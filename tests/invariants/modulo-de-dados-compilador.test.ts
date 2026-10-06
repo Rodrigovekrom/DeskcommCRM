@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 
+import { nomeDaTabela } from "@/lib/modulos/dados/nome";
+
 // O compilador da onda 1 da ADR-0005: um módulo de TERCEIRO declara objetos e campos, e quem
 // escreve o SQL é o banco, lendo o artefato JÁ ADMITIDO (imutável, validado, auditado). Nenhum SQL
 // vem de quem chama — o parâmetro é o id de uma linha de `extension_artifacts`, não DDL. É o que
@@ -309,5 +311,28 @@ describe("módulo de dados: mesclar contatos não deixa a ficha presa no contato
     const depois = (await query(`select paciente_id from public.${tabela} where id = $1`, [ficha]))
       .rows[0];
     expect(depois.paciente_id).toBe(principal);
+  });
+});
+
+describe("módulo de dados: o TypeScript e o SQL calculam o MESMO nome de tabela", () => {
+  // A regra de nome vive em dois lugares por necessidade: o compilador monta o DDL dentro do banco, e
+  // o resolvedor do serviço precisa saber ONDE ler. Duas implementações da mesma regra é dívida — e a
+  // forma de pagá-la é esta: comparar o nome que o TypeScript calcula com a tabela que o banco CRIOU
+  // de verdade. Mudar a regra de um lado só reprova aqui, em vez de virar 404 em produção.
+  it("o nome que o resolvedor calcula é a tabela que o compilador criou", async () => {
+    const criadas = (await compilar(await artefato())).tabelas as string[];
+    const m = manifesto() as unknown as {
+      publisher: string;
+      name: string;
+      data: { objetos: { slug: string }[] };
+    };
+    const esperado = m.data.objetos.map((o) => nomeDaTabela(m.publisher, m.name, o.slug));
+
+    expect(criadas).toEqual(esperado);
+    // E a tabela existe com esse nome — o controle contra os dois lados estarem igualmente errados.
+    for (const nome of esperado) {
+      const reg = (await query("select to_regclass($1) reg", [`public.${nome}`])).rows[0].reg;
+      expect(reg).toBe(nome);
+    }
   });
 });
