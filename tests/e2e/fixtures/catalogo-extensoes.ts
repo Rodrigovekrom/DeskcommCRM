@@ -359,7 +359,7 @@ export async function criarCatalogoDeExtensoes(
     base.name = name;
     base.display.title["pt-BR"] = title;
     base.display.summary["pt-BR"] = `Publicado depois do build ${buildId}.`;
-    const firstCard = base.contributions.crm_cards[0];
+    const firstCard = cardsDeclarados(base)[0];
     if (!firstCard) throw new Error("O exemplo do CLI não contém um card CRM.");
     firstCard.id = cardId;
     firstCard.title["pt-BR"] = cardTitle;
@@ -441,6 +441,18 @@ export async function criarCatalogoDeExtensoes(
       "con.commit()",
       "print(json.dumps({'sha256':hashlib.sha256(mutated).hexdigest(),'byte_length':len(mutated)}))",
     ].join(";");
+
+/**
+ * Os cards de um manifesto DECLARATIVO — que sempre os tem. `crm_cards` virou opcional quando o
+ * perfil `data` entrou (um módulo de dados não contribui card), e as fixturas daqui são todas
+ * declarativas. Um helper que FALHA ALTO é melhor que `?? []`, que transformaria fixture quebrada em
+ * lista vazia e num teste verde sobre nada; e melhor que `!`, que é escape de tipo.
+ */
+function cardsDeclarados(manifesto: { contributions: { crm_cards?: unknown[] } }) {
+  const cards = manifesto.contributions.crm_cards;
+  if (!cards) throw new Error("fixture declarativa sem crm_cards — o perfil mudou?");
+  return cards;
+}
     const adulterado = JSON.parse(
       (
         await executar("python3", ["-c", alterarSqlite, banco, digestAlterado], {
@@ -613,7 +625,7 @@ export async function criarCatalogoDeVersoes(
     base.name = name;
     base.display.title["pt-BR"] = title;
     base.display.summary["pt-BR"] = `Versão 1.0.0 publicada depois do build.`;
-    const primeiro = base.contributions.crm_cards[0];
+    const primeiro = cardsDeclarados(base)[0];
     if (!primeiro) throw new Error("O exemplo do CLI não contém um card CRM.");
     primeiro.id = cardEstavel.id;
     primeiro.title["pt-BR"] = cardEstavel.titulo;
@@ -621,7 +633,7 @@ export async function criarCatalogoDeVersoes(
     const nova = structuredClone(base);
     nova.version = "1.1.0";
     nova.display.summary["pt-BR"] = `Versão 1.1.0 publicada depois do build.`;
-    nova.contributions.crm_cards.push({
+    cardsDeclarados(nova).push({
       ...structuredClone(primeiro),
       id: cardNovo.id,
       title: { "pt-BR": cardNovo.titulo },

@@ -3,7 +3,7 @@ import * as path from "node:path";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import { expect, test } from "./helpers/test";
+import { expect, test, type Page } from "./helpers/test";
 import { credenciaisSupabaseDeTeste } from "../../scripts/lib/env-de-teste";
 
 /**
@@ -38,7 +38,11 @@ const OBJETO = "marcacao";
 const TABELA = `m_${PUBLICADOR}_${MODULO}_${OBJETO}`;
 const ROTULO = "Odontograma";
 
-function lerCreds(): { org_id: string; password: string; users: Record<string, { email: string }> } {
+function lerCreds(): {
+  org_id: string;
+  password: string;
+  users: Record<string, { id?: string; email: string }>;
+} {
   const caminho = path.join(process.cwd(), ".e2e-creds.json");
   return JSON.parse(fs.readFileSync(caminho, "utf8"));
 }
@@ -85,50 +89,91 @@ function manifesto() {
   };
 }
 
-/** Semeia o módulo como se a instalação já tivesse acontecido, e COMPILA pelo caminho real. */
+/**
+ * Instala o módulo pelo caminho REAL do banco: as três RPCs de `fn_extensions_*`, as mesmas que a
+ * rota HTTP de instalação chama.
+ *
+ * A primeira versão desta fixture fazia `insert` direto em `extension_artifacts` — e o banco
+ * recusou, com `permission denied for table extension_artifacts`. Foi a doutrina funcionando contra
+ * o meu atalho: aquelas tabelas são fechadas até para a chave de serviço, e **toda escrita do
+ * framework passa por RPC que revalida ator, organização e papel** (não-negociável 3). O erro foi o
+ * certo; a fixture estava errada.
+ *
+ * O que fica fora, de propósito: a admissão por DOWNLOAD (catálogo HTTP, guarda de SSRF, parser
+ * estrito) é o caminho de `extensoes-declarativas.spec.ts`. Aqui o pacote entra pelo `finish_install`,
+ * que é onde vive a mudança desta onda — ele compila as tabelas na mesma transação do recibo.
+ */
 async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
+  const creds = lerCreds();
+  // A chave do seed é `dono` (scripts/seed-e2e-credentials.ts:84), não `owner`.
+  const dono = creds.users.dono ?? creds.users.admin;
+  if (!dono?.id) throw new Error(".e2e-creds.json sem o id do dono/admin");
+
+  // Administrador da INSTALAÇÃO: é dele a autoridade de instalar (não-negociável 4).
+  await db.from("platform_admins").upsert(
+    {
+      user_id: dono.id,
+      granted_by: dono.id,
+      scope: "full",
+      mfa_required: false,
+      reason: "Fixture E2E do módulo de dados",
+    },
+    { onConflict: "user_id" },
+  );
+
   const m = manifesto();
   const doc = JSON.stringify(m);
-  const sha = await import("node:crypto").then((c) =>
-    c.createHash("sha256").update(doc).digest("hex"),
-  );
+  const { createHash, randomUUID } = await import("node:crypto");
+  const sha = createHash("sha256").update(doc).digest("hex");
 
-  const { data: catalogo } = await db
-    .from("extension_catalogs")
-    .upsert(
-      { origin: `http://127.0.0.1:56999/${PUBLICADOR}`, revision: 1, digest: sha, snapshot: {} },
-      { onConflict: "origin" },
-    )
-    .select("id")
-    .single();
+  const entrada = {
+    publisher: PUBLICADOR,
+    name: MODULO,
+    version: "1.0.0",
+    license: "MIT",
+    host_api: m.host_api,
+    display: m.display,
+    permissions: m.permissions,
+    sha256: sha,
+    byte_length: Buffer.byteLength(doc),
+  };
+  const snapshot = {
+    format_version: 1,
+    origin: `https://modulo-de-dados.e2e.invalid/${PUBLICADOR}`,
+    revision: 1,
+    entries: [entrada],
+  };
 
-  const { data: artefato, error: erroArtefato } = await db
-    .from("extension_artifacts")
-    .upsert(
-      { sha256: sha, byte_length: Buffer.byteLength(doc), manifest: m, document: doc },
-      { onConflict: "sha256" },
-    )
-    .select("id")
-    .single();
-  if (erroArtefato) throw new Error(`artefato: ${erroArtefato.message}`);
-
-  await db.from("extension_installations").upsert(
-    {
-      catalog_id: catalogo!.id,
-      artifact_id: artefato!.id,
-      publisher: PUBLICADOR,
-      name: MODULO,
-      version: "1.0.0",
-      removed_at: null,
-    },
-    { onConflict: "catalog_id,publisher,name" },
-  );
-
-  // O compilador de verdade — a mesma função que a conclusão da instalação chama.
-  const { error: erroCompilar } = await db.rpc("fn_modulo_dados_compilar", {
-    p_artifact_id: artefato!.id,
+  const admissao = await db.rpc("fn_extensions_admit_catalog", {
+    p_actor: dono.id,
+    p_operation: randomUUID(),
+    p_snapshot: snapshot,
+    p_digest: createHash("sha256").update(JSON.stringify(snapshot)).digest("hex"),
   });
-  if (erroCompilar) throw new Error(`compilar: ${erroCompilar.message}`);
+  if (admissao.error) throw new Error(`admitir: ${admissao.error.message}`);
+  const catalogId = (admissao.data as { catalog_id: string }).catalog_id;
+
+  const preparo = await db.rpc("fn_extensions_prepare_install", {
+    p_actor: dono.id,
+    p_operation: randomUUID(),
+    p_catalog: catalogId,
+    p_publisher: PUBLICADOR,
+    p_name: MODULO,
+    p_version: "1.0.0",
+    p_expected_revision: null,
+  });
+  if (preparo.error) throw new Error(`preparar: ${preparo.error.message}`);
+
+  // É ESTA chamada que compila as tabelas do módulo, na mesma transação do recibo.
+  const conclusao = await db.rpc("fn_extensions_finish_install", {
+    p_actor: dono.id,
+    p_operation: (preparo.data as { id: string }).id,
+    p_manifest: m,
+    p_sha256: sha,
+    p_byte_length: Buffer.byteLength(doc),
+    p_document: doc,
+  });
+  if (conclusao.error) throw new Error(`concluir: ${conclusao.error.message}`);
 
   const { data: contato, error: erroContato } = await db
     .from("contacts")
@@ -147,10 +192,10 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
   });
   if (erroFicha) throw new Error(`ficha: ${erroFicha.message}`);
 
-  return { contatoId: contato!.id as string, artefatoId: artefato!.id as string };
+  return { contatoId: contato!.id as string };
 }
 
-async function entrar(page: import("@playwright/test").Page) {
+async function entrar(page: Page) {
   const creds = lerCreds();
   const usuario = creds.users.manager ?? creds.users.admin;
   if (!usuario) throw new Error(".e2e-creds.json sem usuário");
