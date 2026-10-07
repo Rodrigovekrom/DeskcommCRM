@@ -10,6 +10,26 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ExtensionManifest } from "../../../lib/extensions/manifest";
 import { credenciaisSupabaseDeTeste } from "../../../scripts/lib/env-de-teste";
 
+/**
+ * Os cards de um manifesto DECLARATIVO — que sempre os tem. `crm_cards` virou opcional quando o
+ * perfil `data` entrou (um módulo de dados não contribui card), e as fixturas daqui são todas
+ * declarativas. Um helper que FALHA ALTO é melhor que `?? []`, que transformaria fixture quebrada em
+ * lista vazia e num teste verde sobre nada; e melhor que `!`, que é escape de tipo.
+ *
+ * O retorno é TIPADO (`CardsDeclarados`). A primeira versão devolvia `unknown[]`, e aí cada card
+ * virava `{}` — o `tsc` passou a reclamar de `.action`, `.id` e `.title` em vez de reclamar do
+ * opcional. Helper com tipo frouxo troca um erro de tipo por outro.
+ */
+type CardsDeclarados = NonNullable<ExtensionManifest["contributions"]["crm_cards"]>;
+
+function cardsDeclarados(manifesto: {
+  contributions: { crm_cards?: CardsDeclarados };
+}): CardsDeclarados {
+  const cards = manifesto.contributions.crm_cards;
+  if (!cards) throw new Error("fixture declarativa sem crm_cards — o perfil mudou?");
+  return cards;
+}
+
 const executar = promisify(execFile);
 const ORIGEM_CATALOGO = "http://127.0.0.1:56331";
 const CAMINHO_CLI = "experiments/extensoes/catalog/catalog.py";
@@ -442,17 +462,6 @@ export async function criarCatalogoDeExtensoes(
       "print(json.dumps({'sha256':hashlib.sha256(mutated).hexdigest(),'byte_length':len(mutated)}))",
     ].join(";");
 
-/**
- * Os cards de um manifesto DECLARATIVO — que sempre os tem. `crm_cards` virou opcional quando o
- * perfil `data` entrou (um módulo de dados não contribui card), e as fixturas daqui são todas
- * declarativas. Um helper que FALHA ALTO é melhor que `?? []`, que transformaria fixture quebrada em
- * lista vazia e num teste verde sobre nada; e melhor que `!`, que é escape de tipo.
- */
-function cardsDeclarados(manifesto: { contributions: { crm_cards?: unknown[] } }) {
-  const cards = manifesto.contributions.crm_cards;
-  if (!cards) throw new Error("fixture declarativa sem crm_cards — o perfil mudou?");
-  return cards;
-}
     const adulterado = JSON.parse(
       (
         await executar("python3", ["-c", alterarSqlite, banco, digestAlterado], {

@@ -21,12 +21,21 @@ import {
  * perfil `data` entrou (um módulo de dados não contribui card), e as fixturas daqui são todas
  * declarativas. Um helper que FALHA ALTO é melhor que `?? []`, que transformaria fixture quebrada em
  * lista vazia e num teste verde sobre nada; e melhor que `!`, que é escape de tipo.
+ *
+ * O retorno é TIPADO (`CardsDeclarados`). A primeira versão devolvia `unknown[]`, e aí cada card
+ * virava `{}` — o `tsc` passou a reclamar de `.action`, `.id` e `.title` em vez de reclamar do
+ * opcional. Helper com tipo frouxo troca um erro de tipo por outro.
  */
-function cardsDeclarados(manifesto: { contributions: { crm_cards?: unknown[] } }) {
+type CardsDeclarados = NonNullable<ExtensionManifest["contributions"]["crm_cards"]>;
+
+function cardsDeclarados(manifesto: {
+  contributions: { crm_cards?: CardsDeclarados };
+}): CardsDeclarados {
   const cards = manifesto.contributions.crm_cards;
   if (!cards) throw new Error("fixture declarativa sem crm_cards — o perfil mudou?");
   return cards;
 }
+
 
 const encoder = new TextEncoder();
 
