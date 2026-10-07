@@ -681,6 +681,15 @@ revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb
 revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) from authenticated;
 grant execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) to service_role;
 
+-- ⚠️ O PAR ORIGINAL DESTA FUNÇÃO, repetido tal como está no bloco que a criou — e NÃO o par padrão
+-- de função nova. `fn_mesclar_contatos` é chamada pelo USUÁRIO LOGADO (juntar contatos duplicados é
+-- ação de tela), então ela concede a `authenticated` de propósito e consta como exceção declarada em
+-- `tests/invariants/hardening-definer-varredura.test.ts`.
+--
+-- Eu havia colado aqui o rodapé de função nova, que revoga `authenticated`. Medido no CI: três
+-- invariantes vermelhos e `permission denied for function fn_mesclar_contatos` — ou seja, juntar
+-- contatos quebraria para todo mundo. `create or replace` PRESERVA os grants existentes; quem os
+-- destrói é um rodapé escrito por reflexo. Repetir o par original é explícito e não depende da ordem
+-- de aplicação dos blocos.
 revoke execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) from public, anon;
-revoke execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) from authenticated;
-grant execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) to service_role;
+grant execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) to authenticated, service_role;
