@@ -1,11 +1,19 @@
 ---
-impacto: nada_mudou
+impacto: capacidade_nova
 secao: adicionado
-titulo: A base para módulos que trazem dados próprios, declarados em vez de programados
+titulo: Módulos podem guardar informação própria, e ela aparece na ficha do contato
 ---
 
-O servidor passa a saber transformar a **descrição** das informações de um módulo — quais fichas ele guarda e quais campos cada ficha tem — nas tabelas correspondentes do banco, sem que o autor do módulo escreva uma linha de banco de dados. É a primeira peça da plataforma de módulos: ela permite que um módulo de nicho (odontograma de clínica, ficha de imóvel, cardápio) guarde informação de verdade, com as mesmas proteções de isolamento entre empresas que as tabelas do próprio produto têm.
+Começa a plataforma de módulos: um módulo de nicho — odontograma de clínica, ficha de imóvel, cardápio de delivery — pode guardar informação própria no sistema, **declarando** quais fichas guarda e quais campos cada ficha tem. Quem escreve o módulo não escreve banco de dados; o próprio servidor cria as tabelas a partir dessa descrição, com as mesmas proteções de isolamento entre empresas que as tabelas do produto têm.
 
-Duas proteções ficam valendo desde já. As tabelas de módulo nascem **fechadas ao navegador**: nada nelas é alcançável direto, só pelas rotas do sistema, que registram quem fez o quê. E a ligação de uma ficha de módulo com um contato é conferida **junto com a empresa dona do contato**, de modo que um módulo não consegue apontar para o cliente de outra empresa na mesma instalação.
+O que isso muda na tela: a ficha de um contato passa a mostrar o que os módulos instalados guardam sobre aquela pessoa, com os nomes que o autor do módulo escolheu e os valores já formatados. Se nenhum módulo com informação própria estiver instalado, nada muda na tela — e é esse o caso de toda instalação hoje, porque o catálogo oficial ainda não publica nenhum módulo desse tipo.
 
-Nada muda na tela por enquanto: esta versão traz a base, e a instalação de módulos com dados aparece numa próxima. A atualização pode levar alguns segundos a mais uma única vez, porque o banco cria um índice novo na tabela de contatos.
+Três proteções ficam valendo desde já:
+
+- as informações de um módulo não são alcançáveis direto pelo navegador: toda leitura e escrita passa pelas rotas do sistema, que registram quem fez o quê;
+- a ligação de uma ficha de módulo com um contato é conferida **junto com a empresa dona do contato**, de modo que um módulo não consegue apontar para o cliente de outra empresa na mesma instalação;
+- um módulo que falhe, ou que seja desinstalado, não derruba nem esvazia a ficha do contato — o painel dele sai e o resto continua.
+
+Ao juntar dois contatos duplicados, as fichas de módulo passam a acompanhar o contato que ficou, em vez de permanecerem presas ao que saiu da junção.
+
+A atualização pode levar alguns segundos a mais, uma única vez, porque o banco cria um índice novo na tabela de contatos.
