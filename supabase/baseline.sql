@@ -45340,12 +45340,12 @@ grant execute on function public.fn_contato_pessoal_remove_trechos_do_rag(uuid,u
 
 notify pgrst,'reload schema';
 
--- ---- compilador de módulo de dados (migration 0565) ----
--- Espelho exato da migration 20261006160000_0565_modulo_de_dados_compilador.sql.
+-- ---- compilador de módulo de dados (migration 0586) ----
+-- Espelho exato da migration 20261007170000_0586_modulo_de_dados_compilador.sql.
 -- Posição: antes da VARREDURA anon, que é o último bloco do arquivo, e depois de
 -- fn_proteger_modulo_provisionado() e de extension_artifacts.
 
--- 0565 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
+-- 0586 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
 --
 -- Onda 1 da ADR-0005. Um módulo de terceiro declara objetos e campos num artefato JSON; esta função
 -- lê esse artefato — a linha de `extension_artifacts`, que é imutável, validada na admissão e
@@ -45590,7 +45590,7 @@ begin
     or not (p_manifest ?& array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'])
     or p_manifest - array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'] <> '{}'::jsonb
     or exists (select 1 from jsonb_each(p_manifest) e where e.value='null'::jsonb)
-    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0565: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`,
+    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0586: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`,
     -- que o manifesto já reservava para o modo de dados.
     or p_manifest->>'profile' not in ('declarative','data')
     or jsonb_typeof(p_manifest->'configuration') is distinct from 'object'
@@ -45672,7 +45672,7 @@ begin
       version=v_op.version, revision=revision+1 where id=v_install.id returning * into v_install;
     select count(*)::integer into v_active from public.organization_extensions where installation_id=v_install.id and enabled;
   end if;
-  -- 0565 — O EFEITO do perfil `data`, na MESMA transação do recibo: as tabelas declaradas nascem
+  -- 0586 — O EFEITO do perfil `data`, na MESMA transação do recibo: as tabelas declaradas nascem
   -- aqui. Um recibo `completed` com as tabelas faltando deixaria a tela anunciando um módulo que não
   -- guarda nada, e a repetição idempotente não reaplicaria. O compilador recebe o id do artefato que
   -- ESTA conclusão publicou — nunca DDL, nunca nome de tabela de quem chama.
@@ -45816,7 +45816,7 @@ begin
       from pg_catalog.pg_constraint co
       join pg_catalog.pg_class c on c.oid = co.conrelid
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      -- 0565: a POSIÇÃO, dentro da FK, da coluna que referencia `contacts.id`. Era fixa em
+      -- 0586: a POSIÇÃO, dentro da FK, da coluna que referencia `contacts.id`. Era fixa em
       -- `conkey[1]` com `array_length(conkey, 1) = 1`, e por isso FK COMPOSTA ficava FORA do
       -- repontamento — a tabela de um módulo de dados referencia contato por
       -- `(organization_id, <ref>_id) → contacts(organization_id, id)`, porque FK simples não isola
