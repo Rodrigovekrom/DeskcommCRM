@@ -47,7 +47,7 @@ export async function GET(
   let consulta = admin
     .from(alvo.tabela)
     .select("*")
-    .eq("organization_id", autorizado.org.organization_id);
+    .eq("organization_id", autorizado.org.orgId);
 
   // O recorte por contato só existe se o objeto DECLAROU a referência: pedir por contato num objeto
   // que não a tem devolveria a lista inteira da organização, o que seria uma surpresa silenciosa.

@@ -72,7 +72,12 @@ export type ExtensionManifest = {
     category: "productivity" | "sales" | "service";
     icon: "ListChecks" | "BookOpen" | "Lightbulb";
   };
-  configuration: ExtensionConfiguration;
+  /**
+   * A configuração padrão da organização. O perfil de DADOS não tem card para configurar, então
+   * vem vazia — e o tipo diz isso, em vez de o schema aceitar uma forma que o tipo nega. O par
+   * perfil↔forma é amarrado no `superRefine` do schema.
+   */
+  configuration: ExtensionConfiguration | Record<string, never>;
   contributions: {
     crm_cards?: Array<{
       id: string;

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+import type { ActiveOrg } from "@/lib/auth/types";
+
 /**
  * A LEITURA das fichas de um módulo de dados, pelo caminho HTTP.
  *
@@ -39,7 +41,14 @@ function consulta(linhas: unknown[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireRole.mockResolvedValue({ ok: true, org: { organization_id: ORG }, user: { id: "u1" } });
+  // ⚠️ TIPADO de propósito. A primeira versão deste mock devolvia `{ organization_id: ORG }`, um
+  // campo que `ActiveOrg` NÃO tem — o campo é `orgId`. O teste passava, porque o mock inventava a
+  // forma do dado, e a rota filtrava por `undefined`: o isolamento entre organizações teria ido para
+  // produção quebrado, com quatro casos verdes em cima. Quem pegou foi o `tsc` do CI.
+  //
+  // Com a anotação, inventar campo não compila mais.
+  const org: ActiveOrg = { orgId: ORG, role: "viewer" } as ActiveOrg;
+  mocks.requireRole.mockResolvedValue({ ok: true, org, user: { id: "u1" } });
   mocks.tabelaDoObjeto.mockResolvedValue({
     tabela: "m_clinica_odontograma_marcacao",
     campos: [{ slug: "dente", tipo: "inteiro" }],
