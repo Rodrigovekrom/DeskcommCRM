@@ -159,6 +159,14 @@ begin
   -- RLS ligada, isolamento por organização e as travas da sessão de suporte.
   perform public.fn_proteger_modulo_provisionado();
 
+  -- ⚠️ O POSTGREST PRECISA SER AVISADO, e a falta disto era defeito de PRODUÇÃO — achado pelo e2e,
+  -- não por leitura: a tabela nascia no banco e a rota de leitura do host (que fala por PostgREST)
+  -- respondia `Could not find the table '…' in the schema cache` até o cache recarregar sozinho.
+  -- Instalar um módulo e não conseguir ler o que ele guarda é instalar um módulo quebrado.
+  --
+  -- É o mesmo aviso que `fn_modulo_instalar` já dá no caminho de módulo oficial (ADR-0002).
+  perform pg_notify('pgrst', 'reload schema');
+
   return jsonb_build_object('tabelas', to_jsonb(v_criadas));
 end $f$;
 

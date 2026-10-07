@@ -32,11 +32,22 @@ import { credenciaisSupabaseDeTeste } from "../../scripts/lib/env-de-teste";
  */
 
 const ESPERA = 20_000;
-const PUBLICADOR = "clinicae2e";
-const MODULO = "odontograma";
 const OBJETO = "marcacao";
-const TABELA = `m_${PUBLICADOR}_${MODULO}_${OBJETO}`;
 const ROTULO = "Odontograma";
+
+/**
+ * Um publicador POR TESTE. O segundo caso reinstalava o mesmo pacote e versão do primeiro, e
+ * `fn_extensions_prepare_install` recusou com `extension_version_changed` — corretamente: trocar o
+ * conteúdo de uma versão já publicada é adulteração, e a instalação existe para impedir isso.
+ *
+ * Sufixo fixo por teste (não aleatório) para a tabela ser previsível no diagnóstico, e porque o
+ * banco do e2e nasce limpo em cada rodada.
+ */
+function identidade(sufixo: string) {
+  const publicador = `clinicae2e${sufixo}`;
+  const modulo = "odontograma";
+  return { publicador, modulo, tabela: `m_${publicador}_${modulo}_${OBJETO}` };
+}
 
 function lerCreds(): {
   org_id: string;
@@ -52,12 +63,12 @@ function banco(): SupabaseClient {
   return createClient(url, serviceRole, { auth: { persistSession: false } });
 }
 
-function manifesto() {
+function manifesto(id: ReturnType<typeof identidade>) {
   return {
     format_version: 1,
     profile: "data",
-    publisher: PUBLICADOR,
-    name: MODULO,
+    publisher: id.publicador,
+    name: id.modulo,
     version: "1.0.0",
     license: "MIT",
     host_api: { min: 2, max: 2 },
@@ -103,7 +114,7 @@ function manifesto() {
  * estrito) é o caminho de `extensoes-declarativas.spec.ts`. Aqui o pacote entra pelo `finish_install`,
  * que é onde vive a mudança desta onda — ele compila as tabelas na mesma transação do recibo.
  */
-async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
+async function instalarModuloDeDados(db: SupabaseClient, orgId: string, id: ReturnType<typeof identidade>) {
   const creds = lerCreds();
   // A chave do seed é `dono` (scripts/seed-e2e-credentials.ts:84), não `owner`.
   const dono = creds.users.dono ?? creds.users.admin;
@@ -121,14 +132,14 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
     { onConflict: "user_id" },
   );
 
-  const m = manifesto();
+  const m = manifesto(id);
   const doc = JSON.stringify(m);
   const { createHash, randomUUID } = await import("node:crypto");
   const sha = createHash("sha256").update(doc).digest("hex");
 
   const entrada = {
-    publisher: PUBLICADOR,
-    name: MODULO,
+    publisher: id.publicador,
+    name: id.modulo,
     version: "1.0.0",
     license: "MIT",
     host_api: m.host_api,
@@ -142,7 +153,7 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
     // A origem é esquema + HOST, sem caminho: `fn_extensions_admit_catalog` a valida com
     // `^https?://[^/@?#[:space:]]+$`, e uma barra depois do host devolve `extension_invalid_input`.
     // Foi o que reprovou a primeira rodada desta spec no CI.
-    origin: `https://modulo-de-dados-${PUBLICADOR}.e2e.invalid`,
+    origin: `https://modulo-de-dados-${id.publicador}.e2e.invalid`,
     revision: 1,
     entries: [entrada],
   };
@@ -160,8 +171,8 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
     p_actor: dono.id,
     p_operation: randomUUID(),
     p_catalog: catalogId,
-    p_publisher: PUBLICADOR,
-    p_name: MODULO,
+    p_publisher: id.publicador,
+    p_name: id.modulo,
     p_version: "1.0.0",
     // O nome É `p_expected_installation_revision` (confira em `supabase/baseline.sql`): o PostgREST
     // resolve a função pelos NOMES dos parâmetros, então um nome errado não dá "argumento inválido"
@@ -188,7 +199,7 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
     .single();
   if (erroContato) throw new Error(`contato: ${erroContato.message}`);
 
-  const { error: erroFicha } = await db.from(TABELA).insert({
+  const { error: erroFicha } = await db.from(id.tabela).insert({
     organization_id: orgId,
     paciente_id: contato!.id,
     dente: 11,
@@ -219,7 +230,8 @@ test("a ficha do contato mostra o que o módulo de dados guarda, com o rótulo d
   const creds = lerCreds();
   if (!creds.org_id) throw new Error(".e2e-creds.json sem org_id");
   const db = banco();
-  const { contatoId } = await instalarModuloDeDados(db, creds.org_id);
+  const id = identidade("a");
+  const { contatoId } = await instalarModuloDeDados(db, creds.org_id, id);
 
   await entrar(page);
   await page.goto(`/app/contacts/${contatoId}`);
@@ -237,14 +249,15 @@ test("a ficha do contato mostra o que o módulo de dados guarda, com o rótulo d
 test("módulo removido: o painel sai e a ficha do contato segue inteira", async ({ page }) => {
   const creds = lerCreds();
   const db = banco();
-  const { contatoId } = await instalarModuloDeDados(db, creds.org_id);
+  const id = identidade("b");
+  const { contatoId } = await instalarModuloDeDados(db, creds.org_id, id);
 
   // Remover é LÓGICO e preserva dados (não-negociável 7): as tabelas ficam, as telas saem.
   const { error } = await db
     .from("extension_installations")
     .update({ removed_at: new Date().toISOString() })
-    .eq("publisher", PUBLICADOR)
-    .eq("name", MODULO);
+    .eq("publisher", id.publicador)
+    .eq("name", id.modulo);
   if (error) throw new Error(`remover: ${error.message}`);
 
   await entrar(page);
@@ -259,7 +272,7 @@ test("módulo removido: o painel sai e a ficha do contato segue inteira", async 
 
   // E o dado NÃO foi apagado: remover é lógico.
   const { count } = await db
-    .from(TABELA)
+    .from(id.tabela)
     .select("id", { count: "exact", head: true })
     .eq("organization_id", creds.org_id);
   expect(count ?? 0).toBeGreaterThan(0);
