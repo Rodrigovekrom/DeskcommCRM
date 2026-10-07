@@ -163,7 +163,10 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
     p_publisher: PUBLICADOR,
     p_name: MODULO,
     p_version: "1.0.0",
-    p_expected_revision: null,
+    // O nome É `p_expected_installation_revision` (confira em `supabase/baseline.sql`): o PostgREST
+    // resolve a função pelos NOMES dos parâmetros, então um nome errado não dá "argumento inválido"
+    // — dá "Could not find the function ... in the schema cache", que soa como função ausente.
+    p_expected_installation_revision: null,
   });
   if (preparo.error) throw new Error(`preparar: ${preparo.error.message}`);
 
