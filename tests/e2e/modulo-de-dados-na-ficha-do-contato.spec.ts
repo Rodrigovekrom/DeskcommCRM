@@ -139,7 +139,10 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string) {
   };
   const snapshot = {
     format_version: 1,
-    origin: `https://modulo-de-dados.e2e.invalid/${PUBLICADOR}`,
+    // A origem é esquema + HOST, sem caminho: `fn_extensions_admit_catalog` a valida com
+    // `^https?://[^/@?#[:space:]]+$`, e uma barra depois do host devolve `extension_invalid_input`.
+    // Foi o que reprovou a primeira rodada desta spec no CI.
+    origin: `https://modulo-de-dados-${PUBLICADOR}.e2e.invalid`,
     revision: 1,
     entries: [entrada],
   };
