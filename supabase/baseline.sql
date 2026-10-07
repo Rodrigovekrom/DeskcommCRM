@@ -10166,6 +10166,13 @@ alter table public.agent_inbox_items
     -- lista pelas razões de sempre (#159; a janela do `midia-nao-lida.test.ts`).
     'jev_pedido_de_humano',
     'jev_parar_de_receber',
+    -- (migration 0589, issue #2389) A pausa de uma conexão era silenciosa para
+    -- todo mundo menos para quem clicou. O audit registrava `channel.disabled`
+    -- / `channel.enabled`, mas audit é histórico para quem procura, não
+    -- comunicação — a Central é onde a operação inteira olha. O item nasce na
+    -- pausa e se resolve sozinho na retomada ou no arquivamento, com o motivo
+    -- no corpo (laço do canal-mudo-watcher, só que instantâneo).
+    'canal_pausado',
     'other'
   ));
 
@@ -45765,11 +45772,110 @@ grant  execute on function public.emit_event(text, text, uuid, jsonb, jsonb, uui
 
 notify pgrst, 'reload schema';
 
--- ---- compilador de módulo de dados (migration 0588) ----
--- Espelho exato da migration 20261007180000_0588_modulo_de_dados_compilador.sql.
+-- ---- relatório por canal: volume, 1ª resposta humana e vazamento (migration 0590) ----
+-- (issue #2390) Mesmo texto da migration, aplicado pelo kit self-host — o apêndice
+-- entra ANTES da VARREDURA anon de propósito: ele cria função.
+create or replace function public.fn_channel_metrics(
+  p_org uuid,
+  p_from timestamptz,
+  p_to timestamptz,
+  p_owner uuid default null
+) returns jsonb
+language sql stable
+set search_path = public
+as $$
+  with
+  -- Conversas da organização na régua de ATRIBUIÇÃO da irmã (0037 §6.5).
+  -- Sem janela AQUI de propósito: cada medida corta na SUA coluna — contagem e
+  -- vazamento em `assigned_at`, 1ª resposta em `first_human_out`. É o mesmo
+  -- desenho da irmã, cujo `ttfr` também não filtra `assigned_at`.
+  conversas as (
+    select
+      c.channel_session_id as channel_session_id,
+      c.channel as channel,
+      c.assigned_at as assigned_at,
+      fr.first_in,
+      fr.first_human_out
+    from public.conversations c
+    cross join lateral (
+      select
+        min(m.sent_at) filter (where m.direction = 'inbound') as first_in,
+        min(m.sent_at) filter (
+          where m.direction = 'outbound' and m.sent_by_user_id is not null
+        ) as first_human_out
+      from public.messages m
+      where m.conversation_id = c.id
+    ) fr
+    where c.organization_id = p_org
+      and c.channel_session_id is not null
+      and c.assigned_to_user_id is not null
+      and (p_owner is null or c.assigned_to_user_id = p_owner)
+  ),
+  -- Uma linha por canal: volume, 1ª resposta humana e vazamento no MESMO
+  -- `group by`, para a soma nunca divergir da média.
+  canais as (
+    select
+      c.channel_session_id,
+      -- O tipo é constante por sessão (0027/0368): `max()` agrupa uma coluna
+      -- funcionalmente dependente, não inventa valor.
+      max(c.channel) as channel,
+      -- Critério 1: volume por canal, janela semiaberta em `assigned_at`.
+      count(*) filter (
+        where c.assigned_at >= p_from and c.assigned_at < p_to
+      ) as conversations_handled,
+      -- Critério 3: o vazamento — conversa da janela que NUNCA teve 1ª resposta
+      -- humana. Conta aqui e só aqui; nunca mexe na média.
+      count(*) filter (
+        where c.assigned_at >= p_from and c.assigned_at < p_to
+          and c.first_human_out is null
+      ) as sem_resposta,
+      -- Critérios 2 e 4: a MESMA fórmula da irmã — bot fora e `t1 <= t0`
+      -- descartado. Sem par válido a média fica `null` (não medida), nunca 0.
+      avg(extract(epoch from (c.first_human_out - c.first_in))) filter (
+        where c.first_in is not null
+          and c.first_human_out is not null
+          and c.first_human_out > c.first_in
+          and c.first_human_out >= p_from and c.first_human_out < p_to
+      ) as avg_first_response_seconds
+    from conversas c
+    group by c.channel_session_id
+  )
+  select jsonb_build_object(
+    'channels', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'channel_session_id', k.channel_session_id,
+          'channel_name', coalesce(cs.phone_number, cs.display_name, cs.waha_session_name),
+          'channel', k.channel,
+          'is_archived', (cs.archived_at is not null),
+          'conversations_handled', k.conversations_handled,
+          'avg_first_response_seconds', k.avg_first_response_seconds,
+          'sem_resposta', k.sem_resposta
+        ) order by k.conversations_handled desc, k.channel_session_id
+      )
+      from canais k
+      left join public.channel_sessions cs on cs.id = k.channel_session_id
+      -- Critério 5: canal sem atividade na janela não é linha, é ruído — a
+      -- resposta sem dado é `[]` e a tela diz "Sem atividade no período".
+      where k.conversations_handled > 0
+         or k.sem_resposta > 0
+         or k.avg_first_response_seconds is not null
+    ), '[]'::jsonb)
+  );
+$$;
+
+revoke all on function public.fn_channel_metrics(uuid, timestamptz, timestamptz, uuid) from public;
+revoke execute on function public.fn_channel_metrics(uuid, timestamptz, timestamptz, uuid) from anon;
+grant execute on function public.fn_channel_metrics(uuid, timestamptz, timestamptz, uuid)
+  to authenticated, service_role;
+
+notify pgrst, 'reload schema';
+
+-- ---- compilador de módulo de dados (migration 0591) ----
+-- Espelho exato da migration 20261007200000_0591_modulo_de_dados_compilador.sql.
 -- Antes da VARREDURA anon, que é o último bloco do arquivo de propósito.
 
--- 0588 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
+-- 0591 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
 --
 -- Onda 1 da ADR-0005. Um módulo de terceiro declara objetos e campos num artefato JSON; esta função
 -- lê esse artefato — a linha de `extension_artifacts`, que é imutável, validada na admissão e
@@ -46014,18 +46120,14 @@ begin
     or not (p_manifest ?& array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'])
     or p_manifest - array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'] <> '{}'::jsonb
     or exists (select 1 from jsonb_each(p_manifest) e where e.value='null'::jsonb)
-    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0588: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`,
-    -- que o manifesto já reservava para o modo de dados.
+    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0591: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`.
     or p_manifest->>'profile' not in ('declarative','data')
     or jsonb_typeof(p_manifest->'configuration') is distinct from 'object'
     or jsonb_typeof(p_manifest->'contributions') is distinct from 'object'
     or p_manifest->>'publisher' is distinct from v_op.publisher or p_manifest->>'name' is distinct from v_op.name
     or p_manifest->>'version' is distinct from v_op.version
     or p_manifest->'dependencies' <> '[]'::jsonb
-    -- Quem NÃO declara dados não ganha folga: segue exigido `{"mode":"none"}` exato.
     or (p_manifest->>'profile' = 'declarative' and p_manifest->'data' <> '{"mode":"none"}'::jsonb)
-    -- Quem declara: `mode` fixo e lista de objetos não vazia. O conteúdo de cada objeto é conferido
-    -- pelo compilador, que é quem conhece o vocabulário de tipos.
     or (p_manifest->>'profile' = 'data' and (
          p_manifest->'data'->>'mode' is distinct from 'declarado'
          or jsonb_typeof(p_manifest->'data'->'objetos') is distinct from 'array'
@@ -46096,9 +46198,7 @@ begin
       version=v_op.version, revision=revision+1 where id=v_install.id returning * into v_install;
     select count(*)::integer into v_active from public.organization_extensions where installation_id=v_install.id and enabled;
   end if;
-  -- 0588 — O EFEITO do perfil `data`, na MESMA transação do recibo: as tabelas declaradas nascem
-  -- aqui. Um recibo `completed` com as tabelas faltando deixaria a tela anunciando um módulo que não
-  -- guarda nada, e a repetição idempotente não reaplicaria.
+  -- 0591 — O EFEITO do perfil `data`, na MESMA transação do recibo.
   if p_manifest->>'profile' = 'data' then
     perform public.fn_modulo_dados_compilar(v_artifact.id);
   end if;
@@ -46239,15 +46339,9 @@ begin
       from pg_catalog.pg_constraint co
       join pg_catalog.pg_class c on c.oid = co.conrelid
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      -- 0588: a POSIÇÃO, dentro da FK, da coluna que referencia `contacts.id`. Era fixa em
-      -- `conkey[1]` com `array_length(conkey, 1) = 1`, e FK COMPOSTA ficava FORA do repontamento —
-      -- a tabela de um módulo de dados referencia contato por
-      -- `(organization_id, <ref>_id) → contacts(organization_id, id)`, porque FK simples não isola
-      -- tenant (a checagem de FK não passa por RLS). Medido: a ficha do módulo continuava apontando
-      -- para o contato que SAIU da fusão.
-      --
-      -- `left join lateral`, e NÃO subquery escalar no `ON`: medido, a escalar devolvia NULL para
-      -- TODAS as constraints e o laço inteiro ficava vazio, em silêncio.
+      -- 0591: a POSIÇÃO da coluna que referencia `contacts.id`. FK COMPOSTA ficava fora do
+      -- repontamento, e a ficha do módulo continuava apontando para o contato que SAIU da fusão.
+      -- `left join lateral`, não subquery escalar no `ON`: a escalar zerava o laço inteiro.
       left join lateral (
         select k.ord
           from pg_catalog.unnest(co.confkey) with ordinality as k(attnum, ord)
@@ -46452,16 +46546,9 @@ revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb
 revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) from authenticated;
 grant execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) to service_role;
 
--- ⚠️ O PAR ORIGINAL DESTA FUNÇÃO, repetido tal como está no bloco que a criou — e NÃO o par padrão
--- de função nova. `fn_mesclar_contatos` é chamada pelo USUÁRIO LOGADO (juntar contatos duplicados é
--- ação de tela), então ela concede a `authenticated` de propósito e consta como exceção declarada em
--- `tests/invariants/hardening-definer-varredura.test.ts`.
---
--- Eu havia colado aqui o rodapé de função nova, que revoga `authenticated`. Medido no CI: três
--- invariantes vermelhos e `permission denied for function fn_mesclar_contatos` — ou seja, juntar
--- contatos quebraria para todo mundo. `create or replace` PRESERVA os grants existentes; quem os
--- destrói é um rodapé escrito por reflexo. Repetir o par original é explícito e não depende da ordem
--- de aplicação dos blocos.
+-- O par ORIGINAL de `fn_mesclar_contatos`: ela é chamada pelo USUÁRIO LOGADO (juntar contatos é ação
+-- de tela) e consta como exceção declarada em `hardening-definer-varredura`. O rodapé de função nova
+-- revogaria `authenticated` e quebraria a junção para todo mundo — já aconteceu nesta frente.
 revoke execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) from public, anon;
 grant execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) to authenticated, service_role;
 
@@ -48558,3 +48645,86 @@ where l.id = repetidas.id
 create unique index if not exists uniq_comanda_do_ganho_por_negocio
   on public.crm_lead_links (organization_id, lead_id)
   where link_kind = 'comanda_no_ganho';
+
+
+
+-- ---- índices do caminho quente e da poda (migration 0585) ----
+--
+-- Cinco buscas rodavam sem índice que as servisse, e todas crescem com o uso:
+--
+-- 1. `send_ledger` por contato. "1º outbound" (`countPriorAcceptedSends`,
+--    disclosure e LGPD) conta envios `accepted` do contato DENTRO da transação
+--    que segura o lock do número; `ultimaInboundJaRespondida` procura envio
+--    `accepted`/`queued` do mesmo contato a cada turno. Nenhum índice começava
+--    por contato (o de busca é (organization_id, created_at)). O predicado
+--    cobre os dois status porque `status = 'accepted'` implica
+--    `status in ('accepted','queued')`: um índice serve as duas consultas.
+--    Custo aceito: `status` entra no predicado, então a troca de status de um
+--    envio deixa de ser HOT update — uma escrita a mais por envio, contra uma
+--    varredura por contato a cada turno.
+-- 2. `llm_calls.job_id`. `recordRunMetrics` soma as chamadas do run por job_id,
+--    e o `on delete set null` vindo de `job_queue` faz a poda diária
+--    (`fn_podar_fila_de_jobs`, até 1000 jobs por chamada) varrer a tabela uma vez
+--    por job apagado.
+-- 3/4. `lead_checkpoints.job_id` e `lead_state_transitions.job_id`: o mesmo
+--    `on delete set null`, a mesma varredura por job apagado.
+-- 5. `event_log` em `processing`. Dois polls fixos procuram eventos presos: o
+--    reaper do drain do agente (a cada tick, por event_type) e o do dreno geral
+--    (só status + updated_at). Os índices parciais existentes são de `pending`
+--    e `dead`. A chave é `event_type`, e NÃO `updated_at`: o trigger
+--    `trg_event_log_touch` reescreve updated_at em todo update, e indexá-lo tiraria
+--    o HOT update de toda escrita na tabela. `processing` é transitório, então o
+--    índice fica pequeno e o filtro de updated_at roda sobre poucas linhas.
+--
+-- Sem CONCURRENTLY, como no resto deste arquivo: um build concorrente que falha
+-- deixa o índice INVÁLIDO de pé, e o `if not exists` do update seguinte o pula
+-- para sempre. O update trava escrita nessas tabelas pelo tempo de construir
+-- cada índice.
+-- Sem função nova (nada a revogar de anon).
+
+create index if not exists idx_send_ledger_contato_entregue
+  on public.send_ledger (organization_id, contact_id)
+  where status in ('accepted', 'queued');
+
+create index if not exists idx_llm_calls_job_id
+  on public.llm_calls (job_id)
+  where job_id is not null;
+
+create index if not exists idx_lead_checkpoints_job_id
+  on public.lead_checkpoints (job_id)
+  where job_id is not null;
+
+create index if not exists idx_lead_state_transitions_job_id
+  on public.lead_state_transitions (job_id)
+  where job_id is not null;
+
+create index if not exists event_log_processing_por_tipo_idx
+  on public.event_log (event_type)
+  where status = 'processing';
+
+-- ---- dedupe do aviso de canal pausado: índice único parcial (migration 0589) ----
+-- Um canal pausado = um aviso aberto, garantido pelo banco: duas pausas
+-- simultâneas leriam "nenhum aberto" e inseririam dois. O segundo INSERT
+-- recebe 23505 e `lib/channels/central-de-pausa.ts` o trata como "a outra
+-- rodada já abriu". O kind entrou no bloco ÚNICO de
+-- `agent_inbox_items_kind_check`; cabeçalho da 0589 para o racional inteiro.
+with repetidas as (
+  select id,
+         row_number() over (
+           partition by organization_id, kind, ref_id
+           order by created_at asc, id asc
+         ) as ordem
+    from public.agent_inbox_items
+   where status = 'open'
+     and kind = 'canal_pausado'
+)
+update public.agent_inbox_items i
+   set status = 'resolved',
+       resolved_at = now()
+  from repetidas r
+ where i.id = r.id
+   and r.ordem > 1;
+
+create unique index if not exists agent_inbox_canal_pausado_aberto_unico
+  on public.agent_inbox_items (organization_id, kind, ref_id)
+  where status = 'open' and kind = 'canal_pausado';

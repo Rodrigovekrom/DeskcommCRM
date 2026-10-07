@@ -1,4 +1,4 @@
--- 0588 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
+-- 0591 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
 --
 -- Onda 1 da ADR-0005. Um módulo de terceiro declara objetos e campos num artefato JSON; esta função
 -- lê esse artefato — a linha de `extension_artifacts`, que é imutável, validada na admissão e
@@ -243,18 +243,14 @@ begin
     or not (p_manifest ?& array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'])
     or p_manifest - array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'] <> '{}'::jsonb
     or exists (select 1 from jsonb_each(p_manifest) e where e.value='null'::jsonb)
-    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0588: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`,
-    -- que o manifesto já reservava para o modo de dados.
+    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0591: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`.
     or p_manifest->>'profile' not in ('declarative','data')
     or jsonb_typeof(p_manifest->'configuration') is distinct from 'object'
     or jsonb_typeof(p_manifest->'contributions') is distinct from 'object'
     or p_manifest->>'publisher' is distinct from v_op.publisher or p_manifest->>'name' is distinct from v_op.name
     or p_manifest->>'version' is distinct from v_op.version
     or p_manifest->'dependencies' <> '[]'::jsonb
-    -- Quem NÃO declara dados não ganha folga: segue exigido `{"mode":"none"}` exato.
     or (p_manifest->>'profile' = 'declarative' and p_manifest->'data' <> '{"mode":"none"}'::jsonb)
-    -- Quem declara: `mode` fixo e lista de objetos não vazia. O conteúdo de cada objeto é conferido
-    -- pelo compilador, que é quem conhece o vocabulário de tipos.
     or (p_manifest->>'profile' = 'data' and (
          p_manifest->'data'->>'mode' is distinct from 'declarado'
          or jsonb_typeof(p_manifest->'data'->'objetos') is distinct from 'array'
@@ -325,9 +321,7 @@ begin
       version=v_op.version, revision=revision+1 where id=v_install.id returning * into v_install;
     select count(*)::integer into v_active from public.organization_extensions where installation_id=v_install.id and enabled;
   end if;
-  -- 0588 — O EFEITO do perfil `data`, na MESMA transação do recibo: as tabelas declaradas nascem
-  -- aqui. Um recibo `completed` com as tabelas faltando deixaria a tela anunciando um módulo que não
-  -- guarda nada, e a repetição idempotente não reaplicaria.
+  -- 0591 — O EFEITO do perfil `data`, na MESMA transação do recibo.
   if p_manifest->>'profile' = 'data' then
     perform public.fn_modulo_dados_compilar(v_artifact.id);
   end if;
@@ -468,15 +462,9 @@ begin
       from pg_catalog.pg_constraint co
       join pg_catalog.pg_class c on c.oid = co.conrelid
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      -- 0588: a POSIÇÃO, dentro da FK, da coluna que referencia `contacts.id`. Era fixa em
-      -- `conkey[1]` com `array_length(conkey, 1) = 1`, e FK COMPOSTA ficava FORA do repontamento —
-      -- a tabela de um módulo de dados referencia contato por
-      -- `(organization_id, <ref>_id) → contacts(organization_id, id)`, porque FK simples não isola
-      -- tenant (a checagem de FK não passa por RLS). Medido: a ficha do módulo continuava apontando
-      -- para o contato que SAIU da fusão.
-      --
-      -- `left join lateral`, e NÃO subquery escalar no `ON`: medido, a escalar devolvia NULL para
-      -- TODAS as constraints e o laço inteiro ficava vazio, em silêncio.
+      -- 0591: a POSIÇÃO da coluna que referencia `contacts.id`. FK COMPOSTA ficava fora do
+      -- repontamento, e a ficha do módulo continuava apontando para o contato que SAIU da fusão.
+      -- `left join lateral`, não subquery escalar no `ON`: a escalar zerava o laço inteiro.
       left join lateral (
         select k.ord
           from pg_catalog.unnest(co.confkey) with ordinality as k(attnum, ord)
@@ -681,15 +669,8 @@ revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb
 revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) from authenticated;
 grant execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) to service_role;
 
--- ⚠️ O PAR ORIGINAL DESTA FUNÇÃO, repetido tal como está no bloco que a criou — e NÃO o par padrão
--- de função nova. `fn_mesclar_contatos` é chamada pelo USUÁRIO LOGADO (juntar contatos duplicados é
--- ação de tela), então ela concede a `authenticated` de propósito e consta como exceção declarada em
--- `tests/invariants/hardening-definer-varredura.test.ts`.
---
--- Eu havia colado aqui o rodapé de função nova, que revoga `authenticated`. Medido no CI: três
--- invariantes vermelhos e `permission denied for function fn_mesclar_contatos` — ou seja, juntar
--- contatos quebraria para todo mundo. `create or replace` PRESERVA os grants existentes; quem os
--- destrói é um rodapé escrito por reflexo. Repetir o par original é explícito e não depende da ordem
--- de aplicação dos blocos.
+-- O par ORIGINAL de `fn_mesclar_contatos`: ela é chamada pelo USUÁRIO LOGADO (juntar contatos é ação
+-- de tela) e consta como exceção declarada em `hardening-definer-varredura`. O rodapé de função nova
+-- revogaria `authenticated` e quebraria a junção para todo mundo — já aconteceu nesta frente.
 revoke execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) from public, anon;
 grant execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) to authenticated, service_role;
