@@ -525,6 +525,21 @@ function validateSnapshotStructure(root: unknown) {
   }
 }
 
+/**
+ * O manifesto tem configuração de CARD, ou veio vazio (perfil de dados)?
+ *
+ * Existe como type guard, e não como `"density" in configuration` no ponto de uso, porque
+ * `Record<string, never>` tem índice genérico: o `in` casa com qualquer chave e o TypeScript NÃO
+ * estreita a união. O primeiro conserto que eu tentei fazia exatamente isso e o `tsc` continuou
+ * reprovando — com a mensagem igual, no mesmo lugar, o que é a assinatura de conserto que não tocou
+ * a causa.
+ */
+export function temConfiguracaoDeCard(
+  configuration: ExtensionManifest["configuration"],
+): configuration is ExtensionConfiguration {
+  return "density" in configuration && typeof configuration.density === "string";
+}
+
 export function parseManifest(bytes: Uint8Array): ExtensionManifest {
   return parseWithSchema(bytes, EXTENSION_LIMITS.packageBytes, manifestSchema);
 }

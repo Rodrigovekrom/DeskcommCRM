@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { ExtensionError, type ExtensionErrorCode } from "./errors";
 import {
   checkCompatibility,
+  temConfiguracaoDeCard,
   parseManifest,
   type CatalogEntry,
   type ExtensionConfiguration,
@@ -156,7 +157,7 @@ export function montarInstalada({
     // receberia `{}` e leria `density`/`show_description` como `undefined`.
     configuration:
       binding?.configuration ??
-      ("density" in leitura.manifest.configuration
+      (temConfiguracaoDeCard(leitura.manifest.configuration)
         ? leitura.manifest.configuration
         : { density: "comfortable", show_description: true }),
     compatible: compatibility.compatible,
