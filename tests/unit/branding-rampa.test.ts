@@ -65,7 +65,7 @@ const distanciaPorCanal = (a: string, b: string): number => {
 
 describe("conversões de cor", () => {
   it("faz ida-e-volta hex → OKLab → hex sem perder mais que 1/255", () => {
-    for (const hex of ["#506d48", "#f5c518", "#0f172a", "#ffffff", "#000000", "#7c3aed"]) {
+    for (const hex of ["#2a4a73", "#f5c518", "#0f172a", "#ffffff", "#000000", "#7c3aed"]) {
       const volta = linearParaHex(oklabParaLinear(hexParaOklab(hex)));
       expect(distanciaPorCanal(hex, volta), `${hex} → ${volta}`).toBeLessThanOrEqual(1);
     }
@@ -110,11 +110,11 @@ describe("rampaDeSemente — catraca de calibração contra o design system", ()
     // por não ter o que comparar — instrumento morto tem cara de teste verde.
     expect(esperados).toHaveLength(11);
     expect(new Set(esperados).size).toBe(11);
-    expect(esperados[K]).toBe("#506d48");
+    expect(esperados[K]).toBe("#2a4a73");
   });
 
-  it("reproduz os 11 stops Sage a partir de #506d48 com Δ ≤ 2/255 por canal", () => {
-    const derivada = rampaDeSemente("#506d48");
+  it("reproduz os 11 stops Sage a partir de #2a4a73 com Δ ≤ 2/255 por canal", () => {
+    const derivada = rampaDeSemente("#2a4a73");
     const distancias = esperados.map((esperado, i) => distanciaPorCanal(esperado, derivada[i]!));
     expect(
       Math.max(...distancias),
@@ -124,8 +124,8 @@ describe("rampaDeSemente — catraca de calibração contra o design system", ()
 
   it("devolve o hex LITERAL no stop da semente", () => {
     // Ida-e-volta por OKLab erra ±1/255. Mostrar `#516d49` no seletor de cor enquanto a
-    // UI pinta `#506d48` custa mais confiança do que o pixel vale.
-    for (const semente of ["#506d48", "#f5c518", "#0f172a", "#e11d48"]) {
+    // UI pinta `#2a4a73` custa mais confiança do que o pixel vale.
+    for (const semente of ["#2a4a73", "#f5c518", "#0f172a", "#e11d48"]) {
       expect(rampaDeSemente(semente)[K]).toBe(semente);
     }
   });
