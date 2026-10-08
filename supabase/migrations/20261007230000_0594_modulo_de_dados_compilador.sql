@@ -1,4 +1,4 @@
--- 0591 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
+-- 0594 — O compilador de módulo de dados: quem escreve o SQL é o BANCO, lendo o artefato admitido.
 --
 -- Onda 1 da ADR-0005. Um módulo de terceiro declara objetos e campos num artefato JSON; esta função
 -- lê esse artefato — a linha de `extension_artifacts`, que é imutável, validada na admissão e
@@ -263,7 +263,7 @@ begin
     or not (p_manifest ?& array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'])
     or p_manifest - array['format_version','profile','publisher','name','version','license','host_api','permissions','dependencies','data','display','configuration','contributions'] <> '{}'::jsonb
     or exists (select 1 from jsonb_each(p_manifest) e where e.value='null'::jsonb)
-    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0591: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`.
+    or p_manifest->'format_version' is distinct from '1'::jsonb -- 0594: dois perfis. `declarative` segue igual; `data` declara objetos na chave `data`.
     or p_manifest->>'profile' not in ('declarative','data')
     or jsonb_typeof(p_manifest->'configuration') is distinct from 'object'
     or jsonb_typeof(p_manifest->'contributions') is distinct from 'object'
@@ -341,7 +341,7 @@ begin
       version=v_op.version, revision=revision+1 where id=v_install.id returning * into v_install;
     select count(*)::integer into v_active from public.organization_extensions where installation_id=v_install.id and enabled;
   end if;
-  -- 0591 — O EFEITO do perfil `data`, na MESMA transação do recibo.
+  -- 0594 — O EFEITO do perfil `data`, na MESMA transação do recibo.
   if p_manifest->>'profile' = 'data' then
     perform public.fn_modulo_dados_compilar(v_artifact.id);
   end if;
@@ -482,7 +482,7 @@ begin
       from pg_catalog.pg_constraint co
       join pg_catalog.pg_class c on c.oid = co.conrelid
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      -- 0591: a POSIÇÃO da coluna que referencia `contacts.id`. FK COMPOSTA ficava fora do
+      -- 0594: a POSIÇÃO da coluna que referencia `contacts.id`. FK COMPOSTA ficava fora do
       -- repontamento, e a ficha do módulo continuava apontando para o contato que SAIU da fusão.
       -- `left join lateral`, não subquery escalar no `ON`: a escalar zerava o laço inteiro.
       left join lateral (
@@ -689,8 +689,8 @@ revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb
 revoke execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) from authenticated;
 grant execute on function public.fn_extensions_finish_install(uuid, uuid, jsonb, text, integer, text) to service_role;
 
--- O par ORIGINAL de `fn_mesclar_contatos`: ela é chamada pelo USUÁRIO LOGADO (juntar contatos é ação
--- de tela) e consta como exceção declarada em `hardening-definer-varredura`. O rodapé de função nova
--- revogaria `authenticated` e quebraria a junção para todo mundo — já aconteceu nesta frente.
+-- O par ORIGINAL de `fn_mesclar_contatos`: ela é chamada pelo USUÁRIO LOGADO e consta como exceção
+-- declarada em `hardening-definer-varredura`. O rodapé de função nova revogaria `authenticated` e
+-- quebraria a junção de contatos para todo mundo — já aconteceu nesta frente.
 revoke execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) from public, anon;
 grant execute on function public.fn_mesclar_contatos(uuid, uuid, uuid[]) to authenticated, service_role;
