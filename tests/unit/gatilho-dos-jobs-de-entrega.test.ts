@@ -64,6 +64,19 @@ const DIR = join(process.cwd(), ".github/workflows");
  * que desliga um job de entrega fica visível em code review.
  */
 const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string }> = {
+  // --- fork ia.vek: a imagem do app com a identidade da marca ------------------
+  "iavek-imagem.yml::verificar": {
+    condicao: null,
+    efeito:
+      "Gate da imagem ia.vek: typecheck e test:unit antes de publicar. Desligá-lo publica " +
+      "imagem sem prova nenhuma.",
+  },
+  "iavek-imagem.yml::imagem": {
+    condicao: null,
+    efeito:
+      "Publica a imagem do app ia.vek no GHCR — é o APP_IMAGE da VPS. Desligá-lo faz o " +
+      "commit existir sem imagem por trás dele.",
+  },
   // --- a cadeia que leva o conserto até a VPS ---------------------------------
   "release.yml::abrir-pr-de-release": {
     condicao: "github.event_name == 'workflow_dispatch'",
