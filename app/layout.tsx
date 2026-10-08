@@ -30,30 +30,31 @@ import "./globals.css";
 
 // Fontes versionadas em app/fonts/ (origem e licença no README de lá): o
 // next/font/google as baixava durante o build, e o build caía quando o Google
-// não respondia. A família passa a se chamar como a variável JS ("atkinson"),
-// então use sempre a custom property (--font-atkinson), nunca o nome da fonte.
-const atkinson = localFont({
-  src: [
-    {
-      path: "./fonts/atkinson-hyperlegible-400-latin-latin-ext.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "./fonts/atkinson-hyperlegible-700-latin-latin-ext.woff2",
-      weight: "700",
-      style: "normal",
-    },
-  ],
+// não respondia. A família passa a se chamar como a variável JS, então use
+// sempre a custom property (--font-ui, --font-wordmark, --font-mono), nunca o
+// nome da fonte.
+// Identidade ia.vek: Plus Jakarta Sans no texto, Archivo largo no wordmark e
+// JetBrains Mono nos números.
+const uiSans = localFont({
+  src: "./fonts/plus-jakarta-sans-200-800-latin.woff2",
+  weight: "200 800",
+  style: "normal",
   display: "swap",
-  variable: "--font-atkinson",
+  variable: "--font-ui",
 });
 
-const plexMono = localFont({
-  src: [
-    { path: "./fonts/ibm-plex-mono-400-latin-latin-ext.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/ibm-plex-mono-500-latin-latin-ext.woff2", weight: "500", style: "normal" },
-  ],
+const wordmark = localFont({
+  src: "./fonts/archivo-62-125-latin.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
+  variable: "--font-wordmark",
+});
+
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-100-800-latin.woff2",
+  weight: "100 800",
+  style: "normal",
   display: "swap",
   variable: "--font-mono",
 });
@@ -327,7 +328,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       lang="pt-BR"
       data-theme="light"
       suppressHydrationWarning
-      className={`${atkinson.variable} ${plexMono.variable}`}
+      className={`${uiSans.variable} ${wordmark.variable} ${jetbrainsMono.variable}`}
     >
       <head>
         {/* Primeiro de tudo: a cor da instalação, antes do CSS e do script de tema. */}

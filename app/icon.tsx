@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 import { marcaEhADoProduto } from "@/lib/branding";
-import { CORES_DA_MARCA, SIMBOLO } from "@/lib/branding/desenho";
+import { CORES_DA_MARCA, SIMBOLO_PEQUENO } from "@/lib/branding/desenho";
 import { letraDoIcone } from "@/lib/branding/icone";
 import { marcaDaSaida, NEUTROS_DE_SAIDA } from "@/lib/branding/saida";
 
@@ -79,37 +79,9 @@ export default async function Icon() {
   const marca = await marcaDaSaida(null);
 
   if (marcaEhADoProduto({ name: marca.nome, logoUrl: marca.logoUrl })) {
-    // 78% da aresta: o D ocupa ~75% do próprio viewBox, então sobra o mesmo
-    // respiro que a letra tem no ramo de baixo.
+    // 78% da aresta: o símbolo pequeno já traz respiro no próprio viewBox.
     const lado = Math.round(size.width * 0.78);
     return new ImageResponse(
-      (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: NEUTROS_DE_SAIDA.fundo,
-          }}
-        >
-          <svg viewBox={SIMBOLO.viewBox} width={lado} height={lado}>
-            <g fill={CORES_DA_MARCA.claro.simbolo} transform={SIMBOLO.transform}>
-              <path d={SIMBOLO.d} />
-              <rect {...SIMBOLO.modulo} />
-            </g>
-          </svg>
-        </div>
-      ),
-      { ...size, headers: CACHE },
-    );
-  }
-
-  const letra = letraDoIcone(marca.nome);
-
-  return new ImageResponse(
-    (
       <div
         style={{
           width: "100%",
@@ -117,19 +89,40 @@ export default async function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: marca.accent,
-          color: marca.accentFg,
-          // 62% da altura: a caixa maiúscula do Geist ocupa ~72% do em, então
-          // a letra fica com respiro sem virar um selo minúsculo no meio.
-          fontSize: Math.round(size.height * 0.62),
-          // O ladrilho é quadrado e cheio: o navegador já arredonda o favicon
-          // no chrome dele, e arredondar aqui também produz canto duplo.
-          borderRadius: 0,
+          background: NEUTROS_DE_SAIDA.fundo,
         }}
       >
-        {letra ?? ""}
-      </div>
-    ),
+        <svg viewBox={SIMBOLO_PEQUENO.viewBox} width={lado} height={lado}>
+          <path d={SIMBOLO_PEQUENO.base} fill={CORES_DA_MARCA.claro.simbolo} />
+          <path d={SIMBOLO_PEQUENO.noFinal} fill={CORES_DA_MARCA.claro.noFinal} />
+        </svg>
+      </div>,
+      { ...size, headers: CACHE },
+    );
+  }
+
+  const letra = letraDoIcone(marca.nome);
+
+  return new ImageResponse(
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: marca.accent,
+        color: marca.accentFg,
+        // 62% da altura: a caixa maiúscula do Geist ocupa ~72% do em, então
+        // a letra fica com respiro sem virar um selo minúsculo no meio.
+        fontSize: Math.round(size.height * 0.62),
+        // O ladrilho é quadrado e cheio: o navegador já arredonda o favicon
+        // no chrome dele, e arredondar aqui também produz canto duplo.
+        borderRadius: 0,
+      }}
+    >
+      {letra ?? ""}
+    </div>,
     { ...size, headers: CACHE },
   );
 }

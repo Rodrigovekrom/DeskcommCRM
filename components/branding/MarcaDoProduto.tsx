@@ -26,9 +26,9 @@ type Props = {
   readonly decorativo?: boolean;
 };
 
-const SIMBOLO_CLARO_ESCURO = "fill-[#506d48] dark:fill-[#82a077]";
-const NOME_CLARO_ESCURO = "fill-[#1c1a16] dark:fill-[#f5f4ef]";
-const SUFIXO_CLARO_ESCURO = "fill-[#5d594f] dark:fill-[#8e8b7f]";
+const SIMBOLO_CLARO_ESCURO = "fill-[#0e1b2b] dark:fill-[#f2f4f6]";
+const NO_FINAL = "fill-[#e08a2b] dark:fill-[#e08a2b]";
+const NOME_CLARO_ESCURO = "fill-[#0e1b2b] dark:fill-[#f2f4f6]";
 
 // As classes acima repetem os hexes de `CORES_DA_MARCA` porque o Tailwind só
 // gera utilitário para valor LITERAL no fonte. Quem impede os dois de divergirem
@@ -36,8 +36,8 @@ const SUFIXO_CLARO_ESCURO = "fill-[#5d594f] dark:fill-[#8e8b7f]";
 // e não uma asserção em runtime: um throw aqui derrubaria a casca inteira.
 export const CLASSES_DE_COR = {
   simbolo: SIMBOLO_CLARO_ESCURO,
+  noFinal: NO_FINAL,
   nome: NOME_CLARO_ESCURO,
-  sufixo: SUFIXO_CLARO_ESCURO,
 } as const;
 
 function acessibilidade(nome: string, decorativo: boolean) {
@@ -54,15 +54,13 @@ export function SimboloDoProduto({ nome, className, decorativo = false }: Props)
       className={cn("shrink-0", className)}
       {...acessibilidade(nome, decorativo)}
     >
-      <g className={SIMBOLO_CLARO_ESCURO} transform={SIMBOLO.transform}>
-        <path d={SIMBOLO.d} />
-        <rect {...SIMBOLO.modulo} />
-      </g>
+      <path className={SIMBOLO_CLARO_ESCURO} d={SIMBOLO.base} />
+      <path className={NO_FINAL} d={SIMBOLO.noFinal} />
     </svg>
   );
 }
 
-/** Símbolo + nome — para a barra aberta e a fachada de entrada. */
+/** Símbolo + wordmark — para a barra aberta e a fachada de entrada. */
 export function LogotipoDoProduto({ nome, className, decorativo = false }: Props) {
   return (
     <svg
@@ -70,20 +68,9 @@ export function LogotipoDoProduto({ nome, className, decorativo = false }: Props
       className={cn("shrink-0", className)}
       {...acessibilidade(nome, decorativo)}
     >
-      <g className={SIMBOLO_CLARO_ESCURO} transform={LOGOTIPO.simbolo.transform}>
-        <path d={LOGOTIPO.simbolo.d} />
-        <rect {...LOGOTIPO.simbolo.modulo} />
-      </g>
-      <g className={NOME_CLARO_ESCURO}>
-        {LOGOTIPO.nome.map((g) => (
-          <path key={g.transform} transform={g.transform} d={g.d} />
-        ))}
-      </g>
-      <g className={SUFIXO_CLARO_ESCURO}>
-        {LOGOTIPO.sufixo.map((g) => (
-          <path key={g.transform} transform={g.transform} d={g.d} />
-        ))}
-      </g>
+      <path className={SIMBOLO_CLARO_ESCURO} d={LOGOTIPO.simbolo.base} />
+      <path className={NO_FINAL} d={LOGOTIPO.simbolo.noFinal} />
+      <path className={NOME_CLARO_ESCURO} d={LOGOTIPO.nome} />
     </svg>
   );
 }
