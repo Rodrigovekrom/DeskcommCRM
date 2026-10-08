@@ -1,4 +1,4 @@
-import { LOGOTIPO, SIMBOLO } from "@/lib/branding/desenho";
+import { LOGOTIPO, SIMBOLO_PEQUENO } from "@/lib/branding/desenho";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,16 +46,20 @@ function acessibilidade(nome: string, decorativo: boolean) {
     : ({ role: "img", "aria-label": nome } as const);
 }
 
-/** O símbolo sozinho — para a barra recolhida, avatar e cantos apertados. */
+/**
+ * O símbolo sozinho — para a barra recolhida, avatar e cantos apertados. Usa o
+ * desenho PEQUENO (ligações mais grossas, viewBox quadrado): todos os usos são
+ * de 32-36 px, onde o traço fino do símbolo grande some.
+ */
 export function SimboloDoProduto({ nome, className, decorativo = false }: Props) {
   return (
     <svg
-      viewBox={SIMBOLO.viewBox}
+      viewBox={SIMBOLO_PEQUENO.viewBox}
       className={cn("shrink-0", className)}
       {...acessibilidade(nome, decorativo)}
     >
-      <path className={SIMBOLO_CLARO_ESCURO} d={SIMBOLO.base} />
-      <path className={NO_FINAL} d={SIMBOLO.noFinal} />
+      <path className={SIMBOLO_CLARO_ESCURO} d={SIMBOLO_PEQUENO.base} />
+      <path className={NO_FINAL} d={SIMBOLO_PEQUENO.noFinal} />
     </svg>
   );
 }
