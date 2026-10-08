@@ -1,3 +1,4 @@
+import { FundoNeural } from "@/components/branding/FundoNeural";
 import { LogotipoDoProduto } from "@/components/branding/MarcaDoProduto";
 import { marcaEhADoProduto } from "@/lib/branding";
 import { marcaDaSaida } from "@/lib/branding/saida";
@@ -56,8 +57,10 @@ export default async function PublicLayout({ children }: { children: React.React
 
   return (
     <IdiomaProvider locale={locale}>
-      <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <div className="w-full max-w-sm space-y-6">
+      <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-background p-6">
+        {/* Fundo de rede neural: identidade do produto. Instalação com marca própria fica limpa. */}
+        {marcaEhADoProduto({ name: marca.nome, logoUrl: marca.logoUrl }) ? <FundoNeural /> : null}
+        <div className="relative z-10 w-full max-w-sm space-y-6">
           {marca.logoUrl || marca.logoDarkUrl ? (
             <div className="flex justify-center">
               {/*

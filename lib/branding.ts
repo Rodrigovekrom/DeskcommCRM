@@ -18,6 +18,14 @@
 
 export const DEFAULT_APP_NAME = "DeskcommCRM";
 
+/**
+ * Nome da instalação ia.vek (fork). A imagem continua trazendo o padrão do
+ * upstream; a instalação ia.vek grava `APP_NAME=ia.vek` no `.env` e, com esse
+ * nome, mostra o logotipo da rede de nós — o mesmo caminho que o upstream manda
+ * seguir (APP_NAME), sem editar o padrão do produto.
+ */
+export const NOME_DA_INSTALACAO_IAVEK = "ia.vek";
+
 export type Branding = {
   /** Nome exibido na interface e nos títulos de página. */
   name: string;
@@ -93,7 +101,10 @@ export function resolveBranding(
  * escrita, só pintada de outro jeito.
  */
 export function marcaEhADoProduto(marca: Pick<Branding, "name" | "logoUrl">): boolean {
-  return marca.logoUrl === null && marca.name === DEFAULT_APP_NAME;
+  return (
+    marca.logoUrl === null &&
+    (marca.name === DEFAULT_APP_NAME || marca.name === NOME_DA_INSTALACAO_IAVEK)
+  );
 }
 
 export function branding(): Branding {
