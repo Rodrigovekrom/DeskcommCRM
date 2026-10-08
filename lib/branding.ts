@@ -26,6 +26,18 @@ export const DEFAULT_APP_NAME = "DeskcommCRM";
  */
 export const NOME_DA_INSTALACAO_IAVEK = "ia.vek";
 
+/**
+ * Os nomes com que a instalação ia.vek se apresenta. O oficial é "ia.vek CRM"
+ * (é o que está no `.env` e no `/admin/marca` da produção); "ia.vek" é o nome
+ * curto. Os dois mostram o desenho da rede de nós, cujo wordmark é "ia.vek".
+ */
+const NOMES_DA_INSTALACAO_IAVEK = new Set([NOME_DA_INSTALACAO_IAVEK, "ia.vek crm"]);
+
+/** Caixa e espaços não mudam de quem é a marca: "IA.VEK  CRM " é "ia.vek CRM". */
+function normalizarNome(nome: string): string {
+  return nome.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export type Branding = {
   /** Nome exibido na interface e nos títulos de página. */
   name: string;
@@ -103,7 +115,7 @@ export function resolveBranding(
 export function marcaEhADoProduto(marca: Pick<Branding, "name" | "logoUrl">): boolean {
   return (
     marca.logoUrl === null &&
-    (marca.name === DEFAULT_APP_NAME || marca.name === NOME_DA_INSTALACAO_IAVEK)
+    (marca.name === DEFAULT_APP_NAME || NOMES_DA_INSTALACAO_IAVEK.has(normalizarNome(marca.name)))
   );
 }
 
