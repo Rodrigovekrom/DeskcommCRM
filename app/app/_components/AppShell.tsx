@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import { BarraInferior } from "@/components/shell/BarraInferior";
 import { BarraDeProgressoNavegacao } from "@/components/shell/BarraDeProgressoNavegacao";
+import { FundoDaCasca } from "@/components/shell/FundoDaCasca";
 import { useSinalDePresenca } from "@/hooks/atendimento/useSinalDePresenca";
 import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessageAlerts";
 import { useInboundCallAlerts } from "@/hooks/calls/useInboundCallAlerts";
@@ -51,7 +52,9 @@ export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellPr
       sumindo. Princípio 2 de `docs/design-system/screen-flow/07-responsive-strategy.md`,
       escrito em abril de 2026 e aplicado em 6 lugares de 33 até aqui.
     */
-    <div className="flex min-h-dvh w-full bg-background">
+    <div className="relative isolate flex min-h-dvh w-full bg-background">
+      {/* Rede neural da marca, variante sutil: atrás de tudo, só nas áreas livres. */}
+      <FundoDaCasca />
       <BarraDeProgressoNavegacao />
       <div className="hidden md:block">
         <Sidebar collapsed={sidebarCollapsed} />

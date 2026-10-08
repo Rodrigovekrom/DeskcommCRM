@@ -56,6 +56,7 @@ vi.mock("@/components/shell/BarraDeProgressoNavegacao", () => ({
 // `tests/unit/rodape-ocupado-contrato.test.ts` cobra isso dela por arquivo, mais
 // `components/shell/BarraInferior.celular.test.tsx`, que prova a regra da tela.
 vi.mock("@/components/shell/BarraInferior", () => ({ BarraInferior: () => null }));
+vi.mock("@/components/shell/FundoDaCasca", () => ({ FundoDaCasca: () => null }));
 vi.mock("@/hooks/atendimento/useSinalDePresenca", () => ({ useSinalDePresenca: () => {} }));
 vi.mock("@/hooks/notifications/useInboundMessageAlerts", () => ({
   useInboundMessageAlerts: () => {},
