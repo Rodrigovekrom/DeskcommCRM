@@ -199,14 +199,31 @@ async function instalarModuloDeDados(db: SupabaseClient, orgId: string, id: Retu
     .single();
   if (erroContato) throw new Error(`contato: ${erroContato.message}`);
 
-  const { error: erroFicha } = await db.from(id.tabela).insert({
-    organization_id: orgId,
-    paciente_id: contato!.id,
-    dente: 11,
-    condicao: "restaurado",
-    valor_cents: 12500,
-    valor_moeda: "BRL",
-  });
+  // ⚠️ O RECARREGAMENTO DO POSTGREST É ASSÍNCRONO, e isso é propriedade do produto, não da fixture.
+  // `fn_modulo_dados_compilar` termina com `pg_notify('pgrst', 'reload schema')`, mas o PostgREST
+  // recarrega quando recebe o aviso — não dentro da transação. Então existe uma janela de alguns
+  // segundos, depois de instalar, em que a tabela JÁ EXISTE no banco e a API ainda responde
+  // `Could not find the table … in the schema cache`.
+  //
+  // A fixture espera essa janela em vez de a esconder: insistir aqui é o que um cliente de verdade
+  // faria, e o teto declarado diz quanto a janela pode durar antes de isto virar defeito.
+  const limite = Date.now() + 20_000;
+  let erroFicha: { message: string } | null = null;
+  for (;;) {
+    const r = await db.from(id.tabela).insert({
+      organization_id: orgId,
+      paciente_id: contato!.id,
+      dente: 11,
+      condicao: "restaurado",
+      valor_cents: 12500,
+      valor_moeda: "BRL",
+    });
+    erroFicha = r.error;
+    if (!erroFicha) break;
+    const aindaNaoVisivel = /schema cache/i.test(erroFicha.message);
+    if (!aindaNaoVisivel || Date.now() > limite) break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
   if (erroFicha) throw new Error(`ficha: ${erroFicha.message}`);
 
   return { contatoId: contato!.id as string };

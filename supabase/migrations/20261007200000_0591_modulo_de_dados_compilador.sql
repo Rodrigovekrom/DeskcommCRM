@@ -166,6 +166,18 @@ begin
   --
   -- É o mesmo aviso que `fn_modulo_instalar` já dá no caminho de módulo oficial (ADR-0002).
   perform pg_notify('pgrst', 'reload schema');
+  -- ⚠️ O RELOAD É ASSÍNCRONO, e isso é limitação conhecida desta onda, não detalhe: o PostgREST
+  -- recarrega quando RECEBE o aviso, fora desta transação. Existe portanto uma janela de alguns
+  -- segundos, logo depois de instalar, em que a tabela já existe no banco e a API ainda responde
+  -- `Could not find the table … in the schema cache` — medido no e2e, que precisou esperar por ela.
+  --
+  -- O que isso significa para quem usa: o painel do módulo na ficha do contato pode aparecer com a
+  -- mensagem de "não foi possível carregar" por alguns segundos depois da instalação, e carregar
+  -- normalmente ao recarregar a página. A ficha do núcleo não é afetada (nn.1).
+  --
+  -- O que NÃO foi feito, e fica declarado: a tela não distingue "ainda preparando" de "falhou". Um
+  -- estado próprio para a janela é trabalho da onda seguinte, e exige saber quando o reload terminou
+  -- — o `pg_notify` não dá retorno.
 
   return jsonb_build_object('tabelas', to_jsonb(v_criadas));
 end $f$;
