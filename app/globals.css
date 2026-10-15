@@ -1503,3 +1503,45 @@
     animation-iteration-count: infinite !important;
   }
 }
+
+/* ── Coluna do quadro do funil: tom SÓLIDO que avança com a etapa (#119) ──────
+   A coluna usava `bg-surface-muted/40`, um token que este arquivo nunca
+   declarou: a classe não gerava regra nenhuma e a coluna saía TRANSPARENTE
+   (no upstream também) — com o fundo de rede da marca passando por dentro dela.
+
+   Agora o fundo é opaco e diz em que ponto do funil a etapa está: o
+   `--nivel-da-etapa` (0 = primeira, 1 = última; `lib/kanban/tom-da-etapa.ts`,
+   posto pelo quadro em cada coluna) decide quanto do `--color-accent` entra no
+   `--color-surface-elevated`. Os dois são tokens de PAPEL, então a cor segue a
+   marca da instalação — e o accent é o que `escolherAccent` já desliza para
+   caber nos pisos de contraste com qualquer semente.
+
+   Por que o papel e não um stop cru (`--color-accent-300`): a cerca de
+   contraste da marca (`extrairRegua`, em `lib/branding/contraste.ts`) lê toda
+   regra que cita um stop da rampa como COMPONENTE pintado e cobra 3:1 contra o
+   fundo. Isto é superfície tingida, não componente — e o que se mede nela é o
+   texto por cima, abaixo.
+
+   Os tetos foram MEDIDOS contra o texto que vive na coluna, com a paleta da
+   ia.vek (semente #2A4A73), mistura em oklab: na etapa mais forte o
+   `--color-text-muted` (contagem, totais, "Vazio") fica em 4,66:1 no claro
+   (#c9d2dd) e 4,59:1 no escuro (#2a3648) — acima do piso 4,5 de WCAG 1.4.3.
+   Subir o teto (16% / 18%) derruba esse piso; não suba sem medir de novo.
+
+   A primeira declaração é o piso para navegador sem `color-mix`: sólido, sem a
+   progressão — nunca transparente de novo. */
+.coluna-da-etapa {
+  background-color: var(--color-surface-elevated);
+  background-color: color-mix(
+    in oklab,
+    var(--color-accent) calc(3% + var(--nivel-da-etapa, 0) * 13%),
+    var(--color-surface-elevated)
+  );
+}
+[data-theme="dark"] .coluna-da-etapa {
+  background-color: color-mix(
+    in oklab,
+    var(--color-accent) calc(4% + var(--nivel-da-etapa, 0) * 14%),
+    var(--color-surface-elevated)
+  );
+}

@@ -37,6 +37,8 @@ interface StageColumnProps {
   /** `manager`+ — mesmo corte de papel da rota que renomeia a etapa. */
   podeRenomear?: boolean;
   onRenomear?: (nome: string) => void;
+  /** 0 (primeira etapa) a 1 (última): o tom do fundo da coluna (`nivelDaEtapa`). */
+  nivel?: number;
 }
 
 export function StageColumn({
@@ -53,6 +55,7 @@ export function StageColumn({
   onOpen,
   podeRenomear = false,
   onRenomear,
+  nivel = 0,
 }: StageColumnProps) {
   const t = useT();
   // O TOTAL É POR MOEDA (#1531). Antes ele somava todos os `value_cents` e
@@ -150,15 +153,16 @@ export function StageColumn({
         coluna de etapa não vira painel. De `md` para cima volta o `w-80` de
         sempre, onde a graça é justamente ver várias etapas ao mesmo tempo.
       */
-      className="bg-surface-muted/40 flex min-h-full w-[85vw] max-w-80 shrink-0 snap-center flex-col rounded-lg border border-border md:w-80"
+      className="coluna-da-etapa flex min-h-full w-[85vw] max-w-80 shrink-0 snap-center flex-col rounded-lg border border-border md:w-80"
+      style={{ "--nivel-da-etapa": nivel } as CSSProperties}
       data-etapa-do-quadro={stage.id}
     >
       {/* Cabeçalho e total PRESOS no alto do quadro enquanto os cards rolam: com
-          uma etapa comprida, é o que diz em que etapa se está olhando. O fundo
-          opaco (`bg-background`) é o que impede os cards de aparecerem por baixo;
-          por dentro, a mesma camada translúcida da coluna, para o tom não mudar. */}
-      <div className="sticky top-0 z-10 rounded-t-lg bg-background" data-cabecalho-da-etapa>
-        <div className="bg-surface-muted/40 rounded-t-lg">
+          uma etapa comprida, é o que diz em que etapa se está olhando. O fundo é
+          o MESMO tom sólido da coluna (`coluna-da-etapa`, que lê o nível herdado
+          dela): opaco, então os cards não aparecem por baixo, e o tom não muda. */}
+      <div className="coluna-da-etapa sticky top-0 z-10 rounded-t-lg" data-cabecalho-da-etapa>
+        <div className="rounded-t-lg">
           <div className="group/etapa flex items-center gap-2 border-b border-border px-3 py-2.5">
             {/* "Selecionar a etapa inteira" é o gesto que faz a ação em lote valer a
             pena: sem ele, mover trinta cards deixa de ser trinta arrastes e vira
