@@ -38,14 +38,24 @@ curto é um **canário no próprio VPS**: subir a imagem nova num contêiner à
 parte, numa porta interna, sem worker nem scheduler, e abrir pelo túnel SSH.
 
 ```bash
-# no VPS, dentro da pasta do projeto
-docker run -d --name iavek-canario --env-file .env -e APP_NAME=ia.vek \
-  -p 127.0.0.1:3901:3000 ghcr.io/rodrigovekrom/iavek-crm:<tag>
+# no VPS. O env sai do contêiner que está no ar, e NÃO do .env: o
+# `docker run --env-file` mantém as aspas que o compose tira, e o app recusa
+# o valor ("Variáveis de ambiente inválidas").
+umask 077
+docker inspect deskcommcrm-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
+  | grep -v '^$' > /root/iavek-canario.env
+docker run -d --name iavek-canario --env-file /root/iavek-canario.env \
+  --network deskcommcrm_internal -p 127.0.0.1:3901:3000 \
+  ghcr.io/rodrigovekrom/iavek-crm:<tag>
+shred -u /root/iavek-canario.env   # o contêiner já leu; o arquivo tem as chaves
 # no Mac
-ssh -p 22022 -L 3901:127.0.0.1:3901 root@143.95.173.212
+ssh -i ~/.ssh/iavek_vps -p 22022 -L 3901:127.0.0.1:3901 root@143.95.173.212
 # abrir http://localhost:3901/login ; ao terminar:
 docker rm -f iavek-canario
 ```
+
+A rede `deskcommcrm_internal` é a do compose: sem ela o canário não alcança o
+Redis nem o WAHA pelo nome.
 
 Ele lê o MESMO banco da produção — por isso só olhar e navegar; nenhuma
 configuração salva ali. (Staging completo com o projeto Supabase separado
@@ -57,7 +67,7 @@ conjunto de chaves; para uma mudança só visual o canário prova o mesmo.)
 ```bash
 cd ~/DeskcommCRM            # a pasta onde o install.sh rodou
 bash hostgator-setup-kit/backup.sh
-cp .env .env.antes-iavek
+grep '^APP_IMAGE=' .env      # anote a imagem atual: é a volta
 # no .env:
 #   APP_IMAGE=ghcr.io/rodrigovekrom/iavek-crm:<tag>
 #   APP_NAME=ia.vek
@@ -71,11 +81,18 @@ Se em `/admin/marca` houver nome ou logo gravados, eles vencem o `.env`
 ## 4. Desfazer
 
 ```bash
-cp .env.antes-iavek .env
+# APP_IMAGE de volta para a imagem anotada no passo 3
+sed -i 's#^APP_IMAGE=.*#APP_IMAGE="<imagem anterior>"#' .env
 bash -c 'source hostgator-setup-kit/_common.sh && enter_project && dc up -d app'
 ```
 
 Volta em segundos: o banco não muda nos dois sentidos.
+
+**Sem cópia do `.env`.** A troca muda só o `APP_IMAGE`, então a volta é ele.
+Uma cópia inteira do `.env` guarda TODAS as chaves e sobrevive às rotações: em
+15/10/2026 (#72) foram apagadas três (`.env.antes-iavek`, `.env.antes-chaves*`),
+uma delas com as chaves novas vivas. Se uma troca futura precisar de cópia,
+apague-a com `shred -u` assim que a troca for conferida.
 
 ## Atenção depois da troca
 

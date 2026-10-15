@@ -1528,13 +1528,14 @@
    (#c9d2dd) e 4,59:1 no escuro (#2a3648) — acima do piso 4,5 de WCAG 1.4.3.
    Subir o teto (16% / 18%) derruba esse piso; não suba sem medir de novo.
 
-   O piso para navegador sem `color-mix` é o `background-color` sólido. A
-   mistura mora numa propriedade customizada e é pintada por `background-image`
-   de propósito: escrita direto em `background-color`, o minificador do build
-   (Lightning CSS) gerava como "fallback" o `--color-accent` PURO e punha a
-   mistura num `@supports` — sem suporte, a coluna saía navy cheio e ilegível.
-   Custom property ele não reescreve; e, sem suporte, ela fica inválida, a
-   imagem não pinta e sobra o piso. Nunca transparente de novo. */
+   Navegador sem `color-mix` (Chrome < 111, Safari < 16.2, Firefox < 113):
+   o Tailwind 4 gera, para TODO `color-mix` do arquivo, um fallback com a cor
+   de entrada pura e põe a mistura num `@supports` — inclusive dentro da custom
+   property. Ali a coluna sai no `--color-accent` cheio. É o mesmo que acontece
+   com os 150 `color-mix` do app (`bg-accent/5` vira o accent inteiro, medido no
+   CSS servido em 15/10/2026): suporte a esses navegadores já não existe no
+   produto, e a coluna não cria risco novo. A custom property só deixa o tom
+   num lugar só para os dois temas. */
 .coluna-da-etapa {
   --tom-da-etapa: color-mix(
     in oklab,
