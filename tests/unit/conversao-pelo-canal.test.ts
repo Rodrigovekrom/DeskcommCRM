@@ -449,8 +449,14 @@ describe("o evento de ETAPA da Meta também sai pelo canal", () => {
       fakeAdmin({ sessao: CANAL_COM_PONTE, conexao: "ligada", extras: regraDaEtapa() }) as never,
     );
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(resposta({ events_received: 1 }));
+    // Relógio fixo logo depois da entrada na etapa: o evento tem data fixa
+    // (`ENTROU_NA_ETAPA`) e, com o relógio real, envelhecia além da janela da
+    // Meta e virava `skipped` — o caso passou a falhar sozinho a partir de 14/10/2026.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(Date.parse(ENTROU_NA_ETAPA) + 60 * 60 * 1000));
 
     const r = await conversaoDeEtapaMetaHandler.handle(entrouNaEtapa);
+    vi.useRealTimers();
 
     expect(r.status).toBe("ok");
     expect(f).toHaveBeenCalledOnce();
