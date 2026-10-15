@@ -1528,18 +1528,24 @@
    (#c9d2dd) e 4,59:1 no escuro (#2a3648) — acima do piso 4,5 de WCAG 1.4.3.
    Subir o teto (16% / 18%) derruba esse piso; não suba sem medir de novo.
 
-   A primeira declaração é o piso para navegador sem `color-mix`: sólido, sem a
-   progressão — nunca transparente de novo. */
+   O piso para navegador sem `color-mix` é o `background-color` sólido. A
+   mistura mora numa propriedade customizada e é pintada por `background-image`
+   de propósito: escrita direto em `background-color`, o minificador do build
+   (Lightning CSS) gerava como "fallback" o `--color-accent` PURO e punha a
+   mistura num `@supports` — sem suporte, a coluna saía navy cheio e ilegível.
+   Custom property ele não reescreve; e, sem suporte, ela fica inválida, a
+   imagem não pinta e sobra o piso. Nunca transparente de novo. */
 .coluna-da-etapa {
-  background-color: var(--color-surface-elevated);
-  background-color: color-mix(
+  --tom-da-etapa: color-mix(
     in oklab,
     var(--color-accent) calc(3% + var(--nivel-da-etapa, 0) * 13%),
     var(--color-surface-elevated)
   );
+  background-color: var(--color-surface-elevated);
+  background-image: linear-gradient(var(--tom-da-etapa), var(--tom-da-etapa));
 }
 [data-theme="dark"] .coluna-da-etapa {
-  background-color: color-mix(
+  --tom-da-etapa: color-mix(
     in oklab,
     var(--color-accent) calc(4% + var(--nivel-da-etapa, 0) * 14%),
     var(--color-surface-elevated)
