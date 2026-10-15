@@ -12,6 +12,10 @@ vi.mock("@/lib/i18n/idiomaAnonimo", () => ({ idiomaDoVisitante: vi.fn(async () =
 vi.mock("@/lib/i18n/dicionario", () => ({ traduzir: (texto: string) => texto }));
 vi.mock("@/components/auth/LoginForm", () => ({ LoginForm: () => null }));
 vi.mock("@/components/auth/EntrarComGoogle", () => ({ EntrarComGoogle: () => null }));
+vi.mock("@/lib/auth/politica-de-cadastro", () => ({ modoDeCadastro: vi.fn(async () => "aberto") }));
+vi.mock("@/lib/auth/provedor-google", () => ({
+  estadoDoProvedorGoogle: vi.fn(async () => "desligado"),
+}));
 
 describe("marca da instalação na tela de login", () => {
   beforeEach(() => {

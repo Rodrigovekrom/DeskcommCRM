@@ -13,6 +13,15 @@ import { Label } from "@/components/ui/label";
 import { signInWithPassword } from "@/app/actions/auth/signInWithPassword";
 import { Eye, EyeSlash } from "@/lib/ui/icons";
 
+/**
+ * Campo SÓLIDO e mais claro que o fundo da tela de entrar. O `Input` padrão usa
+ * `bg-bg` — a MESMA cor do fundo da página —, e sobre o fundo de rede neural da
+ * marca o campo sumia: as linhas passavam por trás e a borda era tudo o que se
+ * via. Claro: `surface` (branco). Escuro: `surface-elevated`, o degrau acima do
+ * fundo navy. Borda forte para o contorno não depender do fundo.
+ */
+const CAMPO_DA_ENTRADA = "border-border-strong bg-surface dark:bg-surface-elevated";
+
 export function LoginForm({ next }: { next?: string }) {
   const t = useT();
   const router = useRouter();
@@ -68,6 +77,7 @@ export function LoginForm({ next }: { next?: string }) {
           type="email"
           autoComplete="email"
           autoFocus
+          className={CAMPO_DA_ENTRADA}
           aria-invalid={errors.email ? true : undefined}
           {...register("email")}
         />
@@ -82,7 +92,7 @@ export function LoginForm({ next }: { next?: string }) {
             id="password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            className="pr-12"
+            className={`${CAMPO_DA_ENTRADA} pr-12`}
             aria-invalid={errors.password ? true : undefined}
             {...register("password")}
           />

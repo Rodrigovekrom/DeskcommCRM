@@ -2,6 +2,9 @@ import Link from "next/link";
 
 import { EntrarComGoogle } from "@/components/auth/EntrarComGoogle";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { opcoesDaEntrada } from "@/lib/auth/opcoes-da-entrada";
+import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
+import { estadoDoProvedorGoogle } from "@/lib/auth/provedor-google";
 import { marcaDaSaida } from "@/lib/branding/saida";
 import { createClient } from "@/lib/supabase/server";
 import { idiomaDoVisitante } from "@/lib/i18n/idiomaAnonimo";
@@ -28,12 +31,19 @@ export default async function LoginPage({
   );
   const t = (texto: string) => traduzir(texto, idioma);
   const marca = await marcaDaSaida(null);
+  const { mostrarCadastro, mostrarGoogle } = opcoesDaEntrada({
+    modo: await modoDeCadastro(),
+    google: await estadoDoProvedorGoogle(),
+  });
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Entrar")}</h1>
-        <p className="text-sm text-muted-foreground">{marca.nome}</p>
+      {/* Título e nome só para leitor de tela: a tela já mostra o logotipo da
+          marca logo acima (layout do grupo), e "Entrar" + o nome repetidos sob
+          ele eram ruído visual. O `h1` continua sendo o título da página. */}
+      <div className="sr-only">
+        <h1>{t("Entrar")}</h1>
+        <p>{marca.nome}</p>
       </div>
       {reset === "success" && (
         <div
@@ -140,7 +150,7 @@ export default async function LoginPage({
         </div>
       )}
       <LoginForm next={next} />
-      <EntrarComGoogle next={next} />
+      {mostrarGoogle && <EntrarComGoogle next={next} />}
       <div className="space-y-2 text-center text-sm">
         <p>
           <Link
@@ -150,12 +160,17 @@ export default async function LoginPage({
             {t("Esqueci minha senha")}
           </Link>
         </p>
-        <p className="text-muted-foreground">
-          {t("Não tem conta?")}{" "}
-          <Link href="/signup" className="font-medium text-foreground underline underline-offset-4">
-            {t("Criar conta")}
-          </Link>
-        </p>
+        {mostrarCadastro && (
+          <p className="text-muted-foreground">
+            {t("Não tem conta?")}{" "}
+            <Link
+              href="/signup"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              {t("Criar conta")}
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
