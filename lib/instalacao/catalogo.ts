@@ -147,6 +147,15 @@ export const CATALOGO_DA_INSTALACAO: readonly ChaveDaInstalacao[] = [
     controle: "edita",
   },
   {
+    chave: "ALTIMUS_ESTOQUE_URL",
+    rotulo: "Endereço do estoque no Altimus",
+    explicacao:
+      "O link do estoque da revenda no Altimus. Com ele, os carros, preços e fotos entram sozinhos no catálogo de produtos a cada hora.",
+    grupo: "integracao",
+    natureza: "segredo",
+    controle: "edita",
+  },
+  {
     chave: "LGPD_DPO_EMAIL",
     rotulo: "E-mail do encarregado de dados (DPO)",
     explicacao:

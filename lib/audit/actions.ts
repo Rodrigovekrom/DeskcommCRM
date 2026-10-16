@@ -693,6 +693,9 @@ export const AUDIT_ACTIONS = [
   // As fotos do produto (migration 0390): subir uma, e reordenar/remover.
   "catalog_product.photo_added",
   "catalog_product.photos_updated",
+  // ia.vek D2: a rodada de sincronização do estoque do Altimus que mudou o catálogo
+  // (criou, atualizou, desativou, baixou foto ou registrou erro). Rodada sem efeito não audita.
+  "catalog.estoque_altimus_sincronizado",
 
   // As tarefas do CRM (migration 0210). Tarefa é combinado de trabalho entre
   // pessoas do time — quem a criou, quem mudou o prazo e quem a apagou é

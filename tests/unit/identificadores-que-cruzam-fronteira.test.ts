@@ -170,6 +170,9 @@ const SITES: { arquivo: string; fronteira: string; papel?: "gerador" | "validado
   // package.ts. Nada de texto digitado pelo operador entra na chave.
   { arquivo: "lib/ai/skills/package-files.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/products/[id]/fotos/route.ts", fronteira: "storage.chave-de-objeto" },
+  // ia.vek D2: a sincronização do estoque do Altimus grava a MESMA forma de chave
+  // (`<org>/<produto>/<uuid>.jpg|png`), com o UUID derivado da URL de origem.
+  { arquivo: "lib/estoque/deps-reais.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/cron/contact-avatars/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/channels/partner/templates/media/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/settings/sons/route.ts", fronteira: "storage.chave-de-objeto" },

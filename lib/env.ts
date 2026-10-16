@@ -383,6 +383,12 @@ const schema = z.object({
    */
   RESEND_API_KEY: z.string().optional().default(""),
   RESEND_FROM_EMAIL: z.string().optional().default(""),
+  /**
+   * Estoque da revenda no Altimus (ia.vek D2): URL do feed JSON, com a chave de
+   * acesso na query string — SEGREDO. O lugar normal dela é o banco (Admin ›
+   * Configuração › Integrações, cifrada); aqui é só o piso de instalação.
+   */
+  ALTIMUS_ESTOQUE_URL: z.string().optional().default(""),
 
   /**
    * SMTP — o SEGUNDO transporte de e-mail, ao lado da Resend, nunca no lugar

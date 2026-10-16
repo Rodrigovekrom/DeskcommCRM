@@ -51,6 +51,11 @@ const ORDEM: readonly {
   { grupo: "banco", titulo: "Banco de dados", resumo: "Onde ficam todos os seus dados." },
   { grupo: "fila", titulo: "Fila de tarefas", resumo: "Controla o ritmo dos envios." },
   { grupo: "ia", titulo: "Inteligência artificial", resumo: "Como o atendimento automático opera." },
+  {
+    grupo: "integracao",
+    titulo: "Integrações",
+    resumo: "Ligações com sistemas de fora, como o estoque da revenda.",
+  },
 ];
 
 export interface LinhaDaTela {
