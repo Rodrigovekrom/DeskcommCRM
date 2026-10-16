@@ -1088,7 +1088,7 @@ export const DICIONARIO: Traducoes = {
   "Se esta for a primeira tentativa, o sistema cria mais uma ligação ainda hoje.": { es: "Si es el primer intento, el sistema crea otra llamada hoy mismo." },
   "Agendou visita ou vídeo": { es: "Agendó visita o video" },
   "Retornar em outra data": { es: "Volver a llamar otro día" },
-  "Sem interesse": { es: "Sin interés" },
+  "Não tem interesse": { es: "No tiene interés" },
   "Detalhe do motivo": { es: "Detalle del motivo" },
   "Registrar": { es: "Registrar" },
   "Esteira salva.": { es: "Embudo de ventas guardado." },

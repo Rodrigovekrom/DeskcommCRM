@@ -127,7 +127,7 @@ export function RegistroDeLigacao({
                 <SelectContent>
                   <SelectItem value="agendou">{t("Agendou visita ou vídeo")}</SelectItem>
                   <SelectItem value="retornar">{t("Retornar em outra data")}</SelectItem>
-                  <SelectItem value="sem_interesse">{t("Sem interesse")}</SelectItem>
+                  <SelectItem value="sem_interesse">{t("Não tem interesse")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
