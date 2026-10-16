@@ -6,15 +6,15 @@ operação moram **fora do repositório**, em `~/projects/ia-vek-crm/` no Mac.
 
 ## O que o fork muda
 
-| Peça                                                                            | Arquivos                                                            |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Paleta navy/aço (semente `#2A4A73`), superfícies frias `#F2F4F6` / `#11171F`    | `app/globals.css`, `lib/branding/regua-do-produto.ts` (gerado)      |
-| Fontes: Plus Jakarta Sans (texto), Archivo (wordmark), JetBrains Mono (números) | `app/layout.tsx`, `app/fonts/archivo-62-125-latin.woff2`            |
-| Logo: rede de nós com o nó final âmbar + wordmark `ia.vek`                      | `lib/branding/desenho.ts`, `components/branding/MarcaDoProduto.tsx` |
-| Favicon e ícone do app com o símbolo pequeno                                    | `app/icon.tsx`, `lib/branding/icone-do-app.tsx`                     |
-| Fundo de rede neural (telas de acesso)                                          | `components/branding/FundoNeural.tsx`, `app/(public)/layout.tsx`    |
-| Funcionalidades da Fenômenos (preço em 3 níveis, estoque Altimus, esteira, avisos no grupo…) | `lib/esteira/`, `lib/avisos-grupo/`, `lib/estoque/` e afins |
-| Três imagens no GHCR do fork                                                    | `.github/workflows/iavek-imagem.yml`                                |
+| Peça                                                                                         | Arquivos                                                            |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Paleta navy/aço (semente `#2A4A73`), superfícies frias `#F2F4F6` / `#11171F`                 | `app/globals.css`, `lib/branding/regua-do-produto.ts` (gerado)      |
+| Fontes: Plus Jakarta Sans (texto), Archivo (wordmark), JetBrains Mono (números)              | `app/layout.tsx`, `app/fonts/archivo-62-125-latin.woff2`            |
+| Logo: rede de nós com o nó final âmbar + wordmark `ia.vek`                                   | `lib/branding/desenho.ts`, `components/branding/MarcaDoProduto.tsx` |
+| Favicon e ícone do app com o símbolo pequeno                                                 | `app/icon.tsx`, `lib/branding/icone-do-app.tsx`                     |
+| Fundo de rede neural (telas de acesso)                                                       | `components/branding/FundoNeural.tsx`, `app/(public)/layout.tsx`    |
+| Funcionalidades da Fenômenos (preço em 3 níveis, estoque Altimus, esteira, avisos no grupo…) | `lib/esteira/`, `lib/avisos-grupo/`, `lib/estoque/` e afins         |
+| Três imagens no GHCR do fork                                                                 | `.github/workflows/iavek-imagem.yml`                                |
 
 O logo da rede de nós aparece quando a instalação se chama **`ia.vek`**
 (`APP_NAME`) e não tem logo subido em `/admin/marca`. O padrão do upstream
