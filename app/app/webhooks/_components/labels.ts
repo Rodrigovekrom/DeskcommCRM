@@ -13,7 +13,8 @@ export type ActionType =
   | "assign_owner"
   | "call_webhook"
   | "start_message_flow"
-  | "create_task";
+  | "create_task"
+  | "avisar_grupo";
 
 export const TRIGGER_LABELS: Record<TriggerEvent, string> = {
   "lead.created": "Quando entrar um contato novo (webhook)",
@@ -56,6 +57,10 @@ export const TRIGGER_LABELS: Record<TriggerEvent, string> = {
   // funil) ficam embaixo, na configuração da regra.
   "lead.silent_for": "Quando ficar N dias sem mensagem",
   "lead.stage_stale": "Quando um lead ficar N dias na mesma etapa",
+  // ia.vek D4 — os gatilhos dos avisos da equipe.
+  "ai.handoff_triggered": "Quando a conversa passar para a equipe",
+  "ai.case_opened": "Quando a IA abrir um caso para a equipe",
+  "task.overdue": "Quando uma tarefa vencer sem ser concluída",
 };
 
 export const ACTION_LABELS: Record<ActionType, string> = {
@@ -68,4 +73,6 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   start_message_flow: "Iniciar fluxo de mensagem",
   // #1540 — a ação que não fala com o cliente: o lembrete é da equipe.
   create_task: "Criar tarefa interna (sem mensagem ao cliente)",
+  // ia.vek D4 — fala com a EQUIPE, nunca com o cliente.
+  avisar_grupo: "Avisar grupo do WhatsApp da equipe",
 };

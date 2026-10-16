@@ -45,7 +45,9 @@ export type ActionItem =
         atribuir_a: "dono_do_lead" | { usuario_id: string };
         prioridade: string;
       };
-    };
+    }
+  // ia.vek D4 — aviso à EQUIPE no grupo configurado na organização.
+  | { type: "avisar_grupo"; config: { tipo: "comemoracao" | "urgente" | "observacao"; texto: string } };
 
 export function defaultActionConfig(type: ActionItem["type"]): ActionItem {
   switch (type) {
@@ -69,6 +71,8 @@ export function defaultActionConfig(type: ActionItem["type"]): ActionItem {
         type,
         config: { titulo: "", vence_em_dias: 1, atribuir_a: "dono_do_lead", prioridade: "medium" },
       };
+    case "avisar_grupo":
+      return { type, config: { tipo: "comemoracao", texto: "" } };
   }
 }
 
@@ -552,6 +556,51 @@ function StartMessageFlowForm({ config, onChange }: FormProps<{ flow_pointer_id:
   );
 }
 
+/**
+ * ia.vek D4 — "Avisar grupo do WhatsApp da equipe". O grupo e o número são da
+ * organização (Configurações › Distribuição de atendimento); aqui só o tipo
+ * (que vira o prefixo) e o texto. Espaçamento e teto diário protegem o número.
+ */
+function AvisarGrupoForm({
+  config,
+  onChange,
+}: FormProps<{ tipo: "comemoracao" | "urgente" | "observacao"; texto: string }>) {
+  const t = useT();
+  return (
+    <div className="grid gap-2">
+      <div className="space-y-1">
+        <Label>{t("Tipo do aviso")}</Label>
+        <Select
+          value={config.tipo}
+          onValueChange={(v) => onChange({ ...config, tipo: v as "comemoracao" | "urgente" | "observacao" })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t("Tipo do aviso")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="comemoracao">{t("🎉 Comemoração (agendou, vendeu)")}</SelectItem>
+            <SelectItem value="urgente">{t("🚨 Urgente (travou, precisa de ajuda)")}</SelectItem>
+            <SelectItem value="observacao">{t("📊 Observação (reengajou, objeção recorrente)")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <Label>{t("Texto do aviso")}</Label>
+        <Textarea
+          rows={3}
+          maxLength={1000}
+          value={config.texto}
+          onChange={(e) => onChange({ ...config, texto: e.target.value })}
+          placeholder={t("{{contact.name}} passou para a equipe: {{lead.title}}")}
+        />
+        <p className="text-xs text-muted-foreground">
+          {t("Vai para o grupo da equipe configurado em Configurações › Distribuição de atendimento, nunca para o cliente. O prefixo do tipo entra sozinho.")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ActionConfigForm({
   action,
   onChange,
@@ -612,6 +661,13 @@ export function ActionConfigForm({
     case "create_task":
       return (
         <CreateTaskForm
+          config={action.config}
+          onChange={(config) => onChange({ type: action.type, config })}
+        />
+      );
+    case "avisar_grupo":
+      return (
+        <AvisarGrupoForm
           config={action.config}
           onChange={(config) => onChange({ type: action.type, config })}
         />

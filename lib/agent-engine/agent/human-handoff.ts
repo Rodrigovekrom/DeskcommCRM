@@ -327,6 +327,31 @@ export async function performHumanHandoff(
   //
   // Try/catch porque a timeline não pode derrubar a operação que ela descreve —
   // mesma disciplina fire-and-forget do emissor da API.
+  // ia.vek D4: a passagem do atendimento da IA anuncia no barramento o MESMO
+  // evento da passagem do CRM (`lib/ai/handoff/orchestrator.ts`), para a
+  // automação ("Quando a conversa passar para a equipe") e a reatividade dos
+  // fluxos verem TODA passagem. Falhar aqui não desfaz o handoff: só loga.
+  try {
+    await guardServiceEffect();
+    await db.query(`select public.emit_event($1, 'conversation', $2::uuid, $3::jsonb, $4::jsonb, $5::uuid)`, [
+      'ai.handoff_triggered',
+      ids.conversationId,
+      JSON.stringify({
+        conversation_id: ids.conversationId,
+        contact_id: ids.leadId,
+        organization_id: ids.tenantId,
+        reason: opts.reason,
+        metadata: { motor: 'engine', origem: opts.passagem?.origem ?? null },
+      }),
+      JSON.stringify({ source: 'human-handoff' }),
+      ids.tenantId,
+    ]);
+  } catch (err) {
+    opts.log.warn('handoff: evento ai.handoff_triggered não foi emitido', {
+      error: err instanceof Error ? err.message.slice(0, 200) : 'erro desconhecido',
+    });
+  }
+
   try {
     const roteou = await emitAgentActivityForContact({
       pool: db,

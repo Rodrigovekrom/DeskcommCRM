@@ -92,6 +92,15 @@ export const ENTIDADE_ESPERADA_POR_GATILHO = {
   // regras do mesmo gatilho com N diferentes disparariam juntas.
   "lead.silent_for": "crm_lead",
   "lead.stage_stale": "crm_lead",
+  // ia.vek D4 — os gatilhos dos avisos da equipe no grupo do WhatsApp.
+  // Passou para humano: emitido pelos DOIS motores de passagem (o do CRM, em
+  // `lib/ai/handoff/orchestrator.ts`, e o do atendimento da IA, em
+  // `lib/agent-engine/agent/human-handoff.ts`). A entidade é a conversa.
+  "ai.handoff_triggered": "conversation",
+  // Caso aberto pela IA: o trigger do banco `fn_emit_agent_case_event`.
+  "ai.case_opened": "agent_case",
+  // Tarefa vencida: nasce do relógio (cron `tarefas-vencidas`), uma vez por tarefa.
+  "task.overdue": "crm_task",
 } as const;
 
 export type GatilhoDeAutomacao = keyof typeof ENTIDADE_ESPERADA_POR_GATILHO;
@@ -259,6 +268,15 @@ const acoesFixas = [
         z.object({ usuario_id: z.string().uuid() }),
       ]),
       prioridade: z.enum(["low", "medium", "high", "urgent"]),
+    }),
+  }),
+  // ia.vek D4 — avisa o grupo do WhatsApp da EQUIPE (configurado na organização).
+  // Nunca fala com o cliente. `tipo` dá o prefixo: 🎉 comemoração, 🚨 urgente, 📊 observação.
+  z.object({
+    type: z.literal("avisar_grupo"),
+    config: z.object({
+      tipo: z.enum(["comemoracao", "urgente", "observacao"]),
+      texto: z.string().min(1).max(1000),
     }),
   }),
 ] as const;

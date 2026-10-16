@@ -28,6 +28,8 @@ import { AssinaturaForm } from "./_assinatura-form";
 import { ChannelRoutingForm } from "./_channels-form";
 import { AtendimentoForm } from "./_form";
 import { EsteiraForm } from "./_esteira-form";
+import { AvisoGrupoForm } from "./_aviso-grupo-form";
+import { configDoAvisoGrupo } from "@/lib/avisos-grupo/regras";
 import { configDaEsteira } from "@/lib/esteira/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -86,6 +88,17 @@ export default async function AtendimentoSettingsPage() {
   }
   membros.sort((a, b) => a.nome.localeCompare(b.nome));
 
+  // ia.vek D4: grupo de avisos da equipe — só grupos conhecidos dos números.
+  const { data: gruposConhecidos } = await admin
+    .from("channel_session_groups")
+    .select("channel_session_id, group_chat_id, subject")
+    .eq("organization_id", activeOrg.orgId)
+    .order("subject", { ascending: true });
+  const grupos = ((gruposConhecidos ?? []) as Array<{ channel_session_id: string; group_chat_id: string; subject: string | null }>).map(
+    (g) => ({ channel_session_id: g.channel_session_id, group_chat_id: g.group_chat_id, rotulo: g.subject || g.group_chat_id }),
+  );
+  const avisoGrupo = configDoAvisoGrupo(settings);
+
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
       <header>
@@ -118,6 +131,15 @@ export default async function AtendimentoSettingsPage() {
           funis: declarados,
           membros,
           podeSalvar: activeOrg.role === "admin" || (user.is_platform_admin && !user.support),
+        }}
+      />
+      <AvisoGrupoForm
+        grupos={grupos}
+        podeSalvar={activeOrg.role === "admin" || (user.is_platform_admin && !user.support)}
+        initial={{
+          grupo: avisoGrupo ? `${avisoGrupo.channel_session_id}|${avisoGrupo.group_chat_id}` : "",
+          espacamento_segundos: avisoGrupo?.espacamento_segundos ?? 60,
+          teto_diario: avisoGrupo?.teto_diario ?? 30,
         }}
       />
     </div>

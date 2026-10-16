@@ -174,6 +174,13 @@ const CURATED_FIELDS: Record<TriggerEvent, CuratedField[]> = {
   // funil (via etapa/tags) e tags do contato.
   "lead.silent_for": LEAD_FIELDS,
   "lead.stage_stale": [...LEAD_FIELDS, STAGE_FIELD],
+  // ia.vek D4: o filtro é sobre o NEGÓCIO e o contato que o evento alcança.
+  "ai.handoff_triggered": LEAD_FIELDS,
+  "ai.case_opened": LEAD_FIELDS,
+  "task.overdue": [
+    { value: "task.source_kind", label: "Tipo da tarefa (ex.: ligacao:L1)", op: "contains" },
+    ...LEAD_FIELDS,
+  ],
 };
 
 const OP_LABELS: Record<Op, string> = { eq: "é", neq: "não é", contains: "contém" };

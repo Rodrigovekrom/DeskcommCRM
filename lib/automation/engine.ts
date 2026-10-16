@@ -129,6 +129,60 @@ export async function buildContext(admin: SupabaseClient, row: EventRow): Promis
         if (contact) context.contact = contact;
       }
     }
+  } else if (
+    (row.entity_kind === "conversation" || row.entity_kind === "agent_case" || row.entity_kind === "crm_task") &&
+    row.entity_id
+  ) {
+    // ia.vek D4: passagem para humano, caso aberto e tarefa vencida. O contato
+    // e o negócio saem da LINHA (tarefa) ou do payload (conversa, caso); sem
+    // negócio no payload, o negócio aberto mais recente do contato.
+    let contactId = typeof row.payload?.contact_id === "string" ? row.payload.contact_id : null;
+    let leadId = typeof row.payload?.lead_id === "string" ? row.payload.lead_id : null;
+    if (row.entity_kind === "crm_task") {
+      const { data: tarefa } = await admin
+        .from("crm_tasks")
+        .select("*")
+        .eq("id", row.entity_id)
+        .eq("organization_id", org)
+        .maybeSingle();
+      if (tarefa) {
+        context.task = tarefa;
+        contactId = (tarefa.contact_id as string | null) ?? contactId;
+        leadId = (tarefa.lead_id as string | null) ?? leadId;
+      }
+    } else if (row.entity_kind === "conversation" && !contactId) {
+      const { data: conversa } = await admin
+        .from("conversations")
+        .select("contact_id")
+        .eq("id", row.entity_id)
+        .eq("organization_id", org)
+        .maybeSingle();
+      contactId = (conversa?.contact_id as string | null) ?? null;
+    }
+    const { data: lead } = leadId
+      ? await admin.from("crm_leads").select("*").eq("id", leadId).eq("organization_id", org).maybeSingle()
+      : contactId
+        ? await admin
+            .from("crm_leads")
+            .select("*")
+            .eq("contact_id", contactId)
+            .eq("organization_id", org)
+            .eq("status", "open")
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
+    if (lead) context.lead = lead;
+    const idDoContato = (lead?.contact_id as string | null | undefined) ?? contactId;
+    if (idDoContato) {
+      const { data: contact } = await admin
+        .from("contacts")
+        .select("*")
+        .eq("id", idDoContato)
+        .eq("organization_id", org)
+        .maybeSingle();
+      if (contact) context.contact = contact;
+    }
   } else if (row.entity_kind === "message" && row.entity_id) {
     const contactId = row.payload.contact_id as string | undefined;
     if (contactId) {
