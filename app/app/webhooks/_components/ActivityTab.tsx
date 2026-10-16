@@ -99,6 +99,15 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   missing_input:
     "A ação não recebeu o que precisava (o lead do evento ou a pessoa configurada). Abra a automação e revise.",
   no_tags: "Esta ação não tem nenhuma etiqueta escolhida. Abra a automação e escolha pelo menos uma.",
+  // ia.vek D4 — ação "Avisar grupo do WhatsApp da equipe".
+  grupo_nao_configurado:
+    "O grupo de avisos da equipe não está escolhido. Escolha o grupo em Configurações › Distribuição de atendimento.",
+  teto_diario:
+    "O grupo da equipe já recebeu o máximo de avisos de hoje. O limite fica em Configurações › Distribuição de atendimento.",
+  numero_do_aviso_nao_encontrado:
+    "O número escolhido para os avisos da equipe não existe mais. Escolha o grupo de novo em Configurações › Distribuição de atendimento.",
+  grupo_sem_endereco_no_canal:
+    "O número dos avisos não conseguiu endereçar o grupo. Confira se ele ainda participa do grupo.",
   no_target: "O evento que disparou a regra não trouxe um lead nem um contato para etiquetar.",
   no_lead_or_contact: "O evento que disparou a regra não trouxe um lead para criar ou mover.",
   cross_pipeline_move_not_allowed: "Mover um lead para outro funil está desligado nesta organização.",

@@ -1052,6 +1052,10 @@ export const DICIONARIO: Traducoes = {
   "Salvar assinatura": { es: "Guardar firma" },
   "Assinatura salva.": { es: "Firma guardada." },
   // ia.vek D4: aviso no grupo da equipe e gatilhos novos.
+  "O grupo de avisos da equipe não está escolhido. Escolha o grupo em Configurações › Distribuição de atendimento.": { es: "El grupo de avisos del equipo no está elegido. Elige el grupo en Configuración › Distribución de atención." },
+  "O grupo da equipe já recebeu o máximo de avisos de hoje. O limite fica em Configurações › Distribuição de atendimento.": { es: "El grupo del equipo ya recibió el máximo de avisos de hoy. El límite está en Configuración › Distribución de atención." },
+  "O número escolhido para os avisos da equipe não existe mais. Escolha o grupo de novo em Configurações › Distribuição de atendimento.": { es: "El número elegido para los avisos del equipo ya no existe. Vuelve a elegir el grupo en Configuración › Distribución de atención." },
+  "O número dos avisos não conseguiu endereçar o grupo. Confira se ele ainda participa do grupo.": { es: "El número de los avisos no pudo dirigirse al grupo. Verifica si todavía participa del grupo." },
   "Tipo do aviso": { es: "Tipo de aviso" },
   "🎉 Comemoração (agendou, vendeu)": { es: "🎉 Celebración (agendó, vendió)" },
   "🚨 Urgente (travou, precisa de ajuda)": { es: "🚨 Urgente (se trabó, necesita ayuda)" },
