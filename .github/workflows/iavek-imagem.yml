@@ -69,6 +69,10 @@ jobs:
           echo "wrk=${wrk}" >> "$GITHUB_OUTPUT"
           echo "tags=${img}:${ramo}-${GITHUB_SHA::7},${img}:${ramo}" >> "$GITHUB_OUTPUT"
           echo "tags_worker=${wrk}:${ramo}-${GITHUB_SHA::7},${wrk}:${ramo}" >> "$GITHUB_OUTPUT"
+          # ia.vek: o scheduler também é nosso — os crons do fork (estoque, esteira,
+          # relatório, tarefas vencidas) moram em docker/scheduler/entrypoint.sh.
+          sch="${REGISTRY}/${dono}/iavek-crm-scheduler"
+          echo "tags_scheduler=${sch}:${ramo}-${GITHUB_SHA::7},${sch}:${ramo}" >> "$GITHUB_OUTPUT"
           echo "versao=${ramo}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v4
@@ -110,6 +114,18 @@ jobs:
             APP_VERSION=${{ steps.tags.outputs.versao }}
           cache-from: type=gha,scope=iavek-worker
           cache-to: type=gha,mode=max,scope=iavek-worker
+
+      - name: Build e push do scheduler (crons)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.scheduler
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.tags.outputs.tags_scheduler }}
+          labels: |
+            org.opencontainers.image.title=ia.vek CRM scheduler
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
       - name: Resumo
         run: |
