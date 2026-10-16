@@ -98,6 +98,7 @@ export const ApiErrorCodes = {
   // tela oferecer o contato existente em vez de só mostrar que deu erro.
   contact_exists: "contact_exists",
   duplicate_external_id: "duplicate_external_id",
+  atualizacao_desligada: "atualizacao_desligada", // ia.vek: POST /system/update — o "Atualizar agora" do upstream está desligado (410)
   event_gone: "event_gone", // resend de run cujo event_log original foi apagado (on delete set null)
   no_actions_to_resend: "no_actions_to_resend", // resend de regra que não tem mais nenhuma ação de webhook — reenviar nada não é sucesso
   next_action_absent: "next_action_absent", // decisão sobre proposta que não existe (mais) [wave 4]

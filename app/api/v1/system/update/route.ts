@@ -15,6 +15,7 @@ import { loadAuthUser } from "@/lib/auth/server";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isRunStale } from "@/lib/system/update-run";
+import { ATUALIZACAO_DO_UPSTREAM } from "@/lib/iavek/versao";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,18 @@ export async function POST(_req: NextRequest): Promise<Response> {
     await requirePlatformAdminEscrita();
   } catch (err) {
     return falhaDaEscritaDePlatformAdmin(err, undefined, "Só o dono do servidor pode atualizar o sistema.");
+  }
+
+  // ia.vek: o sistema não segue mais o upstream. Este pedido acordaria o
+  // agente do host, que roda o `update.sh` do DeskcommCRM e troca as imagens
+  // do ia.vek pelas do upstream. Recusado aqui mesmo que o agente seja
+  // religado no servidor; atualizar é a troca de imagem feita pela equipe.
+  if (!ATUALIZACAO_DO_UPSTREAM) {
+    return fail(
+      "atualizacao_desligada",
+      "As atualizações do ia.vek CRM são feitas pela equipe.",
+      410,
+    );
   }
 
   const db = createAdminClient();

@@ -45,7 +45,7 @@ const NAV_ALLOWLIST: Record<string, string> = {
   "/app/settings/templates":
     "redirect para /app/connections?aba=oficial&sub=templates — template da Meta só existe por causa do canal oficial, e vive como sub-aba dele",
   "/app/settings/atualizacao":
-    "porta é o rodapé de versão (VersionFooter), que aparece justamente quando há versão nova — melhor que um card fixo. Além disso é só do dono do servidor (is_platform_admin), papel que o registro não modela",
+    "ia.vek: tela residual, só do dono do servidor (is_platform_admin), que diz que as atualizações são feitas pela equipe. Sem porta de propósito: o ia.vek não segue mais o upstream e o rodapé de versão deixou de ser link",
   "/app/proposals/novo":
     "sub-fluxo de criação de proposta, alcançado pelo botão 'Nova proposta' em /app/proposals",
 };

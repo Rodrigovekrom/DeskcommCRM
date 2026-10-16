@@ -1,8 +1,25 @@
 # ia.vek CRM — da branch até a produção
 
-Fork: `Rodrigovekrom/DeskcommCRM`, branches **`iavek/*`** (nunca commitar na
-`main`). Base: **v1.76.0 do upstream** (`melgarafael/DeskcommCRM`). Os scripts de
-operação moram **fora do repositório**, em `~/projects/ia-vek-crm/` no Mac.
+Repositório: `Rodrigovekrom/DeskcommCRM`, branches **`iavek/*`** (nunca commitar
+na `main`). **O sistema é nosso e não segue mais o upstream** (decisão do Rodrigo,
+16/10/2026): nasceu da v1.76.0 do DeskcommCRM, e daí em diante só recebe o que nós
+fazemos. Os scripts de operação moram **fora do repositório**, em
+`~/projects/ia-vek-crm/` no Mac.
+
+## Versões, branches e tags
+
+| O quê                                   | Convenção                                    | Exemplo                  |
+| --------------------------------------- | -------------------------------------------- | ------------------------ |
+| Versão (o que aparece no rodapé)        | `VERSAO_IAVEK` em `lib/iavek/versao.ts`      | `ia.vek CRM v1.1`        |
+| Branch da versão                        | `iavek/vX.Y`                                 | `iavek/v1.1`             |
+| Branch de uma melhoria                  | `iavek/vX.Y-<assunto>`, juntada na da versão | `iavek/v1.2-relatorio`   |
+| Tag da imagem (automática, do workflow) | `<branch com - no lugar de />-<sha7>`        | `iavek-v1.1-abc1234`     |
+| Marco git do que foi para a produção    | `iavek-vX.Y` (tag anotada)                   | `iavek-v1.0` = `aa648ad` |
+
+O marco é `iavek-vX.Y`, e **nunca** `vX.Y`: o repositório herdou as tags do
+upstream (`v1.0.0`, `v1.1.0`…) e o workflow `publish-image.yml` publica imagem
+em toda tag `v*`. O `trocar-producao.sh` aceita qualquer tag `iavek-v…-<sha7>`,
+então não muda com a convenção.
 
 ## O que o fork muda
 
@@ -100,11 +117,11 @@ chaves vivas).
 - **Script de produção nunca se executa para testar.** `trocar-producao.sh` (e
   qualquer script que mexa na produção) se valida só com `bash -n`; quem executa
   é o Rodrigo, depois de aprovar a troca.
-- **Não clicar em "Atualizar agora"** no CRM. O agente roda o `update.sh` do
-  upstream, que regrava as imagens com as do upstream: a marca e as funções do
-  fork somem.
-- Atualizar a base passa a ser: trazer a tag nova do upstream para o fork
-  (`git merge vX.Y.0` numa branch `iavek/vX.Y`), testes, imagens, canário, troca.
-  Quando a versão nova trouxer migrations, o canário **não** basta (ele usa o
-  banco da produção): o schema precisa ser aplicado e provado antes, num banco à
-  parte.
+- **Sem "Atualizar agora".** Desde a v1.1 a tela de atualização só diz que as
+  atualizações são feitas pela equipe, o rodapé não consulta versão e o pedido
+  `POST /api/v1/system/update` é recusado (410), mesmo que o `agent.sh` do kit
+  seja religado no servidor. Nunca rodar o `update.sh` do upstream: ele troca as
+  imagens do ia.vek pelas do DeskcommCRM.
+- Se algum dia uma mudança precisar de migration, o canário **não** basta (ele
+  usa o banco da produção): o schema precisa ser aplicado e provado antes, num
+  banco à parte.

@@ -5,6 +5,11 @@ import { loadAuthUser } from "@/lib/auth/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/lib/audit";
 
+// ia.vek: o POST /system/update testado aqui é o fluxo do upstream, desligado
+// no ia.vek (`lib/iavek/versao.ts`); a recusa 410 é provada em
+// `app/api/v1/system/update/route.test.ts`. Aqui o fluxo segue coberto com a chave ligada.
+vi.mock("@/lib/iavek/versao", () => ({ ATUALIZACAO_DO_UPSTREAM: true }));
+
 vi.mock("@/lib/auth/server", () => ({
   loadAuthUser: vi.fn(),
   mfaEmDivida: vi.fn(async () => false),

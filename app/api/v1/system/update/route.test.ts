@@ -3,8 +3,17 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   insertError: { code: "", message: "" },
+  upstream: true,
   audit: vi.fn(),
   escrita: vi.fn(async () => ({ user: { id: "owner" }, platformAdmin: { user_id: "owner", scope: "full", mfa_required: false } })),
+}));
+// ia.vek: os casos abaixo descrevem o fluxo do upstream, que no ia.vek está
+// desligado (`lib/iavek/versao.ts`). Eles rodam com a chave ligada, para o
+// fluxo continuar coberto; o último caso prova a recusa com a chave desligada.
+vi.mock("@/lib/iavek/versao", () => ({
+  get ATUALIZACAO_DO_UPSTREAM() {
+    return mocks.upstream;
+  },
 }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: async () => null }));
 vi.mock("@/lib/auth/server", () => ({
@@ -43,7 +52,10 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import { POST } from "./route";
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.upstream = true;
+});
 
 it("explica a preparação de extensão que bloqueia a atualização sem despachar um run", async () => {
   mocks.insertError = { code: "P0001", message: "extension_preparation_in_progress" };
@@ -85,5 +97,16 @@ it("support_readonly não dispara atualização: 403 forbidden_scope, nada grava
   const response = await POST(new NextRequest("http://localhost/api/v1/system/update", { method: "POST" }));
   expect(response.status).toBe(403);
   expect((await response.json()).error.code).toBe("forbidden_scope");
+  expect(mocks.audit).not.toHaveBeenCalled();
+});
+
+it("ia.vek: com o 'Atualizar agora' do upstream desligado, recusa com 410 e não grava nada", async () => {
+  mocks.upstream = false;
+  mocks.insertError = { code: "", message: "" };
+  const response = await POST(new NextRequest("http://localhost/api/v1/system/update", { method: "POST" }));
+  expect(response.status).toBe(410);
+  const { error } = await response.json();
+  expect(error.code).toBe("atualizacao_desligada");
+  expect(error.message).toContain("feitas pela equipe");
   expect(mocks.audit).not.toHaveBeenCalled();
 });

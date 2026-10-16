@@ -1051,6 +1051,10 @@ export const DICIONARIO: Traducoes = {
   "Sem asteriscos nem quebra de linha.": { es: "Sin asteriscos ni saltos de línea." },
   "Salvar assinatura": { es: "Guardar firma" },
   "Assinatura salva.": { es: "Firma guardada." },
+  // ia.vek v1.1: atualização feita pela equipe (sem o "Atualizar agora" do upstream).
+  "As atualizações do ia.vek CRM são feitas pela equipe. Não há nada a fazer por aqui.": {
+    es: "Las actualizaciones de ia.vek CRM las hace el equipo. No hay nada que hacer aquí.",
+  },
   // ia.vek D4: aviso no grupo da equipe e gatilhos novos.
   "O grupo de avisos da equipe não está escolhido. Escolha o grupo em Configurações › Distribuição de atendimento.": { es: "El grupo de avisos del equipo no está elegido. Elige el grupo en Configuración › Distribución de atención." },
   "O grupo da equipe já recebeu o máximo de avisos de hoje. O limite fica em Configurações › Distribuição de atendimento.": { es: "El grupo del equipo ya recibió el máximo de avisos de hoy. El límite está en Configuración › Distribución de atención." },
