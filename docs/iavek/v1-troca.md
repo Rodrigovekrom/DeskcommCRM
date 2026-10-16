@@ -1,11 +1,10 @@
-# ia.vek CRM v1 — da branch até a produção
+# ia.vek CRM — da branch até a produção
 
-Fork: `Rodrigovekrom/DeskcommCRM`, branch **`iavek/v1.76`**.
-Base: **v1.76.0 do upstream**, a mesma versão que roda em `crm.iavekcrm.com`
-(medido em `/api/v1/health` em 08/10/2026). O que a branch muda é só visual:
-nenhuma migration, nenhum schema, nenhuma rota.
+Fork: `Rodrigovekrom/DeskcommCRM`, branches **`iavek/*`** (nunca commitar na
+`main`). Base: **v1.76.0 do upstream** (`melgarafael/DeskcommCRM`). Os scripts de
+operação moram **fora do repositório**, em `~/projects/ia-vek-crm/` no Mac.
 
-## O que a v1 entrega
+## O que o fork muda
 
 | Peça                                                                            | Arquivos                                                            |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -14,90 +13,98 @@ nenhuma migration, nenhum schema, nenhuma rota.
 | Logo: rede de nós com o nó final âmbar + wordmark `ia.vek`                      | `lib/branding/desenho.ts`, `components/branding/MarcaDoProduto.tsx` |
 | Favicon e ícone do app com o símbolo pequeno                                    | `app/icon.tsx`, `lib/branding/icone-do-app.tsx`                     |
 | Fundo de rede neural (telas de acesso)                                          | `components/branding/FundoNeural.tsx`, `app/(public)/layout.tsx`    |
-| Imagem no GHCR do fork                                                          | `.github/workflows/iavek-imagem.yml`                                |
+| Funcionalidades da Fenômenos (preço em 3 níveis, estoque Altimus, esteira, avisos no grupo…) | `lib/esteira/`, `lib/avisos-grupo/`, `lib/estoque/` e afins |
+| Três imagens no GHCR do fork                                                    | `.github/workflows/iavek-imagem.yml`                                |
 
 O logo da rede de nós aparece quando a instalação se chama **`ia.vek`**
-(`APP_NAME=ia.vek`) e não tem logo subido em `/admin/marca`. O padrão do
-upstream (`DEFAULT_APP_NAME`) não foi editado: o repositório tem testes que
-travam essa constante, e o caminho que o upstream manda seguir é o `APP_NAME`.
+(`APP_NAME`) e não tem logo subido em `/admin/marca`. O padrão do upstream
+(`DEFAULT_APP_NAME`) não foi editado: o repositório tem testes que travam essa
+constante.
 
-## 1. Publicar a imagem
+**O fork não leva migration.** Configuração nova mora em `organizations.settings`
+(JSON), para não colidir com a numeração do upstream. Por isso o canário, que usa
+o banco da produção, prova a versão inteira.
 
-1. Dar ao `gh` a permissão de workflow (só uma vez): `gh auth refresh -s workflow`
-2. `git push origin iavek/v1.76` — o workflow `iavek-imagem` roda typecheck +
-   test:unit e publica `ghcr.io/rodrigovekrom/iavek-crm:iavek-v1.76-<sha7>`.
-   O resumo do run mostra a linha `APP_IMAGE=…` pronta.
-3. O pacote nasce **privado** no GHCR. Ou torna público (Package settings →
-   Change visibility), ou a VPS faz `docker login ghcr.io` com um token
+## 1. Publicar as imagens
+
+1. Commit numa branch `iavek/*`, com `pnpm typecheck` e `pnpm test:unit` verdes.
+2. `git push origin <branch>`: o workflow `iavek-imagem` roda typecheck +
+   test:unit e publica três imagens **com a mesma tag** `<branch>-<sha7>`
+   (barras viram hífen, ex.: `iavek-v1.76-d4-avisos-aa648ad`):
+   - `ghcr.io/rodrigovekrom/iavek-crm` (app);
+   - `ghcr.io/rodrigovekrom/iavek-crm-worker` (worker);
+   - `ghcr.io/rodrigovekrom/iavek-crm-scheduler` (crons do fork).
+3. Os três pacotes são **públicos**: a VPS baixa sem `docker login` (não há
+   credencial do GHCR no servidor). Se algum dia virarem privados, a troca para
+   no passo de baixar, com "NADA mudou", até a VPS ganhar um login
    `read:packages`.
 
-## 2. Validar antes da troca
-
-Como a versão é a mesma (1.76.0) e a diferença é só visual, o caminho mais
-curto é um **canário no próprio VPS**: subir a imagem nova num contêiner à
-parte, numa porta interna, sem worker nem scheduler, e abrir pelo túnel SSH.
+## 2. Canário (antes de toda troca)
 
 ```bash
-# no VPS. O env sai do contêiner que está no ar, e NÃO do .env: o
-# `docker run --env-file` mantém as aspas que o compose tira, e o app recusa
-# o valor ("Variáveis de ambiente inválidas").
-umask 077
-docker inspect deskcommcrm-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
-  | grep -v '^$' > /root/iavek-canario.env
-docker run -d --name iavek-canario --env-file /root/iavek-canario.env \
-  --network deskcommcrm_internal -p 127.0.0.1:3901:3000 \
-  ghcr.io/rodrigovekrom/iavek-crm:<tag>
-shred -u /root/iavek-canario.env   # o contêiner já leu; o arquivo tem as chaves
-# no Mac
+bash ~/projects/ia-vek-crm/canario.sh <tag>
+```
+
+Sobe o app da tag num contêiner à parte (`iavek-canario`), em
+**`127.0.0.1:3901`**, na rede `deskcommcrm_internal`, com o mesmo ambiente do app
+de produção (lido do contêiner, num arquivo temporário apagado com `shred`). Não
+toca o contêiner de produção, o `.env` nem o compose. Para olhar, abra o túnel e
+acesse `http://localhost:3901/login`:
+
+```bash
 ssh -i ~/.ssh/iavek_vps -p 22022 -L 3901:127.0.0.1:3901 root@143.95.173.212
-# abrir http://localhost:3901/login ; ao terminar:
-docker rm -f iavek-canario
 ```
 
-A rede `deskcommcrm_internal` é a do compose: sem ela o canário não alcança o
-Redis nem o WAHA pelo nome.
+O canário lê **o mesmo banco da produção**: só olhar e navegar, sem salvar
+configuração por ali. O worker e o scheduler da tag não sobem no canário.
 
-Ele lê o MESMO banco da produção — por isso só olhar e navegar; nenhuma
-configuração salva ali. (Staging completo com o projeto Supabase separado
-`deskcomm-crm` é possível, mas exige aplicar o `baseline.sql` nele e um segundo
-conjunto de chaves; para uma mudança só visual o canário prova o mesmo.)
+## 3. Trocar (só com OK explícito do Rodrigo para aquela troca)
 
-## 3. Trocar
+Quem roda é o Rodrigo, no Terminal do Mac:
 
 ```bash
-cd ~/DeskcommCRM            # a pasta onde o install.sh rodou
-bash hostgator-setup-kit/backup.sh
-grep '^APP_IMAGE=' .env      # anote a imagem atual: é a volta
-# no .env:
-#   APP_IMAGE=ghcr.io/rodrigovekrom/iavek-crm:<tag>
-#   APP_NAME=ia.vek
-bash -c 'source hostgator-setup-kit/_common.sh && enter_project && dc up -d app'
+bash ~/projects/ia-vek-crm/trocar-producao.sh <tag>
 ```
 
-Conferir: `/` responde 200, `/app` responde 307 e `/login` mostra o logo novo.
-Se em `/admin/marca` houver nome ou logo gravados, eles vencem o `.env`
-(o banco está acima): deixe o nome como `ia.vek` e o logo vazio.
+O script, em ordem (um passo que falha impede os seguintes):
+
+1. baixa as 3 imagens da tag (a que não existir com a tag fica como está);
+2. faz o backup do banco e do WhatsApp (`backup.sh` do kit);
+3. anota as imagens no ar (app, worker, scheduler, uma por linha) em
+   `/root/iavek-imagem-anterior.txt`, e o histórico em `/root/iavek-trocas.log`;
+4. troca `APP_IMAGE`, `WORKER_IMAGE` e `SCHEDULER_IMAGE` no `.env` e reinicia só
+   esses serviços (30 a 60 s fora do ar);
+5. confere: app saudável, saúde `healthy ok`, `/login` 200 e `/app` 307 pelo
+   domínio, worker e scheduler rodando com a imagem nova. **Se algo falhar,
+   volta sozinho** para as imagens anotadas;
+6. com tudo certo, remove o canário.
+
+O banco não muda: a troca é só de imagem.
 
 ## 4. Desfazer
 
 ```bash
-# APP_IMAGE de volta para a imagem anotada no passo 3
-sed -i 's#^APP_IMAGE=.*#APP_IMAGE="<imagem anterior>"#' .env
-bash -c 'source hostgator-setup-kit/_common.sh && enter_project && dc up -d app'
+bash ~/projects/ia-vek-crm/trocar-producao.sh volta
 ```
 
-Volta em segundos: o banco não muda nos dois sentidos.
+Volta as três imagens anotadas em `/root/iavek-imagem-anterior.txt`, com a mesma
+conferência. Volta em segundos, porque o banco não muda nos dois sentidos.
 
-**Sem cópia do `.env`.** A troca muda só o `APP_IMAGE`, então a volta é ele.
-Uma cópia inteira do `.env` guarda TODAS as chaves e sobrevive às rotações: em
-15/10/2026 (#72) foram apagadas três (`.env.antes-iavek`, `.env.antes-chaves*`),
-uma delas com as chaves novas vivas. Se uma troca futura precisar de cópia,
-apague-a com `shred -u` assim que a troca for conferida.
+**Sem cópia do `.env`.** A troca muda só as três linhas de imagem, e a volta é o
+arquivo de imagens anteriores. Uma cópia inteira do `.env` guarda todas as chaves
+e sobrevive às rotações (em 15/10/2026, #72, três cópias foram apagadas, uma com
+chaves vivas).
 
-## Atenção depois da troca
+## Regras
 
+- **Script de produção nunca se executa para testar.** `trocar-producao.sh` (e
+  qualquer script que mexa na produção) se valida só com `bash -n`; quem executa
+  é o Rodrigo, depois de aprovar a troca.
 - **Não clicar em "Atualizar agora"** no CRM. O agente roda o `update.sh` do
-  upstream, que regrava `APP_IMAGE` com a imagem do upstream — a marca some
-  (nada quebra, mas a v1 é desfeita).
-- Atualizar passa a ser: trazer a tag nova do upstream para o fork
-  (`git merge v1.77.0` numa branch `iavek/v1.77`), testes, imagem, canário, troca.
+  upstream, que regrava as imagens com as do upstream: a marca e as funções do
+  fork somem.
+- Atualizar a base passa a ser: trazer a tag nova do upstream para o fork
+  (`git merge vX.Y.0` numa branch `iavek/vX.Y`), testes, imagens, canário, troca.
+  Quando a versão nova trouxer migrations, o canário **não** basta (ele usa o
+  banco da produção): o schema precisa ser aplicado e provado antes, num banco à
+  parte.
