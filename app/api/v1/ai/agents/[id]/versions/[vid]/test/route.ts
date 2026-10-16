@@ -174,6 +174,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       sampleMessage: parsed.data.sample_message,
       sampleContact: parsed.data.sample_contact,
       channelId: version.channel_session_id,
+      ...(parsed.data.historico ? { historico: parsed.data.historico } : {}),
       ...(parsed.data.simulacao_preco
         ? {
             simulacaoDePreco: {

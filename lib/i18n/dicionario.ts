@@ -2247,6 +2247,13 @@ export const DICIONARIO: Traducoes = {
   "Já pediu o preço antes (vezes)": { es: "Ya pidió el precio antes (veces)" },
   "Carro em discussão (código)": { es: "Auto en discusión (código)" },
   "código do catálogo": { es: "código del catálogo" },
+  "Conversa antes desta mensagem (opcional)": { es: "Conversación antes de este mensaje (opcional)" },
+  "cliente: oi, vi o anúncio do Onix\nia: Boa tarde! Sou a Daiane...": {
+    es: "cliente: hola, vi el anuncio del Onix\nia: ¡Buenas tardes! Soy Daiane...",
+  },
+  "Uma fala por linha, começando com \"cliente:\" ou \"ia:\". Serve para testar o meio da conversa, não só a abertura.": {
+    es: "Un mensaje por línea, empezando con \"cliente:\" o \"ia:\". Sirve para probar la mitad de la conversación, no solo el inicio.",
+  },
   Resultado: { es: "Resultado" },
   "Nenhum teste executado ainda.": { es: "Todavía no se ejecutó ninguna prueba." },
   "Executando dry-run…": { es: "Ejecutando dry-run…" },
