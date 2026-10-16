@@ -144,3 +144,33 @@ it('uses only supplied in-memory sample contact in sandbox', () => {
   expect(context.context.contact.name).toBe('Maria Cenário');
   expect(context.context.contact.phone).toBe('+5511999999999');
 });
+
+describe('ia.vek: ordem e trava de fechamento na prévia', () => {
+  it('candidatos ficam na ordem da CHAMADA, mesmo terminando fora de ordem', async () => {
+    const p = preview();
+    let liberar!: () => void;
+    const segura = new Promise<void>((r) => (liberar = r));
+    let chamadas = 0;
+    const classificador = async () => {
+      chamadas += 1;
+      if (chamadas === 1) await segura; // a 1ª chamada termina por último
+      return { kind: 'none' } as never;
+    };
+    const tools = applyPreviewPolicy({ send_message: definition(vi.fn()) }, p, gate(), () => [], classificador);
+    const primeira = execute(tools, 'send_message', { body: 'Oi, boa noite!' });
+    await execute(tools, 'send_message', { body: 'Como posso te chamar?' });
+    liberar();
+    await primeira;
+    expect(p.result.candidates.map((c) => c.body)).toEqual(['Oi, boa noite!', 'Como posso te chamar?']);
+  });
+
+  it('update_lead_state com lost/won vira impedimento fechamento_e_da_equipe', async () => {
+    const p = preview();
+    const tools = applyPreviewPolicy({ update_lead_state: definition(vi.fn()) }, p, gate(), () => []);
+    await execute(tools, 'update_lead_state', { stage: 'lost' });
+    expect(p.result.impediments.map((i) => i.code)).toEqual(['fechamento_e_da_equipe']);
+    expect(p.result.proposals).toEqual([]);
+    await execute(tools, 'update_lead_state', { stage: 'qualified' });
+    expect(p.result.proposals).toHaveLength(1);
+  });
+});

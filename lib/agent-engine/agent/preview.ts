@@ -1,5 +1,6 @@
 /** Preview is an execution policy of the real turn, never a simulated queue job. */
 import type pg from 'pg';
+import { recusaDeFechamento } from './ia-nao-fecha-negocio';
 import { hasOpenCaseForContact } from './human-cases';
 import type { ToolSet } from '../edge/llm/run-model-call';
 import type { LeadContext, LeadContextResult } from '../edge/crm/get-lead-context';
@@ -29,6 +30,11 @@ import type { Citation } from '@/lib/ai/citations/types';
 
 export interface TurnPreview {
   kind: 'sandbox' | 'assisted';
+  /**
+   * ia.vek: a organização deixa a IA marcar ganho/perda? Preenchido pelo turno
+   * (mesma leitura do envio real); ausente = não deixa, como o padrão.
+   */
+  iaPodeFecharNegocio?: boolean;
   organizationId: string;
   runId: string;
   agent: PublishedAgentConfig;
@@ -62,6 +68,8 @@ export interface PreviewResult {
     trace: GateTraceEntry[];
     /** Código do produto cujas fotos iriam junto (ia.vek: para quem avalia a prévia). */
     produtoCodigo?: string;
+    /** Ordem em que a IA CHAMOU o envio (0, 1, …). */
+    ordem?: number;
   }>;
   /** Ferramentas de LEITURA chamadas na prévia (ex.: busca de produtos), na ordem. */
   leituras?: Array<{ tool: string; arguments: unknown }>;
@@ -219,6 +227,10 @@ export function applyPreviewPolicy(
   semanticClassifier?: (body: string) => Promise<NonNullable<GateContext['semanticPromise']>>,
   liveContext?: () => Partial<GateContext>,
 ): ToolSet {
+  // A ORDEM em que a IA chamou o envio. Chamadas no mesmo passo rodam em
+  // paralelo e terminam fora de ordem (o classificador semântico é assíncrono);
+  // o candidato guarda a ordem da CHAMADA e a lista é mantida nessa ordem.
+  let ordemDaChamada = 0;
   return Object.fromEntries(
     Object.entries(tools).map(([name, definition]) => {
       const nativeRead = [
@@ -252,6 +264,7 @@ export function applyPreviewPolicy(
           ...definition,
           execute: async (args: unknown) => {
             if (name === 'send_message') {
+              const ordem = ordemDaChamada++;
               const body =
                 args && typeof args === 'object' && 'body' in args && typeof args.body === 'string'
                   ? args.body
@@ -286,7 +299,9 @@ export function applyPreviewPolicy(
                 citations: citations(),
                 trace: result.trace,
                 ...(produto !== '' ? { produtoCodigo: produto } : {}),
+                ordem,
               });
+              p.result.candidates.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
               return {
                 ok: true,
                 status: p.kind === 'sandbox' ? 'simulated' : 'awaiting_approval',
@@ -301,6 +316,17 @@ export function applyPreviewPolicy(
                   message: 'Esta consulta precisa de um contato real autorizado.',
                 },
               };
+            if (name === 'update_lead_state') {
+              // ia.vek: a mesma trava do envio real (`ia-nao-fecha-negocio.ts`).
+              const recusa = recusaDeFechamento(
+                (args as { stage?: unknown } | null)?.stage,
+                p.iaPodeFecharNegocio === true,
+              );
+              if (recusa !== null) {
+                p.result.impediments.push({ code: recusa.error.code, message: recusa.error.message });
+                return recusa;
+              }
+            }
             if (
               catalog ||
               [

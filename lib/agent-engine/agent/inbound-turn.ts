@@ -4237,6 +4237,10 @@ async function executarTurnoDoAgente(
     const previewContext = preview
       ? await previewGateContext(pool, preview, runLog, clock())
       : null;
+    // ia.vek: a prévia mostra a MESMA trava de fechamento do envio real.
+    if (preview && preview.iaPodeFecharNegocio === undefined) {
+      preview.iaPodeFecharNegocio = await organizacaoDeixaIaFecharNegocio(pool, tenantId);
+    }
     const previewTools =
       preview && previewContext
         ? applyPreviewPolicy(
