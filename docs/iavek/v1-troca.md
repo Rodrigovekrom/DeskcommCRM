@@ -51,10 +51,10 @@ o banco da produção, prova a versão inteira.
    - `ghcr.io/rodrigovekrom/iavek-crm` (app);
    - `ghcr.io/rodrigovekrom/iavek-crm-worker` (worker);
    - `ghcr.io/rodrigovekrom/iavek-crm-scheduler` (crons do fork).
-3. Os três pacotes são **públicos**: a VPS baixa sem `docker login` (não há
-   credencial do GHCR no servidor). Se algum dia virarem privados, a troca para
-   no passo de baixar, com "NADA mudou", até a VPS ganhar um login
-   `read:packages`.
+3. Os três pacotes são **privados** (desde 16/10/2026): a VPS baixa com o
+   `docker login ghcr.io` gravado em `/root/.docker/config.json` (token
+   `read:packages`). Sem esse login, a troca para no passo de baixar, com "NADA
+   mudou". Para conferir de fora: o pull anônimo responde 401.
 
 ## 2. Canário (antes de toda troca)
 
