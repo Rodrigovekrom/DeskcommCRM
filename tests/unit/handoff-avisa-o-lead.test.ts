@@ -75,6 +75,11 @@ const FONTES = [
   "lib/agent-engine/agent/human-handoff.ts",
   "lib/ai/handoff/orchestrator.ts",
   "app/api/v1/ai/cases/[id]/reply/route.ts",
+  // ia.vek D3: passagens PROGRAMADAS (esteira das 72 h e nó "Passar para humano"
+  // do fluxo). Declaram `avisoAoLead: { avisado: false, porque }`: o cliente não
+  // ficou esperando resposta, e o porquê aparece no aviso da Central.
+  "lib/esteira/deps-reais.ts",
+  "lib/followup/engine.ts",
 ] as const;
 
 /**

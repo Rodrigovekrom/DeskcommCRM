@@ -144,6 +144,14 @@ export type ActivityType =
   | "task_created"
   | "task_completed"
   /**
+   * ia.vek D3 — esteira de vendas. A LIGAÇÃO registrada pelos 3 campos (atendeu?,
+   * resumo, próximo passo); o lead em follow-up que VOLTOU a falar; e a cobrança
+   * de ligação vencida (1ª ou 2ª), que também serve de marca para não cobrar duas vezes.
+   */
+  | "call_logged"
+  | "esteira_reengajou"
+  | "esteira_ligacao_cobrada"
+  /**
    * DOIS CADASTROS DA MESMA PESSOA VIRARAM UM. Emitido por
    * `fn_mesclar_contatos` (migration 0215) em cada negócio que o contato
    * vencedor passou a ter — inclusive nos que ELE não tinha e herdou do
@@ -285,6 +293,9 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   voice_call_unanswered: "Chamada de voz sem resposta",
   task_created: "Tarefa combinada",
   task_completed: "Tarefa concluída",
+  call_logged: "Ligação registrada",
+  esteira_reengajou: "Cliente voltou a falar",
+  esteira_ligacao_cobrada: "Ligação atrasada cobrada",
   // Rótulo com OBJETO e sem jargão de banco: "Mesclado" sozinho é palavra de
   // engenheiro. O que aconteceu, para quem lê a timeline do negócio, é que dois
   // cadastros da mesma pessoa viraram um — e é por isso que este negócio pode

@@ -195,6 +195,16 @@ export interface AdminClient {
     config: Extract<FlowNode, { type: "edit_lead_tag" }>["config"];
   }): Promise<void>;
   /**
+   * ia.vek D3 — nó `human_handoff`: o MESMO `performHumanHandoff` da IA.
+   * Opcional pelas mesmas razões acima.
+   */
+  passarParaHumano?(item: {
+    organization_id: string;
+    contact_id: string;
+    enrollment_id: string;
+    config: Extract<FlowNode, { type: "human_handoff" }>["config"];
+  }): Promise<void>;
+  /**
    * Régua de recuperação de falta esgotada sem resposta — abre um item na
    * Central referenciando o COMPROMISSO. Opcional: só a produção precisa; os
    * adaptadores de teste que não exercitam no-show podem omitir. Ver
@@ -485,6 +495,23 @@ async function applyResult(
       });
     } catch (err) {
       logger.warn("followup_move_lead_failed", {
+        organization_id: enrollment.organization_id,
+        enrollment_id: enrollment.id,
+        node_id: node.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  if (result.kind === "advance" && !isReplay && node.type === "human_handoff") {
+    try {
+      await db.passarParaHumano?.({
+        organization_id: enrollment.organization_id,
+        contact_id: enrollment.contact_id,
+        enrollment_id: enrollment.id,
+        config: node.config,
+      });
+    } catch (err) {
+      logger.warn("followup_human_handoff_failed", {
         organization_id: enrollment.organization_id,
         enrollment_id: enrollment.id,
         node_id: node.id,
@@ -1221,6 +1248,50 @@ export function createSupabaseAdminClient(admin: SupabaseClient): AdminClient {
       if (resultado.status === "failed") {
         throw new Error(resultado.error ?? "add_tag_failed");
       }
+    },
+    /**
+     * ia.vek D3 — nó `human_handoff`: o MESMO `performHumanHandoff` da IA, na
+     * conversa individual mais recente do contato. Sem conversa, não há o que
+     * passar (o nó segue, e o log diz por quê).
+     */
+    async passarParaHumano(item) {
+      const { data: conversa, error } = await admin
+        .from("conversations")
+        .select("id")
+        .eq("organization_id", item.organization_id)
+        .eq("contact_id", item.contact_id)
+        .eq("is_group", false)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!conversa) {
+        logger.warn("followup_human_handoff_sem_conversa", {
+          organization_id: item.organization_id,
+          enrollment_id: item.enrollment_id,
+        });
+        return;
+      }
+      const { performHumanHandoff } = await import("@/lib/agent-engine/agent/human-handoff");
+      const { getRequestPool } = await import("@/lib/agent-engine/db/request-pool");
+      const { createLogger } = await import("@/lib/agent-engine/obs/logger");
+      const motivo = item.config.motivo.trim();
+      await performHumanHandoff(
+        getRequestPool(),
+        { tenantId: item.organization_id, leadId: item.contact_id, conversationId: (conversa as { id: string }).id },
+        {
+          reason: "fluxo_passar_para_humano",
+          conversationSummary: motivo || "O fluxo de follow-up passou este cliente para a equipe.",
+          inboxTitle: motivo ? `Fluxo: ${motivo}`.slice(0, 200) : "Fluxo: passar para a equipe",
+          // Passagem PROGRAMADA pelo fluxo: o cliente não ficou esperando uma
+          // resposta; se o fluxo quiser avisá-lo, faz isso numa caixa de mensagem antes.
+          avisoAoLead: {
+            avisado: false,
+            porque: "Passagem programada pelo fluxo de follow-up: o cliente não aguardava resposta.",
+          },
+          log: createLogger(),
+        },
+      );
     },
     async abrirAvisoRecuperacaoEsgotada(item) {
       // ── A GUARDA DE ANONIMIZAÇÃO DESTA PORTA (issue #701) ──

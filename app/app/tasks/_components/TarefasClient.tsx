@@ -19,6 +19,8 @@ import type { NovaTarefa, SituacaoDaTarefa, Tarefa } from "@/lib/tarefas/tipos";
 import { CalendarioDeTarefas } from "./CalendarioDeTarefas";
 import { FormularioDeTarefa } from "./FormularioDeTarefa";
 import { ListaDeTarefas } from "./ListaDeTarefas";
+import { RegistroDeLigacao } from "./RegistroDeLigacao";
+import { ehLigacao } from "@/lib/esteira/rodada";
 
 /** "aberto" não é uma situação do banco: é o filtro que a tela abre por padrão. */
 type FiltroDeSituacao = "aberto" | SituacaoDaTarefa;
@@ -35,6 +37,8 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
   // "Nova tarefa" precisa de uma chave NOVA — senão a segunda abertura traz o
   // que ficou digitado na primeira.
   const [aberturas, setAberturas] = useState(0);
+  // ia.vek D3: ligação da esteira conclui pelos 3 campos, nunca pelo clique simples.
+  const [ligacao, setLigacao] = useState<Tarefa | null>(null);
 
   const {
     tarefas,
@@ -174,11 +178,27 @@ export function TarefasClient({ podeEditar }: { podeEditar: boolean }) {
         <ListaDeTarefas
           tarefas={tarefas}
           podeEditar={podeEditar}
-          aoAlternarConcluida={alternarConcluida}
+          aoAlternarConcluida={async (tarefa) => {
+            if (ehLigacao(tarefa.source_kind) && tarefa.status !== "done" && tarefa.status !== "cancelled") {
+              setLigacao(tarefa);
+              return;
+            }
+            return alternarConcluida(tarefa);
+          }}
           aoEditar={abrirEdicao}
           aoApagar={(tarefa) => apagarTarefa(tarefa.id)}
         />
       )}
+
+      <RegistroDeLigacao
+        key={ligacao?.id ?? "nenhuma"}
+        tarefa={ligacao}
+        aoFechar={() => setLigacao(null)}
+        aoRegistrar={() => {
+          setLigacao(null);
+          void recarregar();
+        }}
+      />
 
       <FormularioDeTarefa
         key={aberturas}

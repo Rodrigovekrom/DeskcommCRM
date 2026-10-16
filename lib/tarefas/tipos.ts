@@ -43,6 +43,8 @@ export interface Tarefa {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Origem automática (ia.vek: `ligacao:<código>` = ligação da esteira, que se registra pelos 3 campos). */
+  source_kind?: string | null;
 }
 
 export interface NovaTarefa {

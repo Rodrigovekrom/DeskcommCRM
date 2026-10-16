@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-import { Bell, Play, Clock, GitBranch, Brain, ChatCircle, ArrowsClockwise, PaperPlaneTilt, Flag, Question, PuzzlePiece, Funnel, Tag } from "@/lib/ui/icons";
+import { Bell, Play, Clock, GitBranch, Brain, ChatCircle, ArrowsClockwise, PaperPlaneTilt, Flag, Question, PuzzlePiece, Funnel, Tag, UserCircle } from "@/lib/ui/icons";
 import type { FlowNode, NodeType } from "@/lib/followup/graph-schema";
 import { RESULTADOS_DO_FIM } from "@/lib/followup/vocabulario";
 import { NOS_DA_SUPERFICIE } from "@/lib/followup/validate-publish";
@@ -187,6 +187,16 @@ export const NODE_VISUALS: Record<NodeType, NodeVisual> = {
     defaultLabel: "Gravar tag no lead",
     defaultConfig: () => ({ tags: [] }),
   },
+  // ia.vek D3
+  human_handoff: {
+    type: "human_handoff",
+    paletteLabel: "Passar para humano",
+    icon: UserCircle,
+    chipClassName: "bg-warning-bg text-warning-fg",
+    borderClassName: "border-l-warning",
+    defaultLabel: "Passar para humano",
+    defaultConfig: () => ({ motivo: "" }),
+  },
   end: {
     type: "end",
     paletteLabel: "Fim",
@@ -292,6 +302,10 @@ export function describeNodeConfig(
     case "edit_lead_tag": {
       const c = config as ConfigOf<"edit_lead_tag">;
       return c.tags.length ? c.tags.join(", ") : t("sem tag escolhida");
+    }
+    case "human_handoff": {
+      const c = config as ConfigOf<"human_handoff">;
+      return c.motivo ? c.motivo : t("a equipe assume a conversa");
     }
     case "end": {
       const c = config as ConfigOf<"end">;

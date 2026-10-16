@@ -903,6 +903,14 @@ export function processNode(input: {
       return { kind: "advance", next_node_id: edge.target, next_eval_at: clock() };
     }
 
+    case "human_handoff": {
+      // ia.vek D3 — mesma passagem do `move_lead`: quem faz o handoff é o motor
+      // ao aplicar o `advance`, com a trava do idempotency_key do passo.
+      const edge = selectEdge(edges, node.id, { type: "always" });
+      if (!edge) return { kind: "fail", error: `human_handoff node "${node.id}" has no outbound edge` };
+      return { kind: "advance", next_node_id: edge.target, next_eval_at: clock() };
+    }
+
     case "end": {
       if (node.config.outcome === "custom") {
         return { kind: "complete", outcome: null, cancel_reason: node.config.note };

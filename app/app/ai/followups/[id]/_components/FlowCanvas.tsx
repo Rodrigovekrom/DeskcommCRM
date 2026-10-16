@@ -63,6 +63,7 @@ import { CollectNode } from "./nodes/CollectNode";
 import { InternalTaskNode } from "./nodes/InternalTaskNode";
 import { MoveLeadNode } from "./nodes/MoveLeadNode";
 import { EditLeadTagNode } from "./nodes/EditLeadTagNode";
+import { HumanHandoffNode } from "./nodes/HumanHandoffNode";
 import { SkillNode } from "./nodes/SkillNode";
 
 const EMPTY_GRAPH: FlowGraph = { nodes: [], edges: [] };
@@ -88,6 +89,7 @@ const nodeTypes: NodeTypes = {
   // cima), sem rótulo e sem formulário.
   move_lead: MoveLeadNode,
   edit_lead_tag: EditLeadTagNode,
+  human_handoff: HumanHandoffNode,
   end: EndNode,
   collect: CollectNode,
   skill: SkillNode,

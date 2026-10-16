@@ -287,6 +287,11 @@ export const AUDIT_ACTIONS = [
   "leads.bulk_assigned",
   "attendant.availability_changed",
   "routing.config_changed",
+  // ia.vek D3: configuração da esteira de vendas (horário, escalada, relatório).
+  "esteira.config_changed",
+  "esteira.rodada_executada",
+  "esteira.ligacao_registrada",
+  "esteira.relatorio_semanal_enviado",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser
   // lido — é mutação relevante, não preferência de exibição.

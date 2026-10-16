@@ -27,6 +27,9 @@ import { configAssinatura } from "@/lib/messaging/assinatura";
 import { AssinaturaForm } from "./_assinatura-form";
 import { ChannelRoutingForm } from "./_channels-form";
 import { AtendimentoForm } from "./_form";
+import { EsteiraForm } from "./_esteira-form";
+import { configDaEsteira } from "@/lib/esteira/config";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +61,31 @@ export default async function AtendimentoSettingsPage() {
   const assinatura = configAssinatura(settings);
   const assinaturaInicial = { humanos: assinatura.humanos, ia: assinatura.ia, nome_ia: assinatura.nomeIa };
 
+  // ia.vek D3: esteira de vendas (escalada e relatório por papel ou pessoa).
+  const esteira = configDaEsteira(settings);
+  const admin = createAdminClient();
+  const nomeDoFunil = async (id: string) =>
+    ((await admin.from("crm_pipelines").select("name").eq("organization_id", activeOrg.orgId).eq("id", id).maybeSingle())
+      .data as { name?: string } | null)?.name ?? id;
+  const salvoEsteira = ((settings as { esteira?: unknown }).esteira ?? {}) as Record<string, unknown>;
+  const declarados = salvoEsteira.entrada && salvoEsteira.followup
+    ? {
+        entrada: await nomeDoFunil((salvoEsteira.entrada as { pipeline_id: string }).pipeline_id),
+        followup: await nomeDoFunil((salvoEsteira.followup as { pipeline_id: string }).pipeline_id),
+      }
+    : null;
+  const { data: vinculos } = await admin
+    .from("user_organizations")
+    .select("user_id")
+    .eq("organization_id", activeOrg.orgId);
+  const membros: Array<{ id: string; nome: string }> = [];
+  for (const v of (vinculos ?? []) as Array<{ user_id: string }>) {
+    const { data: u } = await admin.auth.admin.getUserById(v.user_id);
+    const meta = (u?.user?.user_metadata ?? {}) as { full_name?: string; name?: string };
+    membros.push({ id: v.user_id, nome: meta.full_name || meta.name || u?.user?.email || v.user_id });
+  }
+  membros.sort((a, b) => a.nome.localeCompare(b.nome));
+
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
       <header>
@@ -77,6 +105,21 @@ export default async function AtendimentoSettingsPage() {
       />
       <ChannelRoutingForm initial={channels} />
       <AssinaturaForm initial={assinaturaInicial} />
+      <EsteiraForm
+        initial={{
+          salvo: salvoEsteira,
+          emVigor: {
+            escalada: esteira.escalada,
+            escaladaNivel2: esteira.escaladaNivel2,
+            relatorioSemanal: esteira.relatorioSemanal,
+            escaladaHoras: esteira.escaladaHoras,
+            escaladaHorasNivel2: esteira.escaladaHorasNivel2,
+          },
+          funis: declarados,
+          membros,
+          podeSalvar: activeOrg.role === "admin" || (user.is_platform_admin && !user.support),
+        }}
+      />
     </div>
   );
 }

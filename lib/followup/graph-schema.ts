@@ -28,6 +28,9 @@ export const NODE_TYPES = [
   // fora desta fatia e é o passo seguinte da issue.
   'move_lead',
   'edit_lead_tag',
+  // ia.vek D3: passa a conversa para a equipe com o MESMO handoff da IA
+  // (silencia o bot, cancela os follow-ups pendentes, aviso crítico na Central).
+  'human_handoff',
   'end',
 ] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
@@ -315,6 +318,14 @@ export const editLeadTagConfigSchema = z.strictObject({
 });
 
 /**
+ * Nó `human_handoff` (ia.vek D3) — "Passar para humano". `motivo` vira o texto
+ * do aviso na Central (vazio = texto padrão). Não envia mensagem ao cliente.
+ */
+export const humanHandoffConfigSchema = z.strictObject({
+  motivo: z.string().max(200, "Motivo muito longo: máximo de 200 caracteres."),
+});
+
+/**
  * One rule of a `condition` node. In `branching: 'per_check'` it IS a branch,
  * so it carries the stable id an edge references and the label the handle shows
  * — identity lives on the rule itself, never in a parallel array that would
@@ -580,6 +591,17 @@ export const flowNodeSchema = z.discriminatedUnion('type', [
       y: z.number(),
     }),
     config: editLeadTagConfigSchema,
+  }),
+  // ia.vek D3: passa a conversa para a equipe (o handoff da IA), sem mensagem
+  z.strictObject({
+    id: z.string().min(1),
+    type: z.literal('human_handoff'),
+    label: z.string().min(1).max(60),
+    position: z.strictObject({
+      x: z.number(),
+      y: z.number(),
+    }),
+    config: humanHandoffConfigSchema,
   }),
   // End node: terminal state
   z.strictObject({

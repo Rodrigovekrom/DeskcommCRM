@@ -137,6 +137,7 @@ const TIPO_DO_NO: Record<FlowNode["type"], string> = {
   // #2065 — as duas ações que também não falam com o cliente.
   move_lead: "Mover no funil",
   edit_lead_tag: "Editar tag",
+  human_handoff: "Passar para humano",
   end: "Fim",
 };
 
@@ -207,6 +208,8 @@ export function resumoDoNo(node: FlowNode): NoDoDossie {
     }
     case "move_lead":
       return { ...base, resumo: "move o card para outra etapa do funil — sem mensagem ao cliente" };
+    case "human_handoff":
+      return { ...base, resumo: "passa a conversa para a equipe (a IA para de responder) — sem mensagem ao cliente" };
     case "edit_lead_tag":
       return {
         ...base,

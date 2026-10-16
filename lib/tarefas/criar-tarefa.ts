@@ -49,6 +49,16 @@ export interface PedidoDeTarefa {
   origem: string;
   requestId?: string;
   agora?: Date;
+  /** Prazo EXATO (ia.vek D3: horas úteis). Presente, vence no lugar de `venceEmDias`. */
+  venceEm?: Date;
+  /** `crm_tasks.source_kind` (ex.: `ligacao`). Ausente = como antes (sem tipo). */
+  sourceKind?: string;
+  /**
+   * Sem responsável resolvido, cria a tarefa SEM responsável em vez de recusar
+   * (`sem_dono`). Só a tarefa de ligação usa: ela tem escalada própria, então
+   * não fica esquecida — ao contrário da tarefa genérica que motivou a recusa.
+   */
+  aceitaSemResponsavel?: boolean;
 }
 
 export type ResultadoDaTarefa =
@@ -140,17 +150,14 @@ export async function criarTarefaInterna(
 
   const assignedTo =
     typeof pedido.atribuirA === "object" ? pedido.atribuirA.usuario_id : (lead?.owner_user_id ?? null);
-  if (typeof pedido.atribuirA === "object" && !assignedTo) {
-    return { ok: false, codigo: "sem_dono" };
-  }
-  if (typeof pedido.atribuirA === "string" && !assignedTo) {
+  if (!assignedTo && !pedido.aceitaSemResponsavel) {
     return { ok: false, codigo: "sem_dono" };
   }
 
   const titulo = interpolarTitulo(pedido.titulo, { lead, contact });
   if (!titulo) return { ok: false, codigo: "titulo_vazio" };
 
-  const dueDate = new Date(agora.getTime() + pedido.venceEmDias * 86_400_000).toISOString();
+  const dueDate = (pedido.venceEm ?? new Date(agora.getTime() + pedido.venceEmDias * 86_400_000)).toISOString();
 
   const { data: criada, error } = await db
     .from("crm_tasks")
@@ -165,6 +172,7 @@ export async function criarTarefaInterna(
       contact_id: contactId,
       assigned_to: assignedTo,
       created_by: null,
+      ...(pedido.sourceKind ? { source_kind: pedido.sourceKind } : {}),
     })
     .select("id")
     .maybeSingle();
