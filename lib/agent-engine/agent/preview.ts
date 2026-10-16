@@ -56,7 +56,15 @@ export interface TurnPreview {
 }
 export interface PreviewResult {
   checkpoint?: unknown;
-  candidates: Array<{ body: string; citations: Citation[]; trace: GateTraceEntry[] }>;
+  candidates: Array<{
+    body: string;
+    citations: Citation[];
+    trace: GateTraceEntry[];
+    /** Código do produto cujas fotos iriam junto (ia.vek: para quem avalia a prévia). */
+    produtoCodigo?: string;
+  }>;
+  /** Ferramentas de LEITURA chamadas na prévia (ex.: busca de produtos), na ordem. */
+  leituras?: Array<{ tool: string; arguments: unknown }>;
   proposals: Array<{ tool: string; arguments: unknown }>;
   impediments: Array<{ code: string; message: string }>;
   /**
@@ -223,8 +231,21 @@ export function applyPreviewPolicy(
       if (
         nativeRead ||
         (catalog?.category === 'read' && (p.contactId !== null || SCENARIO_READS.has(name)))
-      )
-        return [name, definition];
+      ) {
+        // Registra a leitura para quem avalia a prévia; o comportamento é o mesmo.
+        const original = (definition as { execute?: (a: unknown, o?: unknown) => unknown }).execute;
+        if (typeof original !== 'function') return [name, definition];
+        return [
+          name,
+          {
+            ...definition,
+            execute: async (args: unknown, opts?: unknown) => {
+              (p.result.leituras ??= []).push({ tool: name, arguments: args });
+              return original(args, opts);
+            },
+          },
+        ];
+      }
       return [
         name,
         {
@@ -256,10 +277,15 @@ export function applyPreviewPolicy(
               for (const aviso of avisos)
                 if (!p.result.warnings.some((w) => w.code === aviso.code))
                   p.result.warnings.push(aviso);
+              const produto =
+                args && typeof args === 'object' && 'produto_codigo' in args && typeof args.produto_codigo === 'string'
+                  ? args.produto_codigo.trim()
+                  : '';
               p.result.candidates.push({
                 body: result.body,
                 citations: citations(),
                 trace: result.trace,
+                ...(produto !== '' ? { produtoCodigo: produto } : {}),
               });
               return {
                 ok: true,
