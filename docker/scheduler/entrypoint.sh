@@ -75,7 +75,7 @@ CRONS="
 */5 * * * *|60|api/v1/cron/webhook-log-retention
 */5 * * * *|45|api/v1/cron/channel-health
 */10 * * * *|60|api/v1/cron/contact-avatars
-17 * * * *|300|api/v1/cron/estoque-altimus
+17 * * * *|300|api/v1/cron/estoque-altimus|resposta
 */5 * * * *|300|api/v1/cron/esteira-vendas
 # Segunda, 8h em São Paulo (11h UTC): relatório semanal das ligações da esteira.
 0 11 * * 1|120|api/v1/cron/esteira-relatorio
@@ -142,7 +142,7 @@ DESTINO="${CRONTAB_PATH:-/etc/crontabs/root}"
 
 umask 077
 : > "$DESTINO"
-echo "$CRONS" | while IFS='|' read -r quando timeout rota; do
+echo "$CRONS" | while IFS='|' read -r quando timeout rota modo; do
   [ -n "$rota" ] || continue
   # `>/dev/null` só no STDOUT: o corpo da resposta é grande e não interessa aqui.
   # O STDERR era o que a redireção antiga (`>/dev/null 2>&1`) engolia junto — e
@@ -156,6 +156,17 @@ echo "$CRONS" | while IFS='|' read -r quando timeout rota; do
   # uma linha a mais: o `||` só dispara em falha.
   # % é proibido aqui (crontab de vixie trata como início de stdin) e `$`/crase
   # seriam reavaliados pelo sh do crond — nenhum dos dois aparece na mensagem.
+  # ia.vek v1.3: rota marcada com `|resposta` deixa UMA linha no log por rodada,
+  # com o corpo da resposta (contagens e motivo de pulo; a rota nunca devolve
+  # segredo). É a prova positiva de que a rodada rodou — rodada sem mudança não
+  # audita nem toca o banco, então sem esta linha "rodou" e "pulou" ficam iguais.
+  # Sem `%` (proibido no crontab) e o `$r`/`$(date …)` são NOSSOS, avaliados
+  # pelo sh do crond na hora — o segredo continua entre aspas simples.
+  if [ "${modo:-}" = "resposta" ]; then
+    printf '%s r=$(curl -fsS -m%s -H '"'"'Authorization: Bearer %s'"'"' "%s/%s") && echo "deskcomm-cron: $(date -u -Iseconds) %s respondeu: $r" >&2 || echo "deskcomm-cron: FALHOU %s — veja o erro do curl logo acima; se for 401 ou 403, o segredo que este scheduler manda não é o que o app enxerga: confira INTERNAL_SECRET/INTERNAL_CRON_SECRET no .env e rode docker compose up -d --force-recreate app scheduler" >&2\n' \
+      "$quando" "$timeout" "$SEGREDO_SEGURO" "$APP_ORIGIN" "$rota" "$rota" "$rota" >> "$DESTINO"
+    continue
+  fi
   printf '%s curl -fsS -m%s -H '"'"'Authorization: Bearer %s'"'"' "%s/%s" >/dev/null || echo "deskcomm-cron: FALHOU %s — veja o erro do curl logo acima; se for 401 ou 403, o segredo que este scheduler manda não é o que o app enxerga: confira INTERNAL_SECRET/INTERNAL_CRON_SECRET no .env e rode docker compose up -d --force-recreate app scheduler" >&2\n' \
     "$quando" "$timeout" "$SEGREDO_SEGURO" "$APP_ORIGIN" "$rota" "$rota" >> "$DESTINO"
 done

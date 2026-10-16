@@ -123,6 +123,31 @@ check "a mensagem nomeia a rota que falhou" \
 check "a mensagem diz o que o operador deve conferir" \
   grep -q 'INTERNAL_SECRET' "$TMP/falha.err"
 
+echo "scheduler: a rodada do Altimus deixa uma linha no log (ia.vek v1.3)"
+# Rota marcada com `|resposta`: o corpo da resposta vai para o STDERR (o log do
+# scheduler), com a rota e a hora — é a prova positiva de que a rodada rodou.
+RC="$(rodar "$HOSTIL")"
+check "gerou o crontab com o segredo hostil" test "$RC" -eq 0
+LINHA_ALT="$(grep -m1 'estoque-altimus' "$TMP/crontab")"
+check "o Altimus segue agendado no minuto 17" test "${LINHA_ALT%% *}" = "17"
+# Dublê: confere o header byte a byte e responde como a rota.
+cat > "$TMP/bin/curl" <<'DUB'
+#!/bin/sh
+while [ $# -gt 0 ]; do [ "$1" = "-H" ] && h="$2"; shift; done
+[ "$h" = "Authorization: Bearer $ESPERADO_H" ] || { echo "curl: (22) The requested URL returned error: 403" >&2; exit 22; }
+printf '{"data":{"configurado":true,"organizacao":"org-1","alterados":0,"veiculos":59}}'
+DUB
+chmod +x "$TMP/bin/curl"
+ESPERADO_H="$HOSTIL" PATH="$TMP/bin:$PATH" sh -c "${LINHA_ALT#* * * * * }" >"$TMP/alt.out" 2>"$TMP/alt.err"
+check "o STDOUT fica vazio" test ! -s "$TMP/alt.out"
+check "a linha do log traz a rota e a resposta" \
+  grep -q 'deskcomm-cron: .* api/v1/cron/estoque-altimus respondeu: {"data":{"configurado":true,"organizacao":"org-1","alterados":0,"veiculos":59}}' "$TMP/alt.err"
+check "o segredo não vai para o log" sh -c "! grep -qF 'whoami' '$TMP/alt.err'"
+check "uma rodada = uma linha" test "$(wc -l < "$TMP/alt.err" | tr -d ' ')" -eq 1
+ESPERADO_H="outro" PATH="$TMP/bin:$PATH" sh -c "${LINHA_ALT#* * * * * }" >/dev/null 2>"$TMP/alt-falha.err"
+check "falha do cron continua dizendo FALHOU, sem 'respondeu'" \
+  sh -c "grep -q 'FALHOU api/v1/cron/estoque-altimus' '$TMP/alt-falha.err' && ! grep -q respondeu '$TMP/alt-falha.err'"
+
 if [ "$fail" -eq 0 ]; then
   echo "OK — todas as provas passaram."
 else

@@ -125,3 +125,23 @@ chaves vivas).
 - Se algum dia uma mudança precisar de migration, o canário **não** basta (ele
   usa o banco da produção): o schema precisa ser aplicado e provado antes, num
   banco à parte.
+
+## Prova da sincronização do Altimus (v1.3)
+
+Toda rodada do estoque (minuto 17) deixa uma linha no log do scheduler com a
+resposta do cron: organização, veículos, `alterados` e, quando não sincroniza, o
+motivo (`pulado`). Sem segredo nem URL. Para ler:
+
+```bash
+ssh -i ~/.ssh/iavek_vps -p 22022 root@143.95.173.212 \
+  'docker logs --since 2h deskcommcrm-scheduler-1 2>&1 | grep estoque-altimus'
+```
+
+## Trocar as senhas internas das rotinas
+
+`bash ~/projects/ia-vek-crm/trocar-segredo-cron.sh` (quem roda é o Rodrigo)
+troca `INTERNAL_SECRET` e `INTERNAL_CRON_SECRET`. As senhas são geradas no
+servidor e nunca impressas. O script recria app, worker e scheduler, regrava o
+cabeçalho do cron do drain, confere que a senha antiga é recusada e volta sozinho
+se algo falhar. Efeito colateral: o link de convite de equipe ainda pendente deixa
+de valer, e basta reenviar pela tela.

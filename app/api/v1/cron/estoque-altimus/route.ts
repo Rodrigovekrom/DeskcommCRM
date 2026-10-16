@@ -80,5 +80,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     });
   }
 
-  return ok({ configurado: true, organizacao: orgId, ...resumo }, { requestId });
+  // `alterados` é o que a linha do log do scheduler (ia.vek v1.3) mostra de
+  // relance: 0 quer dizer "rodou e o feed não mudou", não "pulou".
+  const alterados = resumo.criados + resumo.atualizados + resumo.desativados;
+  return ok({ configurado: true, organizacao: orgId, alterados, ...resumo }, { requestId });
 }

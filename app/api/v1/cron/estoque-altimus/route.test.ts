@@ -111,4 +111,21 @@ describe("cron estoque-altimus: organização dona", () => {
     expect(corpo.data.pulado).toBe("organizacao_parada");
     expect(mocks.sincronizar).not.toHaveBeenCalled();
   });
+  it("a resposta (que vai para o log do scheduler) traz org, veículos e alterados, sem a URL", async () => {
+    mocks.orgs = [
+      { id: DEMO, settings: {} },
+      { id: LOJA, settings: ligado },
+    ];
+    mocks.sincronizar.mockResolvedValueOnce({
+      criados: 1,
+      atualizados: 2,
+      desativados: 0,
+      veiculos: 59,
+      erros: [],
+    } as never);
+    const { corpo } = await rodar();
+    expect(corpo.data).toMatchObject({ organizacao: LOJA, veiculos: 59, alterados: 3 });
+    // A URL do Altimus leva a chave na query: nunca pode aparecer na resposta.
+    expect(JSON.stringify(corpo)).not.toMatch(/altimus\.example|chave=/);
+  });
 });
