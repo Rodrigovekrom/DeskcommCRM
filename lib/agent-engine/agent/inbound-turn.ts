@@ -7,6 +7,7 @@ import { contextoDePrecoDaSimulacao, lerContextoDePreco } from './contexto-de-pr
 import { regraDePrecoLigada, renderContextoComercial } from './preco-em-tres-niveis';
 import { organizacaoDeixaIaFecharNegocio, recusaDeFechamento } from './ia-nao-fecha-negocio';
 import { semRaciocinio } from './sem-raciocinio';
+import { frasesAprovadasDaMemoria, liberarFrasesDoPlaybook } from '../guardrails/promise/frases-aprovadas';
 import { claimOfJob } from '../queue/claim';
 import { currentExecutionBoundary, guardServiceEffect } from '@/lib/atendimento/fronteira-server';
 /**
@@ -2745,11 +2746,13 @@ async function executarTurnoDoAgente(
   //
   // Memo POR CORPO e por evidências, por turno (`memoizarPorCandidata`): os
   // fail-safes de vocabulário e de promessa re-rodam a cadeia com o MESMO texto.
+  const frasesDoPlaybook = frasesAprovadasDaMemoria(orgMemory.content);
   const semanticClassifier = camadaLigada(
     camadas.promessa_semantica,
     deps.knobs.promiseSemantic?.enabled === true,
   )
     ? memoizarPorCandidata((candidate: string) =>
+        // ia.vek C10: frase aprovada na memória da org não cai na trava comercial.
         classifyPromise(
           pool,
           deps.llmCfg,
@@ -2760,7 +2763,7 @@ async function executarTurnoDoAgente(
             ...argsAux(deps.knobs.promiseSemantic?.model),
           },
           { ...(deps.registry !== undefined ? { registry: deps.registry } : {}), log: runLog },
-        ),
+        ).then((c) => liberarFrasesDoPlaybook(c, frasesDoPlaybook)),
         // As evidências crescem entre o veto e o reenvio; o veredito de antes
         // da consulta não vale para a mesma frase depois dela.
         () => JSON.stringify(evidenciasComerciais.ler()),
