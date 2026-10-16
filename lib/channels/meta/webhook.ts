@@ -124,6 +124,13 @@ export interface InboundMessageEvent {
     voice: boolean;
   } | null;
   /**
+   * ia.vek: o cliente TOCOU num botão (resposta rápida de template, `type:
+   * "button"`, ou botão/lista interativos, `type: "interactive"`). O evento sai
+   * como `text` com o texto do botão — é a resposta dele, e `messages.type` não
+   * aceita `button` —, e o identificador do botão vem aqui para quem precisar.
+   */
+  botao?: { payload: string | null; origem: "template" | "interativo" } | null;
+  /**
    * `messages[].referral` cru — vem na mensagem que o app do cliente manda ao
    * clicar num anúncio "Clique para o WhatsApp". Repassado sem interpretar: a
    * leitura é de `extrairAtribuicaoMeta`. Opcional porque só a ingestão o lê.
@@ -199,6 +206,35 @@ export interface AppContactSyncEvent {
   name: string | null;
   /** `add` = criou/editou no app; `remove` = apagou do endereço. */
   action: string;
+}
+
+/**
+ * A resposta de BOTÃO que o cliente tocou, quando a mensagem é uma (ia.vek).
+ *
+ * - `type: "button"`: resposta rápida de TEMPLATE — `button: { text, payload }`.
+ * - `type: "interactive"`: botão ou lista de mensagem interativa —
+ *   `interactive: { type: "button_reply" | "list_reply", button_reply|list_reply: { id, title } }`.
+ *
+ * Antes, o tipo ia cru para `messages.type`, que o CHECK do banco recusa
+ * (`button`/`interactive` não estão no vocabulário): o insert falhava e a
+ * resposta do cliente se perdia — justo a que um template com botão pede.
+ */
+export function respostaDeBotao(
+  raw: Record<string, unknown>,
+): { texto: string; payload: string | null; origem: "template" | "interativo" } | null {
+  const tipo = str(raw.type);
+  if (tipo === "button") {
+    const b = (raw.button ?? {}) as Record<string, unknown>;
+    const texto = str(b.text) ?? str(b.payload);
+    return texto ? { texto, payload: str(b.payload), origem: "template" } : null;
+  }
+  if (tipo === "interactive") {
+    const i = (raw.interactive ?? {}) as Record<string, unknown>;
+    const r = ((i.button_reply ?? i.list_reply) ?? {}) as Record<string, unknown>;
+    const texto = str(r.title) ?? str(r.id);
+    return texto ? { texto, payload: str(r.id), origem: "interativo" } : null;
+  }
+  return null;
 }
 
 export type MetaWebhookEvent =
@@ -277,7 +313,8 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
           const tipo = str(raw.type) ?? "unknown";
           const corpoMidia = tipo !== "contacts" ? (raw[tipo] as Record<string, unknown> | undefined) : undefined;
           const sharedContact = tipo === "contacts" ? parseMetaInboundContact(raw) : null;
-          const tipoCrm = tipo === "contacts" ? "contact" : tipo;
+          const botao = respostaDeBotao(raw);
+          const tipoCrm = tipo === "contacts" ? "contact" : botao ? "text" : tipo;
 
           out.push({
             kind: "inbound_message",
@@ -289,11 +326,13 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
             // A Meta manda epoch em SEGUNDOS, string. Passar direto ao Date daria 1970.
             sentAt: new Date(Number(str(raw.timestamp) ?? "0") * 1000),
             type: tipoCrm,
-            text:
-              tipoCrm === "text"
+            text: botao
+              ? botao.texto
+              : tipoCrm === "text"
                 ? str((raw.text as Record<string, unknown>)?.body)
                 : sharedContact?.name ?? null,
             ...(sharedContact ? { sharedContact } : {}),
+            ...(botao ? { botao: { payload: botao.payload, origem: botao.origem } } : {}),
             media:
               corpoMidia && str(corpoMidia.id)
                 ? {

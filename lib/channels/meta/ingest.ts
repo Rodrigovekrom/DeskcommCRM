@@ -265,6 +265,8 @@ export async function ingestMetaInbound(
       metadata: {
         ...(e.media ? { meta_media_id: e.media.id, voice: e.media.voice } : {}),
         ...(e.sharedContact ? { shared_contact: e.sharedContact } : {}),
+        // ia.vek: resposta de botão (template ou interativo) — o texto já é o body.
+        ...(e.botao ? { botao: e.botao } : {}),
       },
     })
     .select("id")
