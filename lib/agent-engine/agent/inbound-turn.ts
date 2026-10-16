@@ -6,6 +6,7 @@ import { applyPreviewPolicy, previewGateContext, type TurnPreview } from './prev
 import { contextoDePrecoDaSimulacao, lerContextoDePreco } from './contexto-de-preco';
 import { regraDePrecoLigada, renderContextoComercial } from './preco-em-tres-niveis';
 import { organizacaoDeixaIaFecharNegocio, recusaDeFechamento } from './ia-nao-fecha-negocio';
+import { semRaciocinio } from './sem-raciocinio';
 import { claimOfJob } from '../queue/claim';
 import { currentExecutionBoundary, guardServiceEffect } from '@/lib/atendimento/fronteira-server';
 /**
@@ -4696,7 +4697,9 @@ async function executarTurnoDoAgente(
               // prune: o checkpoint reusa a abertura só como texto — a mídia nativa (cara) já
               // fez seu trabalho na 1ª chamada e não precisa ir de novo.
               ...openingTextOnly,
-              ...responseMessages,
+              // Sem os blocos de raciocínio: assinados para a 1ª chamada, seriam
+              // recusados nesta (ver `sem-raciocinio.ts`).
+              ...semRaciocinio(responseMessages),
               { role: 'user', content: CHECKPOINT_INSTRUCTION },
               ...correcao,
             ],
