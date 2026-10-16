@@ -294,6 +294,18 @@ export const testRunSchema = z
      * já pediu o preço antes desta mensagem e qual o carro em discussão. Só tem
      * efeito em agente cujo prompt usa `preco_perguntas`.
      */
+    /**
+     * Conversa ANTES da mensagem de teste (ia.vek): o teste deixa de ser só a
+     * abertura e passa a cobrir o meio da conversa. Até 20 falas, na ordem.
+     */
+    historico: z
+      .array(
+        z
+          .object({ autor: z.enum(["cliente", "ia"]), texto: z.string().trim().min(1).max(2000) })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
     simulacao_preco: z
       .object({
         perguntas_anteriores: z.number().int().min(0).max(10),

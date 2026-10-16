@@ -5,6 +5,7 @@ import { DEFAULT_CHANNEL_PROVIDER } from '@/lib/channels/capabilities';
 import { applyPreviewPolicy, previewGateContext, type TurnPreview } from './preview';
 import { contextoDePrecoDaSimulacao, lerContextoDePreco } from './contexto-de-preco';
 import { regraDePrecoLigada, renderContextoComercial } from './preco-em-tres-niveis';
+import { organizacaoDeixaIaFecharNegocio, recusaDeFechamento } from './ia-nao-fecha-negocio';
 import { claimOfJob } from '../queue/claim';
 import { currentExecutionBoundary, guardServiceEffect } from '@/lib/atendimento/fronteira-server';
 /**
@@ -3700,6 +3701,13 @@ async function executarTurnoDoAgente(
       ...AGENT_TOOL_DEFS.update_lead_state,
       execute: async (raw) => {
         try {
+          // ia.vek: a IA nunca marca ganho/perda (ver `ia-nao-fecha-negocio.ts`).
+          const pedido = (raw as { stage?: unknown } | null)?.stage;
+          const recusa = recusaDeFechamento(
+            pedido,
+            await organizacaoDeixaIaFecharNegocio(pool, tenantId),
+          );
+          if (recusa !== null) return recusa;
           const update = await applyLeadStateUpdate(
             pool,
             { tenantId, leadId, jobId: liveJob().id },

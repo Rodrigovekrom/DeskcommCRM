@@ -124,6 +124,17 @@ function Verificacoes({ g }: { g: NonNullable<TestResponse["data"]["guardrails"]
   );
 }
 
+/** "cliente: ..." / "ia: ..." por linha → falas do histórico (até 20). Linha sem prefixo é ignorada. */
+export function lerHistorico(texto: string): Array<{ autor: "cliente" | "ia"; texto: string }> {
+  const falas: Array<{ autor: "cliente" | "ia"; texto: string }> = [];
+  for (const linha of texto.split("\n")) {
+    const m = /^\s*(cliente|ia)\s*:\s*(.+)$/i.exec(linha);
+    if (!m) continue;
+    falas.push({ autor: m[1]!.toLowerCase() === "ia" ? "ia" : "cliente", texto: m[2]!.trim() });
+  }
+  return falas.slice(-20);
+}
+
 export function TestPanel({ agent, draft, published, readOnly }: Props) {
   const t = useT();
   const target = draft ?? published;
@@ -135,6 +146,8 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
   // Cenário da regra de preço em três níveis (ia.vek D1): o teste é UMA mensagem,
   // então quem testa declara quantas vezes o cliente já pediu o preço antes dela.
   const [precoAnteriores, setPrecoAnteriores] = React.useState("0");
+  // Conversa antes da mensagem de teste: uma fala por linha, "cliente: ..." ou "ia: ...".
+  const [historico, setHistorico] = React.useState("");
   const [produtoCodigo, setProdutoCodigo] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [result, setResult] = React.useState<TestResponse["data"] | null>(null);
@@ -170,6 +183,8 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
           ...(contactPhone.trim() ? { phone: contactPhone.trim() } : {}),
         };
       }
+      const falas = lerHistorico(historico);
+      if (falas.length > 0) body.historico = falas;
       if (usaRegraDePreco) {
         const anteriores = Math.min(10, Math.max(0, Math.floor(Number(precoAnteriores) || 0)));
         body.simulacao_preco = {
@@ -240,6 +255,21 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
             rows={4}
             disabled={pending || readOnly}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="test-historico">{t("Conversa antes desta mensagem (opcional)")}</Label>
+          <Textarea
+            id="test-historico"
+            value={historico}
+            onChange={(e) => setHistorico(e.target.value)}
+            placeholder={t("cliente: oi, vi o anúncio do Onix\nia: Boa tarde! Sou a Daiane...")}
+            rows={4}
+            disabled={pending || readOnly}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("Uma fala por linha, começando com \"cliente:\" ou \"ia:\". Serve para testar o meio da conversa, não só a abertura.")}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2">

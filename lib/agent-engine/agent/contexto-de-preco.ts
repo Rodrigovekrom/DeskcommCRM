@@ -54,11 +54,14 @@ export async function lerContextoDePreco(
 export async function contextoDePrecoDaSimulacao(
   pool: Pick<pg.Pool, 'query'>,
   tenantId: string,
-  simulacao: { perguntasAnteriores: number; produtoCodigo: string | null },
+  simulacao: { perguntasAnteriores: number; produtoCodigo: string | null; historicoDoCliente?: string[] },
   mensagemDeTeste: string | null,
 ): Promise<ContextoDePreco> {
+  const doHistorico = (simulacao.historicoDoCliente ?? []).filter((t) => ehPerguntaDePreco(t)).length;
   const perguntas =
-    Math.max(0, Math.floor(simulacao.perguntasAnteriores)) + (ehPerguntaDePreco(mensagemDeTeste) ? 1 : 0);
+    Math.max(0, Math.floor(simulacao.perguntasAnteriores)) +
+    doHistorico +
+    (ehPerguntaDePreco(mensagemDeTeste) ? 1 : 0);
   const produtoCodigo = simulacao.produtoCodigo?.trim() || null;
   return completarComCatalogo(pool, tenantId, { perguntas, produtoCodigo });
 }

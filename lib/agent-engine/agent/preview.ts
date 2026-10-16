@@ -46,7 +46,12 @@ export interface TurnPreview {
    * carro em discussão (código do catálogo). Só vale para agente cujo prompt usa
    * `preco_perguntas`.
    */
-  simulacaoDePreco?: { perguntasAnteriores: number; produtoCodigo: string | null };
+  simulacaoDePreco?: {
+    perguntasAnteriores: number;
+    produtoCodigo: string | null;
+    /** Falas do cliente no histórico do teste: pedido de preço ali também conta. */
+    historicoDoCliente?: string[];
+  };
   result: PreviewResult;
 }
 export interface PreviewResult {
