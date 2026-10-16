@@ -13,6 +13,7 @@ export async function testAgentVersion(
     sampleMessage: string;
     sampleContact?: { name?: string; phone?: string };
     channelId: string | null;
+    simulacaoDePreco?: { perguntasAnteriores: number; produtoCodigo: string | null };
   },
 ) {
   const agent = await loadAgentVersionConfig(
@@ -41,6 +42,7 @@ export async function testAgentVersion(
     context,
     contactId: null,
     channelId: input.channelId,
+    ...(input.simulacaoDePreco ? { simulacaoDePreco: input.simulacaoDePreco } : {}),
     result,
   });
   return result;

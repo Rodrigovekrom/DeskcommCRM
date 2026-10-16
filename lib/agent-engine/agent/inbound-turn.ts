@@ -3,6 +3,8 @@ import { setExecutionAgentOperation } from '@/lib/atendimento/fronteira-server';
 import { TIPOS_DE_CASO, TIPOS_DE_CASO_PARA_A_IA } from "@/lib/ai/case-copy";
 import { DEFAULT_CHANNEL_PROVIDER } from '@/lib/channels/capabilities';
 import { applyPreviewPolicy, previewGateContext, type TurnPreview } from './preview';
+import { contextoDePrecoDaSimulacao, lerContextoDePreco } from './contexto-de-preco';
+import { regraDePrecoLigada, renderContextoComercial } from './preco-em-tres-niveis';
 import { claimOfJob } from '../queue/claim';
 import { currentExecutionBoundary, guardServiceEffect } from '@/lib/atendimento/fronteira-server';
 /**
@@ -2374,6 +2376,33 @@ async function executarTurnoDoAgente(
           inboundMessageId: input.inboundMessageId,
         });
 
+  // Preço em três níveis (ia.vek D1 — `preco-em-tres-niveis.ts`): só para o agente
+  // cujo prompt usa `preco_perguntas`. Recontado do histórico a cada turno (no teste,
+  // do cenário que a pessoa declarou). Falhou a leitura? Não entra bloco nenhum — o
+  // prompt cai na própria regra de "campo ausente" — e a trava fica no modo mais
+  // estrito (nenhum valor sai neste turno), nunca no mais solto.
+  let blocoComercial = '';
+  let nivelDePreco: { perguntas: number; autorizadoCents: number | null } | undefined;
+  if (regraDePrecoLigada(agentConfig?.systemPrompt)) {
+    try {
+      const contexto = preview
+        ? await contextoDePrecoDaSimulacao(
+            pool,
+            tenantId,
+            preview.simulacaoDePreco ?? { perguntasAnteriores: 0, produtoCodigo: null },
+            currentInboundText ?? latestInboundSignal(openingContext.context.messages),
+          )
+        : await lerContextoDePreco(pool, { tenantId, conversationId: input.conversationId });
+      blocoComercial = renderContextoComercial(contexto);
+      nivelDePreco = { perguntas: contexto.perguntas, autorizadoCents: contexto.autorizadoCents };
+    } catch (err) {
+      runLog.warn('preço em três níveis: contexto não lido; nenhum valor sai neste turno', {
+        error: (err instanceof Error ? err.message : String(err)).slice(0, 120),
+      });
+      nivelDePreco = { perguntas: 0, autorizadoCents: null };
+    }
+  }
+
   // Seam de canal (F2-25): o envio vai SÓ pela interface ChannelAdapter — o
   // default WAHA-via-CRM envolve o sink F2-06. Instanciado por job (o pool é
   // per-job neste codebase); trocar o adapter não muda nada abaixo.
@@ -3292,6 +3321,8 @@ async function executarTurnoDoAgente(
             // não é dele, e a única saída seria o silêncio. O follow-up determinístico
             // idem (ver GateContext.internalVocabularyEnforced).
             enforceInternalVocabulary: true,
+            // Preço em três níveis (ia.vek D1): só quando o prompt do agente usa a regra.
+            ...(nivelDePreco !== undefined ? { nivelDePreco } : {}),
             // Afirmação clínica: mesma razão do vocabulário (só o corpo do MODELO), e
             // só para a organização que ligou a camada — ver
             // `GateContext.clinicalClaimEnforced`. Sem linha, desligada: não há padrão de
@@ -3403,6 +3434,11 @@ async function executarTurnoDoAgente(
                   conversationId: input.conversationId,
                   body: corpo,
                   ...(media ? { media } : {}),
+                  // O carro destas fotos vira o "carro em discussão" da regra de
+                  // preço (`contexto-de-preco.ts`) — vai no metadata da mensagem.
+                  ...(fotosDoProduto.length > 0 && produto_codigo
+                    ? { produtoCodigo: produto_codigo.trim() }
+                    : {}),
                 });
               };
               // Cada foto é uma mensagem física: só vão as que cabem no que resta do teto
@@ -4204,6 +4240,9 @@ async function executarTurnoDoAgente(
                 ...previewContext.disclosure,
                 mode: deps.knobs.disclosureMode ?? 'inject',
               },
+              ...(nivelDePreco !== undefined
+                ? { promise: { ...previewContext.promise, nivelDePreco } }
+                : {}),
             },
             () => pendingCitations,
             semanticClassifier,
@@ -4408,6 +4447,7 @@ async function executarTurnoDoAgente(
     const agoraBlock = renderAgora(clock(), fusoDaOrg);
     const openingSuffixes = [
       agoraBlock,
+      blocoComercial,
       matchedSkillsBlock,
       stageHintBlock,
       splitHint,

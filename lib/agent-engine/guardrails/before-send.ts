@@ -53,7 +53,8 @@ import { decideSpinning } from '../spinning/engine';
 import type { RecentCopy } from '../spinning/engine';
 import { loadRecentCopies, loadSpinningKnobs, recordCopy } from '../spinning/store';
 import type { SpinningKnobs } from '../spinning/defaults';
-import { decidePromise } from './promise/engine';
+import { decidePromise, extractPromises } from './promise/engine';
+import { decidirPrecoNaResposta } from '../agent/preco-em-tres-niveis';
 import { loadPromiseTable } from './promise/table';
 import type { PromiseTable } from './promise/table';
 import { renderSemanticPromiseVeto } from './promise/semantic';
@@ -153,6 +154,13 @@ export interface GateContext {
   promise: {
     table: PromiseTable | null;
     versionId?: string;
+    /**
+     * Regra do preço em três níveis (ia.vek, D1 — `agent/preco-em-tres-niveis.ts`).
+     * Presente SÓ quando o prompt do agente usa `preco_perguntas`: aí qualquer valor
+     * em R$ na resposta é vetado até a 3ª pergunta do cliente, e depois dela só passa
+     * o valor autorizado, exato. Ausente = o gate é exatamente o de antes.
+     */
+    nivelDePreco?: { perguntas: number; autorizadoCents: number | null };
   };
   /**
    * Resultado da camada SEMÂNTICA de promessa (F4-02), classificado ASSÍNCRONO na carga do
@@ -402,6 +410,21 @@ export const lgpdGate: Gate = {
 export const promiseGate: Gate = {
   name: 'promise',
   evaluate: (ctx) => {
+    const nivel = ctx.promise.nivelDePreco;
+    if (nivel !== undefined) {
+      const precos = extractPromises(ctx.body)
+        .filter((p) => p.kind === 'price' && p.moeda !== 'EUR')
+        .map((p) => p.value);
+      const decisao = decidirPrecoNaResposta(precos, nivel);
+      if (!decisao.permite) {
+        return {
+          pass: false,
+          code: 'preco_antes_da_hora',
+          reason: decisao.motivo,
+          detail: { perguntas: nivel.perguntas, autorizado: nivel.autorizadoCents !== null ? 'sim' : 'nao' },
+        };
+      }
+    }
     if (ctx.promise.table === null) return { pass: true };
     const decision = decidePromise({ candidate: ctx.body, table: ctx.promise.table });
     return decision.allow
@@ -1130,6 +1153,11 @@ export interface RunBeforeSendArgs {
    * enviar este `body`, não o corpo original capturado antes da cadeia.
    */
   send: (body: string) => Promise<ChannelSendResult>;
+  /**
+   * Regra do preço em três níveis (ver `GateContext.promise.nivelDePreco`). Só o
+   * `send_message` do agente cujo prompt usa `preco_perguntas` passa este campo.
+   */
+  nivelDePreco?: { perguntas: number; autorizadoCents: number | null };
 }
 
 /** Pure chain shared by real delivery and preview; no locks, writes or transport. */
@@ -1401,6 +1429,7 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
       promise: {
         table: promise?.table ?? null,
         ...(promise?.versionId !== undefined ? { versionId: promise.versionId } : {}),
+        ...(args.nivelDePreco !== undefined ? { nivelDePreco: args.nivelDePreco } : {}),
       },
       semanticPromise,
       factualClaim,

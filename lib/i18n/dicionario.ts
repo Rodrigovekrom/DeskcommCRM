@@ -2240,6 +2240,13 @@ export const DICIONARIO: Traducoes = {
   "Telefone (opcional)": { es: "Teléfono (opcional)" },
   "Executando…": { es: "Ejecutando…" },
   "Executar teste": { es: "Ejecutar prueba" },
+  "Cenário de preço (regra dos 3 níveis)": { es: "Escenario de precio (regla de los 3 niveles)" },
+  "O teste é uma mensagem só. Diga quantas vezes o cliente já pediu o preço antes dela e qual carro está em discussão; a mensagem de teste soma mais uma se pedir o preço.": {
+    es: "La prueba es un solo mensaje. Indique cuántas veces el cliente ya pidió el precio antes y qué auto está en discusión; el mensaje de prueba suma una más si pide el precio.",
+  },
+  "Já pediu o preço antes (vezes)": { es: "Ya pidió el precio antes (veces)" },
+  "Carro em discussão (código)": { es: "Auto en discusión (código)" },
+  "código do catálogo": { es: "código del catálogo" },
   Resultado: { es: "Resultado" },
   "Nenhum teste executado ainda.": { es: "Todavía no se ejecutó ninguna prueba." },
   "Executando dry-run…": { es: "Ejecutando dry-run…" },

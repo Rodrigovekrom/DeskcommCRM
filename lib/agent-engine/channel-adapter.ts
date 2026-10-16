@@ -46,6 +46,13 @@ export interface ChannelSendInput {
    * URL curta para o canal é o handler de mensagens, como em toda mídia.
    */
   media?: { storagePath: string; mime: string };
+  /**
+   * Código do produto do catálogo cujas fotos acompanham este envio (o
+   * `produto_codigo` do `send_message`). Vai para `messages.metadata.produto_codigo`
+   * e é como a regra de preço em três níveis sabe qual é o carro em discussão
+   * (`agent/preco-em-tres-niveis.ts`). Opcional: só o envio com fotos o leva.
+   */
+  produtoCodigo?: string;
 }
 
 /**

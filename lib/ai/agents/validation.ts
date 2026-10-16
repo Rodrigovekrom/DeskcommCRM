@@ -289,6 +289,18 @@ export const testRunSchema = z
         phone: z.string().trim().min(3).max(40).optional(),
       })
       .optional(),
+    /**
+     * Cenário da regra de preço em três níveis (ia.vek D1): quantas vezes o cliente
+     * já pediu o preço antes desta mensagem e qual o carro em discussão. Só tem
+     * efeito em agente cujo prompt usa `preco_perguntas`.
+     */
+    simulacao_preco: z
+      .object({
+        perguntas_anteriores: z.number().int().min(0).max(10),
+        produto_codigo: z.string().trim().max(120).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

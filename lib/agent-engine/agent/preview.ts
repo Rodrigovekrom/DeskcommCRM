@@ -40,6 +40,13 @@ export interface TurnPreview {
   contactId: string | null;
   channelId: string | null;
   gateContext?: GateContext;
+  /**
+   * Cenário da regra de preço em três níveis, declarado por quem testa (ia.vek D1):
+   * quantas vezes o cliente já pediu o preço ANTES da mensagem de teste e qual o
+   * carro em discussão (código do catálogo). Só vale para agente cujo prompt usa
+   * `preco_perguntas`.
+   */
+  simulacaoDePreco?: { perguntasAnteriores: number; produtoCodigo: string | null };
   result: PreviewResult;
 }
 export interface PreviewResult {

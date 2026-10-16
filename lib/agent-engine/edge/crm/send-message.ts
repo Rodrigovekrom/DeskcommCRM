@@ -65,6 +65,8 @@ export interface SendMessageInput {
   template?: { name: string; language: string; values: Record<string, string> };
   /** Presente = imagem da pasta da conversa em `whatsapp-media`; `body` é a legenda. */
   media?: { storagePath: string; mime: string };
+  /** Ver `ChannelSendInput.produtoCodigo`: vira `metadata.produto_codigo`. */
+  produtoCodigo?: string;
 }
 
 /**
@@ -94,7 +96,10 @@ export function corpoDoEnvio(
         : { type: 'text' as const }),
     // Foto sem legenda vai sem `body`: o schema do envio pede corpo não vazio.
     ...(input.body !== '' || !input.media ? { body: input.body } : {}),
-    metadata: { idempotency_key: idempotencyKey },
+    metadata: {
+      idempotency_key: idempotencyKey,
+      ...(input.produtoCodigo ? { produto_codigo: input.produtoCodigo } : {}),
+    },
   };
 }
 

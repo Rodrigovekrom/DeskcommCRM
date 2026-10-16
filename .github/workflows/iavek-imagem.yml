@@ -1,12 +1,17 @@
 # Imagem do app com a identidade ia.vek (fork Rodrigovekrom/DeskcommCRM).
 #
-# Só o serviço `app` muda no fork: worker, scheduler e voice-agent seguem nas
-# imagens publicadas pelo upstream, com a mesma versão. Por isso este
-# workflow constrói UMA imagem, linux/amd64 (a VPS HostGator é x86_64).
+# Constrói DUAS imagens, linux/amd64 (a VPS HostGator é x86_64):
+#   - o `app` (Next) com a identidade ia.vek;
+#   - o `worker` (agent-engine). Até a v1 só o app mudava no fork e o worker
+#     seguia no do upstream; desde a regra de preço em três níveis (D1) o turno
+#     do agente — que roda no WORKER — tem código nosso. Sem esta imagem a
+#     mudança aparece no teste da tela (que roda no app) e NÃO no WhatsApp.
+# Scheduler e voice-agent seguem nas imagens do upstream, com a mesma versão.
 #
-# Tags publicadas:
-#   ghcr.io/<dono>/iavek-crm:<branch>-<sha7>   imutável — é a que vai no APP_IMAGE
-#   ghcr.io/<dono>/iavek-crm:<branch>          móvel — conveniência para staging
+# Tags publicadas (mesma tag para as duas — app e worker andam juntos):
+#   ghcr.io/<dono>/iavek-crm:<branch>-<sha7>         imutável — vai no APP_IMAGE
+#   ghcr.io/<dono>/iavek-crm-worker:<branch>-<sha7>  imutável — vai no WORKER_IMAGE
+#   ...:<branch>                                     móvel — conveniência para staging
 #
 # O gate antes do push é o que a mudança visual alcança: typecheck e a suíte
 # unitária inteira (em Linux, onde os testes do kit de shell também rodam).
@@ -59,8 +64,11 @@ jobs:
           dono="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
           ramo="$(echo '${{ github.ref_name }}' | tr '/' '-')"
           img="${REGISTRY}/${dono}/iavek-crm"
+          wrk="${REGISTRY}/${dono}/iavek-crm-worker"
           echo "img=${img}" >> "$GITHUB_OUTPUT"
+          echo "wrk=${wrk}" >> "$GITHUB_OUTPUT"
           echo "tags=${img}:${ramo}-${GITHUB_SHA::7},${img}:${ramo}" >> "$GITHUB_OUTPUT"
+          echo "tags_worker=${wrk}:${ramo}-${GITHUB_SHA::7},${wrk}:${ramo}" >> "$GITHUB_OUTPUT"
           echo "versao=${ramo}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v4
@@ -87,12 +95,29 @@ jobs:
           cache-from: type=gha,scope=iavek-app
           cache-to: type=gha,mode=max,scope=iavek-app
 
+      - name: Build e push do worker (agent-engine)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.worker
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.tags.outputs.tags_worker }}
+          labels: |
+            org.opencontainers.image.title=ia.vek CRM worker
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          build-args: |
+            APP_VERSION=${{ steps.tags.outputs.versao }}
+          cache-from: type=gha,scope=iavek-worker
+          cache-to: type=gha,mode=max,scope=iavek-worker
+
       - name: Resumo
         run: |
           {
-            echo "### Imagem publicada"
+            echo "### Imagens publicadas"
             echo
             echo '```'
             echo "APP_IMAGE=${{ steps.tags.outputs.img }}:${{ steps.tags.outputs.versao }}"
+            echo "WORKER_IMAGE=${{ steps.tags.outputs.wrk }}:${{ steps.tags.outputs.versao }}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

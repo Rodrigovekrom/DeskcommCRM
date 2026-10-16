@@ -174,6 +174,14 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       sampleMessage: parsed.data.sample_message,
       sampleContact: parsed.data.sample_contact,
       channelId: version.channel_session_id,
+      ...(parsed.data.simulacao_preco
+        ? {
+            simulacaoDePreco: {
+              perguntasAnteriores: parsed.data.simulacao_preco.perguntas_anteriores,
+              produtoCodigo: parsed.data.simulacao_preco.produto_codigo || null,
+            },
+          }
+        : {}),
     });
     const finalText = result.candidates.map((c) => c.body).join("\n\n");
     resultPayload = {

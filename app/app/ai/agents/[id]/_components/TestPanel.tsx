@@ -23,6 +23,7 @@ import { agentRunsKey } from "@/hooks/ai/useAgentRuns";
 import { useT } from "@/hooks/i18n/useT";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { AgentVersionRow } from "@/hooks/ai/useAgentVersions";
+import { regraDePrecoLigada } from "@/lib/agent-engine/agent/preco-em-tres-niveis";
 
 import { RunTrace } from "./RunTrace";
 
@@ -131,6 +132,10 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
   const [message, setMessage] = React.useState("");
   const [contactName, setContactName] = React.useState("");
   const [contactPhone, setContactPhone] = React.useState("");
+  // Cenário da regra de preço em três níveis (ia.vek D1): o teste é UMA mensagem,
+  // então quem testa declara quantas vezes o cliente já pediu o preço antes dela.
+  const [precoAnteriores, setPrecoAnteriores] = React.useState("0");
+  const [produtoCodigo, setProdutoCodigo] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [result, setResult] = React.useState<TestResponse["data"] | null>(null);
 
@@ -141,6 +146,8 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
       </p>
     );
   }
+
+  const usaRegraDePreco = regraDePrecoLigada(target.system_prompt);
 
   const versionLabel =
     target.status === "published"
@@ -161,6 +168,13 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
         body.sample_contact = {
           ...(contactName.trim() ? { name: contactName.trim() } : {}),
           ...(contactPhone.trim() ? { phone: contactPhone.trim() } : {}),
+        };
+      }
+      if (usaRegraDePreco) {
+        const anteriores = Math.min(10, Math.max(0, Math.floor(Number(precoAnteriores) || 0)));
+        body.simulacao_preco = {
+          perguntas_anteriores: anteriores,
+          ...(produtoCodigo.trim() ? { produto_codigo: produtoCodigo.trim() } : {}),
         };
       }
       const res = await apiClient.post<TestResponse>(
@@ -250,6 +264,41 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
             />
           </div>
         </div>
+
+        {usaRegraDePreco && (
+          <div className="space-y-2 rounded-md border border-border p-3" data-testid="cenario-de-preco">
+            <p className="text-xs font-medium">{t("Cenário de preço (regra dos 3 níveis)")}</p>
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "O teste é uma mensagem só. Diga quantas vezes o cliente já pediu o preço antes dela e qual carro está em discussão; a mensagem de teste soma mais uma se pedir o preço.",
+              )}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label htmlFor="test-preco-anteriores">{t("Já pediu o preço antes (vezes)")}</Label>
+                <Input
+                  id="test-preco-anteriores"
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={precoAnteriores}
+                  onChange={(e) => setPrecoAnteriores(e.target.value)}
+                  disabled={pending || readOnly}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="test-produto-codigo">{t("Carro em discussão (código)")}</Label>
+                <Input
+                  id="test-produto-codigo"
+                  value={produtoCodigo}
+                  onChange={(e) => setProdutoCodigo(e.target.value)}
+                  placeholder={t("código do catálogo")}
+                  disabled={pending || readOnly}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <Button onClick={handleRun} disabled={pending || readOnly} className="self-start">
           {pending ? t("Executando…") : t("Executar teste")}
