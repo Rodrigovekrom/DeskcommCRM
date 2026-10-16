@@ -150,7 +150,7 @@ export const CATALOGO_DA_INSTALACAO: readonly ChaveDaInstalacao[] = [
     chave: "ALTIMUS_ESTOQUE_URL",
     rotulo: "Endereço do estoque no Altimus",
     explicacao:
-      "O link do estoque da revenda no Altimus. Com ele, os carros, preços e fotos entram sozinhos no catálogo de produtos a cada hora.",
+      "O link do estoque da revenda no Altimus. Com ele, os carros, preços e fotos entram sozinhos, a cada hora, no catálogo da organização marcada como dona em Configurações › Organização.",
     grupo: "integracao",
     natureza: "segredo",
     controle: "edita",

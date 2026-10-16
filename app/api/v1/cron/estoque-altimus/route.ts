@@ -9,6 +9,11 @@
  * rodada não faz nada e responde `configurado: false` — e não audita: rodada que
  * não fez nada não é mutação. A que mudou o catálogo audita uma linha com as
  * contagens (nunca a URL, que carrega a chave de acesso).
+ *
+ * ia.vek v1.2: o estoque vai para a organização DONA, marcada em
+ * `settings.integracoes.altimus.ativa` (Configurações › Organização) — não
+ * exige mais que a instalação tenha uma organização só. A regra está em
+ * `lib/estoque/org-dona.ts`.
  */
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
@@ -16,7 +21,8 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { autorizaCron } from "@/lib/auth/cron-auth";
-import { depsReais, organizacaoUnica } from "@/lib/estoque/deps-reais";
+import { depsReais } from "@/lib/estoque/deps-reais";
+import { orgDonaDoEstoque } from "@/lib/estoque/org-dona";
 import { rodadaTeveEfeito, sincronizarEstoque } from "@/lib/estoque/sincronizar";
 import { valorDaInstalacao } from "@/lib/instalacao/config";
 import { idsDeOrgsParadas } from "@/lib/organizacao/operante";
@@ -34,22 +40,30 @@ export async function GET(req: NextRequest): Promise<Response> {
   const url = (await valorDaInstalacao("ALTIMUS_ESTOQUE_URL")).valor?.trim() ?? "";
   if (url === "") return ok({ configurado: false }, { requestId });
   if (!url.startsWith("https://")) {
-    return fail("validation_error", "ALTIMUS_ESTOQUE_URL precisa começar com https://.", 422, { requestId });
+    return fail("validation_error", "ALTIMUS_ESTOQUE_URL precisa começar com https://.", 422, {
+      requestId,
+    });
   }
 
-  const orgId = await organizacaoUnica();
-  if (orgId === null) {
+  const admin = createAdminClient();
+  const dona = await orgDonaDoEstoque(admin);
+  if (dona.tipo === "nenhuma") {
+    return ok({ configurado: true, pulado: "sem_organizacao_dona" }, { requestId });
+  }
+  if (dona.tipo === "mais_de_uma") {
+    // Uma URL só não pode encher dois catálogos: recusa em vez de escolher.
     return fail(
       "conflict",
-      "A sincronização do estoque exige exatamente uma organização nesta instalação.",
+      "O estoque do Altimus está ligado em mais de uma organização. Deixe ligado só na organização dona.",
       409,
       { requestId },
     );
   }
+  const orgId = dona.orgId;
 
   // Organização parada (suspensa/cancelada) não recebe sincronização: o catálogo
   // dela fica como está até ela voltar a operar.
-  if ((await idsDeOrgsParadas(createAdminClient())).includes(orgId)) {
+  if ((await idsDeOrgsParadas(admin)).includes(orgId)) {
     return ok({ configurado: true, pulado: "organizacao_parada" }, { requestId });
   }
 
@@ -66,5 +80,5 @@ export async function GET(req: NextRequest): Promise<Response> {
     });
   }
 
-  return ok({ configurado: true, ...resumo }, { requestId });
+  return ok({ configurado: true, organizacao: orgId, ...resumo }, { requestId });
 }

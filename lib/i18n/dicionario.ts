@@ -1051,6 +1051,18 @@ export const DICIONARIO: Traducoes = {
   "Sem asteriscos nem quebra de linha.": { es: "Sin asteriscos ni saltos de línea." },
   "Salvar assinatura": { es: "Guardar firma" },
   "Assinatura salva.": { es: "Firma guardada." },
+  // ia.vek v1.2: estoque do Altimus preso à organização dona.
+  "Estoque do Altimus": { es: "Inventario de Altimus" },
+  "De hora em hora, os carros do Altimus entram e saem do catálogo de produtos desta organização (preço, km e fotos). Só uma organização pode receber o estoque.": { es: "Cada hora, los autos de Altimus entran y salen del catálogo de productos de esta organización (precio, km y fotos). Solo una organización puede recibir el inventario." },
+  "Ligado: esta organização recebe o estoque.": { es: "Encendido: esta organización recibe el inventario." },
+  "Desligado: esta organização não recebe o estoque.": { es: "Apagado: esta organización no recibe el inventario." },
+  "O endereço do Altimus ainda não foi colado em Admin › Configuração › Integrações. Sem ele, nada sincroniza.": { es: "La dirección de Altimus todavía no fue pegada en Admin › Configuración › Integraciones. Sin ella, nada se sincroniza." },
+  "O estoque está ligado em outra organização. Desligue lá antes de ligar aqui.": { es: "El inventario está encendido en otra organización. Apáguelo allí antes de encenderlo aquí." },
+  "Desligar o estoque aqui": { es: "Apagar el inventario aquí" },
+  "Ligar o estoque nesta organização": { es: "Encender el inventario en esta organización" },
+  "Estoque do Altimus ligado nesta organização.": { es: "Inventario de Altimus encendido en esta organización." },
+  "Estoque do Altimus desligado.": { es: "Inventario de Altimus apagado." },
+  "O estoque do Altimus já está ligado em outra organização. Desligue lá antes de ligar aqui.": { es: "El inventario de Altimus ya está encendido en otra organización. Apáguelo allí antes de encenderlo aquí." },
   // ia.vek v1.1: atualização feita pela equipe (sem o "Atualizar agora" do upstream).
   "As atualizações do ia.vek CRM são feitas pela equipe. Não há nada a fazer por aqui.": {
     es: "Las actualizaciones de ia.vek CRM las hace el equipo. No hay nada que hacer aquí.",

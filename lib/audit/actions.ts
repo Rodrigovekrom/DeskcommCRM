@@ -294,6 +294,8 @@ export const AUDIT_ACTIONS = [
   "esteira.relatorio_semanal_enviado",
   "task.overdue_announced",
   "aviso_grupo.config_changed",
+  // ia.vek v1.2: a organização dona do estoque do Altimus.
+  "estoque_altimus.config_changed",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser
   // lido — é mutação relevante, não preferência de exibição.

@@ -118,13 +118,3 @@ export function depsReais(orgId: string, urlDoFeed: string): DepsDaSincronizacao
     },
   };
 }
-
-/**
- * A organização dona do estoque. Esta instalação tem UMA organização (a
- * Fenômenos); com mais de uma, a sincronização se recusa em vez de escolher.
- */
-export async function organizacaoUnica(): Promise<string | null> {
-  const { data, error } = await createAdminClient().from("organizations").select("id").limit(2);
-  if (error || !data || data.length !== 1) return null;
-  return data[0]!.id as string;
-}
