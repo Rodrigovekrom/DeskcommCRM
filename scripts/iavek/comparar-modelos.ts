@@ -131,6 +131,24 @@ async function main() {
   if (!base) throw new Error('versão do agente não encontrada');
   // PROMPT_ARQUIVO: testa um prompt novo (ex.: o r3) sem salvar nada no agente.
   if (process.env.PROMPT_ARQUIVO) base.systemPrompt = readFileSync(process.env.PROMPT_ARQUIVO, 'utf8');
+  // MEMORIA_ARQUIVO: testa uma memória da organização nova sem publicá-la. Só a
+  // leitura do documento da memória (org_memory_pointers) é trocada; o resto vai ao banco.
+  const memoria = process.env.MEMORIA_ARQUIVO ? readFileSync(process.env.MEMORIA_ARQUIVO, 'utf8') : null;
+  const poolDoTeste: typeof pool =
+    memoria === null
+      ? pool
+      : (new Proxy(pool, {
+          get(alvo, chave) {
+            if (chave === 'query') {
+              return (sql: unknown, params?: unknown[]) =>
+                typeof sql === 'string' && sql.includes('org_memory_pointers')
+                  ? Promise.resolve({ rows: [{ content: memoria }], rowCount: 1 })
+                  : (alvo.query as (s: unknown, p?: unknown[]) => Promise<unknown>)(sql, params);
+            }
+            const v = Reflect.get(alvo, chave) as unknown;
+            return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(alvo) : v;
+          },
+        }) as typeof pool);
 
   const precoDe = async (cod: string) => {
     const { rows } = await pool.query<{ preco_cents: string }>(
@@ -175,7 +193,7 @@ async function main() {
         const doCliente = conversa.filter((f) => f.autor === 'cliente').map((f) => f.texto);
         let erro: string | null = null;
         try {
-          await runAgentPreview(deps, pool, {
+          await runAgentPreview(deps, poolDoTeste, {
             kind: 'sandbox',
             organizationId: orgId,
             runId: randomUUID(),
