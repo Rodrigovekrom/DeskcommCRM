@@ -171,6 +171,8 @@ export const customFieldSchema = z.object({
     "email",
     "phone",
     "url",
+    // ia.vek v1.5: produto do catálogo (o carro de interesse); grava o id.
+    "catalog_product",
   ]),
   required: z.boolean().optional(),
   /**

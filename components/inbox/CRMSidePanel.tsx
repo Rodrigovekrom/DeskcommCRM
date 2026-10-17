@@ -28,6 +28,8 @@ import { ConversationTagsEditor } from "./ConversationTagsEditor";
 import { ContactTagsEditor } from "./ContactTagsEditor";
 import { useDefaultPipeline } from "@/hooks/pipelines/useDefaultPipeline";
 import { SeloCronometro72h } from "./SeloCronometro72h";
+import { SecaoRecolhivel } from "./SecaoRecolhivel";
+import { AcompanhamentoDoLead } from "./AcompanhamentoDoLead";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
@@ -57,6 +59,13 @@ interface LeadRow {
   stage_id?: string;
   /** As etapas ativas do funil, na ordem do quadro (rota crm-summary). */
   etapas_do_funil?: Array<{ id: string; name: string; is_won: boolean; is_lost: boolean }>;
+  // ia.vek v1.5: o Acompanhamento lê estes da mesma rota.
+  created_at?: string;
+  closed_at?: string | null;
+  lost_reason?: string | null;
+  won_reason?: string | null;
+  owner_kind?: string | null;
+  owner_name?: string | null;
 }
 
 interface OrderRow {
@@ -673,14 +682,9 @@ export function CRMSidePanel({ conversation }: Props) {
 
   return (
     <aside className="flex h-full flex-col gap-4 overflow-y-auto border-l border-border bg-background p-4">
-      <section>
-        <h3 className="text-xs font-semibold text-text">
-          {t("Contato")}
-        </h3>
+      <SecaoRecolhivel id="cliente" titulo={t("Cliente")}>
         <Card className="mt-2 space-y-2 p-3 text-sm">
           <div className="font-medium">{displayName}</div>
-          {/* ia.vek v1.5: as 72h do lead novo para agendar. */}
-          <SeloCronometro72h contactId={contactId} />
           {contact?.phone_number && (
             <div className="text-xs text-muted-foreground">{phoneForDisplay(contact.phone_number)}</div>
           )}
@@ -724,7 +728,7 @@ export function CRMSidePanel({ conversation }: Props) {
           </div>
           {tagEditorOpen && contactId && <ContactTagsEditor contactId={contactId} orgId={conversation.organization_id} tags={tags} />}
         </Card>
-      </section>
+      </SecaoRecolhivel>
 
       <LeadEnrichment
         data={summaryContactId === contactId && !erro && !contact?.is_anonymized ? enrichment : null}
@@ -757,14 +761,31 @@ export function CRMSidePanel({ conversation }: Props) {
 
       <Separator />
 
+      {/* ia.vek v1.5: o funil inteiro de relance — etapa, dono, próximo passo e
+          a linha de "entrou" até "comprou / não comprou (motivo)". */}
+      <SecaoRecolhivel
+        id="acompanhamento"
+        titulo={t("Acompanhamento")}
+        extra={<SeloCronometro72h contactId={contactId} />}
+      >
+        {sectionsLoading ? (
+          <Skeleton className="mt-2 h-14 w-full" />
+        ) : (
+          <AcompanhamentoDoLead
+            lead={(leads ?? []).find((l) => l.id === leadAtivoId) ?? leads?.[0] ?? null}
+            conversa={conversation}
+            contactId={contactId}
+          />
+        )}
+      </SecaoRecolhivel>
+
+      <Separator />
+
       {/* ANTES dos negócios de propósito (doutrina cap. 5): lead é o negócio,
           conversa é o canal, demanda é o que precisa acabar. Quem abre esta
           conversa está atendendo alguém que pediu alguma coisa — a primeira
           pergunta a responder é o que ainda está pendente, não quanto vale. */}
-      <section data-testid="inbox-demandas">
-        <h3 className="text-xs font-semibold text-text">
-          {t("Demandas abertas")}
-        </h3>
+      <SecaoRecolhivel id="demandas" titulo={t("Demandas abertas")} testId="inbox-demandas">
         {sectionsLoading ? (
           <Skeleton className="mt-2 h-14 w-full" />
         ) : demandas && demandas.length > 0 ? (
@@ -819,27 +840,23 @@ export function CRMSidePanel({ conversation }: Props) {
             onTentarDeNovo={() => setTentativa((n) => n + 1)}
           />
         )}
-      </section>
+      </SecaoRecolhivel>
 
       <Separator />
 
-      <section data-testid="inbox-memoria">
-        <h3 className="text-xs font-semibold">{t("Memória do contato")}</h3>
+      <SecaoRecolhivel id="memoria" titulo={t("Memória do contato")} testId="inbox-memoria">
         <p className="mt-1 text-xs text-muted-foreground">{t("Fatos duráveis registrados nas notas. Pendências pertencem à demanda vigente.")}</p>
         {!sectionsLoading && fatos.map((f) => <details key={f.id} className="mt-2 text-xs"><summary className="wrap-anywhere">{f.headline}</summary><p className="mt-1 whitespace-pre-wrap wrap-anywhere">{f.body}</p></details>)}
         {!sectionsLoading && fatos.length === 0 && <p className="mt-2 text-xs text-muted-foreground">{t("Nenhum fato durável registrado.")}</p>}
         {!sectionsLoading && historico.length > 0 && <div className="mt-3 text-xs"><h4>{t("Histórico encerrado — sem tarefas pendentes")}</h4>{historico.map((h) => <p key={h.id}>{t(DESFECHO_LEGIVEL[h.desfecho] ?? h.desfecho)}{h.fechada_em ? ` · ${shortDate(h.fechada_em, localeDaData)}` : ""}</p>)}</div>}
-      </section>
+      </SecaoRecolhivel>
       <Separator />
 
       {/* O que os roteiros de atendimento coletaram (módulo opcional; desligado
           ou sem roteiro, não desenha nada). */}
       {contactId && !contact?.is_anonymized && <RoteirosDoContato contactId={contactId} variante="painel" />}
 
-      <section data-testid="inbox-campos-lead">
-        <h3 className="text-xs font-semibold text-text">
-          {t("Leads recentes")}
-        </h3>
+      <SecaoRecolhivel id="dados-da-compra" titulo={t("Negócio e dados da compra")} testId="inbox-campos-lead">
         {sectionsLoading ? (
           <Skeleton className="mt-2 h-14 w-full" />
         ) : leads && leads.length > 0 ? (
@@ -852,14 +869,11 @@ export function CRMSidePanel({ conversation }: Props) {
         ) : (
           <SemLista vazio="Sem leads." erro={erro} onTentarDeNovo={() => setTentativa((n) => n + 1)} />
         )}
-      </section>
+      </SecaoRecolhivel>
 
       <Separator />
 
-      <section>
-        <h3 className="text-xs font-semibold text-text">
-          {t("Pedidos recentes")}
-        </h3>
+      <SecaoRecolhivel id="pedidos" titulo={t("Pedidos recentes")}>
         {sectionsLoading ? (
           <Skeleton className="mt-2 h-14 w-full" />
         ) : orders && orders.length > 0 ? (
@@ -884,14 +898,11 @@ export function CRMSidePanel({ conversation }: Props) {
         ) : (
           <SemLista vazio="Sem pedidos." erro={erro} onTentarDeNovo={() => setTentativa((n) => n + 1)} />
         )}
-      </section>
+      </SecaoRecolhivel>
 
       <Separator />
 
-      <section>
-        <h3 className="text-xs font-semibold text-text">
-          {t("Atividade")}
-        </h3>
+      <SecaoRecolhivel id="atividade" titulo={t("Linha do tempo")}>
         {sectionsLoading ? (
           <Skeleton className="mt-2 h-14 w-full" />
         ) : activities && activities.length > 0 ? (
@@ -925,7 +936,7 @@ export function CRMSidePanel({ conversation }: Props) {
         ) : (
           <SemLista vazio="Sem atividade." erro={erro} onTentarDeNovo={() => setTentativa((n) => n + 1)} />
         )}
-      </section>
+      </SecaoRecolhivel>
 
       <Separator />
 
@@ -934,13 +945,12 @@ export function CRMSidePanel({ conversation }: Props) {
           decide limiar/top-K é a rota, que chama `buscarConhecimento`. Colocada
           DEPOIS das seções de trabalho: é consulta, não é o que o atendente abre
           a conversa para fazer. */}
-      <section>
-        <h3 className="text-xs font-semibold">{t("Acervo")}</h3>
+      <SecaoRecolhivel id="acervo" titulo={t("Acervo")}>
         <p className="mt-1 mb-2 text-xs text-muted-foreground">
           {t("Pergunte como a IA perguntaria — a resposta vem com a origem de cada trecho.")}
         </p>
         <AcervoSearch />
-      </section>
+      </SecaoRecolhivel>
     </aside>
   );
 }

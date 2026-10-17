@@ -47,7 +47,7 @@ export const dynamic = "force-dynamic";
 // `stage_id` e as `etapas` do funil alimentam o seletor de etapa do painel: mover
 // o negócio (ex.: "Pedido confirmado") direto da conversa, sem ir ao quadro.
 const LEAD_COLS =
-  "id, title, status, value_cents, currency, updated_at, pipeline_id, stage_id, custom_fields, crm_pipelines!inner(name, settings, is_archived, etapas:crm_stages!crm_stages_pipeline_id_fkey(id, name, position, is_won, is_lost, is_archived)), crm_stages!crm_leads_stage_id_fkey(name)";
+  "id, title, status, value_cents, currency, updated_at, created_at, closed_at, lost_reason, won_reason, owner_kind, owner_user_id, pipeline_id, stage_id, custom_fields, crm_pipelines!inner(name, settings, is_archived, etapas:crm_stages!crm_stages_pipeline_id_fkey(id, name, position, is_won, is_lost, is_archived)), crm_stages!crm_leads_stage_id_fkey(name)";
 const ORDER_COLS = "id, external_id, status, total_cents, currency, created_at";
 /** Acompanha o que a timeline mostra — `reason` e `actor_kind` inclusive. */
 /**
@@ -168,12 +168,23 @@ export async function GET(
     performed_by_user_id?: string | null;
     [k: string]: unknown;
   }>;
-  const nomes = await nomesDosAtendentes(linhas.map((a) => a.performed_by_user_id ?? null));
+  // ia.vek v1.5: os donos dos negócios entram no MESMO lookup (Acompanhamento).
+  const donos = ((leads.data ?? []) as Array<{ owner_user_id?: string | null }>).map(
+    (l) => l.owner_user_id ?? null,
+  );
+  const nomes = await nomesDosAtendentes([
+    ...linhas.map((a) => a.performed_by_user_id ?? null),
+    ...donos,
+  ]);
 
   return ok(
     {
       ...enrichment,
-      leads: (leads.data ?? []).map((row) => comCamposDoFunil(row as Record<string, unknown>)),
+      leads: (leads.data ?? []).map((row) => {
+        const lead = comCamposDoFunil(row as Record<string, unknown>);
+        const dono = (row as { owner_user_id?: string | null }).owner_user_id;
+        return { ...lead, owner_name: dono ? (nomes.get(dono) ?? null) : null };
+      }),
       orders: orders.data ?? [],
       activities: linhas.map((a) => ({
         ...a,

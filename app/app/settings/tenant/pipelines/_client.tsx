@@ -1,4 +1,5 @@
 "use client";
+import { comCamposDaCompra } from "@/lib/iavek/campos-da-compra";
 
 import { useT } from "@/hooks/i18n/useT";
 import { useState, useTransition } from "react";
@@ -572,6 +573,20 @@ function PipelineEditor({
             }
           >
             <Plus size={14} aria-hidden className="mr-1" /> {t("Adicionar campo")}
+          </Button>
+        )}
+        {/* ia.vek v1.5: a ficha da compra de veículo num clique (só acrescenta o
+            que falta; nada é gravado até Salvar). */}
+        {fields.length < 50 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="ml-2"
+            data-testid="acrescentar-campos-da-compra"
+            onClick={() => setFields(comCamposDaCompra(fields) as typeof fields)}
+          >
+            <Plus size={14} aria-hidden className="mr-1" /> {t("Acrescentar campos da compra de veículo")}
           </Button>
         )}
       </div>

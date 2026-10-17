@@ -18,6 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
+import { CampoDoCatalogo } from "./CampoDoCatalogo";
 import { cn } from "@/lib/utils";
 
 export type CustomFieldType =
@@ -30,7 +31,8 @@ export type CustomFieldType =
   | "boolean"
   | "email"
   | "phone"
-  | "url";
+  | "url"
+  | "catalog_product";
 
 export interface CustomFieldDef {
   key: string;
@@ -163,6 +165,18 @@ export function CustomFieldsEditor({ fields, value, onChange, disabled, classNam
               </div>
             );
           }
+          case "catalog_product":
+            return (
+              <div key={f.key} className="space-y-2 md:col-span-2">
+                {labelEl}
+                <CampoDoCatalogo
+                  id={id}
+                  valor={v}
+                  onChange={(produtoId) => set(f.key, produtoId)}
+                  disabled={disabled}
+                />
+              </div>
+            );
           case "boolean":
             return (
               <div key={f.key} className="flex items-center justify-between gap-4 md:col-span-2">
