@@ -87,7 +87,7 @@ export interface NavMetadata {
  * mesma conversa para a sexta tela.
  */
 export const NAV_GROUPS: NavGroup[] = [
-  { id: "atendimento", label: "Atendimento" },
+  { id: "atendimento", label: "Controle de atendimentos" },
   { id: "crm", label: "CRM", hub: { href: "/app/crm", label: "Ver tudo em CRM" } },
   { id: "ia", label: "Agente de IA", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
   { id: "canais", label: "Canais" },
@@ -148,8 +148,9 @@ export const NAV_CATALOG = [
   // ---- Atendimento — onde o operador passa o dia ----
   {
     href: "/app/inbox",
-    label: "Inbox",
-    description: "As conversas de WhatsApp, com você e a IA atendendo lado a lado.",
+    label: "Entrada de leads",
+    // "inbox" na descrição: era o nome antigo, e a busca do ⌘K varre a descrição.
+    description: "As conversas de WhatsApp (inbox), com você e a IA atendendo lado a lado.",
     icon: "Inbox",
     group: "atendimento",
     sidebar: true,

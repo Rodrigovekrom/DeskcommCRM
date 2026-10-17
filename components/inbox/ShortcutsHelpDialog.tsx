@@ -18,6 +18,9 @@ const BINDINGS: { keys: string; description: string }[] = [
   { keys: "Shift + Enter", description: "Quebrar linha sem enviar" },
   { keys: "a", description: "Assumir conversa" },
   { keys: "e", description: "Fechar conversa" },
+  // ia.vek v1.4: recolher/abrir os painéis da Entrada de leads.
+  { keys: "[", description: "Recolher ou abrir a lista de conversas" },
+  { keys: "]", description: "Recolher ou abrir as informações do lead" },
   { keys: "?", description: "Mostrar atalhos" },
 ];
 

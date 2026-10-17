@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -29,7 +29,17 @@ import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 // ADR-05: ícone de feature sai do mapa canônico, nunca do pacote direto.
-import { CaretLeft, ChatCircle, IdentificationCard, MagnifyingGlass, X } from "@/lib/ui/icons";
+import {
+  CaretDoubleLeft,
+  CaretDoubleRight,
+  CaretLeft,
+  ChatCircle,
+  ChatsCircle,
+  IdentificationCard,
+  MagnifyingGlass,
+  X,
+} from "@/lib/ui/icons";
+import { useAtalhosDosPaineis, usePainelRecolhido } from "@/hooks/inbox/usePainelRecolhido";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -61,6 +71,24 @@ export function colunasDoCelular(temSelecao: boolean): { lista: string; conversa
     lista: temSelecao ? "hidden md:flex" : "flex",
     conversa: temSelecao ? "flex" : "hidden md:flex",
   };
+}
+
+/**
+ * ia.vek v1.4: as colunas da grade conforme a lista e a ficha estejam
+ * recolhidas. Recolhida, a coluna vira um trilho de 2.5rem com o botão de abrir,
+ * e a conversa (`1fr`) ocupa o espaço. As classes ficam LITERAIS de propósito:
+ * o Tailwind só gera a classe que encontra escrita por inteiro no código.
+ */
+export function gradeDaInbox(listaRecolhida: boolean, fichaRecolhida: boolean): string {
+  const md = listaRecolhida ? "md:grid-cols-[2.5rem_1fr]" : "md:grid-cols-[300px_1fr]";
+  const largas = listaRecolhida
+    ? fichaRecolhida
+      ? "xl:grid-cols-[2.5rem_1fr_2.5rem] 2xl:grid-cols-[2.5rem_1fr_2.5rem]"
+      : "xl:grid-cols-[2.5rem_1fr_296px] 2xl:grid-cols-[2.5rem_1fr_320px]"
+    : fichaRecolhida
+      ? "xl:grid-cols-[272px_1fr_2.5rem] 2xl:grid-cols-[300px_1fr_2.5rem]"
+      : "xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_320px]";
+  return `grid-cols-1 ${md} ${largas}`;
 }
 
 /**
@@ -309,6 +337,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
     needsFetch && !single.isPending && !single.data && isNotFound(single.error);
 
   const colunas = colunasDoCelular(Boolean(selectedId));
+  // ia.vek v1.4: lista e ficha recolhíveis, lembradas por usuário; atalhos [ e ].
+  const lista = usePainelRecolhido("inbox-lista", user?.id);
+  const ficha = usePainelRecolhido("inbox-ficha", user?.id);
+  useAtalhosDosPaineis(lista.alternar, ficha.alternar);
 
   const claim = useClaimConversation();
   const close = useCloseConversation();
@@ -430,7 +462,12 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   return (
     <OpenConversationProvider conversationId={selectedId}>
     <div
-      className="grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full grid-cols-1 md:grid-cols-[300px_1fr] xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_320px]"
+      className={cn(
+        "grid h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] w-full",
+        gradeDaInbox(lista.recolhido, ficha.recolhido),
+      )}
+      data-lista-recolhida={lista.recolhido ? "sim" : "nao"}
+      data-ficha-recolhida={ficha.recolhido ? "sim" : "nao"}
       /*
        * O ESTADO DO TEMPO REAL, LEGÍVEL DE FORA — mesmo par que o dossiê do lead
        * já publica (`LeadDossier`), e pela mesma razão: quando a entrega morre,
@@ -469,10 +506,16 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       */}
       <div
         className={cn(
-          "h-full min-h-0 flex-col border-r border-border md:flex",
+          "relative h-full min-h-0 flex-col border-r border-border md:flex",
           colunas.lista,
+          lista.recolhido && "md:hidden",
         )}
       >
+        <BotaoDoPainel
+          lado="lista"
+          rotulo={t("Recolher a lista de conversas")}
+          onClick={() => lista.definir(true)}
+        />
         <InboxFilters value={filterValue} onChange={setFilterValue} />
         <div className="min-h-0 flex-1 overflow-hidden">
           <ConversationList
@@ -485,6 +528,15 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
           />
         </div>
       </div>
+
+      {lista.recolhido && (
+        <TrilhoDoPainel
+          lado="lista"
+          rotulo={t("Abrir a lista de conversas")}
+          icone={<ChatsCircle size={18} aria-hidden />}
+          onClick={() => lista.definir(false)}
+        />
+      )}
 
       {/*
         AS DUAS COLUNAS DECIDEM PELO MESMO DADO — `selectedId`, não o objeto.
@@ -650,9 +702,23 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 min-w-0 xl:block">
-        <CRMSidePanel conversation={selectedConversation} />
-      </div>
+      {ficha.recolhido ? (
+        <TrilhoDoPainel
+          lado="ficha"
+          rotulo={t("Abrir as informações do lead")}
+          icone={<IdentificationCard size={18} aria-hidden />}
+          onClick={() => ficha.definir(false)}
+        />
+      ) : (
+        <div className="relative hidden h-full min-h-0 min-w-0 xl:block">
+          <BotaoDoPainel
+            lado="ficha"
+              rotulo={t("Recolher as informações do lead")}
+            onClick={() => ficha.definir(true)}
+          />
+          <CRMSidePanel conversation={selectedConversation} />
+        </div>
+      )}
 
       <InboxKeyboardShortcuts
         visibleIds={visibleIds}
@@ -666,5 +732,76 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
     </OpenConversationProvider>
+  );
+}
+
+/**
+ * ia.vek v1.4: o botão redondo que fica na borda da coluna aberta e a recolhe.
+ * Só no desktop (no celular as colunas já se alternam uma por vez).
+ */
+function BotaoDoPainel({
+  lado,
+  rotulo,
+  onClick,
+}: {
+  lado: "lista" | "ficha";
+  rotulo: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={rotulo}
+      title={`${rotulo} (${lado === "lista" ? "[" : "]"})`}
+      aria-expanded
+      data-testid={`recolher-${lado}`}
+      onClick={onClick}
+      className={cn(
+        "absolute top-3 z-20 hidden size-6 items-center justify-center rounded-full border border-border bg-background text-text-muted shadow-sm transition-colors hover:bg-surface-elevated hover:text-text md:flex",
+        "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+        lado === "lista" ? "-right-3" : "-left-3",
+      )}
+    >
+      {lado === "lista" ? (
+        <CaretDoubleLeft size={12} aria-hidden />
+      ) : (
+        <CaretDoubleRight size={12} aria-hidden />
+      )}
+    </button>
+  );
+}
+
+/** A coluna recolhida: um trilho estreito, com o botão que a abre de novo. */
+function TrilhoDoPainel({
+  lado,
+  rotulo,
+  icone,
+  onClick,
+}: {
+  lado: "lista" | "ficha";
+  rotulo: string;
+  icone: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "hidden h-full min-h-0 flex-col items-center gap-2 border-border bg-background py-3",
+        lado === "lista" ? "border-r md:flex" : "border-l xl:flex",
+      )}
+    >
+      <button
+        type="button"
+        aria-label={rotulo}
+        title={`${rotulo} (${lado === "lista" ? "[" : "]"})`}
+        aria-expanded={false}
+        data-testid={`abrir-${lado}`}
+        onClick={onClick}
+        className="flex size-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-elevated hover:text-text focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {lado === "lista" ? <CaretDoubleRight size={14} aria-hidden /> : <CaretDoubleLeft size={14} aria-hidden />}
+      </button>
+      <span className="text-text-subtle">{icone}</span>
+    </div>
   );
 }

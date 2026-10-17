@@ -114,7 +114,7 @@ describe("CommandPalette", () => {
 
   it("sem texto, oferece o trabalho do dia em vez de tela vazia", () => {
     abrir();
-    expect(screen.getByRole("option", { name: /Inbox/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /Entrada de leads/ })).toBeTruthy();
   });
 
   it("diz quando não achou, em vez de sumir sem explicação", async () => {
@@ -132,7 +132,7 @@ describe("CommandPalette", () => {
     expect(btnAtendimento).toBeTruthy();
     await user.click(btnAtendimento);
     // Ao filtrar por Atendimento, itens de CRM ou Funcionários não devem aparecer
-    expect(screen.getByRole("option", { name: /Inbox/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /Entrada de leads/ })).toBeTruthy();
     expect(screen.queryByRole("option", { name: /Contatos/ })).toBeNull();
   });
 

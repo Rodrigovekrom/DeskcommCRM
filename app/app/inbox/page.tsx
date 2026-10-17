@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { lerRascunho, type AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Inbox" };
+export const metadata: Metadata = { title: "Entrada de leads" };
 
 export default async function InboxPage({
   searchParams,

@@ -1399,6 +1399,15 @@ export const DICIONARIO: Traducoes = {
 
   // ─── Navegação (a barra lateral, presente em toda tela) ───
   Inbox: { es: "Inbox" },
+  // ia.vek v1.4: nomes do menu do Rodrigo.
+  "Entrada de leads": { es: "Entrada de leads" },
+  "Controle de atendimentos": { es: "Control de atención" },
+  "Recolher ou abrir a lista de conversas": { es: "Ocultar o abrir la lista de conversaciones" },
+  "Recolher ou abrir as informações do lead": { es: "Ocultar o abrir la información del lead" },
+  "Recolher a lista de conversas": { es: "Ocultar la lista de conversaciones" },
+  "Abrir a lista de conversas": { es: "Abrir la lista de conversaciones" },
+  "Recolher as informações do lead": { es: "Ocultar la información del lead" },
+  "Abrir as informações do lead": { es: "Abrir la información del lead" },
   Agenda: { es: "Agenda" },
   Radar: { es: "Radar" },
   // A porta do tema de extensão (#1095). `theme.apply` não abre tela — pinta o
@@ -12311,7 +12320,7 @@ export const DICIONARIO: Traducoes = {
   "Billing": { es: "Facturación" },
   "API Tokens": { es: "Tokens de API" },
   "As colunas de cada funil, o vocabulário do negócio e os motivos de perda.": { es: "Las columnas de cada embudo, el vocabulario del negocio y los motivos de pérdida." },
-  "As conversas de WhatsApp, com você e a IA atendendo lado a lado.": { es: "Las conversaciones de WhatsApp, donde tú y la IA atienden lado a lado." },
+  "As conversas de WhatsApp (inbox), com você e a IA atendendo lado a lado.": { es: "Las conversaciones de WhatsApp (inbox), donde tú y la IA atienden lado a lado." },
   "As pessoas do outro lado da conversa e seu histórico.": { es: "Las personas del otro lado de la conversación y su historial." },
   "Avise outros sistemas quando algo acontecer aqui dentro.": { es: "Avisa a otros sistemas cuando algo pase aquí." },
   "Conectar a conta de anúncios para ler o desempenho das campanhas.": { es: "Conectar la cuenta de anuncios para leer el rendimiento de las campañas." },
