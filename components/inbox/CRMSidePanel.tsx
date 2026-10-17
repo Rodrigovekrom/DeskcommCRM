@@ -27,6 +27,7 @@ import { soChavesAlteradas } from "@/lib/leads/custom-fields-so-diff";
 import { ConversationTagsEditor } from "./ConversationTagsEditor";
 import { ContactTagsEditor } from "./ContactTagsEditor";
 import { useDefaultPipeline } from "@/hooks/pipelines/useDefaultPipeline";
+import { SeloCronometro72h } from "./SeloCronometro72h";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
@@ -678,6 +679,8 @@ export function CRMSidePanel({ conversation }: Props) {
         </h3>
         <Card className="mt-2 space-y-2 p-3 text-sm">
           <div className="font-medium">{displayName}</div>
+          {/* ia.vek v1.5: as 72h do lead novo para agendar. */}
+          <SeloCronometro72h contactId={contactId} />
           {contact?.phone_number && (
             <div className="text-xs text-muted-foreground">{phoneForDisplay(contact.phone_number)}</div>
           )}

@@ -17,6 +17,8 @@ const closeMutate = vi.hoisted(() => vi.fn());
 const arquivarMutate = vi.hoisted(() => vi.fn());
 const startCall = vi.hoisted(() => vi.fn());
 
+// ia.vek v1.5: o selo das 72h lê a rota do painel (react-query); aqui não interessa.
+vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () => null }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ user: { id: "u1", support: null } }),
 }));

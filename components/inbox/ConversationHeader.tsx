@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
 import { ChannelLogo } from "@/components/inbox/ChannelLogo";
 import { Phone, ArrowRight, MagnifyingGlass } from "@/lib/ui/icons";
+import { SeloCronometro72h } from "./SeloCronometro72h";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useReleaseConversation } from "@/hooks/inbox/useReleaseConversation";
@@ -56,6 +57,11 @@ interface Props {
   botaoBuscaRef?: RefObject<HTMLButtonElement | null>;
   /** Seleciona outra conversa no Inbox — a aba Número do Transferir abre a do outro número. */
   onAbrirConversa?: (id: string) => void;
+  /**
+   * ia.vek v1.5: chamado ANTES de abrir a confirmação de Fechar/Arquivar. Devolve
+   * `false` quando o humano dono cancelou o pedido de próximo passo.
+   */
+  antesDeEncerrar?: (acao: "fechar" | "arquivar") => Promise<boolean>;
 }
 
 /**
@@ -90,6 +96,7 @@ export function ConversationHeader({
   onBuscar,
   buscaAberta,
   botaoBuscaRef,
+  antesDeEncerrar,
 }: Props) {
   const t = useT();
   const { user, activeOrg } = useAuth();
@@ -218,6 +225,8 @@ export function ConversationHeader({
             provider={conversation.channel_sessions?.provider ?? null}
             lastInboundAt={conversation.last_inbound_at}
           />
+          {/* ia.vek v1.5: as 72h do lead novo para agendar. */}
+          {!conversation.is_group && <SeloCronometro72h contactId={conversation.contact_id} />}
         </div>
 
         {/* QUEM ESTÁ NO COMANDO, com nome e por GEOMETRIA — disco cheio para
@@ -389,7 +398,10 @@ export function ConversationHeader({
             size="sm"
             variant="outline"
             disabled={close.isPending}
-            onClick={() => setConfirmFecharOpen(true)}
+            onClick={async () => {
+              if (antesDeEncerrar && !(await antesDeEncerrar("fechar"))) return;
+              setConfirmFecharOpen(true);
+            }}
           >
             {t("Fechar")}
           </Button>
@@ -411,7 +423,10 @@ export function ConversationHeader({
             size="sm"
             variant="ghost"
             disabled={arquivar.isPending}
-            onClick={() => setConfirmArquivarOpen(true)}
+            onClick={async () => {
+              if (antesDeEncerrar && !(await antesDeEncerrar("arquivar"))) return;
+              setConfirmArquivarOpen(true);
+            }}
           >
             {arquivar.isPending ? t("Arquivando...") : t("Arquivar")}
           </Button>

@@ -40,6 +40,7 @@ import {
   X,
 } from "@/lib/ui/icons";
 import { useAtalhosDosPaineis, usePainelRecolhido } from "@/hooks/inbox/usePainelRecolhido";
+import { useProximoPassoObrigatorio } from "./ProximoPassoObrigatorio";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -341,6 +342,12 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const lista = usePainelRecolhido("inbox-lista", user?.id);
   const ficha = usePainelRecolhido("inbox-ficha", user?.id);
   useAtalhosDosPaineis(lista.alternar, ficha.alternar);
+  // ia.vek v1.5: próximo passo obrigatório (trava ao fechar/arquivar, aviso ao trocar).
+  const {
+    garantir: garantirProximoPasso,
+    avisarSaida: avisarSaidaSemProximoPasso,
+    dialogo: dialogoDoProximoPasso,
+  } = useProximoPassoObrigatorio();
 
   const claim = useClaimConversation();
   const close = useCloseConversation();
@@ -358,6 +365,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   //
   const handleSelect = useCallback((id: string | null) => {
     if (id === selectedId) return;
+    // ia.vek v1.5: sair da conversa sem próximo passo só AVISA (não trava).
+    if (selectedConversation && selectedConversation.id === selectedId) {
+      avisarSaidaSemProximoPasso(selectedConversation);
+    }
     setSelectedId(id);
     // Sem isto, escolher "responder" numa conversa e trocar para outra levaria
     // a citação junto — e a resposta sairia citando mensagem de outro cliente.
@@ -371,7 +382,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
     params.delete("rascunho");
     const query = params.toString();
     window.history.pushState(null, "", query ? `${pathname}?${query}` : pathname);
-  }, [selectedId, searchParams, pathname]);
+  }, [selectedId, searchParams, pathname, selectedConversation, avisarSaidaSemProximoPasso]);
   const handleVisibleChange = useCallback((ids: string[]) => setVisibleIds(ids), []);
   const handleFocusReply = useCallback(() => composerRef.current?.focus(), []);
   const handleClaim = useCallback(() => {
@@ -381,10 +392,12 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       expected_assignee: selectedConversation.assigned_to_user_id,
     });
   }, [claim, selectedConversation]);
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback(async () => {
     if (!selectedConversation) return;
+    // ia.vek v1.5: fechar exige o próximo passo do humano dono da conversa.
+    if (!(await garantirProximoPasso(selectedConversation, "fechar"))) return;
     close.mutate({ conversation_id: selectedConversation.id });
-  }, [close, selectedConversation]);
+  }, [close, selectedConversation, garantirProximoPasso]);
 
   // A janela vence SOZINHA com a aba aberta. Sem este relógio, quem deixa o
   // inbox aberto a tarde inteira seguiria com o composer liberado numa conversa
@@ -605,6 +618,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
               }
               buscaAberta={buscaAberta}
               botaoBuscaRef={botaoBuscaRef}
+              antesDeEncerrar={(acao) => garantirProximoPasso(selectedConversation, acao)}
             />
             {buscaAberta && (
               <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
@@ -730,6 +744,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         onToggleHelp={() => setHelpOpen((v) => !v)}
       />
       <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
+      {dialogoDoProximoPasso}
     </div>
     </OpenConversationProvider>
   );

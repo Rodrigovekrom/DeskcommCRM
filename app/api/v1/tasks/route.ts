@@ -30,6 +30,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { SOURCE_KIND_PROXIMO_PASSO } from "@/lib/iavek/proximo-passo";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
@@ -50,6 +51,9 @@ const criacaoSchema = z.object({
   lead_id: z.string().uuid().nullable().optional(),
   contact_id: z.string().uuid().nullable().optional(),
   assigned_to: z.string().uuid().nullable().optional(),
+  // ia.vek v1.5: só o próximo passo pode ser criado com origem pela tela; as
+  // ligações da esteira (`ligacao:Lx`) continuam exclusivas do servidor.
+  source_kind: z.literal(SOURCE_KIND_PROXIMO_PASSO).optional(),
 });
 
 const listaSchema = z.object({
@@ -61,6 +65,7 @@ const listaSchema = z.object({
   due_to: z.string().datetime({ offset: true }).optional(),
   /** "abertas" = o que ainda pede ação. É o default da tela. */
   aberto: z.enum(["true", "false"]).optional(),
+  source_kind: z.literal(SOURCE_KIND_PROXIMO_PASSO).optional(),
 });
 
 export async function GET(req: NextRequest): Promise<Response> {
@@ -97,6 +102,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (filtros.contact_id) query = query.eq("contact_id", filtros.contact_id);
   if (filtros.due_from) query = query.gte("due_date", filtros.due_from);
   if (filtros.due_to) query = query.lte("due_date", filtros.due_to);
+  if (filtros.source_kind) query = query.eq("source_kind", filtros.source_kind);
   if (filtros.aberto === "true") query = query.in("status", ["pending", "in_progress"]);
 
   const { data, error } = await query;
