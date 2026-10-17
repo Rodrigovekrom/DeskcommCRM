@@ -37,6 +37,9 @@ jobs:
         pg: ["15", "17"]
     env:
       TEST_DB_IMAGE: pgvector/pgvector:pg${{ matrix.pg }}
+      # O fork não publica release; a conferência de isolamento do kit usa a
+      # versão de onde o ia.vek nasceu (o upstream v1.76.0).
+      CONFERENCIA_KIT_RELEASE: v1.76.0
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/preparar-node
