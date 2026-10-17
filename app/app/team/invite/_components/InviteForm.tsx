@@ -96,6 +96,7 @@ export function InviteForm() {
           </Select>
         </div>
         <InterfaceEditor
+          mostrarFuncao
           value={settings}
           onChange={setSettings}
           role={role}
@@ -147,7 +148,9 @@ export function InviteForm() {
                   {result.failed.map((f) => (
                     <li key={f.email}>
                       <span className="font-medium">{f.email}</span>{" "}
-                      <span className="text-muted-foreground">— {t(descreverMotivoDaFalha(f.reason))}</span>
+                      <span className="text-muted-foreground">
+                        — {t(descreverMotivoDaFalha(f.reason))}
+                      </span>
                     </li>
                   ))}
                 </ul>

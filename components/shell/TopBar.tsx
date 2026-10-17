@@ -5,6 +5,7 @@ import { MobileSidebar } from "./MobileSidebar";
 import { TenantSwitcher } from "./TenantSwitcher";
 import { UserMenu } from "./UserMenu";
 import { SearchTrigger } from "./SearchTrigger";
+import { SeloVerComo } from "./VerComo";
 
 export function TopBar() {
   return (
@@ -17,6 +18,7 @@ export function TopBar() {
         <SearchTrigger />
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <SeloVerComo />
         <AlertsBell />
         <AvisoDePropostaEmDestaque />
         <UserMenu />

@@ -155,9 +155,18 @@ interface InboxLayoutProps {
   initialSelectedId?: string | null;
   /** Rascunho sugerido por integração (issue #1611) — `null` é o caso comum. */
   rascunho?: AvisoDeRascunho | null;
+  /**
+   * ia.vek v1.6: o "Espaço da IA" é esta mesma tela presa na aba Automático.
+   * Escolher outra aba ali leva para a Entrada de leads, na aba escolhida.
+   */
+  abaFixa?: InboxTab;
 }
 
-export function InboxLayout({ initialSelectedId = null, rascunho = null }: InboxLayoutProps = {}) {
+export function InboxLayout({
+  initialSelectedId = null,
+  rascunho = null,
+  abaFixa,
+}: InboxLayoutProps = {}) {
   const t = useT();
   const { activeOrg, user } = useAuth();
   const supportReadonly = user.support?.access_mode === "support_readonly";
@@ -166,7 +175,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const tab = parseFilterParam(searchParams.get("filter"));
+  const tab = abaFixa ?? parseFilterParam(searchParams.get("filter"));
   const idNaUrl = searchParams.get("id");
   /**
    * `?tag=` é o destino do link de cada linha do relatório Por etiqueta
@@ -190,6 +199,10 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(
     (next: InboxFiltersValue) => {
+      if (next.tab !== tab && abaFixa) {
+        router.push(`/app/inbox?filter=${next.tab}`);
+        return;
+      }
       if (next.tab !== tab) {
         const params = new URLSearchParams(searchParams);
         params.set("filter", next.tab);
@@ -198,7 +211,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       const { tab: _t, ...rest } = next;
       setAux(rest);
     },
-    [tab, searchParams, router, pathname],
+    [tab, searchParams, router, pathname, abaFixa],
   );
 
   // Desliga só os AUXILIARES e mantém a aba: a aba é onde a pessoa está, e

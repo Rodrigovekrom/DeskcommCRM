@@ -2,6 +2,7 @@
 import { useT } from "@/hooks/i18n/useT";
 import { useId } from "react";
 import type { Role } from "@/lib/auth/types";
+import { FUNCOES, ROTULO_DA_FUNCAO, ehFuncao } from "@/lib/iavek/funcoes";
 import { NAV_GROUPS, type NavDestinationId } from "@/lib/navigation/catalogo";
 import {
   destinosDaInterface,
@@ -17,11 +18,14 @@ export function InterfaceEditor({
   onChange,
   role,
   disabled = false,
+  mostrarFuncao = false,
 }: {
   value: InterfaceSettings;
   onChange: (value: InterfaceSettings) => void;
   role: Role;
   disabled?: boolean;
+  /** ia.vek v1.6: só o vínculo de uma PESSOA tem função (nunca a empresa). */
+  mostrarFuncao?: boolean;
 }) {
   const t = useT();
   const id = useId();
@@ -32,24 +36,73 @@ export function InterfaceEditor({
   return (
     <fieldset disabled={disabled} className="space-y-3 rounded-md border p-4">
       <legend className="px-1 text-sm font-medium">{t("Interface")}</legend>
-      <p className="text-xs text-muted-foreground">{t("Define quais áreas aparecem na navegação. As permissões continuam sendo determinadas pelo papel. Links de conversas e avisos podem abrir áreas autorizadas que estejam ocultas.")}</p>
-      <label htmlFor={id} className="block text-sm">{t("Perfil de interface")}</label>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          "Define quais áreas aparecem na navegação. As permissões continuam sendo determinadas pelo papel. Links de conversas e avisos podem abrir áreas autorizadas que estejam ocultas.",
+        )}
+      </p>
+      {mostrarFuncao && (
+        <>
+          {/* ia.vek v1.6: a FUNÇÃO na loja decide o menu e a tela inicial ("Meu dia");
+          a permissão continua sendo a do papel. */}
+          <label htmlFor={`${id}-funcao`} className="block text-sm">
+            {t("Função na loja")}
+          </label>
+          <select
+            id={`${id}-funcao`}
+            data-testid="funcao-na-loja"
+            value={value.funcao ?? ""}
+            onChange={(e) => {
+              const { funcao: _antiga, ...resto } = value;
+              onChange(ehFuncao(e.target.value) ? { ...resto, funcao: e.target.value } : resto);
+            }}
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="">{t("Nenhuma (interface de sempre)")}</option>
+            {FUNCOES.map((f) => (
+              <option key={f} value={f}>
+                {t(ROTULO_DA_FUNCAO[f])}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            {t(
+              "SDR e Vendedor veem só o que é do dia deles; Gerente vê tudo. A permissão continua sendo a do papel.",
+            )}
+          </p>
+        </>
+      )}
+      <label htmlFor={id} className="block text-sm">
+        {t("Perfil de interface")}
+      </label>
       <select
         id={id}
         value={value.preset}
-        onChange={(e) => onChange({ preset: e.target.value as InterfaceSettings["preset"] })}
+        onChange={(e) =>
+          onChange({
+            preset: e.target.value as InterfaceSettings["preset"],
+            ...(value.funcao ? { funcao: value.funcao } : {}),
+          })
+        }
         className="h-10 w-full rounded-md border bg-background px-3 text-sm"
       >
         <option value="completa">{t("Completa")}</option>
         <option value="simplificada">{t("Simplificada")}</option>
       </select>
-      <p className="text-xs text-muted-foreground">{t("Trocar o perfil restaura sua seleção padrão. Perfil, segurança e acesso à equipe de quem administra continuam disponíveis.")}</p>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          "Trocar o perfil restaura sua seleção padrão. Perfil, segurança e acesso à equipe de quem administra continuam disponíveis.",
+        )}
+      </p>
       {lerInterface(value).needsAdjustment && (
-        <p role="status" className="text-sm">{t("A seleção contém áreas antigas. Confira e salve novamente.")}</p>
+        <p role="status" className="text-sm">
+          {t("A seleção contém áreas antigas. Confira e salve novamente.")}
+        </p>
       )}
       <details>
         <summary className="cursor-pointer text-sm font-medium">
-          {t("Personalizar áreas visíveis")}{value.destinos ? t(" (personalizada)") : ""}
+          {t("Personalizar áreas visíveis")}
+          {value.destinos ? t(" (personalizada)") : ""}
         </summary>
         <div className="mt-3 max-h-64 space-y-4 overflow-y-auto">
           {NAV_GROUPS.map((group) => {
@@ -76,6 +129,7 @@ export function InterfaceEditor({
                         onChange({
                           preset: value.preset,
                           destinos: [...next] as NavDestinationId[],
+                          ...(value.funcao ? { funcao: value.funcao } : {}),
                         });
                       }}
                       className="mt-1"
@@ -89,7 +143,9 @@ export function InterfaceEditor({
         </div>
       </details>
       {!interfaceTemDestino(value, role) || value.destinos?.length === 0 ? (
-        <p role="alert" className="text-sm text-destructive">{t("Selecione ao menos uma área de trabalho permitida ao papel.")}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {t("Selecione ao menos uma área de trabalho permitida ao papel.")}
+        </p>
       ) : null}
     </fieldset>
   );

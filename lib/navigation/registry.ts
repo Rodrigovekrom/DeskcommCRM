@@ -127,7 +127,13 @@ export function sidebarGroups(
   return NAV_GROUPS.map((group) => ({
     group,
     items: NAV_DESTINATIONS.filter(
-      (d) => d.group === group.id && (d.sidebar || (!group.hub && !!settings?.destinos)) && visible.has(d.href),
+      (d) =>
+        d.group === group.id &&
+        (d.sidebar || (!group.hub && !!settings?.destinos)) &&
+        // ia.vek v1.6: "Meu dia" e "Espaço da IA" entram na barra só para quem
+        // tem função; sem função, a barra é a de sempre (e a busca os acha).
+        (!d.soComFuncao || Boolean(settings?.funcao)) &&
+        visible.has(d.href),
     ),
   })).filter(
     (g) =>

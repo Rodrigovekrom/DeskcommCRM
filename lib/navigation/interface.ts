@@ -4,6 +4,7 @@ import { ROLE_RANK, type Role } from "@/lib/auth/types";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
 import { NAV_CATALOG, type NavMetadata, type NavDestinationId } from "./catalogo";
+import { FUNCOES, funcaoMostra } from "@/lib/iavek/funcoes";
 
 const ids = NAV_CATALOG.map((d) => d.href);
 export const interfaceSettingsSchema = z
@@ -15,6 +16,8 @@ export const interfaceSettingsSchema = z
       .max(ids.length)
       .transform((values) => ids.filter((id) => values.includes(id)))
       .optional(),
+    // ia.vek v1.6: a função na loja (só decide o que a pessoa vê).
+    funcao: z.enum(FUNCOES).optional(),
   })
   .strict();
 export type InterfaceSettings = z.infer<typeof interfaceSettingsSchema>;
@@ -97,6 +100,9 @@ export function lerInterface(raw: unknown): {
   const parsed = interfaceSettingsSchema.safeParse({
     preset: value.preset,
     ...(destinos ? { destinos } : {}),
+    // Função desconhecida (versão futura, valor estranho) é ignorada, não
+    // invalida a interface inteira.
+    ...((FUNCOES as readonly unknown[]).includes(value.funcao) ? { funcao: value.funcao } : {}),
   });
   if (!parsed.success) return { settings: INTERFACE_COMPLETA, needsAdjustment: true };
   return {
@@ -116,7 +122,10 @@ export function destinosDaInterface(
   const chosen =
     settings.destinos ?? (settings.preset === "simplificada" ? SIMPLIFICADA : undefined);
   return allowed.filter(
-    (d) => essencial(d, role, platform) || !chosen || chosen.includes(d.href as NavDestinationId),
+    (d) =>
+      essencial(d, role, platform) ||
+      ((!chosen || chosen.includes(d.href as NavDestinationId)) &&
+        funcaoMostra(settings.funcao, d.href)),
   );
 }
 export function interfaceTemDestino(
@@ -128,6 +137,10 @@ export function interfaceTemDestino(
 }
 export function homeDaInterface(raw: unknown, platform: boolean, role: Role | null): string {
   const visible = destinosDaInterface(raw, platform, role);
+  // ia.vek v1.6: quem tem função começa o dia pelo "Meu dia".
+  if (lerInterface(raw).settings.funcao && visible.some((d) => d.href === "/app/meu-dia")) {
+    return "/app/meu-dia";
+  }
   return (
     visible.find((d) => d.href === "/app/inbox")?.href ??
     visible.find((d) => !essencial(d, role, platform))?.href ??
@@ -175,10 +188,18 @@ const SO_O_ESSENCIAL: readonly NavDestinationId[] = ids.filter((id) =>
  */
 export function combinarInterfaces(daEmpresa: unknown, doVinculo: unknown): InterfaceSettings {
   const empresa = conjuntoEscolhido(lerInterface(daEmpresa).settings);
-  const vinculo = conjuntoEscolhido(lerInterface(doVinculo).settings);
-  if (!empresa && !vinculo) return INTERFACE_COMPLETA;
+  const doVinculoLido = lerInterface(doVinculo).settings;
+  const vinculo = conjuntoEscolhido(doVinculoLido);
+  // ia.vek v1.6: a função é do VÍNCULO (da pessoa), e atravessa a combinação.
+  const funcao = doVinculoLido.funcao ? { funcao: doVinculoLido.funcao } : {};
+  if (!empresa && !vinculo) return { ...INTERFACE_COMPLETA, ...funcao };
   const soUm = empresa ?? vinculo;
-  if (!empresa || !vinculo) return { preset: "completa", destinos: [...(soUm as readonly NavDestinationId[])] };
+  if (!empresa || !vinculo)
+    return { preset: "completa", destinos: [...(soUm as readonly NavDestinationId[])], ...funcao };
   const comuns = empresa.filter((id) => vinculo.includes(id));
-  return { preset: "completa", destinos: [...(comuns.length > 0 ? comuns : SO_O_ESSENCIAL)] };
+  return {
+    preset: "completa",
+    destinos: [...(comuns.length > 0 ? comuns : SO_O_ESSENCIAL)],
+    ...funcao,
+  };
 }

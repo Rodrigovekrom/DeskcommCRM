@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SeletorDeIdioma } from "@/components/shell/SeletorDeIdioma";
+import { VerComoNoMenu } from "@/components/shell/VerComo";
 import { useT } from "@/hooks/i18n/useT";
 import Link from "next/link";
 import { SignOut, ShieldCheck } from "@/lib/ui/icons";
@@ -51,6 +52,8 @@ export function UserMenu() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {/* ia.vek v1.6: "Ver como" (SDR · Vendedor · Gerente · Minha visão). */}
+          <VerComoNoMenu />
           {/*
             A PORTA DO MODO ADMINISTRADOR.
 

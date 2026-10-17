@@ -53,6 +53,12 @@ export interface NavMetadata {
    */
   contador?: "casos" | "fila";
   /**
+   * ia.vek v1.6: só aparece para quem tem uma FUNÇÃO na loja (SDR, vendedor,
+   * gerente). Sem função, o menu é o de sempre — e o teto de itens da dobra
+   * (tests/unit/interface-por-empresa.test.ts) segue valendo.
+   */
+  soComFuncao?: boolean;
+  /**
    * A porta de um MÓDULO OPCIONAL da instalação (`lib/instalacao/modulos.ts`).
    * Com o módulo desligado ela some do menu, do hub e do ⌘K — para todo papel.
    * É apresentação, como o resto deste arquivo: quem recusa é a tela e a rota.
@@ -156,6 +162,32 @@ export const NAV_CATALOG = [
     sidebar: true,
     // Quantas conversas a IA passou para a equipe e esperam uma pessoa (aba Fila).
     contador: "fila",
+  },
+  // ia.vek v1.6: a tela inicial de cada função (SDR, Vendedor, Gerente) — só
+  // o que a pessoa tem a fazer hoje.
+  {
+    href: "/app/meu-dia",
+    label: "Meu dia",
+    description:
+      "O que você tem a fazer hoje: leads novos com o prazo das 72h, ligações, agendamentos e próximos passos.",
+    icon: "ListChecks",
+    group: "atendimento",
+    sidebar: true,
+    soComFuncao: true,
+  },
+  // ia.vek v1.6: o lugar onde o lead novo é atendido pela IA — a aba
+  // Automático da Entrada de leads, com o cronômetro das 72h e o "assumir"
+  // para passar a conversa para uma pessoa.
+  {
+    href: "/app/espaco-ia",
+    label: "Espaço da IA",
+    description:
+      "As conversas que a IA está atendendo agora (automático), com o prazo das 72h de cada lead.",
+    icon: "Robot",
+    group: "atendimento",
+    sidebar: true,
+    minRole: "agent",
+    soComFuncao: true,
   },
   {
     href: "/app/radar",
@@ -399,7 +431,8 @@ export const NAV_CATALOG = [
   {
     href: "/app/settings/tenant/proposals/modelos",
     label: "Modelos de proposta",
-    description: "Personalize os modelos da plataforma ou crie os da sua empresa, inclusive a partir de uma proposta que você já usa.",
+    description:
+      "Personalize os modelos da plataforma ou crie os da sua empresa, inclusive a partir de uma proposta que você já usa.",
     icon: "FileText",
     group: "organizacao",
     section: "Sua empresa",
@@ -512,7 +545,8 @@ export const NAV_CATALOG = [
     // e na busca, e quem usa pode pô-la no menu dela.
     href: "/app/ai/atendimento",
     label: "Fluxos de atendimento",
-    description: "Perguntas que a IA conduz durante a conversa, com as respostas guardadas na ficha do cliente.",
+    description:
+      "Perguntas que a IA conduz durante a conversa, com as respostas guardadas na ficha do cliente.",
     icon: "ListChecks",
     group: "ia",
     section: "Montar o agente",
@@ -554,7 +588,8 @@ export const NAV_CATALOG = [
     label: "Provedores",
     // O "Jev" vem cedo: o ⌘K mostra só o começo da descrição, e a versão
     // longa cortava antes do nome — quem procurava "jev" achava, mas não via por quê.
-    description: "Ligue o Jev para decisões rápidas e escolha qual inteligência atende cada parte do sistema.",
+    description:
+      "Ligue o Jev para decisões rápidas e escolha qual inteligência atende cada parte do sistema.",
     icon: "Plugs",
     group: "ia",
     section: "Montar o agente",
@@ -881,7 +916,8 @@ export const NAV_CATALOG = [
     // configuração tem superfície" (docs/doctrine/restricao-de-canal.md).
     href: "/app/settings/automacoes",
     label: "Automações",
-    description: "O freio único do passo em que a IA escolhe entre as opções de uma regra, para a empresa inteira.",
+    description:
+      "O freio único do passo em que a IA escolhe entre as opções de uma regra, para a empresa inteira.",
     icon: "FlowArrow",
     group: "organizacao",
     section: "Sua empresa",

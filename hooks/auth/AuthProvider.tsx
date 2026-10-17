@@ -13,6 +13,7 @@ import { definirOrgDaAba } from "@/lib/auth/org-da-aba";
 import { createClient, resetRealtimeAuthentication } from "@/lib/supabase/browser";
 import type { AuthUser, ActiveOrg, Role } from "@/lib/auth/types";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { ehFuncao, type Funcao } from "@/lib/iavek/funcoes";
 
 interface AuthCtx {
   user: AuthUser;
@@ -20,6 +21,15 @@ interface AuthCtx {
   isAuthenticated: true;
   refreshing: boolean;
   signOut: () => Promise<void>;
+  /**
+   * ia.vek v1.6: "Ver como" — quem administra enxerga a interface de uma FUNÇÃO
+   * (menu e tela inicial) sem trocar papel nem permissão. `activeOrg` acima já
+   * sai com a função escolhida; a função real fica em `funcaoReal`.
+   */
+  verComo: Funcao | null;
+  definirVerComo: (f: Funcao | null) => void;
+  podeVerComo: boolean;
+  funcaoReal: Funcao | null;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -35,6 +45,44 @@ export function AuthProvider({
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const supabaseRef = useRef(createClient());
+
+  // ia.vek v1.6: "Ver como", lembrado por pessoa e organização neste navegador.
+  const podeVerComo = (user.is_platform_admin && !user.support) || activeOrg?.role === "admin";
+  const chaveVerComo = `iavek:ver-como:${user.id}:${activeOrg?.orgId ?? "-"}`;
+  const [verComo, setVerComo] = useState<Funcao | null>(null);
+  useEffect(() => {
+    if (!podeVerComo) return setVerComo(null);
+    try {
+      const salvo = window.localStorage.getItem(chaveVerComo);
+      setVerComo(ehFuncao(salvo) ? salvo : null);
+    } catch {
+      setVerComo(null);
+    }
+  }, [podeVerComo, chaveVerComo]);
+  const definirVerComo = useMemo(
+    () => (f: Funcao | null) => {
+      setVerComo(f);
+      try {
+        if (f) window.localStorage.setItem(chaveVerComo, f);
+        else window.localStorage.removeItem(chaveVerComo);
+      } catch {
+        // sem armazenamento: vale só nesta aba.
+      }
+    },
+    [chaveVerComo],
+  );
+  const funcaoReal = ehFuncao(activeOrg?.interface_settings?.funcao)
+    ? activeOrg!.interface_settings!.funcao!
+    : null;
+  // A interface VISTA: com "Ver como", a da função escolhida, inteira (sem as
+  // áreas personalizadas de quem administra), para mostrar o que ela vê.
+  const orgVista = useMemo<ActiveOrg | null>(
+    () =>
+      activeOrg && podeVerComo && verComo
+        ? { ...activeOrg, interface_settings: { preset: "completa", funcao: verComo } }
+        : activeOrg,
+    [activeOrg, podeVerComo, verComo],
+  );
 
   useEffect(() => {
     resetRealtimeAuthentication();
@@ -63,7 +111,9 @@ export function AuthProvider({
       const result = await response.json();
       if (result.data.signature !== expected) window.location.reload();
     };
-    const timer = setInterval(() => { void check(); }, 15000);
+    const timer = setInterval(() => {
+      void check();
+    }, 15000);
     return () => clearInterval(timer);
   }, [user.support]);
 
@@ -86,7 +136,11 @@ export function AuthProvider({
   const value = useMemo<AuthCtx>(
     () => ({
       user,
-      activeOrg,
+      activeOrg: orgVista,
+      verComo: podeVerComo ? verComo : null,
+      definirVerComo,
+      podeVerComo,
+      funcaoReal,
       isAuthenticated: true,
       refreshing,
       signOut: async () => {
@@ -95,12 +149,18 @@ export function AuthProvider({
         await signOut();
       },
     }),
-    [user, activeOrg, refreshing],
+    [user, orgVista, refreshing, podeVerComo, verComo, definirVerComo, funcaoReal],
   );
 
-  return <Ctx.Provider value={value}>
-    <Providers key={`${user.id}:${activeOrg?.orgId ?? "none"}:${user.support?.id ?? "normal"}:${user.support?.access_mode ?? ""}`}>{children}</Providers>
-  </Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      <Providers
+        key={`${user.id}:${activeOrg?.orgId ?? "none"}:${user.support?.id ?? "normal"}:${user.support?.access_mode ?? ""}`}
+      >
+        {children}
+      </Providers>
+    </Ctx.Provider>
+  );
 }
 
 export function useAuth(): AuthCtx {

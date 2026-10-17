@@ -1,0 +1,177 @@
+/**
+ * ia.vek v1.6 (parte B): o "Meu dia" de cada função — as contas puras, a tela
+ * inicial por função e os três painéis (SDR, Vendedor, Gerente) com dados e
+ * com estado vazio amigável.
+ */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+
+const mocks = vi.hoisted(() => ({
+  org: {
+    orgId: "o",
+    role: "agent",
+    interface_settings: { preset: "completa", funcao: "sdr" },
+  } as Record<string, unknown>,
+  resposta: {} as unknown,
+  get: vi.fn(),
+}));
+vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useAuth: () => ({ activeOrg: mocks.org, user: { id: "eu" } }),
+}));
+vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/api/client", () => ({
+  apiClient: {
+    get: (url: string) => {
+      mocks.get(url);
+      return Promise.resolve({ data: mocks.resposta });
+    },
+    patch: vi.fn(),
+  },
+}));
+
+import { atrasosPorPessoa, limitesDoDia, perdasPorMotivo, porPrazo } from "@/lib/iavek/meu-dia";
+import { homeDaInterface } from "@/lib/navigation/interface";
+import { MeuDia, funcaoDoDia } from "@/components/iavek/MeuDia";
+
+function montar() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+  render(<MeuDia />, { wrapper });
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+  mocks.get.mockClear();
+});
+
+describe("contas do Meu dia", () => {
+  it("hoje é o dia do fuso da loja (São Paulo, UTC-3)", () => {
+    const { inicio, fim } = limitesDoDia(new Date("2026-10-17T02:00:00Z"), "America/Sao_Paulo");
+    expect(inicio.toISOString()).toBe("2026-10-16T03:00:00.000Z");
+    expect(fim.toISOString()).toBe("2026-10-17T03:00:00.000Z");
+  });
+
+  it("leads com menos tempo primeiro", () => {
+    expect(
+      porPrazo([{ fim_em: "2026-10-20" }, { fim_em: "2026-10-18" }]).map((l) => l.fim_em),
+    ).toEqual(["2026-10-18", "2026-10-20"]);
+  });
+
+  it("atrasos por pessoa separam ligações, próximos passos e outras", () => {
+    expect(
+      atrasosPorPessoa([
+        { assigned_to: "a", source_kind: "ligacao:L1" },
+        { assigned_to: "a", source_kind: "proximo_passo" },
+        { assigned_to: "b", source_kind: null },
+        { assigned_to: "a", source_kind: "ligacao:L2" },
+      ]),
+    ).toEqual([
+      { user_id: "a", ligacoes: 2, proximos_passos: 1, outras: 0 },
+      { user_id: "b", ligacoes: 0, proximos_passos: 0, outras: 1 },
+    ]);
+  });
+
+  it("perdas agrupadas por motivo, sem motivo vira 'Sem motivo'", () => {
+    expect(
+      perdasPorMotivo([
+        { lost_reason: "Preço" },
+        { lost_reason: null },
+        { lost_reason: " Preço " },
+      ]),
+    ).toEqual([
+      { motivo: "Preço", total: 2 },
+      { motivo: "Sem motivo", total: 1 },
+    ]);
+  });
+});
+
+describe("tela inicial por função", () => {
+  it("quem tem função começa pelo Meu dia; sem função, nada muda", () => {
+    expect(homeDaInterface({ preset: "completa", funcao: "sdr" }, false, "agent")).toBe(
+      "/app/meu-dia",
+    );
+    expect(homeDaInterface({ preset: "completa", funcao: "gerente" }, false, "manager")).toBe(
+      "/app/meu-dia",
+    );
+    expect(homeDaInterface({ preset: "completa" }, false, "agent")).toBe("/app/inbox");
+  });
+
+  it("sem função: gerente e admin veem o dia do Gerente; os outros, o do Vendedor", () => {
+    expect(funcaoDoDia(undefined, "admin")).toBe("gerente");
+    expect(funcaoDoDia(undefined, "manager")).toBe("gerente");
+    expect(funcaoDoDia(undefined, "agent")).toBe("vendedor");
+    expect(funcaoDoDia("sdr", "admin")).toBe("sdr");
+  });
+});
+
+describe("painéis do Meu dia", () => {
+  it("SDR: leads novos com o prazo, contador x meta e estado vazio amigável", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "sdr" };
+    mocks.resposta = {
+      funcao: "sdr",
+      sdr: {
+        leads_novos: [
+          {
+            id: "l1",
+            title: "Onix",
+            contact_id: "c1",
+            contato_nome: "Ana",
+            fim_em: new Date(Date.now() + 3 * 3_600_000).toISOString(),
+            conversation_id: "cv1",
+          },
+        ],
+        ligacoes: [],
+        proximos_passos: [],
+        agendamentos: { hoje: 3, meta: 10 },
+      },
+    };
+    montar();
+    expect(await screen.findByText("Ana")).toBeTruthy();
+    expect(mocks.get).toHaveBeenCalledWith("/api/v1/iavek/meu-dia?funcao=sdr");
+    expect(screen.getByRole("link", { name: /Ana/ }).getAttribute("href")).toBe(
+      "/app/inbox?id=cv1",
+    );
+    expect(screen.getByTestId("contador-agendamentos").textContent).toContain("de 10 da meta");
+    expect(screen.getByText("Nenhuma ligação para hoje.")).toBeTruthy();
+  });
+
+  it("Vendedor: tudo vazio mostra os estados amigáveis", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "vendedor" };
+    mocks.resposta = {
+      funcao: "vendedor",
+      vendedor: { agendamentos: [], leads: [], propostas: [], proximos_passos: [] },
+    };
+    montar();
+    expect(await screen.findByText("Nenhuma visita ou test drive marcado para hoje.")).toBeTruthy();
+    expect(screen.getByText("Nenhum lead com você agora.")).toBeTruthy();
+    expect(screen.getByText("Nenhuma proposta em aberto.")).toBeTruthy();
+  });
+
+  it("Gerente: números do dia, atrasos por pessoa e o funil de 30 dias", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    mocks.resposta = {
+      funcao: "gerente",
+      gerente: {
+        leads_novos_hoje: 4,
+        estourando: [],
+        atrasos_por_pessoa: [
+          { user_id: "u1", nome: "Bruno", ligacoes: 2, proximos_passos: 1, outras: 0 },
+        ],
+        funil_30d: { agendou: 10, veio: 6, comprou: 2 },
+        conversas_abertas: { com_pessoa: 3, com_ia_ou_sem_dono: 7 },
+        perdas_30d: [{ motivo: "Preço", total: 2 }],
+        meta_agendamentos_dia: null,
+      },
+    };
+    montar();
+    expect((await screen.findByTestId("gerente-novos-hoje")).textContent).toContain("4");
+    expect(screen.getByTestId("tabela-atrasos").textContent).toContain("Bruno");
+    expect(screen.getByTestId("funil-30d").textContent).toContain("10");
+    expect(screen.getByText("Preço")).toBeTruthy();
+  });
+});
