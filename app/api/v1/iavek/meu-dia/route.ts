@@ -19,14 +19,9 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { requireRole } from "@/lib/auth/require-role";
 import { cronometroDoLead, entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
 import { FUNCOES } from "@/lib/iavek/funcoes";
-import {
-  atrasosPorPessoa,
-  limitesDoDia,
-  nomeDoContato,
-  perdasPorMotivo,
-  porPrazo,
-} from "@/lib/iavek/meu-dia";
+import { atrasosPorPessoa, limitesDoDia, perdasPorMotivo, porPrazo } from "@/lib/iavek/meu-dia";
 import { SOURCE_KIND_PROXIMO_PASSO } from "@/lib/iavek/proximo-passo";
+import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
@@ -51,7 +46,7 @@ interface LinhaComContato {
 function semEmbed<T extends LinhaComContato>(linha: T) {
   const { contacts, ...resto } = linha;
   const c = Array.isArray(contacts) ? (contacts[0] ?? null) : (contacts ?? null);
-  return { ...resto, contato_nome: nomeDoContato(c) };
+  return { ...resto, contato_nome: c ? rotuloDoContato(c) : null };
 }
 
 /** A conversa mais recente de cada contato, para o atalho "abrir a conversa". */

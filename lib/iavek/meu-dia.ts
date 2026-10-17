@@ -82,11 +82,3 @@ export function perdasPorMotivo(
     .map(([motivo, total]) => ({ motivo, total }))
     .sort((a, b) => b.total - a.total);
 }
-
-/** O nome que a tela mostra para um contato. */
-export function nomeDoContato(
-  c: { name?: string | null; display_name?: string | null; phone_number?: string | null } | null,
-): string | null {
-  if (!c) return null;
-  return c.name?.trim() || c.display_name?.trim() || c.phone_number || null;
-}
