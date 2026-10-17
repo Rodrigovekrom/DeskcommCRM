@@ -1,0 +1,49 @@
+# Prova do BANCO do ia.vek CRM (fork Rodrigovekrom/DeskcommCRM).
+#
+# Desde a v1.7 o fork tem migrations próprias (a primeira é a 0579). O canário
+# usa o banco da PRODUÇÃO, então uma mudança de schema não se prova por ele: ela
+# se prova aqui, num Postgres descartável, ANTES de qualquer SQL na produção.
+#
+# Roda o mesmo gate do upstream (`invariants-majors` do ci.yml), que no fork não
+# dispara: `pnpm test:db` (baseline em modo install com ON_ERROR_STOP + update +
+# invariantes, incluindo RLS entre organizações) e `pnpm test:db:update` (o
+# baseline reaplicado sobre um banco COM DADOS), nas majors 15 e 17.
+name: iavek-banco
+
+on:
+  push:
+    branches: ["iavek/**"]
+    paths:
+      - "supabase/**"
+      - "tests/invariants/**"
+      - "scripts/test-db.sh"
+      - "scripts/test-update-com-dados.sh"
+      - ".github/workflows/iavek-banco.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: iavek-banco-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  banco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "17"]
+    env:
+      TEST_DB_IMAGE: pgvector/pgvector:pg${{ matrix.pg }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/preparar-node
+        timeout-minutes: 5
+      - name: test:db (pg${{ matrix.pg }})
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm test:db
+      - name: test:db:update — baseline sobre banco com dados (pg${{ matrix.pg }})
+        run: pnpm test:db:update
