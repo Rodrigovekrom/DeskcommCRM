@@ -41,13 +41,8 @@ interface LeadComPrazo {
 }
 interface DadosDoDia {
   funcao: Funcao;
-  sdr?: {
-    leads_novos: LeadComPrazo[];
-    ligacoes: Tarefa[];
-    proximos_passos: Tarefa[];
-    agendamentos: { hoje: number; meta: number | null };
-  };
-  vendedor?: {
+  /** ia.vek v1.7: a mesma visão para SDR e Vendedor. */
+  pessoal?: {
     agendamentos: Array<{
       id: string;
       title: string;
@@ -62,7 +57,12 @@ interface DadosDoDia {
       etapa: string | null;
       contato_nome: string | null;
       conversation_id?: string | null;
+      papel: "dono" | "guardiao";
+      dono_nome: string | null;
+      proximo_passo_do_dono: { title: string; due_date: string | null } | null;
     }>;
+    ligacoes: Tarefa[];
+    proximos_passos: Tarefa[];
     propostas: Array<{
       id: string;
       titulo: string;
@@ -72,7 +72,11 @@ interface DadosDoDia {
       valid_until: string | null;
       contato_nome: string | null;
     }>;
-    proximos_passos: Tarefa[];
+  };
+  /** Só para o SDR: a fila dos leads novos das 72h e a meta do dia. */
+  sdr?: {
+    leads_novos: LeadComPrazo[];
+    agendamentos: { hoje: number; meta: number | null };
   };
   gerente?: {
     leads_novos_hoje: number;
@@ -132,10 +136,8 @@ export function MeuDia() {
             {t("Tentar de novo")}
           </Button>
         </div>
-      ) : data.sdr ? (
-        <DiaDoSdr d={data.sdr} />
-      ) : data.vendedor ? (
-        <DiaDoVendedor d={data.vendedor} />
+      ) : data.pessoal ? (
+        <DiaPessoal d={data.pessoal} sdr={data.sdr} />
       ) : data.gerente ? (
         <DiaDoGerente d={data.gerente} />
       ) : null}
@@ -296,83 +298,120 @@ function ListaDeTarefas({ tarefas, vazio }: { tarefas: Tarefa[]; vazio: string }
   );
 }
 
-// ── SDR ───────────────────────────────────────────────────────────────────────
+// ── SDR e Vendedor (a mesma visão; muda só quais leads) ──────────────────────
 
-function DiaDoSdr({ d }: { d: NonNullable<DadosDoDia["sdr"]> }) {
+function DiaPessoal({
+  d,
+  sdr,
+}: {
+  d: NonNullable<DadosDoDia["pessoal"]>;
+  sdr?: DadosDoDia["sdr"];
+}) {
   const t = useT();
   const agora = useAgora();
-  const { hoje, meta } = d.agendamentos;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <div className="lg:col-span-2">
-        <Bloco id="sdr-agendamentos" titulo={t("Agendamentos de hoje")}>
-          <div className="flex items-baseline gap-2" data-testid="contador-agendamentos">
-            <span className="text-3xl font-semibold tabular-nums">{hoje}</span>
-            <span className="text-sm text-muted-foreground">
-              {meta
-                ? t("de {goal} da meta").replace("{goal}", String(meta))
-                : t("sem meta definida")}
-            </span>
+      {sdr ? (
+        <>
+          <div className="lg:col-span-2">
+            <Bloco id="sdr-agendamentos" titulo={t("Agendamentos de hoje")}>
+              <div className="flex items-baseline gap-2" data-testid="contador-agendamentos">
+                <span className="text-3xl font-semibold tabular-nums">{sdr.agendamentos.hoje}</span>
+                <span className="text-sm text-muted-foreground">
+                  {sdr.agendamentos.meta
+                    ? t("de {goal} da meta").replace("{goal}", String(sdr.agendamentos.meta))
+                    : t("sem meta definida")}
+                </span>
+              </div>
+              {sdr.agendamentos.meta ? (
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-elevated">
+                  <div
+                    className="h-full rounded-full bg-accent"
+                    style={{
+                      width: `${Math.min(100, Math.round((sdr.agendamentos.hoje / sdr.agendamentos.meta) * 100))}%`,
+                    }}
+                  />
+                </div>
+              ) : null}
+            </Bloco>
           </div>
-          {meta ? (
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-elevated">
-              <div
-                className="h-full rounded-full bg-accent"
-                style={{ width: `${Math.min(100, Math.round((hoje / meta) * 100))}%` }}
-              />
-            </div>
-          ) : null}
-        </Bloco>
-      </div>
-      <Bloco
-        id="sdr-leads"
-        titulo={t("Leads novos (72h)")}
-        extra={<Contagem n={d.leads_novos.length} />}
-      >
-        {d.leads_novos.length === 0 ? (
-          <Vazio>{t("Nenhum lead novo esperando agendamento.")}</Vazio>
-        ) : (
-          <ul className="divide-y divide-border">
-            {d.leads_novos.map((l) => (
-              <Linha
-                key={l.id}
-                href={linkDaConversa(l.conversation_id)}
-                principal={l.contato_nome ?? l.title}
-                secundario={l.contato_nome ? l.title : null}
-                direita={<Prazo fimEm={l.fim_em} agora={agora} />}
-              />
-            ))}
-          </ul>
-        )}
-      </Bloco>
-      <Bloco
-        id="sdr-ligacoes"
-        titulo={t("Ligações do dia")}
-        extra={<Contagem n={d.ligacoes.length} />}
-      >
-        <ListaDeTarefas tarefas={d.ligacoes} vazio={t("Nenhuma ligação para hoje.")} />
-      </Bloco>
+          <div className="lg:col-span-2">
+            <Bloco
+              id="sdr-leads"
+              titulo={t("Leads novos (72h)")}
+              extra={<Contagem n={sdr.leads_novos.length} />}
+            >
+              {sdr.leads_novos.length === 0 ? (
+                <Vazio>{t("Nenhum lead novo esperando agendamento.")}</Vazio>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {sdr.leads_novos.map((l) => (
+                    <Linha
+                      key={l.id}
+                      href={linkDaConversa(l.conversation_id)}
+                      principal={l.contato_nome ?? l.title}
+                      secundario={l.contato_nome ? l.title : null}
+                      direita={<Prazo fimEm={l.fim_em} agora={agora} />}
+                    />
+                  ))}
+                </ul>
+              )}
+            </Bloco>
+          </div>
+        </>
+      ) : null}
       <div className="lg:col-span-2">
-        <Bloco
-          id="sdr-passos"
-          titulo={t("Próximos passos de hoje e atrasados")}
-          extra={<Contagem n={d.proximos_passos.length} />}
-        >
-          <ListaDeTarefas tarefas={d.proximos_passos} vazio={t("Nada pendente para hoje.")} />
+        <Bloco id="pessoal-leads" titulo={t("Meus leads")} extra={<Contagem n={d.leads.length} />}>
+          {d.leads.length === 0 ? (
+            <Vazio>{t("Nenhum lead com você agora.")}</Vazio>
+          ) : (
+            <ul className="divide-y divide-border" data-testid="meus-leads">
+              {d.leads.map((l) => {
+                const passo = l.proximo_passo_do_dono;
+                const atrasado = passo?.due_date
+                  ? new Date(passo.due_date).getTime() < agora
+                  : false;
+                const guardiao =
+                  l.papel === "guardiao"
+                    ? [
+                        t("Com {who}").replace("{who}", l.dono_nome ?? t("outra pessoa")),
+                        passo
+                          ? `${t("Próximo passo")}: ${passo.title}${passo.due_date ? ` · ${quando(passo.due_date, agora, t)}` : ""}`
+                          : t("Sem próximo passo marcado"),
+                      ].join(" · ")
+                    : null;
+                return (
+                  <Linha
+                    key={l.id}
+                    href={linkDaConversa(l.conversation_id)}
+                    principal={l.contato_nome ?? l.title}
+                    secundario={guardiao ?? [l.title, l.etapa].filter(Boolean).join(" · ")}
+                    direita={
+                      l.papel === "guardiao" ? (
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full border px-2 py-0.5 text-[11px]",
+                            !passo || atrasado
+                              ? "border-warning-fg/30 bg-warning-bg text-warning-fg"
+                              : "border-border text-text-muted",
+                          )}
+                          data-testid="selo-guardiao"
+                        >
+                          {t("Você é o guardião")}
+                        </span>
+                      ) : l.etapa ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">{l.etapa}</span>
+                      ) : null
+                    }
+                  />
+                );
+              })}
+            </ul>
+          )}
         </Bloco>
       </div>
-    </div>
-  );
-}
-
-// ── Vendedor ──────────────────────────────────────────────────────────────────
-
-function DiaDoVendedor({ d }: { d: NonNullable<DadosDoDia["vendedor"]> }) {
-  const t = useT();
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
       <Bloco
-        id="vendedor-agenda"
+        id="pessoal-agenda"
         titulo={t("Agendamentos de hoje")}
         extra={<Contagem n={d.agendamentos.length} />}
       >
@@ -400,34 +439,21 @@ function DiaDoVendedor({ d }: { d: NonNullable<DadosDoDia["vendedor"]> }) {
         )}
       </Bloco>
       <Bloco
-        id="vendedor-passos"
+        id="pessoal-ligacoes"
+        titulo={t("Ligações do dia")}
+        extra={<Contagem n={d.ligacoes.length} />}
+      >
+        <ListaDeTarefas tarefas={d.ligacoes} vazio={t("Nenhuma ligação para hoje.")} />
+      </Bloco>
+      <Bloco
+        id="pessoal-passos"
         titulo={t("Próximos passos")}
         extra={<Contagem n={d.proximos_passos.length} />}
       >
         <ListaDeTarefas tarefas={d.proximos_passos} vazio={t("Nenhum próximo passo marcado.")} />
       </Bloco>
       <Bloco
-        id="vendedor-leads"
-        titulo={t("Leads passados para você")}
-        extra={<Contagem n={d.leads.length} />}
-      >
-        {d.leads.length === 0 ? (
-          <Vazio>{t("Nenhum lead com você agora.")}</Vazio>
-        ) : (
-          <ul className="divide-y divide-border">
-            {d.leads.map((l) => (
-              <Linha
-                key={l.id}
-                href={linkDaConversa(l.conversation_id)}
-                principal={l.contato_nome ?? l.title}
-                secundario={[l.title, l.etapa].filter(Boolean).join(" · ")}
-              />
-            ))}
-          </ul>
-        )}
-      </Bloco>
-      <Bloco
-        id="vendedor-propostas"
+        id="pessoal-propostas"
         titulo={t("Propostas em aberto")}
         extra={<Contagem n={d.propostas.length} />}
       >

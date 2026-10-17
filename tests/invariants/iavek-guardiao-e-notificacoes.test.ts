@@ -121,9 +121,15 @@ beforeAll(() => {
   `);
 
   // O SDR assume a conversa (vinda da IA, sem dono)…
-  agindoComo(SDR, `update public.conversations set assigned_to_user_id = '${SDR}' where id = '${CONVERSA}'`);
+  agindoComo(
+    SDR,
+    `update public.conversations set assigned_to_user_id = '${SDR}' where id = '${CONVERSA}'`,
+  );
   // …e passa para o vendedor.
-  agindoComo(SDR, `update public.conversations set assigned_to_user_id = '${VENDEDOR}' where id = '${CONVERSA}'`);
+  agindoComo(
+    SDR,
+    `update public.conversations set assigned_to_user_id = '${VENDEDOR}' where id = '${CONVERSA}'`,
+  );
 });
 
 describe("passagem SDR → vendedor", () => {
@@ -134,11 +140,19 @@ describe("passagem SDR → vendedor", () => {
   });
 
   it("quem passa sem ser SDR não vira guardião", () => {
-    agindoComo(VENDEDOR, `update public.crm_leads set owner_user_id = '${VENDEDOR}', owner_kind = 'user' where id = '${LEAD_SEM_SDR}'`);
-    agindoComo(VENDEDOR, `update public.crm_leads set owner_user_id = '${COLEGA}' where id = '${LEAD_SEM_SDR}'`);
-    expect(valor(`select coalesce(sdr_user_id::text, 'nenhum') from public.crm_leads where id = '${LEAD_SEM_SDR}'`)).toBe(
-      "nenhum",
+    agindoComo(
+      VENDEDOR,
+      `update public.crm_leads set owner_user_id = '${VENDEDOR}', owner_kind = 'user' where id = '${LEAD_SEM_SDR}'`,
     );
+    agindoComo(
+      VENDEDOR,
+      `update public.crm_leads set owner_user_id = '${COLEGA}' where id = '${LEAD_SEM_SDR}'`,
+    );
+    expect(
+      valor(
+        `select coalesce(sdr_user_id::text, 'nenhum') from public.crm_leads where id = '${LEAD_SEM_SDR}'`,
+      ),
+    ).toBe("nenhum");
   });
 });
 
@@ -172,10 +186,15 @@ describe("avisos", () => {
   });
 
   it("o guardião fica sabendo da mudança de etapa e da perda feitas pelo vendedor", () => {
-    agindoComo(VENDEDOR, `update public.crm_leads set stage_id = '${ETAPA_2}' where id = '${LEAD}'`);
+    agindoComo(
+      VENDEDOR,
+      `update public.crm_leads set stage_id = '${ETAPA_2}' where id = '${LEAD}'`,
+    );
     expect(notificacoes(SDR, "guardiao_etapa")).toBe(1);
     expect(
-      valor(`select dados->>'para' from public.notificacoes where user_id = '${SDR}' and tipo = 'guardiao_etapa'`),
+      valor(
+        `select dados->>'para' from public.notificacoes where user_id = '${SDR}' and tipo = 'guardiao_etapa'`,
+      ),
     ).toBe("Agendado");
 
     agindoComo(SDR, `update public.crm_leads set stage_id = '${ETAPA_1}' where id = '${LEAD}'`);
@@ -183,7 +202,7 @@ describe("avisos", () => {
 
     agindoComo(
       VENDEDOR,
-      `update public.crm_leads set status = 'lost', lost_reason = 'Preço', closed_at = now() where id = '${LEAD}'`,
+      `update public.crm_leads set status = 'lost', lost_reason = 'price', closed_at = now() where id = '${LEAD}'`,
     );
     expect(notificacoes(SDR, "guardiao_perda")).toBe(1);
   });
@@ -207,8 +226,12 @@ describe("sino privado", () => {
     const doSdr = numero(sql(`select count(*) from public.notificacoes where user_id = '${SDR}';`));
     expect(doSdr).toBeGreaterThan(0);
     expect(contaComo(SDR, minhas)).toBe(doSdr);
-    expect(contaComo(COLEGA, `select count(*) from public.notificacoes where user_id = '${SDR}'`)).toBe(0);
-    expect(contaComo(GERENTE, `select count(*) from public.notificacoes where user_id = '${SDR}'`)).toBe(0);
+    expect(
+      contaComo(COLEGA, `select count(*) from public.notificacoes where user_id = '${SDR}'`),
+    ).toBe(0);
+    expect(
+      contaComo(GERENTE, `select count(*) from public.notificacoes where user_id = '${SDR}'`),
+    ).toBe(0);
     expect(contaComo(DE_FORA, minhas)).toBe(0);
   });
 

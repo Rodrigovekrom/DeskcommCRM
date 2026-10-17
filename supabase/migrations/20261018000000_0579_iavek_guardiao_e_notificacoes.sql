@@ -128,6 +128,9 @@ as $$
 begin
   return p_contact is not null
      and auth.uid() is not null
+     -- 0149: confere de qual organização é quem chama. Sem lançar: esta função
+     -- roda DENTRO da policy de conversas, para linhas de qualquer organização.
+     and p_org in (select public.fn_user_org_ids())
      and exists (
        select 1 from public.crm_leads l
         where l.organization_id = p_org

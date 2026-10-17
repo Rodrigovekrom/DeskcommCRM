@@ -144,45 +144,12 @@ export async function GET(req: NextRequest): Promise<Response> {
   }
 
   try {
-    if (funcao === "sdr") {
-      const [leads, ligacoes, passos, agendadosHoje] = await Promise.all([
-        leadsComPrazo(200),
-        tarefas("ligacoes", true, fim),
-        tarefas("proximos_passos", true, fim),
-        supabase
-          .from("calendar_appointments")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .neq("status", "cancelled")
-          .gte("created_at", inicio.toISOString())
-          .lt("created_at", fim.toISOString()),
-      ]);
-      const novos = porPrazo(leads).slice(0, 30);
-      const conversas = await conversasDos(supabase, orgId, [
-        ...novos.map((l) => l.contact_id),
-        ...ligacoes.map((t) => t.contact_id),
-        ...passos.map((t) => t.contact_id),
-      ]);
-      const comConversa = <T extends { contact_id: string | null }>(x: T) => ({
-        ...x,
-        conversation_id: x.contact_id ? (conversas.get(x.contact_id) ?? null) : null,
-      });
-      return ok(
-        {
-          funcao,
-          sdr: {
-            leads_novos: novos.map(comConversa),
-            ligacoes: ligacoes.map(comConversa),
-            proximos_passos: passos.map(comConversa),
-            agendamentos: { hoje: agendadosHoje.count ?? 0, meta: metaDoDia },
-          },
-        },
-        { requestId },
-      );
-    }
-
-    if (funcao === "vendedor") {
-      const [agenda, leads, propostas, passos] = await Promise.all([
+    // ia.vek v1.7: SDR e Vendedor têm a MESMA visão; muda só QUAIS leads entram.
+    // "Meus leads" = os que eu sou dono OU guardião (SDR que passou adiante).
+    // O SDR ganha, além disso, a fila dos leads novos das 72h e a meta do dia.
+    if (funcao === "sdr" || funcao === "vendedor") {
+      const ehSdr = funcao === "sdr";
+      const [agenda, meus, ligacoes, passos, propostas, novos, agendadosHoje] = await Promise.all([
         supabase
           .from("calendar_appointments")
           .select(`id, title, starts_at, ends_at, status, contact_id, conversation_id, ${CONTATO}`)
@@ -196,13 +163,15 @@ export async function GET(req: NextRequest): Promise<Response> {
         supabase
           .from("crm_leads")
           .select(
-            `id, title, status, updated_at, contact_id, crm_stages!crm_leads_stage_id_fkey(name), ${CONTATO}`,
+            `id, title, status, updated_at, contact_id, owner_user_id, sdr_user_id, crm_stages!crm_leads_stage_id_fkey(name), ${CONTATO}`,
           )
           .eq("organization_id", orgId)
-          .eq("owner_user_id", eu)
           .eq("status", "open")
+          .or(`owner_user_id.eq.${eu},sdr_user_id.eq.${eu}`)
           .order("updated_at", { ascending: false })
-          .limit(30),
+          .limit(50),
+        tarefas("ligacoes", true, fim),
+        tarefas("proximos_passos", true, null),
         supabase
           .from("crm_proposals")
           .select(
@@ -213,38 +182,100 @@ export async function GET(req: NextRequest): Promise<Response> {
           .in("status", ["rascunho", "enviando", "enviada"])
           .order("updated_at", { ascending: false })
           .limit(30),
-        tarefas("proximos_passos", true, null),
+        ehSdr ? leadsComPrazo(200) : Promise.resolve([]),
+        ehSdr
+          ? supabase
+              .from("calendar_appointments")
+              .select("id", { count: "exact", head: true })
+              .eq("organization_id", orgId)
+              .neq("status", "cancelled")
+              .gte("created_at", inicio.toISOString())
+              .lt("created_at", fim.toISOString())
+          : Promise.resolve({ count: 0, error: null }),
       ]);
-      const falha = agenda.error ?? leads.error ?? propostas.error;
+      const falha = agenda.error ?? meus.error ?? propostas.error ?? agendadosHoje.error;
       if (falha) throw new Error(falha.message);
-      const leadsLimpos = (leads.data ?? []).map((l) => {
-        const { crm_stages, ...resto } = l as typeof l & { crm_stages?: unknown };
+
+      const leadsLimpos = (meus.data ?? []).map((l) => {
+        const { crm_stages, owner_user_id, sdr_user_id: _guardiao, ...resto } = l as typeof l & {
+          crm_stages?: unknown;
+          owner_user_id: string | null;
+          sdr_user_id: string | null;
+        };
         const etapa = Array.isArray(crm_stages) ? crm_stages[0] : crm_stages;
         return {
           ...semEmbed(resto as LinhaComContato & typeof resto),
           etapa: (etapa as { name?: string } | null)?.name ?? null,
+          papel: owner_user_id === eu ? ("dono" as const) : ("guardiao" as const),
+          dono_id: owner_user_id,
         };
       });
+
+      // Para os leads que eu GUARDO: quem é o dono agora e qual o próximo passo
+      // dele (o que o guardião acompanha e cobra).
+      const guardados = leadsLimpos.filter((l) => l.papel === "guardiao");
+      const passosDosGuardados = new Map<string, { title: string; due_date: string | null }>();
+      if (guardados.length > 0) {
+        const { data } = await supabase
+          .from("crm_tasks")
+          .select("lead_id, title, due_date")
+          .eq("organization_id", orgId)
+          .eq("source_kind", SOURCE_KIND_PROXIMO_PASSO)
+          .in("status", ["pending", "in_progress"])
+          .in(
+            "lead_id",
+            guardados.map((l) => l.id),
+          )
+          .order("due_date", { ascending: true, nullsFirst: false });
+        for (const t of data ?? []) {
+          if (t.lead_id && !passosDosGuardados.has(t.lead_id)) {
+            passosDosGuardados.set(t.lead_id, { title: t.title, due_date: t.due_date });
+          }
+        }
+      }
+      const nomesDosDonos = await nomesDosAtendentes(guardados.map((l) => l.dono_id));
+
       const conversas = await conversasDos(supabase, orgId, [
         ...leadsLimpos.map((l) => l.contact_id),
-        ...(propostas.data ?? []).map((p) => p.contact_id),
+        ...ligacoes.map((t) => t.contact_id),
         ...passos.map((t) => t.contact_id),
+        ...(propostas.data ?? []).map((p) => p.contact_id),
+        ...novos.map((l) => l.contact_id),
       ]);
       const comConversa = <T extends { contact_id: string | null }>(x: T) => ({
         ...x,
         conversation_id: x.contact_id ? (conversas.get(x.contact_id) ?? null) : null,
       });
+
       return ok(
         {
           funcao,
-          vendedor: {
+          pessoal: {
             agendamentos: (agenda.data ?? []).map((a) => semEmbed(a as LinhaComContato & typeof a)),
-            leads: leadsLimpos.map(comConversa),
+            leads: leadsLimpos.map((l) => {
+              const { dono_id, ...resto } = l;
+              return comConversa({
+                ...resto,
+                dono_nome:
+                  l.papel === "guardiao" && dono_id ? (nomesDosDonos.get(dono_id) ?? null) : null,
+                proximo_passo_do_dono:
+                  l.papel === "guardiao" ? (passosDosGuardados.get(l.id) ?? null) : null,
+              });
+            }),
+            ligacoes: ligacoes.map(comConversa),
+            proximos_passos: passos.map(comConversa),
             propostas: (propostas.data ?? []).map((p) =>
               comConversa(semEmbed(p as LinhaComContato & typeof p)),
             ),
-            proximos_passos: passos.map(comConversa),
           },
+          ...(ehSdr
+            ? {
+                sdr: {
+                  leads_novos: porPrazo(novos).slice(0, 30).map(comConversa),
+                  agendamentos: { hoje: agendadosHoje.count ?? 0, meta: metaDoDia },
+                },
+              }
+            : {}),
         },
         { requestId },
       );

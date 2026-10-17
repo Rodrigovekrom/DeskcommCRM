@@ -6,6 +6,7 @@ import { TenantSwitcher } from "./TenantSwitcher";
 import { UserMenu } from "./UserMenu";
 import { SearchTrigger } from "./SearchTrigger";
 import { SeloVerComo } from "./VerComo";
+import { SinoPessoal } from "./SinoPessoal";
 
 export function TopBar() {
   return (
@@ -19,6 +20,7 @@ export function TopBar() {
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <SeloVerComo />
+        <SinoPessoal />
         <AlertsBell />
         <AvisoDePropostaEmDestaque />
         <UserMenu />

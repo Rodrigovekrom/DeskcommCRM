@@ -110,10 +110,11 @@ describe("tela inicial por função", () => {
 });
 
 describe("painéis do Meu dia", () => {
-  it("SDR: leads novos com o prazo, contador x meta e estado vazio amigável", async () => {
+  it("SDR: a fila das 72h e a meta, e os MESMOS blocos do vendedor", async () => {
     mocks.org.interface_settings = { preset: "completa", funcao: "sdr" };
     mocks.resposta = {
       funcao: "sdr",
+      pessoal: { agendamentos: [], leads: [], ligacoes: [], proximos_passos: [], propostas: [] },
       sdr: {
         leads_novos: [
           {
@@ -125,8 +126,6 @@ describe("painéis do Meu dia", () => {
             conversation_id: "cv1",
           },
         ],
-        ligacoes: [],
-        proximos_passos: [],
         agendamentos: { hoje: 3, meta: 10 },
       },
     };
@@ -137,19 +136,52 @@ describe("painéis do Meu dia", () => {
       "/app/inbox?id=cv1",
     );
     expect(screen.getByTestId("contador-agendamentos").textContent).toContain("de 10 da meta");
+    expect(screen.getByText("Meus leads")).toBeTruthy();
     expect(screen.getByText("Nenhuma ligação para hoje.")).toBeTruthy();
   });
 
-  it("Vendedor: tudo vazio mostra os estados amigáveis", async () => {
+  it("Vendedor: mesma tela, sem a fila do SDR; tudo vazio mostra os estados amigáveis", async () => {
     mocks.org.interface_settings = { preset: "completa", funcao: "vendedor" };
     mocks.resposta = {
       funcao: "vendedor",
-      vendedor: { agendamentos: [], leads: [], propostas: [], proximos_passos: [] },
+      pessoal: { agendamentos: [], leads: [], ligacoes: [], proximos_passos: [], propostas: [] },
     };
     montar();
     expect(await screen.findByText("Nenhuma visita ou test drive marcado para hoje.")).toBeTruthy();
     expect(screen.getByText("Nenhum lead com você agora.")).toBeTruthy();
     expect(screen.getByText("Nenhuma proposta em aberto.")).toBeTruthy();
+    expect(screen.queryByText("Leads novos (72h)")).toBeNull();
+  });
+
+  it("o lead que eu GUARDO mostra com quem está e o próximo passo do dono", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "sdr" };
+    mocks.resposta = {
+      funcao: "sdr",
+      pessoal: {
+        agendamentos: [],
+        ligacoes: [],
+        proximos_passos: [],
+        propostas: [],
+        leads: [
+          {
+            id: "g1",
+            title: "Hilux",
+            etapa: "Negociação",
+            contato_nome: "Bia",
+            conversation_id: "cv9",
+            papel: "guardiao",
+            dono_nome: "Bruno",
+            proximo_passo_do_dono: null,
+          },
+        ],
+      },
+      sdr: { leads_novos: [], agendamentos: { hoje: 0, meta: null } },
+    };
+    montar();
+    const lista = await screen.findByTestId("meus-leads");
+    expect(lista.textContent).toContain("Com Bruno");
+    expect(lista.textContent).toContain("Sem próximo passo marcado");
+    expect(screen.getByTestId("selo-guardiao").textContent).toBe("Você é o guardião");
   });
 
   it("Gerente: números do dia, atrasos por pessoa e o funil de 30 dias", async () => {

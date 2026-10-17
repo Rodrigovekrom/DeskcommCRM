@@ -6,7 +6,9 @@ import { destinosDaInterface } from "@/lib/navigation/interface";
 import { useAgentInbox } from "@/hooks/ai/useAgentInbox";
 import { useSonsDaCentral } from "@/hooks/notifications/useSonsDaCentral";
 import { useT } from "@/hooks/i18n/useT";
-import { Bell } from "@/lib/ui/icons";
+// ia.vek v1.7: o sino (Bell) agora é o pessoal (SinoPessoal); a Central de
+// avisos da IA ganha o ícone do robô, para os dois não se confundirem.
+import { Robot } from "@/lib/ui/icons";
 
 /**
  * Sino da central de avisos (Operação Visível F1): contador de avisos abertos
@@ -42,7 +44,7 @@ function VisibleAlertsBell() {
       data-testid="alerts-bell"
       className="relative inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:h-9 lg:w-9"
     >
-      <Bell size={18} aria-hidden />
+      <Robot size={18} aria-hidden />
       {count > 0 ? (
         <span
           data-testid="alerts-bell-count"

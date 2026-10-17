@@ -77,6 +77,12 @@ const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string
       "Publica a imagem do app ia.vek no GHCR — é o APP_IMAGE da VPS. Desligá-lo faz o " +
       "commit existir sem imagem por trás dele.",
   },
+  "iavek-banco.yml::banco": {
+    condicao: null,
+    efeito:
+      "Prova do banco do ia.vek (test:db e test:db:update em pg15 e pg17) antes de qualquer " +
+      "migration ir para a produção. Desligá-lo deixa SQL novo sem prova nenhuma.",
+  },
   // --- a cadeia que leva o conserto até a VPS ---------------------------------
   "release.yml::abrir-pr-de-release": {
     condicao: "github.event_name == 'workflow_dispatch'",
