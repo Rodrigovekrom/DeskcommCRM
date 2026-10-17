@@ -93,7 +93,7 @@ export function AcompanhamentoDoLead({
     } else {
       linhas.push({
         marca: "agora",
-        texto: t("Agora em {etapa}").replace("{etapa}", lead.etapa_nome ?? "—"),
+        texto: t("Agora em {stage}").replace("{stage}", lead.etapa_nome ?? "—"),
       });
     }
   }

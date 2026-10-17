@@ -30,6 +30,7 @@ import { useDefaultPipeline } from "@/hooks/pipelines/useDefaultPipeline";
 import { SeloCronometro72h } from "./SeloCronometro72h";
 import { SecaoRecolhivel } from "./SecaoRecolhivel";
 import { AcompanhamentoDoLead } from "./AcompanhamentoDoLead";
+import { FotosDaTroca } from "./FotosDaTroca";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
@@ -868,6 +869,23 @@ export function CRMSidePanel({ conversation }: Props) {
           /></fieldset>
         ) : (
           <SemLista vazio="Sem leads." erro={erro} onTentarDeNovo={() => setTentativa((n) => n + 1)} />
+        )}
+      </SecaoRecolhivel>
+
+      <Separator />
+
+      {/* ia.vek v1.5 (parte C): as fotos do carro da troca, marcadas no lead. */}
+      <SecaoRecolhivel id="troca" titulo={t("Fotos do carro da troca")} testId="secao-fotos-da-troca">
+        {sectionsLoading ? (
+          <Skeleton className="mt-2 h-14 w-full" />
+        ) : (
+          <FotosDaTroca
+            contactId={contactId}
+            conversationId={conversation.id}
+            lead={(leads ?? []).find((l) => l.id === leadAtivoId) ?? leads?.[0] ?? null}
+            readonly={readonly}
+            onSalvo={recarregar}
+          />
         )}
       </SecaoRecolhivel>
 
