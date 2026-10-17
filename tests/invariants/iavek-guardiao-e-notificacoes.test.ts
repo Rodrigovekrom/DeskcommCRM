@@ -142,6 +142,17 @@ describe("passagem SDR → vendedor", () => {
   });
 });
 
+describe("o clone do lead (esteira, troca de funil) herda o guardião", () => {
+  it("lead criado com source_metadata.clonado_de nasce com o mesmo sdr_user_id", () => {
+    const CLONE = "05790000-7777-4000-8000-000000000009";
+    sql(`insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, contact_id, source_metadata)
+           values ('${CLONE}', '${ORG}', '${FUNIL}', '${ETAPA_1}', 'Clone 0579', '${CONTATO}',
+                   jsonb_build_object('clonado_de', jsonb_build_object('lead_id', '${LEAD}')))
+           on conflict do nothing;`);
+    expect(valor(`select sdr_user_id from public.crm_leads where id = '${CLONE}'`)).toBe(SDR);
+  });
+});
+
 describe("o guardião continua vendo (modo padrão own_and_unassigned)", () => {
   it("o SDR guardião vê o lead e a conversa; o colega não", () => {
     const lead = `select count(*) from public.crm_leads where id = '${LEAD}'`;

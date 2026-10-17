@@ -47962,3 +47962,32 @@ create trigger trg_iavek_notifica_tarefa_vencida
   for each row
   when (new.event_type = 'task.overdue')
   execute function public.fn_iavek_notifica_tarefa_vencida();
+
+-- ---- 9. o clone (esteira 72h → follow-up, troca de funil) herda o guardião ----
+create or replace function public.fn_iavek_clone_herda_guardiao()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_origem uuid;
+begin
+  if new.sdr_user_id is null
+     and new.source_metadata ? 'clonado_de'
+     and (new.source_metadata->'clonado_de'->>'lead_id') ~* '^[0-9a-f-]{36}$'
+  then
+    v_origem := (new.source_metadata->'clonado_de'->>'lead_id')::uuid;
+    select l.sdr_user_id into new.sdr_user_id
+      from public.crm_leads l
+     where l.id = v_origem and l.organization_id = new.organization_id;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.fn_iavek_clone_herda_guardiao() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_clone_herda_guardiao on public.crm_leads;
+create trigger trg_iavek_clone_herda_guardiao
+  before insert on public.crm_leads
+  for each row execute function public.fn_iavek_clone_herda_guardiao();
