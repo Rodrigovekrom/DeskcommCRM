@@ -10,7 +10,7 @@ import { ATUALIZACAO_DO_UPSTREAM, ROTULO_DA_VERSAO, VERSAO_IAVEK } from "@/lib/i
  */
 describe("ia.vek: versão própria, sem atualização do upstream", () => {
   it("o rótulo é 'ia.vek CRM vX.Y'", () => {
-    expect(VERSAO_IAVEK).toMatch(/^\d+\.\d+$/);
+    expect(VERSAO_IAVEK).toMatch(/^\d+\.\d+(\.\d+)?$/);
     expect(ROTULO_DA_VERSAO).toBe(`ia.vek CRM v${VERSAO_IAVEK}`);
   });
 

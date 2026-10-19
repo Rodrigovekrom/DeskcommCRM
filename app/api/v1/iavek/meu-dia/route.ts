@@ -147,8 +147,10 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ia.vek v1.7: SDR e Vendedor têm a MESMA visão; muda só QUAIS leads entram.
     // "Meus leads" = os que eu sou dono OU guardião (SDR que passou adiante).
     // O SDR ganha, além disso, a fila dos leads novos das 72h e a meta do dia.
-    if (funcao === "sdr" || funcao === "vendedor") {
-      const ehSdr = funcao === "sdr";
+    // v1.7.1: o SDR de suporte tem o dia do SDR (com a fila das 72h); o
+    // Gerente de apoio, o do vendedor (os leads dele, a agenda, as propostas).
+    if (funcao === "sdr" || funcao === "suporte" || funcao === "vendedor" || funcao === "apoio") {
+      const ehSdr = funcao === "sdr" || funcao === "suporte";
       const [agenda, meus, ligacoes, passos, propostas, novos, agendadosHoje] = await Promise.all([
         supabase
           .from("calendar_appointments")
@@ -197,7 +199,12 @@ export async function GET(req: NextRequest): Promise<Response> {
       if (falha) throw new Error(falha.message);
 
       const leadsLimpos = (meus.data ?? []).map((l) => {
-        const { crm_stages, owner_user_id, sdr_user_id: _guardiao, ...resto } = l as typeof l & {
+        const {
+          crm_stages,
+          owner_user_id,
+          sdr_user_id: _guardiao,
+          ...resto
+        } = l as typeof l & {
           crm_stages?: unknown;
           owner_user_id: string | null;
           sdr_user_id: string | null;

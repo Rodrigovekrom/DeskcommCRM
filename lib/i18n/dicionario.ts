@@ -1402,6 +1402,8 @@ export const DICIONARIO: Traducoes = {
   // ia.vek v1.4: nomes do menu do Rodrigo.
   "Entrada de leads": { es: "Entrada de leads" },
   "Controle de atendimentos": { es: "Control de atención" },
+  "SDR de suporte": { es: "SDR de soporte" },
+  "Gerente de apoio": { es: "Gerente de apoyo" },
   "Com {who}": { es: "Con {who}" },
   "Meus leads": { es: "Mis leads" },
   "Nada novo por aqui. Quando algo acontecer com os seus leads, aparece neste sino.": { es: "Nada nuevo por aquí. Cuando pase algo con tus leads, aparece en esta campana." },

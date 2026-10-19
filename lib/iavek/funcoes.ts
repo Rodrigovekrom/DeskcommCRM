@@ -6,12 +6,17 @@
  * (viewer/agent/manager/admin): uma função nunca abre o que o papel não abre.
  * Sem função, nada muda (a interface de sempre).
  */
-export const FUNCOES = ["sdr", "vendedor", "gerente"] as const;
+// ia.vek v1.7.1: "apoio" (Gerente de apoio, o fechador) e "suporte" (SDR de
+// suporte, que observa a IA). Só "sdr" vira GUARDIÃO do lead: o gatilho da
+// migration 0579 compara a função com 'sdr' exato, e nenhum outro valor dispara.
+export const FUNCOES = ["sdr", "suporte", "vendedor", "apoio", "gerente"] as const;
 export type Funcao = (typeof FUNCOES)[number];
 
 export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
   sdr: "SDR",
+  suporte: "SDR de suporte",
   vendedor: "Vendedor",
+  apoio: "Gerente de apoio",
   gerente: "Gerente",
 };
 
@@ -37,6 +42,34 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[] | null> = {
     "/app/inbox",
     "/app/agenda",
     "/app/kanban",
+    "/app/tasks",
+    "/app/contacts",
+    "/app/products",
+    "/app/proposals",
+    "/app/calls",
+    "/app/templates",
+  ],
+  /** Igual ao SDR (inclui o Espaço da IA), mas sem virar guardião do lead. */
+  suporte: [
+    "/app/meu-dia",
+    "/app/espaco-ia",
+    "/app/inbox",
+    "/app/agenda",
+    "/app/tasks",
+    "/app/contacts",
+    "/app/calls",
+    "/app/templates",
+  ],
+  /**
+   * O fechador: papel manager (vê os leads e conversas dos vendedores), mas o
+   * menu é só o que ajuda a fechar — sem relatórios, configurações,
+   * automações, campanhas nem IA.
+   */
+  apoio: [
+    "/app/meu-dia",
+    "/app/inbox",
+    "/app/kanban",
+    "/app/agenda",
     "/app/tasks",
     "/app/contacts",
     "/app/products",

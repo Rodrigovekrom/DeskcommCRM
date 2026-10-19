@@ -27,6 +27,10 @@ const VENDEDOR = "05790000-1111-4000-8000-000000000002";
 const COLEGA = "05790000-1111-4000-8000-000000000003";
 const GERENTE = "05790000-1111-4000-8000-000000000004";
 const DE_FORA = "05790000-1111-4000-8000-000000000005";
+/** v1.7.1: SDR de SUPORTE — observa a IA, mas nunca vira guardião. */
+const SUPORTE = "05790000-1111-4000-8000-000000000006";
+const LEAD_DO_SUPORTE = "05790000-7777-4000-8000-000000000003";
+const CONTATO_3 = "05790000-3333-4000-8000-000000000003";
 const SESSAO = "05790000-2222-4000-8000-000000000001";
 const CONTATO = "05790000-3333-4000-8000-000000000001";
 const CONVERSA = "05790000-4444-4000-8000-000000000001";
@@ -76,7 +80,8 @@ beforeAll(() => {
       ('${VENDEDOR}', 'g0579-vendedor@invariant.test'),
       ('${COLEGA}', 'g0579-colega@invariant.test'),
       ('${GERENTE}', 'g0579-gerente@invariant.test'),
-      ('${DE_FORA}', 'g0579-fora@invariant.test')
+      ('${DE_FORA}', 'g0579-fora@invariant.test'),
+      ('${SUPORTE}', 'g0579-suporte@invariant.test')
       on conflict do nothing;
 
     insert into public.organizations (id, slug, legal_name, display_name)
@@ -89,7 +94,8 @@ beforeAll(() => {
       ('${VENDEDOR}', '${ORG}', 'agent',   now(), '{"preset":"completa","funcao":"vendedor"}'),
       ('${COLEGA}',   '${ORG}', 'agent',   now(), '{"preset":"completa","funcao":"vendedor"}'),
       ('${GERENTE}',  '${ORG}', 'manager', now(), '{"preset":"completa","funcao":"gerente"}'),
-      ('${DE_FORA}',  '${OUTRA_ORG}', 'admin', now(), '{"preset":"completa"}')
+      ('${DE_FORA}',  '${OUTRA_ORG}', 'admin', now(), '{"preset":"completa"}'),
+      ('${SUPORTE}',  '${ORG}', 'agent',   now(), '{"preset":"completa","funcao":"suporte"}')
       on conflict do nothing;
 
     do $seed$ begin
@@ -99,7 +105,8 @@ beforeAll(() => {
 
     insert into public.contacts (id, organization_id, display_name) values
       ('${CONTATO}', '${ORG}', 'Cliente 0579'),
-      ('${CONTATO_2}', '${ORG}', 'Cliente 0579 B')
+      ('${CONTATO_2}', '${ORG}', 'Cliente 0579 B'),
+      ('${CONTATO_3}', '${ORG}', 'Cliente 0579 C')
       on conflict do nothing;
 
     insert into public.crm_pipelines (id, organization_id, name, slug)
@@ -112,7 +119,8 @@ beforeAll(() => {
 
     insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, contact_id)
       values ('${LEAD}', '${ORG}', '${FUNIL}', '${ETAPA_1}', 'Lead 0579', '${CONTATO}'),
-             ('${LEAD_SEM_SDR}', '${ORG}', '${FUNIL}', '${ETAPA_1}', 'Lead 0579 B', '${CONTATO_2}')
+             ('${LEAD_SEM_SDR}', '${ORG}', '${FUNIL}', '${ETAPA_1}', 'Lead 0579 B', '${CONTATO_2}'),
+             ('${LEAD_DO_SUPORTE}', '${ORG}', '${FUNIL}', '${ETAPA_1}', 'Lead 0579 C', '${CONTATO_3}')
       on conflict do nothing;
 
     insert into public.conversations (id, organization_id, contact_id, channel_session_id, status)
@@ -137,6 +145,25 @@ describe("passagem SDR → vendedor", () => {
     expect(valor(`select owner_user_id from public.crm_leads where id = '${LEAD}'`)).toBe(VENDEDOR);
     expect(valor(`select owner_kind from public.crm_leads where id = '${LEAD}'`)).toBe("user");
     expect(valor(`select sdr_user_id from public.crm_leads where id = '${LEAD}'`)).toBe(SDR);
+  });
+
+  it("o SDR de SUPORTE passa o lead e NÃO vira guardião (só 'sdr' dispara)", () => {
+    agindoComo(
+      SUPORTE,
+      `update public.crm_leads set owner_user_id = '${SUPORTE}', owner_kind = 'user' where id = '${LEAD_DO_SUPORTE}'`,
+    );
+    agindoComo(
+      SUPORTE,
+      `update public.crm_leads set owner_user_id = '${VENDEDOR}' where id = '${LEAD_DO_SUPORTE}'`,
+    );
+    expect(
+      valor(`select owner_user_id from public.crm_leads where id = '${LEAD_DO_SUPORTE}'`),
+    ).toBe(VENDEDOR);
+    expect(
+      valor(
+        `select coalesce(sdr_user_id::text, 'nenhum') from public.crm_leads where id = '${LEAD_DO_SUPORTE}'`,
+      ),
+    ).toBe("nenhum");
   });
 
   it("quem passa sem ser SDR não vira guardião", () => {

@@ -11,7 +11,7 @@ import {
   interfaceSettingsSchema,
   lerInterface,
 } from "@/lib/navigation/interface";
-import { DESTINOS_DA_FUNCAO, funcaoMostra } from "@/lib/iavek/funcoes";
+import { DESTINOS_DA_FUNCAO, ROTULO_DA_FUNCAO, funcaoMostra } from "@/lib/iavek/funcoes";
 import { NAV_CATALOG } from "@/lib/navigation/catalogo";
 
 const auth = vi.hoisted(() => ({
@@ -79,6 +79,46 @@ describe("menu por função", () => {
 
   it("sem função, nada muda", () => {
     expect(hrefs({ preset: "completa" })).toEqual(hrefs(null));
+  });
+});
+
+describe("funções novas da v1.7.1", () => {
+  it("Gerente de apoio (papel manager) vê só o que ajuda a fechar", () => {
+    const apoio = hrefs({ preset: "completa", funcao: "apoio" }, "manager");
+    for (const h of [
+      "/app/meu-dia",
+      "/app/inbox",
+      "/app/kanban",
+      "/app/proposals",
+      "/app/products",
+    ]) {
+      expect(apoio).toContain(h);
+    }
+    for (const h of [
+      "/app/metrics",
+      "/app/settings/automacoes",
+      "/app/campaigns",
+      "/app/ai/agents",
+      "/app/audit",
+    ]) {
+      expect(apoio).not.toContain(h);
+    }
+  });
+
+  it("SDR de suporte tem o menu do SDR, com o Espaço da IA", () => {
+    expect(hrefs({ preset: "completa", funcao: "suporte" })).toEqual(
+      hrefs({ preset: "completa", funcao: "sdr" }),
+    );
+  });
+
+  it("o schema aceita as duas, e os rótulos são os combinados", () => {
+    for (const f of ["apoio", "suporte"]) {
+      expect(interfaceSettingsSchema.safeParse({ preset: "completa", funcao: f }).success).toBe(
+        true,
+      );
+    }
+    expect(ROTULO_DA_FUNCAO.apoio).toBe("Gerente de apoio");
+    expect(ROTULO_DA_FUNCAO.suporte).toBe("SDR de suporte");
   });
 });
 
