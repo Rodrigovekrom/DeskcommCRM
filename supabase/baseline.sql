@@ -5447,11 +5447,64 @@ $$;
 revoke execute on function public.fn_iavek_e_guardiao_do_contato(uuid, uuid) from public, anon;
 grant execute on function public.fn_iavek_e_guardiao_do_contato(uuid, uuid) to authenticated, service_role;
 
+-- ia.vek (migration 0580): a mesma regra de fn_can_view_conversation (+ guardião),
+-- escrita para o Postgres decidir "quem sou e o que vejo" UMA vez por consulta
+-- (initplan/hash), e não por linha. Medido em 20/10/2026: lista do vendedor de
+-- ~590 ms para ~10 ms, com o mesmo conjunto visível. O porquê inteiro está no
+-- cabeçalho da migration 0580.
+create or replace function public.fn_iavek_visao_de_conversas()
+returns table (org_id uuid, ve_tudo boolean, ve_sem_dono boolean)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select v.org,
+         v.papel in ('viewer', 'manager', 'admin') or v.modo = 'all',
+         v.modo = 'own_and_unassigned'
+    from (
+      select x.org,
+             public.fn_user_role_in_org(x.org) as papel,
+             coalesce((select o.settings->>'visibility_mode'
+                         from public.organizations o
+                        where o.id = x.org), 'own_and_unassigned') as modo
+        from public.fn_user_org_ids() as x(org)
+    ) v
+   where v.papel is not null;
+$$;
+revoke execute on function public.fn_iavek_visao_de_conversas() from public, anon;
+grant execute on function public.fn_iavek_visao_de_conversas() to authenticated, service_role;
+
+-- plpgsql de propósito, como a 0579: o corpo só é resolvido na chamada.
+create or replace function public.fn_iavek_contatos_que_guardo()
+returns table (org_id uuid, contato_id uuid)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  return query
+    select l.organization_id, l.contact_id
+      from public.crm_leads l
+     where l.sdr_user_id = auth.uid()
+       and l.contact_id is not null
+       and l.organization_id in (select public.fn_user_org_ids());
+end;
+$$;
+revoke execute on function public.fn_iavek_contatos_que_guardo() from public, anon;
+grant execute on function public.fn_iavek_contatos_que_guardo() to authenticated, service_role;
+
 drop policy if exists "conversations_select" on public.conversations;
 create policy "conversations_select" on public.conversations
   for select using (
-    public.fn_can_view_conversation(organization_id, assigned_to_user_id)
-    or public.fn_iavek_e_guardiao_do_contato(organization_id, contact_id)
+    (select public.fn_is_platform_admin())
+    or organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_tudo)
+    or (assigned_to_user_id = (select auth.uid())
+        and organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v))
+    or (assigned_to_user_id is null
+        and organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_sem_dono))
+    or (organization_id, contact_id) in (select g.org_id, g.contato_id from public.fn_iavek_contatos_que_guardo() g)
   );
 
 drop policy if exists "conversations_agent_write" on public.conversations;
@@ -45762,7 +45815,8 @@ grant execute on function public.fn_iavek_funcao_do_membro(uuid, uuid) to servic
 
 -- ---- 4. o guardião enxerga o contato que guarda ----
 -- A função e as policies ampliadas (crm_leads_select/update e
--- conversations_select) moram no lugar das originais, mais acima neste arquivo:
+-- conversations_select — reescrita pela 0580 para ser avaliada por consulta, e
+-- não por linha) moram no lugar das originais, mais acima neste arquivo:
 -- reinstalar a policy aqui com outro texto deixaria uma versão intermediária
 -- valendo a cada update (cerca baseline-nao-constroi-o-que-derruba).
 
