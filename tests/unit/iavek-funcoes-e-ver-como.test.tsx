@@ -67,14 +67,88 @@ describe("menu por função", () => {
     }
   });
 
-  it("vendedor vê o funil e as propostas; gerente vê tudo o que o papel permite", () => {
+  it("vendedor vê o funil e as propostas", () => {
     const vendedor = hrefs({ preset: "completa", funcao: "vendedor" });
     expect(vendedor).toContain("/app/kanban");
     expect(vendedor).not.toContain("/app/espaco-ia");
-    expect(hrefs({ preset: "completa", funcao: "gerente" }, "manager")).toEqual(
-      hrefs({ preset: "completa" }, "manager"),
-    );
-    expect(DESTINOS_DA_FUNCAO.gerente).toBeNull();
+  });
+
+  it("v1.7.3: gerente vê a operação, sem a configuração técnica de IA", () => {
+    const gerente = hrefs({ preset: "completa", funcao: "gerente" }, "manager");
+    for (const h of [
+      "/app/meu-dia",
+      "/app/inbox",
+      "/app/kanban",
+      "/app/contacts",
+      "/app/tasks",
+      "/app/agenda",
+      "/app/metrics",
+      "/app/team",
+      "/app/settings/atendimento",
+      "/app/settings/tags",
+      "/app/ai/cases",
+    ]) {
+      expect(gerente).toContain(h);
+    }
+    for (const h of [
+      "/app/ai/agents",
+      "/app/ai/followups",
+      "/app/ai/routers",
+      "/app/ai/credentials",
+      "/app/ai/providers",
+      "/app/ai/knowledge/sources",
+      "/app/ai/memory",
+      "/app/ai/skills",
+      "/app/ai/runs",
+      "/app/ai/usage",
+      "/app/ai/evolution",
+      "/app/settings/automacoes",
+      "/app/webhooks",
+      "/app/settings/recursos",
+      "/app/campaigns",
+    ]) {
+      expect(gerente).not.toContain(h);
+    }
+    // Toda entrada da lista existe no catálogo (sem porta fantasma).
+    const catalogo = NAV_CATALOG.map((d) => d.href as string);
+    for (const h of DESTINOS_DA_FUNCAO.gerente) expect(catalogo).toContain(h);
+  });
+
+  it("nenhum gerente (gerente ou apoio) vê configuração técnica", () => {
+    const tecnicas = [
+      "/app/ai/agents",
+      "/app/ai/followups",
+      "/app/ai/atendimento",
+      "/app/ai/routers",
+      "/app/ai/credentials",
+      "/app/ai/providers",
+      "/app/ai/knowledge/sources",
+      "/app/ai/memory",
+      "/app/ai/skills",
+      "/app/ai/proposals",
+      "/app/ai/runs",
+      "/app/ai/usage",
+      "/app/ai/evolution",
+      "/app/settings/automacoes",
+      "/app/webhooks",
+      "/app/settings/recursos",
+      "/app/extensions",
+      "/app/integracao-dados",
+      "/app/imports",
+      "/app/audit",
+      "/app/settings/tenant/pipelines",
+    ];
+    for (const f of ["gerente", "apoio"] as const) {
+      const menu = hrefs({ preset: "completa", funcao: f }, "manager");
+      for (const h of tecnicas) expect(menu).not.toContain(h);
+    }
+  });
+
+  it("admin sem função continua vendo tudo", () => {
+    const admin = hrefs({ preset: "completa" }, "admin");
+    expect(admin).toContain("/app/ai/agents");
+    expect(admin).toContain("/app/settings/automacoes");
+    expect(admin).toContain("/app/webhooks");
   });
 
   it("sem função, nada muda", () => {

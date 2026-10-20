@@ -22,11 +22,10 @@ export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
 
 /**
  * O que cada função vê no menu (além das portas essenciais: perfil, segurança
- * e, para quem administra, equipe e organização). O gerente vê tudo o que o
- * papel dele permite. Item que não existe na instalação simplesmente não
- * aparece.
+ * e, para quem administra, equipe e organização). Item que não existe na
+ * instalação, ou que o papel não abre, simplesmente não aparece.
  */
-export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[] | null> = {
+export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   sdr: [
     "/app/meu-dia",
     "/app/espaco-ia",
@@ -77,16 +76,47 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[] | null> = {
     "/app/calls",
     "/app/templates",
   ],
-  gerente: null,
+  /**
+   * ia.vek v1.7.3 (decisão do Rodrigo, "limita"): o gerente CONTROLA E VÊ a
+   * cadeira abaixo (vendedores e SDR) — funil, conversas, tarefas, agenda,
+   * desempenho da equipe e a distribuição de atendimento. Nenhum gerente (nem
+   * este nem o "apoio") vê configuração técnica: agentes de IA e o que os
+   * ajusta, automações, webhooks, campanhas, importações, etapas do funil,
+   * recursos opcionais, extensões, integrações e as configurações da empresa.
+   * Admin segue vendo tudo (sem função).
+   */
+  gerente: [
+    "/app/meu-dia",
+    "/app/inbox",
+    "/app/espaco-ia",
+    "/app/radar",
+    "/app/agenda",
+    "/app/templates",
+    "/app/kanban",
+    "/app/contacts",
+    "/app/companies",
+    "/app/people",
+    "/app/tasks",
+    "/app/calls",
+    "/app/products",
+    "/app/proposals",
+    "/app/ai/cases",
+    "/app/ai/inbox",
+    "/app/metrics",
+    "/app/activities",
+    "/app/faturamento",
+    "/app/team",
+    "/app/settings/notifications",
+    "/app/settings/atendimento",
+    "/app/settings/tags",
+  ],
 };
 
 export function ehFuncao(v: unknown): v is Funcao {
   return typeof v === "string" && (FUNCOES as readonly string[]).includes(v);
 }
 
-/** O destino está no menu desta função? (sem função ou gerente: tudo) */
+/** O destino está no menu desta função? (sem função: tudo) */
 export function funcaoMostra(funcao: Funcao | undefined | null, href: string): boolean {
-  if (!funcao) return true;
-  const lista = DESTINOS_DA_FUNCAO[funcao];
-  return lista === null || lista.includes(href);
+  return !funcao || DESTINOS_DA_FUNCAO[funcao].includes(href);
 }
