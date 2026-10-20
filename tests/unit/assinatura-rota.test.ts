@@ -86,7 +86,7 @@ describe("/api/v1/settings/assinatura", () => {
   it("GET sem a chave devolve o padrão: tudo desligado", async () => {
     sessao("manager");
     const corpo = await (await GET()).json();
-    expect(corpo.data).toEqual({ humanos: false, ia: false, nome_ia: "Assistente Virtual" });
+    expect(corpo.data).toMatchObject({ humanos: false, ia: false, nome_ia: "Assistente Virtual" });
   });
 
   it("PATCH grava a chave SEM apagar as outras, e audita", async () => {
@@ -99,7 +99,10 @@ describe("/api/v1/settings/assinatura", () => {
       assinatura_mensagens: { humanos: true, ia: true, nome_ia: "Bia" },
     });
     expect(vi.mocked(audit)).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "settings.message_signature_updated", organizationId: ORG }),
+      expect.objectContaining({
+        action: "settings.message_signature_updated",
+        organizationId: ORG,
+      }),
     );
   });
 

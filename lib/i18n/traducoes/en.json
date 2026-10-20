@@ -928,6 +928,8 @@
   "Inbox": "Inbox",
   "Entrada de leads": "Lead inbox",
   "Controle de atendimentos": "Service control",
+  "Como cada função aparece para o cliente": "How each role appears to the customer",
+  "O atendente com função assina como “Nome | Rótulo”. Quem não tem função (ex.: administrador) assina só com o nome.": "Agents with a role sign as “Name | Label”. Those without a role (e.g. admin) sign with their name only.",
   "SDR de suporte": "Support SDR",
   "Gerente de apoio": "Closing manager",
   "Com {who}": "With {who}",

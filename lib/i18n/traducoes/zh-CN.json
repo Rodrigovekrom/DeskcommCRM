@@ -260,6 +260,8 @@
   "Inbox": "会话收件箱",
   "Entrada de leads": "线索收件箱",
   "Controle de atendimentos": "服务管理",
+  "Como cada função aparece para o cliente": "各职能对客户的显示方式",
+  "O atendente com função assina como “Nome | Rótulo”. Quem não tem função (ex.: administrador) assina só com o nome.": "有职能的客服署名为“姓名 | 标签”。没有职能的人（如管理员）只署名姓名。",
   "SDR de suporte": "支持型 SDR",
   "Gerente de apoio": "支援经理",
   "Com {who}": "在 {who} 处",

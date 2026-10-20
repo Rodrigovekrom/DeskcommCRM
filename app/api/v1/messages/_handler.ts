@@ -51,6 +51,7 @@ import type { ListMessagesQuery, SendMessageInput } from "@/lib/schemas";
 import { sendTemplateForSession } from "@/lib/channels/meta/send-template-for-session";
 import { emitirFalhaDeEntrega } from "@/lib/messaging/falha-de-entrega";
 import { aplicarAssinatura, configAssinatura, linhaDeAssinatura } from "@/lib/messaging/assinatura";
+import { ehFuncao, type Funcao } from "@/lib/iavek/funcoes";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -649,10 +650,21 @@ export async function sendMessageHandler(
       (origemDoEmissor === "ai" && configAss.ia);
     if (coberta) {
       let nomeDoAtendente: string | null = null;
+      // ia.vek v1.7.2: a FUNÇÃO do atendente (interface_settings.funcao do
+      // vínculo) entra na assinatura como rótulo para o cliente.
+      let funcaoDoAtendente: Funcao | null = null;
       if (origemDoEmissor === "user" && ctx.actor.type === "user") {
         nomeDoAtendente = (await nomesDosAtendentes([ctx.actor.id])).get(ctx.actor.id) ?? null;
+        const { data: vinculo } = await supabase
+          .from("user_organizations")
+          .select("interface_settings")
+          .eq("organization_id", ctx.organization_id)
+          .eq("user_id", ctx.actor.id)
+          .maybeSingle();
+        const funcao = (vinculo?.interface_settings as { funcao?: unknown } | null)?.funcao;
+        funcaoDoAtendente = ehFuncao(funcao) ? funcao : null;
       }
-      assinatura = linhaDeAssinatura(configAss, origemDoEmissor, nomeDoAtendente);
+      assinatura = linhaDeAssinatura(configAss, origemDoEmissor, nomeDoAtendente, funcaoDoAtendente);
     }
   }
 

@@ -18,20 +18,34 @@ import {
 
 describe("configAssinatura", () => {
   it("degenera para tudo desligado quando não há settings (adição não muda instalação existente)", () => {
-    expect(configAssinatura(undefined)).toEqual({ humanos: false, ia: false, nomeIa: "Assistente Virtual" });
-    expect(configAssinatura({})).toEqual({ humanos: false, ia: false, nomeIa: "Assistente Virtual" });
-    expect(configAssinatura({ outras: 1 })).toEqual({ humanos: false, ia: false, nomeIa: "Assistente Virtual" });
+    expect(configAssinatura(undefined)).toMatchObject({
+      humanos: false,
+      ia: false,
+      nomeIa: "Assistente Virtual",
+    });
+    expect(configAssinatura({})).toMatchObject({
+      humanos: false,
+      ia: false,
+      nomeIa: "Assistente Virtual",
+    });
+    expect(configAssinatura({ outras: 1 })).toMatchObject({
+      humanos: false,
+      ia: false,
+      nomeIa: "Assistente Virtual",
+    });
   });
 
   it("lê humanos/ia/nome_ia do settings, e jsonb torto degrada sem lançar", () => {
     const on = configAssinatura({
       assinatura_mensagens: { humanos: true, ia: true, nome_ia: "Ana I.A." },
     });
-    expect(on).toEqual({ humanos: true, ia: true, nomeIa: "Ana I.A." });
+    expect(on).toMatchObject({ humanos: true, ia: true, nomeIa: "Ana I.A." });
 
     // A string "true" não liga — só o booleano (régua da casa).
-    expect(configAssinatura({ assinatura_mensagens: { humanos: "true", ia: 1 } }).humanos).toBe(false);
-    expect(configAssinatura({ assinatura_mensagens: "lixo" })).toEqual({
+    expect(configAssinatura({ assinatura_mensagens: { humanos: "true", ia: 1 } }).humanos).toBe(
+      false,
+    );
+    expect(configAssinatura({ assinatura_mensagens: "lixo" })).toMatchObject({
       humanos: false,
       ia: false,
       nomeIa: "Assistente Virtual",
@@ -49,13 +63,15 @@ describe("capitalizarIniciais", () => {
 
 describe("linhaDeAssinatura", () => {
   it("humano: `*Nome*\n` com iniciais em maiúsculo, quando a config liga humanos", () => {
-    expect(linhaDeAssinatura({ humanos: true, ia: false, nomeIa: "x" }, "user", "carlos gaban")).toBe(
-      "*Carlos Gaban*\n",
-    );
+    expect(
+      linhaDeAssinatura({ humanos: true, ia: false, nomeIa: "x" }, "user", "carlos gaban"),
+    ).toBe("*Carlos Gaban*\n");
   });
 
   it("humano desligado → null, mesmo com o nome à mão", () => {
-    expect(linhaDeAssinatura({ humanos: false, ia: false, nomeIa: "x" }, "user", "Carlos")).toBeNull();
+    expect(
+      linhaDeAssinatura({ humanos: false, ia: false, nomeIa: "x" }, "user", "Carlos"),
+    ).toBeNull();
   });
 
   it("humano sem nome resolvido → null (não assina uma linha sem dono)", () => {
@@ -64,9 +80,9 @@ describe("linhaDeAssinatura", () => {
   });
 
   it("IA: usa o nome configurável da organização, no formato que ela deu", () => {
-    expect(linhaDeAssinatura({ humanos: false, ia: true, nomeIa: "Assistente Virtual" }, "ai")).toBe(
-      "*Assistente Virtual*\n",
-    );
+    expect(
+      linhaDeAssinatura({ humanos: false, ia: true, nomeIa: "Assistente Virtual" }, "ai"),
+    ).toBe("*Assistente Virtual*\n");
     expect(linhaDeAssinatura({ humanos: false, ia: true, nomeIa: "Agente Juliana" }, "ai")).toBe(
       "*Agente Juliana*\n",
     );
@@ -92,9 +108,16 @@ describe("semAssinatura — a volta do que aplicarAssinatura pôs (#2079)", asyn
   const { semAssinatura } = await import("./assinatura");
 
   it("tira exatamente a linha que a assinatura pôs, para IA e humano", () => {
-    const cfg = configAssinatura({ assinatura_mensagens: { humanos: true, ia: true, nome_ia: "Bia" } });
-    for (const linha of [linhaDeAssinatura(cfg, "ai"), linhaDeAssinatura(cfg, "user", "carlos gaban")]) {
-      expect(semAssinatura(aplicarAssinatura(linha, "oi\n*tudo bem?*") ?? "")).toBe("oi\n*tudo bem?*");
+    const cfg = configAssinatura({
+      assinatura_mensagens: { humanos: true, ia: true, nome_ia: "Bia" },
+    });
+    for (const linha of [
+      linhaDeAssinatura(cfg, "ai"),
+      linhaDeAssinatura(cfg, "user", "carlos gaban"),
+    ]) {
+      expect(semAssinatura(aplicarAssinatura(linha, "oi\n*tudo bem?*") ?? "")).toBe(
+        "oi\n*tudo bem?*",
+      );
     }
   });
 

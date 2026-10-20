@@ -28,7 +28,12 @@ async function lerSettings(orgId: string) {
     .eq("id", orgId)
     .maybeSingle();
   if (error) return { error };
-  return { settings: ((data as { settings?: Record<string, unknown> } | null)?.settings ?? {}) as Record<string, unknown> };
+  return {
+    settings: ((data as { settings?: Record<string, unknown> } | null)?.settings ?? {}) as Record<
+      string,
+      unknown
+    >,
+  };
 }
 
 export async function GET(): Promise<Response> {
@@ -39,7 +44,10 @@ export async function GET(): Promise<Response> {
   const lido = await lerSettings(authz.org.orgId);
   if ("error" in lido) return fail("internal_error", lido.error?.message ?? "", 500, { requestId });
   const c = configAssinatura(lido.settings);
-  return ok({ humanos: c.humanos, ia: c.ia, nome_ia: c.nomeIa }, { requestId });
+  return ok(
+    { humanos: c.humanos, ia: c.ia, nome_ia: c.nomeIa, rotulos_funcao: c.rotulosFuncao },
+    { requestId },
+  );
 }
 
 export async function PATCH(req: NextRequest): Promise<Response> {
@@ -64,9 +72,18 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   if ("error" in lido) return fail("internal_error", lido.error?.message ?? "", 500, { requestId });
 
   // Cliente admin: a RLS de `organizations` só deixa platform admin escrever.
+  // ia.vek v1.7.2: quem não manda `rotulos_funcao` (tela antiga) mantém os
+  // rótulos que já estavam gravados.
+  const anterior = (lido.settings.assinatura_mensagens ?? {}) as Record<string, unknown>;
+  const gravar = {
+    ...nova,
+    ...(nova.rotulos_funcao === undefined && anterior.rotulos_funcao !== undefined
+      ? { rotulos_funcao: anterior.rotulos_funcao }
+      : {}),
+  };
   const { error } = await createAdminClient()
     .from("organizations")
-    .update({ settings: { ...lido.settings, assinatura_mensagens: nova } })
+    .update({ settings: { ...lido.settings, assinatura_mensagens: gravar } })
     .eq("id", authz.org.orgId);
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
@@ -77,8 +94,8 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     resourceType: "organization",
     resourceId: authz.org.orgId,
     requestId,
-    metadata: nova,
+    metadata: gravar,
   });
 
-  return ok(nova, { requestId });
+  return ok(gravar, { requestId });
 }

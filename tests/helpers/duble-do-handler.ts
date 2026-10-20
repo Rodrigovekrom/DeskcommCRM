@@ -50,6 +50,8 @@ export interface OpcoesDoDubleDoHandler {
   organizacao?: LinhaDoDuble;
   /** Linhas de `calendar_appointments` lidas pela guarda de agenda. Padrão: `[]`. */
   agenda?: LinhaDoDuble[];
+  /** ia.vek v1.7.2: o vínculo do atendente (`user_organizations`), lido pela assinatura com função. Padrão: nenhum. */
+  vinculo?: LinhaDoDuble | null;
 }
 
 export interface RetornoDoDubleDoHandler {
@@ -63,10 +65,7 @@ interface CadeiaAguardavel extends PromiseLike<{ error: null }> {
   eq: (coluna: string, valor: unknown) => CadeiaAguardavel;
 }
 
-function cadeiaAguardavel(
-  tabela: string,
-  capturas: CapturasDoDubleDoHandler,
-): CadeiaAguardavel {
+function cadeiaAguardavel(tabela: string, capturas: CapturasDoDubleDoHandler): CadeiaAguardavel {
   const cadeia: CadeiaAguardavel = {
     eq: (coluna, valor) => {
       capturas.filtros[tabela]!.push({ coluna, valor });
@@ -111,7 +110,10 @@ export function colunasDoSelect(select: string): string[] {
 export function colunasDoEmbed(select: string, apelido: string): string[] {
   const m = new RegExp(`${apelido}\\s*:[^(]*\\(([^)]*)\\)`).exec(select);
   if (m === null) return [];
-  return m[1]!.split(",").map((c) => c.trim()).filter(Boolean);
+  return m[1]!
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
 }
 
 /** A linha como o PostgREST a devolveria: só o que o `select` pediu. */
@@ -132,9 +134,7 @@ export function projetar(linha: LinhaDoDuble, select: string): LinhaDoDuble {
  * espelho do canal, aviso ao lead, guarda de agenda) — toca hoje. Uma tabela
  * nova deve ser adicionada aqui uma vez, não em cinco fakes diferentes.
  */
-export function criarDubleDoHandler(
-  opcoes: OpcoesDoDubleDoHandler,
-): RetornoDoDubleDoHandler {
+export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): RetornoDoDubleDoHandler {
   const capturas: CapturasDoDubleDoHandler = {
     patches: { conversations: [], messages: [], contacts: [] },
     filtros: {
@@ -159,9 +159,8 @@ export function criarDubleDoHandler(
 
   const mensagens: LinhaDoDuble[] = (opcoes.mensagensIniciais ?? []).map((r) => ({ ...r }));
   let contadorDeMensagens = 0;
-  const filtrarMensagens = (
-    filtros: Array<(r: LinhaDoDuble) => boolean>,
-  ): LinhaDoDuble[] => mensagens.filter((r) => filtros.every((f) => f(r)));
+  const filtrarMensagens = (filtros: Array<(r: LinhaDoDuble) => boolean>): LinhaDoDuble[] =>
+    mensagens.filter((r) => filtros.every((f) => f(r)));
 
   const client = {
     from(tabela: string) {
@@ -280,6 +279,16 @@ export function criarDubleDoHandler(
         return cadeia;
       }
 
+      if (tabela === "user_organizations") {
+        // ia.vek v1.7.2: a assinatura lê a FUNÇÃO de quem envia.
+        const cadeia = {
+          select: () => cadeia,
+          eq: () => cadeia,
+          maybeSingle: async () => ({ data: opcoes.vinculo ?? null, error: null }),
+        };
+        return cadeia;
+      }
+
       if (tabela === "calendar_appointments") {
         const cadeia: {
           select: (colunas?: string) => typeof cadeia;
@@ -346,8 +355,7 @@ export function criarDubleDoHandler(
                 data: null,
                 error: {
                   code: "23505",
-                  message:
-                    'duplicate key value violates "messages_org_external_id_unique"',
+                  message: 'duplicate key value violates "messages_org_external_id_unique"',
                 },
               };
             }

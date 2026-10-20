@@ -13,11 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
+import { FUNCOES, ROTULO_DA_FUNCAO, type Funcao } from "@/lib/iavek/funcoes";
 
 export interface AssinaturaConfig {
   humanos: boolean;
   ia: boolean;
   nome_ia: string;
+  /** ia.vek v1.7.2: como cada função aparece para o cliente (`*Nome | Rótulo*`). */
+  rotulos_funcao: Record<Funcao, string>;
 }
 
 export function AssinaturaForm({ initial }: { initial: AssinaturaConfig }) {
@@ -89,14 +92,47 @@ export function AssinaturaForm({ initial }: { initial: AssinaturaConfig }) {
             disabled={isPending}
             onChange={(e) => setForm((f) => ({ ...f, nome_ia: e.target.value }))}
           />
-          <p className="text-xs text-muted-foreground">{t("Sem asteriscos nem quebra de linha.")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("Sem asteriscos nem quebra de linha.")}
+          </p>
         </div>
+        <fieldset className="space-y-2" data-testid="assinatura-rotulos-funcao">
+          <legend className="text-sm font-medium">
+            {t("Como cada função aparece para o cliente")}
+          </legend>
+          <p className="text-xs text-muted-foreground">
+            {t(
+              "O atendente com função assina como “Nome | Rótulo”. Quem não tem função (ex.: administrador) assina só com o nome.",
+            )}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {FUNCOES.map((f) => (
+              <div key={f} className="space-y-1">
+                <Label htmlFor={`assinatura-rotulo-${f}`}>{t(ROTULO_DA_FUNCAO[f])}</Label>
+                <Input
+                  id={`assinatura-rotulo-${f}`}
+                  value={form.rotulos_funcao[f]}
+                  maxLength={60}
+                  disabled={isPending}
+                  onChange={(e) =>
+                    setForm((anterior) => ({
+                      ...anterior,
+                      rotulos_funcao: { ...anterior.rotulos_funcao, [f]: e.target.value },
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        </fieldset>
       </Card>
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={isPending || !sujo}>
           {isPending ? t("Salvando…") : t("Salvar assinatura")}
         </Button>
-        {sujo ? <span className="text-xs text-muted-foreground">{t("Há mudanças não salvas.")}</span> : null}
+        {sujo ? (
+          <span className="text-xs text-muted-foreground">{t("Há mudanças não salvas.")}</span>
+        ) : null}
       </div>
     </form>
   );

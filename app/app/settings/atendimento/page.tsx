@@ -23,7 +23,7 @@ import { DEFAULT_VISIBILITY_MODE, ROLE_RANK, type VisibilityMode } from "@/lib/a
 import { routingConfigSchema } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { loadChannelRoutingSettings } from "@/lib/routing/channel-policies";
-import { configAssinatura } from "@/lib/messaging/assinatura";
+import { configAssinatura, ROTULOS_FUNCAO_PADRAO } from "@/lib/messaging/assinatura";
 import { AssinaturaForm } from "./_assinatura-form";
 import { ChannelRoutingForm } from "./_channels-form";
 import { AtendimentoForm } from "./_form";
@@ -57,25 +57,46 @@ export default async function AtendimentoSettingsPage() {
   };
   // `.catch(...)`: config antiga ou corrompida no jsonb não pode derrubar a
   // tela que serve justamente para consertá-la.
-  const routing = routingConfigSchema.catch(routingConfigSchema.parse({})).parse(settings.routing ?? {});
+  const routing = routingConfigSchema
+    .catch(routingConfigSchema.parse({}))
+    .parse(settings.routing ?? {});
   const idioma = user.idioma;
   const channels = await loadChannelRoutingSettings(supabase, activeOrg.orgId);
   const assinatura = configAssinatura(settings);
-  const assinaturaInicial = { humanos: assinatura.humanos, ia: assinatura.ia, nome_ia: assinatura.nomeIa };
+  const assinaturaInicial = {
+    humanos: assinatura.humanos,
+    ia: assinatura.ia,
+    nome_ia: assinatura.nomeIa,
+    rotulos_funcao: assinatura.rotulosFuncao ?? ROTULOS_FUNCAO_PADRAO,
+  };
 
   // ia.vek D3: esteira de vendas (escalada e relatório por papel ou pessoa).
   const esteira = configDaEsteira(settings);
   const admin = createAdminClient();
   const nomeDoFunil = async (id: string) =>
-    ((await admin.from("crm_pipelines").select("name").eq("organization_id", activeOrg.orgId).eq("id", id).maybeSingle())
-      .data as { name?: string } | null)?.name ?? id;
-  const salvoEsteira = ((settings as { esteira?: unknown }).esteira ?? {}) as Record<string, unknown>;
-  const declarados = salvoEsteira.entrada && salvoEsteira.followup
-    ? {
-        entrada: await nomeDoFunil((salvoEsteira.entrada as { pipeline_id: string }).pipeline_id),
-        followup: await nomeDoFunil((salvoEsteira.followup as { pipeline_id: string }).pipeline_id),
-      }
-    : null;
+    (
+      (
+        await admin
+          .from("crm_pipelines")
+          .select("name")
+          .eq("organization_id", activeOrg.orgId)
+          .eq("id", id)
+          .maybeSingle()
+      ).data as { name?: string } | null
+    )?.name ?? id;
+  const salvoEsteira = ((settings as { esteira?: unknown }).esteira ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const declarados =
+    salvoEsteira.entrada && salvoEsteira.followup
+      ? {
+          entrada: await nomeDoFunil((salvoEsteira.entrada as { pipeline_id: string }).pipeline_id),
+          followup: await nomeDoFunil(
+            (salvoEsteira.followup as { pipeline_id: string }).pipeline_id,
+          ),
+        }
+      : null;
   const { data: vinculos } = await admin
     .from("user_organizations")
     .select("user_id")
@@ -84,7 +105,10 @@ export default async function AtendimentoSettingsPage() {
   for (const v of (vinculos ?? []) as Array<{ user_id: string }>) {
     const { data: u } = await admin.auth.admin.getUserById(v.user_id);
     const meta = (u?.user?.user_metadata ?? {}) as { full_name?: string; name?: string };
-    membros.push({ id: v.user_id, nome: meta.full_name || meta.name || u?.user?.email || v.user_id });
+    membros.push({
+      id: v.user_id,
+      nome: meta.full_name || meta.name || u?.user?.email || v.user_id,
+    });
   }
   membros.sort((a, b) => a.nome.localeCompare(b.nome));
 
@@ -94,9 +118,17 @@ export default async function AtendimentoSettingsPage() {
     .select("channel_session_id, group_chat_id, subject")
     .eq("organization_id", activeOrg.orgId)
     .order("subject", { ascending: true });
-  const grupos = ((gruposConhecidos ?? []) as Array<{ channel_session_id: string; group_chat_id: string; subject: string | null }>).map(
-    (g) => ({ channel_session_id: g.channel_session_id, group_chat_id: g.group_chat_id, rotulo: g.subject || g.group_chat_id }),
-  );
+  const grupos = (
+    (gruposConhecidos ?? []) as Array<{
+      channel_session_id: string;
+      group_chat_id: string;
+      subject: string | null;
+    }>
+  ).map((g) => ({
+    channel_session_id: g.channel_session_id,
+    group_chat_id: g.group_chat_id,
+    rotulo: g.subject || g.group_chat_id,
+  }));
   const avisoGrupo = configDoAvisoGrupo(settings);
 
   return (
@@ -114,7 +146,10 @@ export default async function AtendimentoSettingsPage() {
       </header>
 
       <AtendimentoForm
-        initial={{ ...routing, visibility_mode: settings.visibility_mode ?? DEFAULT_VISIBILITY_MODE }}
+        initial={{
+          ...routing,
+          visibility_mode: settings.visibility_mode ?? DEFAULT_VISIBILITY_MODE,
+        }}
       />
       <ChannelRoutingForm initial={channels} />
       <AssinaturaForm initial={assinaturaInicial} />

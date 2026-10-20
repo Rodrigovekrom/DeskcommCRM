@@ -36,6 +36,7 @@
  * chamador — `app/api/v1/messages/_handler.ts`.
  */
 import { z } from "zod";
+import { FUNCOES, type Funcao } from "@/lib/iavek/funcoes";
 
 export interface ConfigAssinatura {
   /** Assina as mensagens de atendentes humanos quando `true`. */
@@ -44,6 +45,36 @@ export interface ConfigAssinatura {
   ia: boolean;
   /** O nome configurável da IA (ex.: "Assistente Virtual" ou o nome do agente). */
   nomeIa: string;
+  /**
+   * ia.vek v1.7.2: como cada FUNÇÃO aparece PARA O CLIENTE na assinatura do
+   * humano (`*Nome | Rótulo*`). Um WhatsApp só para a equipe toda: o cliente
+   * precisa saber se fala com o consultor, o relacionamento ou o gerente.
+   */
+  rotulosFuncao?: Record<Funcao, string>;
+}
+
+/** Os rótulos padrão de cada função para o cliente (configuráveis por organização). */
+export const ROTULOS_FUNCAO_PADRAO: Record<Funcao, string> = {
+  sdr: "Relacionamento",
+  suporte: "Atendimento",
+  vendedor: "Consultor de Vendas",
+  apoio: "Gerente de Negócios",
+  gerente: "Gerente",
+};
+
+/** Rótulo seguro: sem `*` nem quebra de linha (desmontariam a linha `*...*\n`). */
+const ROTULO = /^[^*\r\n]+$/;
+
+function rotulosLidos(bruto: unknown): Record<Funcao, string> {
+  const r = { ...ROTULOS_FUNCAO_PADRAO };
+  if (!bruto || typeof bruto !== "object" || Array.isArray(bruto)) return r;
+  for (const f of FUNCOES) {
+    const v = (bruto as Record<string, unknown>)[f];
+    if (typeof v !== "string") continue;
+    const limpo = v.trim();
+    if (limpo.length >= 1 && limpo.length <= 60 && ROTULO.test(limpo)) r[f] = limpo;
+  }
+  return r;
 }
 
 const assinaturaSchema = z
@@ -63,8 +94,14 @@ export function configAssinatura(settings: unknown): ConfigAssinatura {
     settings && typeof settings === "object" && !Array.isArray(settings)
       ? (settings as Record<string, unknown>)
       : undefined;
-  const parsed = assinaturaSchema.parse(raiz?.assinatura_mensagens ?? {});
-  return { humanos: parsed.humanos, ia: parsed.ia, nomeIa: parsed.nome_ia };
+  const bruto = raiz?.assinatura_mensagens ?? {};
+  const parsed = assinaturaSchema.parse(bruto);
+  return {
+    humanos: parsed.humanos,
+    ia: parsed.ia,
+    nomeIa: parsed.nome_ia,
+    rotulosFuncao: rotulosLidos((bruto as { rotulos_funcao?: unknown } | null)?.rotulos_funcao),
+  };
 }
 
 /**
@@ -92,6 +129,8 @@ export function linhaDeAssinatura(
   config: ConfigAssinatura,
   origem: "user" | "ai",
   nomeHumano?: string | null,
+  /** ia.vek v1.7.2: a função do atendente; sem função, só o nome (como antes). */
+  funcaoHumano?: Funcao | null,
 ): string | null {
   if (origem === "ai") {
     if (!config.ia) return null;
@@ -102,7 +141,10 @@ export function linhaDeAssinatura(
   if (!config.humanos) return null;
   const nome = nomeHumano?.trim();
   if (!nome) return null;
-  return `*${capitalizarIniciais(nome)}*\n`;
+  const rotulo = funcaoHumano ? config.rotulosFuncao?.[funcaoHumano] : undefined;
+  return rotulo
+    ? `*${capitalizarIniciais(nome)} | ${rotulo}*\n`
+    : `*${capitalizarIniciais(nome)}*\n`;
 }
 
 /**
@@ -133,6 +175,25 @@ export const assinaturaEntradaSchema = z
       .min(1)
       .max(120)
       .regex(/^[^*\r\n]+$/),
+    // ia.vek v1.7.2: rótulo de cada função para o cliente. Opcional: a tela
+    // antiga, que não manda o campo, não apaga o que já foi configurado.
+    rotulos_funcao: z
+      .object(
+        Object.fromEntries(
+          FUNCOES.map((f) => [
+            f,
+            z
+              .string()
+              .trim()
+              .min(1)
+              .max(60)
+              .regex(/^[^*\r\n]+$/),
+          ]),
+        ) as Record<Funcao, z.ZodString>,
+      )
+      .partial()
+      .strict()
+      .optional(),
   })
   .strict();
 

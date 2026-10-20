@@ -88,10 +88,11 @@ function conversaCompleta(forma: Forma = {}): Row {
   };
 }
 
-function dubleDe(linha: Row, settings: unknown) {
+function dubleDe(linha: Row, settings: unknown, vinculo: Row | null = null) {
   return criarDubleDoHandler({
     conversation: linha,
     organizacao: { settings, status: "active" },
+    vinculo,
   });
 }
 
@@ -132,15 +133,35 @@ describe("a assinatura sai pela cadeia de envio, sem poluir messages.body", () =
     const fetchMock = respostaOk();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { supabase, capturas } = dubleDe(
-      conversaCompleta({ providerConversationId: THREAD }),
-      { assinatura_mensagens: { humanos: true, ia: false, nome_ia: "Assistente Virtual" } },
-    );
+    const { supabase, capturas } = dubleDe(conversaCompleta({ providerConversationId: THREAD }), {
+      assinatura_mensagens: { humanos: true, ia: false, nome_ia: "Assistente Virtual" },
+    });
     const msg = await sendMessageHandler(supabase, ctx, texto());
 
     expect(msg.status).toBe("sent");
     expect(mensagemEnviadoNaRede(fetchMock)).toEqual(
       expect.objectContaining({ message: "*Carlos Gaban*\noi" }),
+    );
+    expect(capturas.inserts.messages!.at(-1)?.["body"]).toBe("oi");
+  });
+
+  it("ia.vek v1.7.2: humano com FUNÇÃO assina `*Nome | Rótulo*` (rótulo da organização)", async () => {
+    mockedNomes.mockResolvedValue(new Map([[USER, "carlos gaban"]]));
+    vi.stubEnv("ZERNIO_ACCOUNT_ID", CONTA);
+    vi.stubEnv("ZERNIO_API_KEY", "sk_env");
+    const fetchMock = respostaOk();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { supabase, capturas } = dubleDe(
+      conversaCompleta({ providerConversationId: THREAD }),
+      { assinatura_mensagens: { humanos: true, ia: false, nome_ia: "Assistente Virtual" } },
+      { interface_settings: { preset: "completa", funcao: "vendedor" } } as Row,
+    );
+    const msg = await sendMessageHandler(supabase, ctx, texto());
+
+    expect(msg.status).toBe("sent");
+    expect(mensagemEnviadoNaRede(fetchMock)).toEqual(
+      expect.objectContaining({ message: "*Carlos Gaban | Consultor de Vendas*\noi" }),
     );
     expect(capturas.inserts.messages!.at(-1)?.["body"]).toBe("oi");
   });
@@ -152,10 +173,9 @@ describe("a assinatura sai pela cadeia de envio, sem poluir messages.body", () =
     const fetchMock = respostaOk();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { supabase } = dubleDe(
-      conversaCompleta({ providerConversationId: THREAD }),
-      { assinatura_mensagens: { humanos: false, ia: false, nome_ia: "Assistente Virtual" } },
-    );
+    const { supabase } = dubleDe(conversaCompleta({ providerConversationId: THREAD }), {
+      assinatura_mensagens: { humanos: false, ia: false, nome_ia: "Assistente Virtual" },
+    });
     await sendMessageHandler(supabase, ctx, texto());
 
     expect(mensagemEnviadoNaRede(fetchMock)).toEqual(expect.objectContaining({ message: "oi" }));
@@ -173,10 +193,9 @@ describe("a assinatura sai pela cadeia de envio, sem poluir messages.body", () =
       actor: { type: "webhook_source", id: "regra-1" },
       requestId: "req-2",
     };
-    const { supabase } = dubleDe(
-      conversaCompleta({ providerConversationId: THREAD }),
-      { assinatura_mensagens: { humanos: true, ia: true, nome_ia: "Assistente Virtual" } },
-    );
+    const { supabase } = dubleDe(conversaCompleta({ providerConversationId: THREAD }), {
+      assinatura_mensagens: { humanos: true, ia: true, nome_ia: "Assistente Virtual" },
+    });
     await sendMessageHandler(supabase, automacaoCtx, texto());
 
     expect(mensagemEnviadoNaRede(fetchMock)).toEqual(expect.objectContaining({ message: "oi" }));

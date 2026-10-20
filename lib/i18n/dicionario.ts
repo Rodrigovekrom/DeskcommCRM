@@ -1402,6 +1402,8 @@ export const DICIONARIO: Traducoes = {
   // ia.vek v1.4: nomes do menu do Rodrigo.
   "Entrada de leads": { es: "Entrada de leads" },
   "Controle de atendimentos": { es: "Control de atención" },
+  "Como cada função aparece para o cliente": { es: "Cómo aparece cada función para el cliente" },
+  "O atendente com função assina como “Nome | Rótulo”. Quem não tem função (ex.: administrador) assina só com o nome.": { es: "El agente con función firma como “Nombre | Etiqueta”. Quien no tiene función (ej.: administrador) firma solo con el nombre." },
   "SDR de suporte": { es: "SDR de soporte" },
   "Gerente de apoio": { es: "Gerente de apoyo" },
   "Com {who}": { es: "Con {who}" },
