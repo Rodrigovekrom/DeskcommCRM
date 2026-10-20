@@ -183,7 +183,7 @@ describe("conversations_select (0580): mesma regra, avaliada por consulta", () =
 
   it("a policy não chama mais a função por linha", () => {
     const texto = ultimaLinha(
-      sql(`select pg_get_expr(polqual, polrelid) from pg_policy
+      sql(`select replace(pg_get_expr(polqual, polrelid), E'\n', ' ') from pg_policy
             where polrelid = 'public.conversations'::regclass and polname = 'conversations_select';`),
     );
     expect(texto).toContain("fn_iavek_visao_de_conversas");
