@@ -8,7 +8,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { corDoCronometro, textoDoRestante } from "@/lib/iavek/cronometro-72h";
-import { ROTULO_DA_FUNCAO, ehFuncao, type Funcao } from "@/lib/iavek/funcoes";
+import { ROTULO_DA_FUNCAO, funcaoDaTela, type Funcao } from "@/lib/iavek/funcoes";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { SecaoRecolhivel } from "@/components/inbox/SecaoRecolhivel";
@@ -92,11 +92,28 @@ interface DadosDoDia {
     conversas_abertas: { com_pessoa: number; com_ia_ou_sem_dono: number };
     perdas_30d: Array<{ motivo: string; total: number }>;
     meta_agendamentos_dia: number | null;
+    /** v1.7.5: quem tem o quê — as abertas e as feitas nos últimos 7 dias. */
+    tarefas_da_equipe?: {
+      por_pessoa: Array<{
+        user_id: string | null;
+        nome: string | null;
+        abertas: number;
+        atrasadas: number;
+        concluidas: number;
+      }>;
+      itens: Array<TarefaDaEquipe>;
+    };
   };
+}
+interface TarefaDaEquipe extends Tarefa {
+  status: string;
+  assigned_to: string | null;
+  responsavel_nome: string | null;
 }
 
 export function funcaoDoDia(funcao: unknown, role: string | null | undefined): Funcao {
-  if (ehFuncao(funcao)) return funcao;
+  const daTela = funcaoDaTela(funcao); // "apoio" → "gerente" (v1.7.5)
+  if (daTela) return daTela;
   const rank = role ? (ROLE_RANK as Record<string, number>)[role] : undefined;
   return rank !== undefined && rank >= ROLE_RANK.manager ? "gerente" : "vendedor";
 }
@@ -518,6 +535,7 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
         <Numero rotulo={t("Conversas com a IA")} valor={ia} />
         <Numero rotulo={t("Conversas com pessoas")} valor={humano} />
       </div>
+      {d.tarefas_da_equipe && <TarefasDaEquipe dados={d.tarefas_da_equipe} />}
       <div className="grid gap-4 lg:grid-cols-2">
         <Bloco
           id="gerente-estourando"
@@ -612,6 +630,171 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
       </div>
       <MetaDeAgendamentos meta={d.meta_agendamentos_dia} />
     </div>
+  );
+}
+
+type Situacao = "abertas" | "atrasadas" | "concluidas";
+
+/**
+ * ia.vek v1.7.5: as TAREFAS DE TODOS, para o gerente controlar — quem tem o
+ * quê, o que atrasou e o que foi feito (7 dias), com filtro por vendedor.
+ * O resumo por pessoa também filtra: clicar na linha escolhe a pessoa.
+ */
+function TarefasDaEquipe({
+  dados,
+}: {
+  dados: NonNullable<NonNullable<DadosDoDia["gerente"]>["tarefas_da_equipe"]>;
+}) {
+  const t = useT();
+  const agora = useAgora();
+  const [pessoa, setPessoa] = useState<string>("todos");
+  const [situacao, setSituacao] = useState<Situacao>("abertas");
+  const chave = (u: string | null) => u ?? "ninguem";
+  const nomeDe = (p: { user_id: string | null; nome: string | null }) =>
+    p.nome ?? (p.user_id ? t("Sem nome") : t("Sem responsável"));
+
+  const daPessoa = dados.itens.filter((x) => pessoa === "todos" || chave(x.assigned_to) === pessoa);
+  const atrasada = (x: TarefaDaEquipe) =>
+    x.status !== "done" && !!x.due_date && new Date(x.due_date).getTime() < agora;
+  const visiveis = daPessoa.filter((x) =>
+    situacao === "concluidas"
+      ? x.status === "done"
+      : situacao === "atrasadas"
+        ? atrasada(x)
+        : x.status !== "done",
+  );
+  const conta = {
+    abertas: daPessoa.filter((x) => x.status !== "done").length,
+    atrasadas: daPessoa.filter(atrasada).length,
+    concluidas: daPessoa.filter((x) => x.status === "done").length,
+  };
+  const ABAS: Array<{ id: Situacao; rotulo: string }> = [
+    { id: "abertas", rotulo: t("Abertas") },
+    { id: "atrasadas", rotulo: t("Atrasadas") },
+    { id: "concluidas", rotulo: t("Concluídas (7 dias)") },
+  ];
+
+  return (
+    <Bloco
+      id="gerente-tarefas-equipe"
+      titulo={t("Tarefas da equipe")}
+      extra={<Contagem n={conta.abertas} />}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-sm font-medium" htmlFor="meu-dia-filtro-vendedor">
+          {t("Vendedor")}
+        </label>
+        <select
+          id="meu-dia-filtro-vendedor"
+          data-testid="tarefas-equipe-vendedor"
+          value={pessoa}
+          onChange={(e) => setPessoa(e.target.value)}
+          className="h-9 min-w-48 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="todos">{t("Todos")}</option>
+          {dados.por_pessoa.map((p) => (
+            <option key={chave(p.user_id)} value={chave(p.user_id)}>
+              {nomeDe(p)}
+            </option>
+          ))}
+        </select>
+        <div className="flex gap-1" role="tablist">
+          {ABAS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              role="tab"
+              aria-selected={situacao === a.id}
+              data-testid={`tarefas-equipe-${a.id}`}
+              onClick={() => setSituacao(a.id)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs",
+                situacao === a.id
+                  ? "border-accent bg-accent/10 font-medium"
+                  : "border-border text-muted-foreground hover:bg-surface-elevated",
+              )}
+            >
+              {a.rotulo} <span className="tabular-nums">{conta[a.id]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {dados.por_pessoa.length > 0 && (
+        <table className="mt-3 w-full text-sm" data-testid="tabela-tarefas-equipe">
+          <thead>
+            <tr className="text-left text-xs text-muted-foreground">
+              <th className="py-1 font-medium">{t("Pessoa")}</th>
+              <th className="py-1 text-right font-medium">{t("Abertas")}</th>
+              <th className="py-1 text-right font-medium">{t("Atrasadas")}</th>
+              <th className="py-1 text-right font-medium">{t("Concluídas (7 dias)")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dados.por_pessoa.map((p) => (
+              <tr
+                key={chave(p.user_id)}
+                className={cn(
+                  "cursor-pointer border-t border-border hover:bg-surface-elevated",
+                  pessoa === chave(p.user_id) && "bg-accent/5",
+                )}
+                onClick={() => setPessoa(chave(p.user_id))}
+              >
+                <td className="py-1.5">{nomeDe(p)}</td>
+                <td className="py-1.5 text-right tabular-nums">{p.abertas}</td>
+                <td
+                  className={cn(
+                    "py-1.5 text-right tabular-nums",
+                    p.atrasadas > 0 && "font-medium text-error-fg",
+                  )}
+                >
+                  {p.atrasadas}
+                </td>
+                <td className="py-1.5 text-right tabular-nums">{p.concluidas}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="mt-3" data-testid="lista-tarefas-equipe">
+        {visiveis.length === 0 ? (
+          <Vazio>
+            {situacao === "concluidas"
+              ? t("Nenhuma tarefa concluída nos últimos 7 dias.")
+              : situacao === "atrasadas"
+                ? t("Nenhuma tarefa atrasada.")
+                : t("Nenhuma tarefa aberta.")}
+          </Vazio>
+        ) : (
+          <ul className="divide-y divide-border">
+            {visiveis.slice(0, 100).map((x) => (
+              <Linha
+                key={x.id}
+                href={
+                  linkDaConversa(x.conversation_id) ??
+                  (x.contact_id ? `/app/contacts/${x.contact_id}` : null)
+                }
+                principal={x.title}
+                secundario={[x.responsavel_nome ?? t("Sem responsável"), x.contato_nome]
+                  .filter(Boolean)
+                  .join(" · ")}
+                direita={
+                  <span
+                    className={cn(
+                      "shrink-0 text-xs tabular-nums",
+                      atrasada(x) ? "font-medium text-error-fg" : "text-muted-foreground",
+                    )}
+                  >
+                    {x.status === "done" ? t("concluída") : quando(x.due_date, agora, t)}
+                  </span>
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    </Bloco>
   );
 }
 

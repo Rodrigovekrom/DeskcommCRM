@@ -56,7 +56,8 @@ describe("menu por função", () => {
   it("SDR vê só a lista dela (e as portas essenciais), nunca além do papel", () => {
     const sdr = hrefs({ preset: "completa", funcao: "sdr" });
     expect(sdr).toContain("/app/inbox");
-    expect(sdr).toContain("/app/espaco-ia");
+    // v1.7.5: o Espaço da IA é só do admin e da função suporte.
+    expect(sdr).not.toContain("/app/espaco-ia");
     expect(sdr).not.toContain("/app/kanban");
     expect(sdr).not.toContain("/app/ai/agents");
     expect(sdr).toContain("/app/settings/profile");
@@ -73,42 +74,18 @@ describe("menu por função", () => {
     expect(vendedor).not.toContain("/app/espaco-ia");
   });
 
-  it("v1.7.3: gerente vê a operação, sem a configuração técnica de IA", () => {
+  it("v1.7.5: o gerente vê SÓ os 4 itens dele, mais as portas pessoais", () => {
     const gerente = hrefs({ preset: "completa", funcao: "gerente" }, "manager");
-    for (const h of [
-      "/app/meu-dia",
-      "/app/inbox",
-      "/app/kanban",
-      "/app/contacts",
-      "/app/tasks",
-      "/app/agenda",
-      "/app/metrics",
-      "/app/team",
-      "/app/settings/atendimento",
-      "/app/settings/tags",
-      "/app/ai/cases",
-    ]) {
-      expect(gerente).toContain(h);
-    }
-    for (const h of [
-      "/app/ai/agents",
-      "/app/ai/followups",
-      "/app/ai/routers",
-      "/app/ai/credentials",
-      "/app/ai/providers",
-      "/app/ai/knowledge/sources",
-      "/app/ai/memory",
-      "/app/ai/skills",
-      "/app/ai/runs",
-      "/app/ai/usage",
-      "/app/ai/evolution",
-      "/app/settings/automacoes",
-      "/app/webhooks",
-      "/app/settings/recursos",
-      "/app/campaigns",
-    ]) {
-      expect(gerente).not.toContain(h);
-    }
+    expect([...gerente].sort()).toEqual(
+      [
+        "/app/meu-dia",
+        "/app/agenda",
+        "/app/kanban",
+        "/app/inbox",
+        "/app/settings/profile",
+        "/app/settings/security",
+      ].sort(),
+    );
     // Toda entrada da lista existe no catálogo (sem porta fantasma).
     const catalogo = NAV_CATALOG.map((d) => d.href as string);
     for (const h of DESTINOS_DA_FUNCAO.gerente) expect(catalogo).toContain(h);
@@ -157,32 +134,18 @@ describe("menu por função", () => {
 });
 
 describe("funções novas da v1.7.1", () => {
-  it("Gerente de apoio (papel manager) vê só o que ajuda a fechar", () => {
-    const apoio = hrefs({ preset: "completa", funcao: "apoio" }, "manager");
-    for (const h of [
-      "/app/meu-dia",
-      "/app/inbox",
-      "/app/kanban",
-      "/app/proposals",
-      "/app/products",
-    ]) {
-      expect(apoio).toContain(h);
-    }
-    for (const h of [
-      "/app/metrics",
-      "/app/settings/automacoes",
-      "/app/campaigns",
-      "/app/ai/agents",
-      "/app/audit",
-    ]) {
-      expect(apoio).not.toContain(h);
-    }
+  it("v1.7.5: o Gerente de apoio virou apelido do gerente — o mesmo menu", () => {
+    expect(hrefs({ preset: "completa", funcao: "apoio" }, "manager")).toEqual(
+      hrefs({ preset: "completa", funcao: "gerente" }, "manager"),
+    );
   });
 
-  it("SDR de suporte tem o menu do SDR, com o Espaço da IA", () => {
-    expect(hrefs({ preset: "completa", funcao: "suporte" })).toEqual(
+  it("SDR de suporte tem o menu do SDR, mais o Espaço da IA", () => {
+    const suporte = hrefs({ preset: "completa", funcao: "suporte" });
+    expect(suporte.filter((h) => h !== "/app/espaco-ia")).toEqual(
       hrefs({ preset: "completa", funcao: "sdr" }),
     );
+    expect(suporte).toContain("/app/espaco-ia");
   });
 
   it("o schema aceita as duas, e os rótulos são os combinados", () => {

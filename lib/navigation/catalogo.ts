@@ -17,7 +17,18 @@ import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
  * Doutrina: docs/doctrine/sistema-vivo.md — "por qual porta se chega até mim?"
  */
 
-export type NavGroupId = "atendimento" | "crm" | "ia" | "canais" | "analise" | "organizacao";
+export type NavGroupId =
+  | "atendimento"
+  | "crm"
+  | "ia"
+  | "canais"
+  | "analise"
+  | "organizacao"
+  // ia.vek v1.7.5: os grupos do menu do gerente (`MENU_DO_GERENTE`). Não entram
+  // em NAV_GROUPS e nenhum destino do catálogo os declara: só o desenho do
+  // gerente em `sidebarGroups()` os usa.
+  | "iavek-controle"
+  | "iavek-acompanhamento";
 
 export interface NavGroup {
   id: NavGroupId;

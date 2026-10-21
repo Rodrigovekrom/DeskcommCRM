@@ -9,8 +9,30 @@
 // ia.vek v1.7.1: "apoio" (Gerente de apoio, o fechador) e "suporte" (SDR de
 // suporte, que observa a IA). Só "sdr" vira GUARDIÃO do lead: o gatilho da
 // migration 0579 compara a função com 'sdr' exato, e nenhum outro valor dispara.
+//
+// ia.vek v1.7.5 (decisão do Rodrigo): só existe UM cargo de gerente. "apoio"
+// continua no vocabulário GRAVADO (vínculos e convites antigos têm o valor, e
+// nada da produção é reescrito), mas na TELA é apelido de "gerente"
+// (`funcaoDaTela`) e saiu das listas de escolha (`FUNCOES_DE_ESCOLHA`).
 export const FUNCOES = ["sdr", "suporte", "vendedor", "apoio", "gerente"] as const;
 export type Funcao = (typeof FUNCOES)[number];
+
+/** O que se ESCOLHE hoje (convite, Equipe, Ver como): sem o "apoio". */
+export const FUNCOES_DE_ESCOLHA = [
+  "sdr",
+  "suporte",
+  "vendedor",
+  "gerente",
+] as const satisfies readonly Funcao[];
+
+/**
+ * A função que a TELA usa: o "apoio" gravado vira "gerente" (mesmo menu, mesmo
+ * Meu dia, mesmo Kanban). Valor desconhecido ou ausente: sem função.
+ */
+export function funcaoDaTela(v: unknown): Funcao | null {
+  if (!ehFuncao(v)) return null;
+  return v === "apoio" ? "gerente" : v;
+}
 
 export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
   sdr: "SDR",
@@ -25,10 +47,11 @@ export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
  * e, para quem administra, equipe e organização). Item que não existe na
  * instalação, ou que o papel não abre, simplesmente não aparece.
  */
+const MENU_GERENTE = ["/app/meu-dia", "/app/agenda", "/app/kanban", "/app/inbox"] as const;
+
 export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   sdr: [
     "/app/meu-dia",
-    "/app/espaco-ia",
     "/app/inbox",
     "/app/agenda",
     "/app/tasks",
@@ -48,7 +71,10 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
     "/app/calls",
     "/app/templates",
   ],
-  /** Igual ao SDR (inclui o Espaço da IA), mas sem virar guardião do lead. */
+  /**
+   * Igual ao SDR, mas sem virar guardião do lead — e é a ÚNICA função que vê o
+   * Espaço da IA (v1.7.5: "só admin tem a visão + SDR de suporte").
+   */
   suporte: [
     "/app/meu-dia",
     "/app/espaco-ia",
@@ -60,56 +86,17 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
     "/app/templates",
   ],
   /**
-   * O fechador: papel manager (vê os leads e conversas dos vendedores), mas o
-   * menu é só o que ajuda a fechar — sem relatórios, configurações,
-   * automações, campanhas nem IA.
+   * ia.vek v1.7.5 (pedido do Rodrigo): o gerente CONTROLA e ACOMPANHA a equipe,
+   * e o menu dele é só isto, em dois grupos com nome próprio
+   * (`MENU_DO_GERENTE`). Saem Espaço da IA, Radar, respostas rápidas, contatos,
+   * tarefas soltas (viraram um bloco do Meu dia), casos, desempenho, atividades,
+   * equipe, distribuição, etiquetas e notificações. É APRESENTAÇÃO: o que ele
+   * pode abrir continua decidido pelo papel e pela RLS — o contato aberto a
+   * partir do Kanban, por exemplo, segue abrindo.
    */
-  apoio: [
-    "/app/meu-dia",
-    "/app/inbox",
-    "/app/kanban",
-    "/app/agenda",
-    "/app/tasks",
-    "/app/contacts",
-    "/app/products",
-    "/app/proposals",
-    "/app/calls",
-    "/app/templates",
-  ],
-  /**
-   * ia.vek v1.7.3 (decisão do Rodrigo, "limita"): o gerente CONTROLA E VÊ a
-   * cadeira abaixo (vendedores e SDR) — funil, conversas, tarefas, agenda,
-   * desempenho da equipe e a distribuição de atendimento. Nenhum gerente (nem
-   * este nem o "apoio") vê configuração técnica: agentes de IA e o que os
-   * ajusta, automações, webhooks, campanhas, importações, etapas do funil,
-   * recursos opcionais, extensões, integrações e as configurações da empresa.
-   * Admin segue vendo tudo (sem função).
-   */
-  gerente: [
-    "/app/meu-dia",
-    "/app/inbox",
-    "/app/espaco-ia",
-    "/app/radar",
-    "/app/agenda",
-    "/app/templates",
-    "/app/kanban",
-    "/app/contacts",
-    "/app/companies",
-    "/app/people",
-    "/app/tasks",
-    "/app/calls",
-    "/app/products",
-    "/app/proposals",
-    "/app/ai/cases",
-    "/app/ai/inbox",
-    "/app/metrics",
-    "/app/activities",
-    "/app/faturamento",
-    "/app/team",
-    "/app/settings/notifications",
-    "/app/settings/atendimento",
-    "/app/settings/tags",
-  ],
+  gerente: MENU_GERENTE,
+  /** v1.7.5: apelido do gerente (ver `funcaoDaTela`). */
+  apoio: MENU_GERENTE,
 };
 
 export function ehFuncao(v: unknown): v is Funcao {
@@ -118,5 +105,46 @@ export function ehFuncao(v: unknown): v is Funcao {
 
 /** O destino está no menu desta função? (sem função: tudo) */
 export function funcaoMostra(funcao: Funcao | undefined | null, href: string): boolean {
-  return !funcao || DESTINOS_DA_FUNCAO[funcao].includes(href);
+  const f = funcaoDaTela(funcao);
+  return !f || DESTINOS_DA_FUNCAO[f].includes(href);
+}
+
+/**
+ * ia.vek v1.7.5: o menu do gerente, com os grupos e rótulos que o Rodrigo pediu.
+ * A ordem aqui é a ordem na barra. Só desenho: quem decide se o destino existe
+ * para a pessoa continua sendo `DESTINOS_DA_FUNCAO` + papel.
+ */
+export const MENU_DO_GERENTE = [
+  {
+    id: "iavek-controle",
+    label: "Controle e análise",
+    itens: [
+      { href: "/app/meu-dia", label: "Meu dia" },
+      { href: "/app/agenda", label: "Agenda da loja" },
+    ],
+  },
+  {
+    id: "iavek-acompanhamento",
+    label: "Acompanhamento",
+    itens: [
+      { href: "/app/kanban", label: "Kanban por vendedor" },
+      { href: "/app/inbox", label: "Atendimento do lead" },
+    ],
+  },
+] as const;
+
+export const ESPACO_DA_IA = "/app/espaco-ia";
+
+/**
+ * ia.vek v1.7.5: quem vê o Espaço da IA — o admin (sem função) e a função
+ * "suporte". Com função, a função decide (por isso o "Ver como gerente" de um
+ * admin mostra o que o gerente vê, sem o Espaço). Vale para o menu E para a rota.
+ */
+export function veEspacoDaIa(
+  funcao: Funcao | undefined | null,
+  role: string | null | undefined,
+  platform = false,
+): boolean {
+  if (funcaoDaTela(funcao)) return funcao === "suporte";
+  return platform || role === "admin";
 }

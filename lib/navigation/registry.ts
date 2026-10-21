@@ -1,6 +1,7 @@
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 import { type Role } from "@/lib/auth/types";
+import { ESPACO_DA_IA, MENU_DO_GERENTE, funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
   Bell,
   BookOpen,
@@ -44,6 +45,7 @@ import {
 } from "@/lib/ui/icons";
 
 import {
+  GRUPO_NO_RODAPE,
   NAV_CATALOG,
   NAV_GROUPS,
   type NavMetadata,
@@ -124,7 +126,7 @@ export function sidebarGroups(
   const visible = new Set<string>(
     destinosDaInterface(settings, isPlatformAdmin, role, modulos, capacidades).map((d) => d.href),
   );
-  return NAV_GROUPS.map((group) => ({
+  const grupos = NAV_GROUPS.map((group) => ({
     group,
     items: NAV_DESTINATIONS.filter(
       (d) =>
@@ -132,7 +134,9 @@ export function sidebarGroups(
         (d.sidebar || (!group.hub && !!settings?.destinos)) &&
         // ia.vek v1.6: "Meu dia" e "Espaço da IA" entram na barra só para quem
         // tem função; sem função, a barra é a de sempre (e a busca os acha).
-        (!d.soComFuncao || Boolean(settings?.funcao)) &&
+        // v1.7.5: o Espaço da IA é a exceção — o admin sem função o vê na barra
+        // (quem pode vê-lo já foi decidido em `destinosDaInterface`).
+        (!d.soComFuncao || Boolean(settings?.funcao) || d.href === ESPACO_DA_IA) &&
         visible.has(d.href),
     ),
   })).filter(
@@ -140,6 +144,20 @@ export function sidebarGroups(
       g.items.length > 0 ||
       (g.group.hub && NAV_DESTINATIONS.some((d) => d.group === g.group.id && visible.has(d.href))),
   );
+  // "apoio" é apelido de gerente (v1.7.5): mesmo desenho.
+  if (funcaoDaTela(settings?.funcao) !== "gerente") return grupos;
+
+  // ia.vek v1.7.5: o gerente tem um desenho próprio — dois grupos com nome e
+  // rótulos dele, sem hubs. O rodapé (Configurações: perfil e segurança) fica.
+  const porHref = new Map(NAV_DESTINATIONS.map((d) => [d.href, d]));
+  const doGerente = MENU_DO_GERENTE.map((g) => ({
+    group: { id: g.id, label: g.label } as NavGroup,
+    items: g.itens.flatMap((i) => {
+      const d = porHref.get(i.href);
+      return d && visible.has(i.href) ? [{ ...d, label: i.label }] : [];
+    }),
+  })).filter((g) => g.items.length > 0);
+  return [...doGerente, ...grupos.filter((g) => g.group.id === GRUPO_NO_RODAPE)];
 }
 
 /**

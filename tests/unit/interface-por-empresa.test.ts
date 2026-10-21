@@ -136,8 +136,14 @@ describe("a organização não consegue se trancar do lado de fora", () => {
     const hostis: unknown[] = [
       { preset: "simplificada" },
       { preset: "completa", destinos: ["/app/inbox"] },
-      combinarInterfaces({ preset: "completa", destinos: ["/app/inbox"] }, { preset: "completa", destinos: ["/app/kanban"] }),
-      combinarInterfaces({ preset: "simplificada" }, { preset: "completa", destinos: ["/app/tasks"] }),
+      combinarInterfaces(
+        { preset: "completa", destinos: ["/app/inbox"] },
+        { preset: "completa", destinos: ["/app/kanban"] },
+      ),
+      combinarInterfaces(
+        { preset: "simplificada" },
+        { preset: "completa", destinos: ["/app/tasks"] },
+      ),
     ];
     for (const escolha of hostis) {
       expect(
@@ -158,7 +164,9 @@ describe("a organização não consegue se trancar do lado de fora", () => {
       // sobre uma porta que não existe mais.
       const d = NAV_CATALOG.find((item) => item.href === porta);
       expect(d, `${porta} está em PORTAS_ESSENCIAIS e não existe no catálogo`).toBeDefined();
-      expect(essencial(d!, "admin"), `${porta} está na lista e não é tratada como essencial`).toBe(true);
+      expect(essencial(d!, "admin"), `${porta} está na lista e não é tratada como essencial`).toBe(
+        true,
+      );
     }
   });
 
@@ -174,7 +182,9 @@ describe("a organização não consegue se trancar do lado de fora", () => {
 
   it("controle: uma porta comum continua ocultável — senão a garantia seria vacuidade", () => {
     // Se TUDO fosse essencial, os casos acima passariam sem medir nada.
-    expect(hrefs({ preset: "completa", destinos: ["/app/inbox"] }, "admin")).not.toContain("/app/kanban");
+    expect(hrefs({ preset: "completa", destinos: ["/app/inbox"] }, "admin")).not.toContain(
+      "/app/kanban",
+    );
   });
 });
 
@@ -184,10 +194,20 @@ describe("medição da folga (pergunta de aceite da issue #1341)", () => {
    * vínculo. É o número que o issue publica (15 itens: atendimento 4, CRM 3,
    * IA 3, canais 2, análise 3), medido aqui pelo módulo que alimenta o menu.
    */
-  it("hoje: 15 itens no menu lateral, folga 0 (é o teto da dobra a 1280x900)", () => {
-    expect(itensNoMenuLateral(INTERFACE_COMPLETA)).toBe(15);
+  /**
+   * ia.vek v1.7.5 (decisão do Rodrigo, "só admin tem a visão + SDR de suporte"):
+   * o admin sem função ganha o Espaço da IA na barra — 16 itens, UM acima do
+   * teto da dobra a 1280x900. Aceito de olho aberto: só o admin vê os 16 (quem
+   * tem função tem menu curto), o rodapé (Configurações) é fixo e não cai, e o
+   * 16º item fica a uma rolagem curta. O teste fixa o número para que um 17º não
+   * entre sem a mesma conversa.
+   */
+  it("hoje: 16 itens no menu lateral do admin (15 do produto + Espaço da IA do ia.vek)", () => {
+    expect(itensNoMenuLateral(INTERFACE_COMPLETA)).toBe(16);
     // `undefined` é o caminho de quem não tem escolha nenhuma gravada
-    expect(itensNoMenuLateral(undefined)).toBe(15);
+    expect(itensNoMenuLateral(undefined)).toBe(16);
+    // sem o ia.vek, o produto segue no teto de 15
+    expect(itensNoMenuLateral(undefined, "agent")).toBeLessThanOrEqual(15);
   });
 
   /**
@@ -195,8 +215,8 @@ describe("medição da folga (pergunta de aceite da issue #1341)", () => {
    * A escolha da empresa é interseção, então o menu só ENCOLHE — a mudança não
    * tem como empurrar o instrumento de tela para o vermelho.
    */
-  it("configuração COMPLETA (ninguém escolheu): 15 itens, folga 0 — igual a hoje", () => {
-    expect(itensNoMenuLateral(combinarInterfaces(completa, completa))).toBe(15);
+  it("configuração COMPLETA (ninguém escolheu): 16 itens no admin — igual a hoje", () => {
+    expect(itensNoMenuLateral(combinarInterfaces(completa, completa))).toBe(16);
   });
 
   it("configuração SIMPLIFICADA (empresa escolhe o preset): 6 itens, folga 9", () => {
@@ -222,7 +242,9 @@ describe("medição da folga (pergunta de aceite da issue #1341)", () => {
     ];
     for (const daEmpresa of casos) {
       for (const doVinculo of [completa, simplificada, undefined]) {
-        expect(itensNoMenuLateral(combinarInterfaces(daEmpresa, doVinculo))).toBeLessThanOrEqual(15);
+        expect(itensNoMenuLateral(combinarInterfaces(daEmpresa, doVinculo))).toBeLessThanOrEqual(
+          15,
+        );
       }
     }
   });

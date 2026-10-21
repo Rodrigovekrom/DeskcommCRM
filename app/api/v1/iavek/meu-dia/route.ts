@@ -18,8 +18,14 @@ import { audit } from "@/lib/audit";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { requireRole } from "@/lib/auth/require-role";
 import { cronometroDoLead, entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
-import { FUNCOES } from "@/lib/iavek/funcoes";
-import { atrasosPorPessoa, limitesDoDia, perdasPorMotivo, porPrazo } from "@/lib/iavek/meu-dia";
+import { FUNCOES, funcaoDaTela } from "@/lib/iavek/funcoes";
+import {
+  atrasosPorPessoa,
+  limitesDoDia,
+  perdasPorMotivo,
+  porPrazo,
+  tarefasPorPessoa,
+} from "@/lib/iavek/meu-dia";
 import { SOURCE_KIND_PROXIMO_PASSO } from "@/lib/iavek/proximo-passo";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -76,7 +82,8 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (!authz.ok) return authz.response;
   const parsed = querySchema.safeParse(Object.fromEntries(new URL(req.url).searchParams));
   if (!parsed.success) return fail("validation_failed", "Função inválida.", 422, { requestId });
-  const { funcao } = parsed.data;
+  // v1.7.5: "apoio" é apelido de gerente — o dia é o do gerente.
+  const funcao = funcaoDaTela(parsed.data.funcao) ?? parsed.data.funcao;
 
   const orgId = authz.org.orgId;
   const eu = authz.user.id;
@@ -148,8 +155,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     // "Meus leads" = os que eu sou dono OU guardião (SDR que passou adiante).
     // O SDR ganha, além disso, a fila dos leads novos das 72h e a meta do dia.
     // v1.7.1: o SDR de suporte tem o dia do SDR (com a fila das 72h); o
-    // Gerente de apoio, o do vendedor (os leads dele, a agenda, as propostas).
-    if (funcao === "sdr" || funcao === "suporte" || funcao === "vendedor" || funcao === "apoio") {
+    // Gerente de apoio, o do vendedor — até a v1.7.5, quando virou o gerente.
+    if (funcao === "sdr" || funcao === "suporte" || funcao === "vendedor") {
       const ehSdr = funcao === "sdr" || funcao === "suporte";
       const [agenda, meus, ligacoes, passos, propostas, novos, agendadosHoje] = await Promise.all([
         supabase
@@ -290,55 +297,82 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     // ── gerente ──────────────────────────────────────────────────────────────
     const desde30 = new Date(agora.getTime() - 30 * DIA).toISOString();
-    const [novosHoje, comPrazo, atrasadas, agendou, veio, comprou, perdidos, abertas] =
-      await Promise.all([
-        supabase
-          .from("crm_leads")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .gte("created_at", inicio.toISOString())
-          .lt("created_at", fim.toISOString()),
-        leadsComPrazo(500),
-        supabase
-          .from("crm_tasks")
-          .select("assigned_to, source_kind")
-          .eq("organization_id", orgId)
-          .in("status", ["pending", "in_progress"])
-          .lt("due_date", agora.toISOString())
-          .limit(1000),
-        supabase
-          .from("calendar_appointments")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .neq("status", "cancelled")
-          .gte("created_at", desde30),
-        supabase
-          .from("calendar_appointments")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .eq("status", "completed")
-          .gte("starts_at", desde30),
-        supabase
-          .from("crm_leads")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .eq("status", "won")
-          .gte("closed_at", desde30),
-        supabase
-          .from("crm_leads")
-          .select("lost_reason")
-          .eq("organization_id", orgId)
-          .eq("status", "lost")
-          .gte("closed_at", desde30)
-          .limit(1000),
-        supabase
-          .from("conversations")
-          .select("assigned_to_user_id")
-          .eq("organization_id", orgId)
-          .eq("status", "open")
-          .eq("is_group", false)
-          .limit(2000),
-      ]);
+    const desde7 = new Date(agora.getTime() - 7 * DIA).toISOString();
+    const [
+      novosHoje,
+      comPrazo,
+      atrasadas,
+      agendou,
+      veio,
+      comprou,
+      perdidos,
+      abertas,
+      tarefasAbertas,
+      tarefasFeitas,
+    ] = await Promise.all([
+      supabase
+        .from("crm_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .gte("created_at", inicio.toISOString())
+        .lt("created_at", fim.toISOString()),
+      leadsComPrazo(500),
+      supabase
+        .from("crm_tasks")
+        .select("assigned_to, source_kind")
+        .eq("organization_id", orgId)
+        .in("status", ["pending", "in_progress"])
+        .lt("due_date", agora.toISOString())
+        .limit(1000),
+      supabase
+        .from("calendar_appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .neq("status", "cancelled")
+        .gte("created_at", desde30),
+      supabase
+        .from("calendar_appointments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("status", "completed")
+        .gte("starts_at", desde30),
+      supabase
+        .from("crm_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("status", "won")
+        .gte("closed_at", desde30),
+      supabase
+        .from("crm_leads")
+        .select("lost_reason")
+        .eq("organization_id", orgId)
+        .eq("status", "lost")
+        .gte("closed_at", desde30)
+        .limit(1000),
+      supabase
+        .from("conversations")
+        .select("assigned_to_user_id")
+        .eq("organization_id", orgId)
+        .eq("status", "open")
+        .eq("is_group", false)
+        .limit(2000),
+      // v1.7.5: as tarefas da equipe — todas as abertas e as feitas em 7 dias.
+      supabase
+        .from("crm_tasks")
+        .select(TAREFA)
+        .eq("organization_id", orgId)
+        .in("status", ["pending", "in_progress"])
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(1000),
+      supabase
+        .from("crm_tasks")
+        .select(TAREFA)
+        .eq("organization_id", orgId)
+        .eq("status", "done")
+        .gte("updated_at", desde7)
+        .order("updated_at", { ascending: false })
+        .limit(300),
+    ]);
     const falha =
       novosHoje.error ??
       atrasadas.error ??
@@ -346,19 +380,37 @@ export async function GET(req: NextRequest): Promise<Response> {
       veio.error ??
       comprou.error ??
       perdidos.error ??
-      abertas.error;
+      abertas.error ??
+      tarefasAbertas.error ??
+      tarefasFeitas.error;
     if (falha) throw new Error(falha.message);
 
     const estourando = porPrazo(comPrazo).filter(
       (l) => new Date(l.fim_em).getTime() - agora.getTime() < DIA,
     );
-    const conversas = await conversasDos(
-      supabase,
-      orgId,
-      estourando.map((l) => l.contact_id),
-    );
+    type LinhaDaTarefa = LinhaComContato & {
+      id: string;
+      title: string;
+      due_date: string | null;
+      status: string;
+      source_kind: string | null;
+      contact_id: string | null;
+      assigned_to: string | null;
+    };
+    const tarefasDaEquipe = (
+      [...(tarefasAbertas.data ?? []), ...(tarefasFeitas.data ?? [])] as unknown as LinhaDaTarefa[]
+    ).map(semEmbed);
+    const conversas = await conversasDos(supabase, orgId, [
+      ...estourando.map((l) => l.contact_id),
+      ...tarefasDaEquipe.map((t) => t.contact_id),
+    ]);
     const porPessoa = atrasosPorPessoa(atrasadas.data ?? []);
-    const nomes = await nomesDosAtendentes(porPessoa.map((p) => p.user_id));
+    const resumoDasTarefas = tarefasPorPessoa(tarefasDaEquipe, agora);
+    const nomes = await nomesDosAtendentes([
+      ...porPessoa.map((p) => p.user_id),
+      ...resumoDasTarefas.map((p) => p.user_id),
+    ]);
+    const nomeDe = (u: string | null) => (u ? (nomes.get(u) ?? null) : null);
     const comPessoa = (abertas.data ?? []).filter((c) => c.assigned_to_user_id).length;
 
     return ok(
@@ -385,6 +437,21 @@ export async function GET(req: NextRequest): Promise<Response> {
           },
           perdas_30d: perdasPorMotivo(perdidos.data ?? []),
           meta_agendamentos_dia: metaDoDia,
+          tarefas_da_equipe: {
+            por_pessoa: resumoDasTarefas.map((p) => ({ ...p, nome: nomeDe(p.user_id) })),
+            itens: tarefasDaEquipe.map((t) => ({
+              id: t.id,
+              title: t.title,
+              due_date: t.due_date,
+              status: t.status,
+              source_kind: t.source_kind,
+              contact_id: t.contact_id,
+              contato_nome: t.contato_nome,
+              conversation_id: t.contact_id ? (conversas.get(t.contact_id) ?? null) : null,
+              assigned_to: t.assigned_to,
+              responsavel_nome: nomeDe(t.assigned_to),
+            })),
+          },
         },
       },
       { requestId },

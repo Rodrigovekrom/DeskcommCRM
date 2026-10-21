@@ -4,7 +4,7 @@ import { ROLE_RANK, type Role } from "@/lib/auth/types";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
 import { NAV_CATALOG, type NavMetadata, type NavDestinationId } from "./catalogo";
-import { FUNCOES, funcaoMostra } from "@/lib/iavek/funcoes";
+import { ESPACO_DA_IA, FUNCOES, funcaoMostra, veEspacoDaIa } from "@/lib/iavek/funcoes";
 
 const ids = NAV_CATALOG.map((d) => d.href);
 export const interfaceSettingsSchema = z
@@ -125,7 +125,9 @@ export function destinosDaInterface(
     (d) =>
       essencial(d, role, platform) ||
       ((!chosen || chosen.includes(d.href as NavDestinationId)) &&
-        funcaoMostra(settings.funcao, d.href)),
+        funcaoMostra(settings.funcao, d.href) &&
+        // ia.vek v1.7.5: o Espaço da IA é só do admin e da função suporte.
+        (d.href !== ESPACO_DA_IA || veEspacoDaIa(settings.funcao, role, platform))),
   );
 }
 export function interfaceTemDestino(

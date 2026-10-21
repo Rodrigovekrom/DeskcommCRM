@@ -2,7 +2,7 @@
 import { useT } from "@/hooks/i18n/useT";
 import { useId } from "react";
 import type { Role } from "@/lib/auth/types";
-import { FUNCOES, ROTULO_DA_FUNCAO, ehFuncao } from "@/lib/iavek/funcoes";
+import { FUNCOES_DE_ESCOLHA, ROTULO_DA_FUNCAO, ehFuncao, funcaoDaTela } from "@/lib/iavek/funcoes";
 import { NAV_GROUPS, type NavDestinationId } from "@/lib/navigation/catalogo";
 import {
   destinosDaInterface,
@@ -51,7 +51,8 @@ export function InterfaceEditor({
           <select
             id={`${id}-funcao`}
             data-testid="funcao-na-loja"
-            value={value.funcao ?? ""}
+            // v1.7.5: um vínculo antigo com "apoio" aparece (e é salvo) como Gerente.
+            value={funcaoDaTela(value.funcao) ?? ""}
             onChange={(e) => {
               const { funcao: _antiga, ...resto } = value;
               onChange(ehFuncao(e.target.value) ? { ...resto, funcao: e.target.value } : resto);
@@ -59,7 +60,7 @@ export function InterfaceEditor({
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
           >
             <option value="">{t("Nenhuma (interface de sempre)")}</option>
-            {FUNCOES.map((f) => (
+            {FUNCOES_DE_ESCOLHA.map((f) => (
               <option key={f} value={f}>
                 {t(ROTULO_DA_FUNCAO[f])}
               </option>

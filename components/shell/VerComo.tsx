@@ -1,7 +1,7 @@
 "use client";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
-import { FUNCOES, ROTULO_DA_FUNCAO, ehFuncao } from "@/lib/iavek/funcoes";
+import { FUNCOES_DE_ESCOLHA, ROTULO_DA_FUNCAO, funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
@@ -27,9 +27,9 @@ export function VerComoNoMenu() {
       </DropdownMenuLabel>
       <DropdownMenuRadioGroup
         value={verComo ?? "minha"}
-        onValueChange={(v) => definirVerComo(ehFuncao(v) ? v : null)}
+        onValueChange={(v) => definirVerComo(funcaoDaTela(v))}
       >
-        {FUNCOES.map((f) => (
+        {FUNCOES_DE_ESCOLHA.map((f) => (
           <DropdownMenuRadioItem key={f} value={f} data-testid={`ver-como-${f}`}>
             {t(ROTULO_DA_FUNCAO[f])}
           </DropdownMenuRadioItem>

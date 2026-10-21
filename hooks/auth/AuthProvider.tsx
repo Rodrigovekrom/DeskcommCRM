@@ -13,7 +13,7 @@ import { definirOrgDaAba } from "@/lib/auth/org-da-aba";
 import { createClient, resetRealtimeAuthentication } from "@/lib/supabase/browser";
 import type { AuthUser, ActiveOrg, Role } from "@/lib/auth/types";
 import { ROLE_RANK } from "@/lib/auth/types";
-import { ehFuncao, type Funcao } from "@/lib/iavek/funcoes";
+import { funcaoDaTela, type Funcao } from "@/lib/iavek/funcoes";
 
 interface AuthCtx {
   user: AuthUser;
@@ -54,7 +54,8 @@ export function AuthProvider({
     if (!podeVerComo) return setVerComo(null);
     try {
       const salvo = window.localStorage.getItem(chaveVerComo);
-      setVerComo(ehFuncao(salvo) ? salvo : null);
+      // Um "apoio" lembrado de antes da v1.7.5 vira "gerente".
+      setVerComo(funcaoDaTela(salvo));
     } catch {
       setVerComo(null);
     }
@@ -71,9 +72,8 @@ export function AuthProvider({
     },
     [chaveVerComo],
   );
-  const funcaoReal = ehFuncao(activeOrg?.interface_settings?.funcao)
-    ? activeOrg!.interface_settings!.funcao!
-    : null;
+  // "apoio" gravado é o gerente (v1.7.5).
+  const funcaoReal = funcaoDaTela(activeOrg?.interface_settings?.funcao);
   // A interface VISTA: com "Ver como", a da função escolhida, inteira (sem as
   // áreas personalizadas de quem administra), para mostrar o que ela vê.
   const orgVista = useMemo<ActiveOrg | null>(

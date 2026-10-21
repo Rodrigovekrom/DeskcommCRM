@@ -82,3 +82,36 @@ export function perdasPorMotivo(
     .map(([motivo, total]) => ({ motivo, total }))
     .sort((a, b) => b.total - a.total);
 }
+
+/**
+ * ia.vek v1.7.5: as tarefas da equipe no Meu dia do gerente — quem tem o quê.
+ * `concluidas` são as feitas na janela que a rota pediu (as `done` cujo
+ * `updated_at` caiu nela); `atrasadas` são as abertas com prazo vencido.
+ */
+export interface TarefaDaEquipe {
+  assigned_to: string | null;
+  status: string;
+  due_date: string | null;
+}
+export interface TarefasPorPessoa {
+  user_id: string | null;
+  abertas: number;
+  atrasadas: number;
+  concluidas: number;
+}
+export function tarefasPorPessoa(tarefas: TarefaDaEquipe[], agora: Date): TarefasPorPessoa[] {
+  const mapa = new Map<string | null, TarefasPorPessoa>();
+  for (const t of tarefas) {
+    const chave = t.assigned_to ?? null;
+    const linha = mapa.get(chave) ?? { user_id: chave, abertas: 0, atrasadas: 0, concluidas: 0 };
+    if (t.status === "done") linha.concluidas += 1;
+    else if (t.status === "pending" || t.status === "in_progress") {
+      linha.abertas += 1;
+      if (t.due_date && new Date(t.due_date).getTime() < agora.getTime()) linha.atrasadas += 1;
+    }
+    mapa.set(chave, linha);
+  }
+  return [...mapa.values()].sort(
+    (a, b) => b.atrasadas - a.atrasadas || b.abertas - a.abertas || b.concluidas - a.concluidas,
+  );
+}

@@ -4,7 +4,7 @@
  * com estado vazio amigável.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -32,7 +32,13 @@ vi.mock("@/lib/api/client", () => ({
   },
 }));
 
-import { atrasosPorPessoa, limitesDoDia, perdasPorMotivo, porPrazo } from "@/lib/iavek/meu-dia";
+import {
+  atrasosPorPessoa,
+  limitesDoDia,
+  perdasPorMotivo,
+  porPrazo,
+  tarefasPorPessoa,
+} from "@/lib/iavek/meu-dia";
 import { homeDaInterface } from "@/lib/navigation/interface";
 import { MeuDia, funcaoDoDia } from "@/components/iavek/MeuDia";
 
@@ -206,4 +212,112 @@ describe("painéis do Meu dia", () => {
     expect(screen.getByTestId("funil-30d").textContent).toContain("10");
     expect(screen.getByText("Preço")).toBeTruthy();
   });
+
+  it("v1.7.5: o 'apoio' gravado abre o dia do GERENTE", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "apoio" };
+    mocks.org.role = "manager";
+    expect(funcaoDoDia("apoio", "manager")).toBe("gerente");
+    mocks.resposta = { funcao: "gerente", gerente: GERENTE_VAZIO };
+    montar();
+    await screen.findByTestId("gerente-novos-hoje");
+    expect(mocks.get).toHaveBeenCalledWith("/api/v1/iavek/meu-dia?funcao=gerente");
+    expect(screen.getByTestId("meu-dia").getAttribute("data-funcao")).toBe("gerente");
+  });
+
+  it("v1.7.5: Tarefas da equipe — quem tem o quê, atrasadas, concluídas e filtro por vendedor", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    const ontem = new Date(Date.now() - 86_400_000).toISOString();
+    const amanha = new Date(Date.now() + 86_400_000).toISOString();
+    mocks.resposta = {
+      funcao: "gerente",
+      gerente: {
+        ...GERENTE_VAZIO,
+        tarefas_da_equipe: {
+          por_pessoa: [
+            { user_id: "u1", nome: "Bruno", abertas: 2, atrasadas: 1, concluidas: 0 },
+            { user_id: "u2", nome: "Carla", abertas: 0, atrasadas: 0, concluidas: 1 },
+          ],
+          itens: [
+            tarefa("t1", "Ligar para o Zé", "pending", ontem, "u1", "Bruno"),
+            tarefa("t2", "Mandar proposta", "pending", amanha, "u1", "Bruno"),
+            tarefa("t3", "Confirmar visita", "done", ontem, "u2", "Carla"),
+          ],
+        },
+      },
+    };
+    montar();
+    const lista = await screen.findByTestId("lista-tarefas-equipe");
+    // Abertas (padrão): as duas do Bruno; a concluída da Carla não.
+    expect(lista.textContent).toContain("Ligar para o Zé");
+    expect(lista.textContent).toContain("Mandar proposta");
+    expect(lista.textContent).not.toContain("Confirmar visita");
+    expect(screen.getByTestId("tabela-tarefas-equipe").textContent).toContain("Carla");
+
+    fireEvent.click(screen.getByTestId("tarefas-equipe-atrasadas"));
+    expect(screen.getByTestId("lista-tarefas-equipe").textContent).toContain("Ligar para o Zé");
+    expect(screen.getByTestId("lista-tarefas-equipe").textContent).not.toContain("Mandar proposta");
+
+    fireEvent.click(screen.getByTestId("tarefas-equipe-concluidas"));
+    expect(screen.getByTestId("lista-tarefas-equipe").textContent).toContain("Confirmar visita");
+
+    // Filtro por vendedor: Bruno não tem concluída.
+    fireEvent.change(screen.getByTestId("tarefas-equipe-vendedor"), { target: { value: "u1" } });
+    expect(screen.getByTestId("lista-tarefas-equipe").textContent).toContain(
+      "Nenhuma tarefa concluída nos últimos 7 dias.",
+    );
+  });
 });
+
+describe("tarefas por pessoa (v1.7.5)", () => {
+  it("conta abertas, atrasadas e concluídas, quem tem mais atraso primeiro", () => {
+    const agora = new Date("2026-10-21T12:00:00Z");
+    expect(
+      tarefasPorPessoa(
+        [
+          { assigned_to: "a", status: "pending", due_date: "2026-10-22T00:00:00Z" },
+          { assigned_to: "b", status: "in_progress", due_date: "2026-10-20T00:00:00Z" },
+          { assigned_to: "b", status: "pending", due_date: null },
+          { assigned_to: "a", status: "done", due_date: "2026-10-19T00:00:00Z" },
+          { assigned_to: null, status: "cancelled", due_date: null },
+        ],
+        agora,
+      ),
+    ).toEqual([
+      { user_id: "b", abertas: 2, atrasadas: 1, concluidas: 0 },
+      { user_id: "a", abertas: 1, atrasadas: 0, concluidas: 1 },
+      { user_id: null, abertas: 0, atrasadas: 0, concluidas: 0 },
+    ]);
+  });
+});
+
+const GERENTE_VAZIO = {
+  leads_novos_hoje: 0,
+  estourando: [],
+  atrasos_por_pessoa: [],
+  funil_30d: { agendou: 0, veio: 0, comprou: 0 },
+  conversas_abertas: { com_pessoa: 0, com_ia_ou_sem_dono: 0 },
+  perdas_30d: [],
+  meta_agendamentos_dia: null,
+};
+
+function tarefa(
+  id: string,
+  title: string,
+  status: string,
+  due_date: string,
+  assigned_to: string,
+  responsavel_nome: string,
+) {
+  return {
+    id,
+    title,
+    status,
+    due_date,
+    source_kind: null,
+    contact_id: null,
+    contato_nome: null,
+    conversation_id: null,
+    assigned_to,
+    responsavel_nome,
+  };
+}

@@ -22,6 +22,9 @@ function formatError(err: unknown, t: (texto: string) => string): string {
 }
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { FilterBar } from "@/components/kanban/FilterBar";
+import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
+import { useActiveOrg } from "@/hooks/auth/AuthProvider";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import { BulkActionBar } from "@/components/kanban/BulkActionBar";
 import { NewLeadDialog } from "@/components/kanban/NewLeadDialog";
 import { Button } from "@/components/ui/button";
@@ -53,6 +56,9 @@ export function PipelinePageClient({
     },
     [router, pathname],
   );
+  // ia.vek v1.7.5: o gerente (e o "apoio", apelido dele) tem o seletor de
+  // vendedor no topo. A função é a VISTA (inclui o "Ver como").
+  const ehGerente = funcaoDaTela(useActiveOrg()?.interface_settings?.funcao) === "gerente";
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [newOpen, setNewOpen] = useState(false);
 
@@ -146,6 +152,7 @@ export function PipelinePageClient({
           leads={data.leads}
         />
       )}
+      {ehGerente && <SeletorDeVendedor filters={filters} onChange={setFilters} />}
       <FilterBar
         filters={filters}
         onChange={setFilters}
