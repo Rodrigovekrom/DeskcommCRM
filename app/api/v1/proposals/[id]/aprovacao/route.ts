@@ -32,6 +32,7 @@ import {
 } from "@/lib/iavek/proposta-do-vendedor";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { montarDocumentoDaProposta } from "@/lib/propostas/documento/documento-da-proposta";
 import { sePropostasDesligadas } from "@/lib/propostas/porta";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
 
   const { data: proposta } = await admin
     .from("crm_proposals")
-    .select("id, lead_id, status, template_slug, aprovacao_pedida_por")
+    .select("*")
     .eq("organization_id", orgId)
     .eq("id", id)
     .maybeSingle();
@@ -107,6 +108,32 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       .eq("proposal_id", id);
     if (!count)
       return fail("validation_failed", t("A proposta não tem itens."), 422, { requestId });
+    // As mesmas travas do envio: o gerente não recebe para aprovar algo que o
+    // "Aprovar e enviar" recusaria (preço a definir, campo do documento vazio).
+    if (proposta.pricing_status === "missing") {
+      return fail("validation_failed", t("Defina o preço de todos os itens antes de pedir aprovação."), 422, {
+        requestId,
+      });
+    }
+    const { data: contatoParaDoc } = proposta.contact_id
+      ? await admin
+          .from("contacts")
+          .select("name, display_name")
+          .eq("organization_id", orgId)
+          .eq("id", proposta.contact_id)
+          .maybeSingle()
+      : { data: null };
+    const documento = await montarDocumentoDaProposta(admin, orgId, proposta as never, contatoParaDoc ?? null);
+    if (documento && documento.camposFaltando.length > 0) {
+      return fail(
+        "validation_failed",
+        t("Faltam {n} campo(s) do documento antes de pedir aprovação: {lista}. Preencha a proposta.")
+          .replace("{n}", String(documento.camposFaltando.length))
+          .replace("{lista}", documento.camposFaltando.map((c) => t(c.rotulo)).join(", ")),
+        422,
+        { requestId },
+      );
+    }
 
     const { data: atualizada } = await admin
       .from("crm_proposals")

@@ -7506,6 +7506,9 @@ export const DICIONARIO: Traducoes = {
   "sem meta": { es: "sin meta" },
   "Atendimentos no mesmo horário (vazio = sem limite)": { es: "Atenciones en el mismo horario (vacío = sin límite)" },
   "Horário e capacidade de atendimento são definidos pelo administrador.": { es: "El horario y la capacidad de atención los define el administrador." },
+  "Defina o preço de todos os itens antes de pedir aprovação.": { es: "Define el precio de todos los ítems antes de pedir aprobación." },
+  "Faltam {n} campo(s) do documento antes de pedir aprovação: {lista}. Preencha a proposta.": { es: "Faltan {n} campo(s) del documento antes de pedir aprobación: {lista}. Completa la propuesta." },
+  "Não foi possível enviar. Veja o motivo no aviso.": { es: "No fue posible enviar. Mira el motivo en el aviso." },
   // ia.vek v1.7.6 — aprovação de proposta e pedido de agendamento
   "Agendamento confirmado.": { es: "Cita confirmada." },
   "Agendamento remarcado e confirmado.": { es: "Cita reprogramada y confirmada." },

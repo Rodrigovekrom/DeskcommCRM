@@ -393,7 +393,7 @@ export function ProposalEditorClient({
       ultimaGravacao.current = assinaturaDoRascunho(res.data);
       setProposta(res.data);
     } catch (e) {
-      setErro(t("Não foi possível enviar. Confira se você tem papel de gestor."));
+      setErro(t("Não foi possível enviar. Veja o motivo no aviso."));
       showApiError(e);
     } finally {
       setSalvando(false);
