@@ -162,6 +162,22 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     });
   }
   const inicio = corpo.starts_at ?? pedido.quando;
+  // O responsável: o que o admin escolheu; senão o dono do negócio do cliente
+  // (o vendedor dele); senão o padrão do tipo (resolvido pela agenda).
+  let responsavel = corpo.owner_user_id ?? null;
+  if (!responsavel) {
+    let consultaDoDono = admin
+      .from("crm_leads")
+      .select("owner_user_id")
+      .eq("organization_id", orgId)
+      .eq("contact_id", pedido.contact_id)
+      .not("owner_user_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (pedido.lead_id) consultaDoDono = consultaDoDono.eq("id", pedido.lead_id);
+    const { data: dono } = await consultaDoDono.maybeSingle();
+    responsavel = (dono?.owner_user_id as string | undefined) ?? null;
+  }
   const { data: reservado } = await marcar({
     status: "confirmado",
     decidido_por: authz.user.id,
@@ -179,7 +195,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
         starts_at: new Date(inicio).toISOString(),
         contact_id: pedido.contact_id,
         ...(pedido.conversation_id ? { conversation_id: pedido.conversation_id } : {}),
-        ...(corpo.owner_user_id ? { owner_user_id: corpo.owner_user_id } : {}),
+        ...(responsavel ? { owner_user_id: responsavel } : {}),
         ...(pedido.observacao ? { description: pedido.observacao } : {}),
       },
     );
