@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
-import { FUNCOES, ROTULO_DA_FUNCAO, type Funcao } from "@/lib/iavek/funcoes";
+import { FUNCOES_DE_ESCOLHA, ROTULO_DA_FUNCAO, type Funcao } from "@/lib/iavek/funcoes";
 
 export interface AssinaturaConfig {
   humanos: boolean;
@@ -106,7 +106,7 @@ export function AssinaturaForm({ initial }: { initial: AssinaturaConfig }) {
             )}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
-            {FUNCOES.map((f) => (
+            {FUNCOES_DE_ESCOLHA.map((f) => (
               <div key={f} className="space-y-1">
                 <Label htmlFor={`assinatura-rotulo-${f}`}>{t(ROTULO_DA_FUNCAO[f])}</Label>
                 <Input

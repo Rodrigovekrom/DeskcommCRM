@@ -36,7 +36,7 @@
  * chamador — `app/api/v1/messages/_handler.ts`.
  */
 import { z } from "zod";
-import { FUNCOES, type Funcao } from "@/lib/iavek/funcoes";
+import { FUNCOES, funcaoDaTela, type Funcao } from "@/lib/iavek/funcoes";
 
 export interface ConfigAssinatura {
   /** Assina as mensagens de atendentes humanos quando `true`. */
@@ -59,8 +59,16 @@ export const ROTULOS_FUNCAO_PADRAO: Record<Funcao, string> = {
   suporte: "Atendimento",
   vendedor: "Consultor de Vendas",
   apoio: "Gerente de Negócios",
-  gerente: "Gerente",
+  // ia.vek v1.7.6: um cargo só de gerente, e ele assina "Gerente de Negócios".
+  gerente: "Gerente de Negócios",
 };
+
+/**
+ * O padrão de gerente até a v1.7.5. A tela de Configurações grava os rótulos
+ * de todas as funções juntos, então uma organização que salvou a tela antes da
+ * v1.7.6 tem "Gerente" gravado sem ter escolhido: lido como "não configurado".
+ */
+const ROTULO_GERENTE_ANTIGO = "Gerente";
 
 /** Rótulo seguro: sem `*` nem quebra de linha (desmontariam a linha `*...*\n`). */
 const ROTULO = /^[^*\r\n]+$/;
@@ -72,8 +80,11 @@ function rotulosLidos(bruto: unknown): Record<Funcao, string> {
     const v = (bruto as Record<string, unknown>)[f];
     if (typeof v !== "string") continue;
     const limpo = v.trim();
+    if (f === "gerente" && limpo === ROTULO_GERENTE_ANTIGO) continue;
     if (limpo.length >= 1 && limpo.length <= 60 && ROTULO.test(limpo)) r[f] = limpo;
   }
+  // Apoio é apelido de gerente (v1.7.5): assina com o rótulo do gerente.
+  r.apoio = r.gerente;
   return r;
 }
 
@@ -141,7 +152,9 @@ export function linhaDeAssinatura(
   if (!config.humanos) return null;
   const nome = nomeHumano?.trim();
   if (!nome) return null;
-  const rotulo = funcaoHumano ? config.rotulosFuncao?.[funcaoHumano] : undefined;
+  // Apoio é apelido de gerente: os dois assinam com o rótulo do gerente.
+  const funcao = funcaoDaTela(funcaoHumano);
+  const rotulo = funcao ? config.rotulosFuncao?.[funcao] : undefined;
   return rotulo
     ? `*${capitalizarIniciais(nome)} | ${rotulo}*\n`
     : `*${capitalizarIniciais(nome)}*\n`;

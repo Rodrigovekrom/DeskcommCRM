@@ -30,7 +30,7 @@ describe("assinatura do humano com a função", () => {
     );
     expect(linhaDeAssinatura(c, "user", "ana", "sdr")).toBe("*Ana | Relacionamento*\n");
     expect(linhaDeAssinatura(c, "user", "ana", "suporte")).toBe("*Ana | Atendimento*\n");
-    expect(linhaDeAssinatura(c, "user", "rui", "gerente")).toBe("*Rui | Gerente*\n");
+    expect(linhaDeAssinatura(c, "user", "rui", "gerente")).toBe("*Rui | Gerente de Negócios*\n");
     expect(linhaDeAssinatura(c, "user", "rui", "apoio")).toBe("*Rui | Gerente de Negócios*\n");
     expect(ROTULOS_FUNCAO_PADRAO.vendedor).toBe("Consultor de Vendas");
   });
@@ -44,7 +44,7 @@ describe("assinatura do humano com a função", () => {
     const c = ligada({ vendedor: "Consultora", sdr: "Pré*venda", gerente: "Ger\nente" });
     expect(linhaDeAssinatura(c, "user", "bia", "vendedor")).toBe("*Bia | Consultora*\n");
     expect(linhaDeAssinatura(c, "user", "bia", "sdr")).toBe("*Bia | Relacionamento*\n");
-    expect(linhaDeAssinatura(c, "user", "bia", "gerente")).toBe("*Bia | Gerente*\n");
+    expect(linhaDeAssinatura(c, "user", "bia", "gerente")).toBe("*Bia | Gerente de Negócios*\n");
   });
 
   it("a IA continua com o nome configurado", () => {
@@ -71,5 +71,25 @@ describe("assinatura do humano com a função", () => {
     expect(
       assinaturaEntradaSchema.safeParse({ ...base, rotulos_funcao: { caixa: "X" } }).success,
     ).toBe(false);
+  });
+});
+
+describe('v1.7.6: todo gerente assina "Gerente de Negócios"', () => {
+  it("gerente e o antigo apoio assinam igual, no padrão", () => {
+    const c = ligada();
+    expect(linhaDeAssinatura(c, "user", "rui", "gerente")).toBe("*Rui | Gerente de Negócios*\n");
+    expect(linhaDeAssinatura(c, "user", "rui", "apoio")).toBe("*Rui | Gerente de Negócios*\n");
+  });
+
+  it('"Gerente" gravado pela tela antiga (era o padrão) não vale como escolha', () => {
+    const c = ligada({ gerente: "Gerente", apoio: "Gerente de Negócios" });
+    expect(linhaDeAssinatura(c, "user", "rui", "gerente")).toBe("*Rui | Gerente de Negócios*\n");
+    expect(linhaDeAssinatura(c, "user", "rui", "apoio")).toBe("*Rui | Gerente de Negócios*\n");
+  });
+
+  it("um rótulo escolhido para o gerente vale também para o antigo apoio", () => {
+    const c = ligada({ gerente: "Gerente Comercial", apoio: "Apoio" });
+    expect(linhaDeAssinatura(c, "user", "rui", "gerente")).toBe("*Rui | Gerente Comercial*\n");
+    expect(linhaDeAssinatura(c, "user", "rui", "apoio")).toBe("*Rui | Gerente Comercial*\n");
   });
 });
