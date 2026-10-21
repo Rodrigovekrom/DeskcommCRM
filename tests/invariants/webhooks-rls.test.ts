@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
+  GOV_ADMIN,
   GOV_AGENT_A,
   GOV_MANAGER,
   GOV_ORG,
@@ -18,7 +19,8 @@ import {
  *
  * Invariantes RLS:
  *  - select org-scoped (membro da org ou platform admin) nas 3 tabelas;
- *  - write manager+ em webhook_sources/automation_rules (agent bloqueado);
+ *  - write admin em webhook_sources/automation_rules (manager e agent
+ *    bloqueados — ia.vek v1.7.6, migration 0581; antes era manager+);
  *  - automation_rule_runs é select-only p/ authenticated — escrita só via
  *    service_role (bypassa RLS), nunca pelo usuário logado.
  */
@@ -30,6 +32,8 @@ const WH_SOURCE = "ffffffff-5555-4000-8000-000000000001";
 const WH_SOURCE_AGENT_PROBE = "ffffffff-5555-4000-8000-000000000002";
 const WH_RULE = "ffffffff-5555-4000-8000-000000000003";
 const WH_RUN = "ffffffff-5555-4000-8000-000000000004";
+const WH_SOURCE_MANAGER_PROBE = "ffffffff-5555-4000-8000-000000000005";
+const WH_RULE_MANAGER_PROBE = "ffffffff-5555-4000-8000-000000000006";
 
 beforeAll(() => {
   seedGov();
@@ -47,9 +51,10 @@ beforeAll(() => {
 });
 
 describe("webhook_sources + automation_rules + automation_rule_runs — RLS (migration 0038)", () => {
-  it("manager A cria webhook_source e automation_rule na org A", () => {
+  it("admin A cria webhook_source e automation_rule na org A", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): quem cria passou de manager para admin.
     const insertedSource = writeCountAs(
-      GOV_MANAGER,
+      GOV_ADMIN,
       `insert into public.webhook_sources
          (id, organization_id, name, path_token, default_pipeline_id, default_stage_id)
        values
@@ -58,7 +63,7 @@ describe("webhook_sources + automation_rules + automation_rule_runs — RLS (mig
     expect(insertedSource).toBe(1);
 
     const insertedRule = writeCountAs(
-      GOV_MANAGER,
+      GOV_ADMIN,
       `insert into public.automation_rules
          (id, organization_id, name, trigger_event)
        values
@@ -88,6 +93,35 @@ describe("webhook_sources + automation_rules + automation_rule_runs — RLS (mig
          ('${WH_SOURCE_AGENT_PROBE}', '${GOV_ORG}', 'Probe agent', 'wh-tok-${WH_SOURCE_AGENT_PROBE}', '${GOV_PIPELINE}', '${GOV_STAGE}')`,
     );
     expect(inserted).toBe(0);
+  });
+
+  it("manager A NÃO cria webhook_source nem automation_rule (write é admin)", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): webhook_sources_manager_write e
+    // automation_rules_manager_write passaram a exigir admin.
+    expect(
+      writeCountAs(
+        GOV_MANAGER,
+        `insert into public.webhook_sources
+           (id, organization_id, name, path_token, default_pipeline_id, default_stage_id)
+         values
+           ('${WH_SOURCE_MANAGER_PROBE}', '${GOV_ORG}', 'Probe manager', 'wh-tok-${WH_SOURCE_MANAGER_PROBE}', '${GOV_PIPELINE}', '${GOV_STAGE}')`,
+      ),
+    ).toBe(0);
+    expect(
+      writeCountAs(
+        GOV_MANAGER,
+        `insert into public.automation_rules
+           (id, organization_id, name, trigger_event)
+         values
+           ('${WH_RULE_MANAGER_PROBE}', '${GOV_ORG}', 'Probe manager', 'lead.created')`,
+      ),
+    ).toBe(0);
+    expect(
+      writeCountAs(
+        GOV_MANAGER,
+        `update public.automation_rules set name = name where id = '${WH_RULE}'`,
+      ),
+    ).toBe(0);
   });
 
   it("manager A lê as próprias linhas (1 cada)", () => {

@@ -57,6 +57,19 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
       return troca("O próximo passo de {lead} venceu: {task}");
     case "tarefa_vencida":
       return troca("Sua tarefa venceu: {task} ({lead})");
+    // ia.vek v1.7.6: aprovação de proposta e pedido de agendamento.
+    case "proposta_aguardando_aprovacao":
+      return troca("{who} pediu aprovação da proposta de {lead}");
+    case "proposta_aprovada":
+      return troca("{who} aprovou e enviou a proposta de {lead}");
+    case "proposta_devolvida":
+      return troca("{who} devolveu a proposta de {lead}: {reason}");
+    case "pedido_de_agendamento":
+      return troca("{who} pediu um agendamento para {lead}");
+    case "pedido_de_agendamento_confirmado":
+      return troca("{who} confirmou o agendamento de {lead}");
+    case "pedido_de_agendamento_recusado":
+      return troca("{who} recusou o pedido de agendamento de {lead}: {reason}");
     default:
       return quem;
   }
@@ -139,7 +152,16 @@ export function SinoPessoal() {
             data-testid="sino-pessoal-lista"
           >
             {lista.map((n) => {
-              const href = n.conversation_id ? `/app/inbox?id=${n.conversation_id}` : null;
+              // ia.vek v1.7.6: aviso de proposta abre a proposta; de pedido de
+              // agendamento abre o Meu dia (onde o admin confirma).
+              const href =
+                typeof n.dados.proposta_id === "string"
+                  ? `/app/proposals/${n.dados.proposta_id}`
+                  : typeof n.dados.pedido_id === "string"
+                    ? "/app/meu-dia"
+                    : n.conversation_id
+                      ? `/app/inbox?id=${n.conversation_id}`
+                      : null;
               const conteudo = (
                 <>
                   <span className={cn("block text-sm", !n.lida && "font-medium")}>

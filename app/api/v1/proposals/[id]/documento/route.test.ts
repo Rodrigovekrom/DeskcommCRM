@@ -35,6 +35,8 @@ interface MundoOpts {
   secoesEditadas?: Record<string, string> | null;
   briefingJson?: Record<string, unknown> | null;
   contato?: { name: string | null; display_name: string | null } | null;
+  /** ia.vek v1.7.6: dono do lead da proposta (o vendedor só mexe no lead dele). */
+  donoDoLead?: string | null;
 }
 
 function montarMundo(opts: MundoOpts = {}) {
@@ -44,7 +46,7 @@ function montarMundo(opts: MundoOpts = {}) {
     const minRank = ROLE_RANK[minRole] ?? 0;
     return rank < minRank
       ? { ok: false, response: new Response(JSON.stringify({ error: { code: "forbidden_role" } }), { status: 403 }) }
-      : { ok: true, user: { id: "u1", idioma: "pt-BR" }, org: { orgId: ORG_ID } };
+      : { ok: true, user: { id: "u1", idioma: "pt-BR" }, org: { orgId: ORG_ID, role: papel } };
   });
   mocks.requireSupportWrite.mockResolvedValue(null);
 
@@ -58,6 +60,7 @@ function montarMundo(opts: MundoOpts = {}) {
     secoes_editadas: opts.secoesEditadas ?? null,
     pricing_status: "manual",
     contact_id: "contato-1",
+    lead_id: "lead-1",
     titulo: "Site catálogo",
     prazo_dias_uteis: 20,
     pagamento: "50_50",
@@ -87,6 +90,18 @@ function montarMundo(opts: MundoOpts = {}) {
             if ("briefing_json" in payload) briefingCapturado = payload.briefing_json as Record<string, unknown>;
             return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) };
           },
+        };
+      }
+      // ia.vek v1.7.6: a régua "proposta do próprio lead" lê o dono do lead.
+      if (tabela === "crm_leads") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { owner_user_id: opts.donoDoLead ?? "outro-vendedor" } }),
+              }),
+            }),
+          }),
         };
       }
       if (tabela === "crm_proposal_items") {
@@ -174,11 +189,30 @@ describe("PATCH /api/v1/proposals/[id]/documento", () => {
     expect(capturedSecoesEditadas()).toMatchObject({ resumo: "Novo texto" });
   });
 
-  it("agent é barrado (403) — só manager+ edita seção (Global Constraint)", async () => {
-    montarMundo({ papel: "agent" });
+  // ia.vek v1.7.6: o vendedor (agent) prepara a proposta do PRÓPRIO lead; a de outro, 403.
+  it("agent que não é dono do lead é barrado (403 forbidden) e nada é gravado", async () => {
+    const mundo = montarMundo({ papel: "agent", donoDoLead: "outro-vendedor" });
     const req = new Request("http://x", { method: "PATCH", body: JSON.stringify({ secaoId: "resumo", texto: "x" }) });
     const res = await PATCH(req as never, { params: Promise.resolve({ id: PROPOSTA_ID }) });
     expect(res.status).toBe(403);
+    expect((await res.json()).error.code).toBe("forbidden");
+    expect(mundo.capturedSecoesEditadas()).toBeUndefined();
+  });
+
+  it("ia.vek v1.7.6: agent dono do lead grava a sobrescrita da seção", async () => {
+    const mundo = montarMundo({ papel: "agent", donoDoLead: "u1" });
+    const req = new Request("http://x", { method: "PATCH", body: JSON.stringify({ secaoId: "resumo", texto: "Meu texto" }) });
+    const res = await PATCH(req as never, { params: Promise.resolve({ id: PROPOSTA_ID }) });
+    expect(res.status).toBe(200);
+    expect(mundo.capturedSecoesEditadas()).toMatchObject({ resumo: "Meu texto" });
+  });
+
+  it("ia.vek v1.7.6: viewer segue barrado pelo papel (requireRole agent)", async () => {
+    montarMundo({ papel: "viewer" });
+    const req = new Request("http://x", { method: "PATCH", body: JSON.stringify({ secaoId: "resumo", texto: "x" }) });
+    const res = await PATCH(req as never, { params: Promise.resolve({ id: PROPOSTA_ID }) });
+    expect(res.status).toBe(403);
+    expect(mocks.requireRole).toHaveBeenCalledWith("agent", expect.anything());
   });
 
   it("secaoId vazio é recusado com 422 (Review Focus)", async () => {

@@ -17,6 +17,7 @@
  * `ctx.organizationId` e filtra `organization_id` em toda query. Está escrito lá
  * dentro, e é o que separa esta chamada de um vazamento entre organizações.
  */
+import { gravarPedidoDeAgendamento } from "@/lib/iavek/pedidos-de-agendamento";
 import { z } from "zod";
 
 import {
@@ -101,6 +102,17 @@ function espalhaPorDia(
  * exatamente isso sob outro nome ("HOF e Botox").
  */
 const tiposShape = {};
+
+/**
+ * ia.vek v1.7.6: a IA ainda NÃO agenda sozinha — ela registra pedido de
+ * agendamento, e o admin confirma. O caminho para a IA marcar direto no futuro
+ * está preparado: `IAVEK_IA_AGENDA_SOZINHA=1` no ambiente religa o motor de
+ * sempre (marcar, remarcar, cancelar). Desligado por padrão; é o que a suíte
+ * do motor liga para continuar medindo o produto.
+ */
+export function iaAgendaSozinha(): boolean {
+  return process.env.IAVEK_IA_AGENDA_SOZINHA === "1";
+}
 
 export const crmListEventTypes: McpToolDefinition<typeof tiposShape> = {
   name: "crm_list_event_types",
@@ -695,6 +707,37 @@ export const crmBookAppointment: McpToolDefinition<typeof marcarShape> = {
           mensagem: `não existe atendimento chamado "${input.event_type_slug}". Pergunte que tipo de atendimento a pessoa quer.`,
         };
       }
+      // ia.vek v1.7.6: a IA (e qualquer integração) NÃO marca direto — ela
+      // registra um PEDIDO, que o admin confirma. Não reserva horário.
+      if (!iaAgendaSozinha() && ctx.actor.type !== "user") {
+        const r = await gravarPedidoDeAgendamento(ctx.supabase, {
+          orgId: ctx.organizationId,
+          input: {
+            contact_id: input.contact_id,
+            quando: input.starts_at,
+            event_type_id: tipo.id,
+            ...(input.description || input.notes
+              ? { observacao: (input.description ?? input.notes ?? "").slice(0, 1000) }
+              : {}),
+          },
+          origem: "ia",
+          pedidoPor: null,
+          pedidoPorAgente: ctx.actor.type === "ai_agent" ? (ctx.actor.agent_id ?? null) : null,
+        });
+        if (!r.ok) {
+          return { marcado: false, motivo: "pedido_recusado", mensagem: `NADA foi registrado: ${r.motivo}` };
+        }
+        return {
+          marcado: false,
+          pedido_registrado: true,
+          aguarda_confirmacao: true,
+          pedido_id: r.pedido.id,
+          mensagem:
+            "O PEDIDO de agendamento foi registrado para a equipe confirmar. NADA está marcado ainda. " +
+            "Não diga que está confirmado, marcado ou garantido: diga que anotou o dia e a hora que a " +
+            "pessoa quer e que a equipe confirma em seguida.",
+        };
+      }
       if (input.guest_email !== undefined && !(await convidadoEhDaEquipe(ctx, input.guest_email))) {
         return {
           marcado: false,
@@ -1029,6 +1072,16 @@ export const crmRescheduleAppointment: McpToolDefinition<typeof remarcarShape> =
   requiresScope: "mcp:write",
   handler: async (input, ctx) =>
     semDerrubarOTurno("remarcado", async () => {
+      // ia.vek v1.7.6: só o admin mexe na agenda; a IA não remarcar compromisso.
+      if (!iaAgendaSozinha() && ctx.actor.type !== "user") {
+        return {
+          remarcado: false,
+          motivo: "so_a_equipe_mexe_na_agenda",
+          mensagem:
+            "NADA mudou: quem remarcar compromisso é a equipe. Diga à pessoa que você avisou a equipe " +
+            "e que ela retorna. Não diga que está feito.",
+        };
+      }
       const r = await alterarAgendamentoHandler(
         ctx.supabase,
         { organization_id: ctx.organizationId, actor: ctx.actor, requestId: ctx.requestId },
@@ -1068,6 +1121,16 @@ export const crmCancelAppointment: McpToolDefinition<typeof cancelarShape> = {
   requiresScope: "mcp:write",
   handler: async (input, ctx) =>
     semDerrubarOTurno("cancelado", async () => {
+      // ia.vek v1.7.6: só o admin mexe na agenda; a IA não cancelar compromisso.
+      if (!iaAgendaSozinha() && ctx.actor.type !== "user") {
+        return {
+          cancelado: false,
+          motivo: "so_a_equipe_mexe_na_agenda",
+          mensagem:
+            "NADA mudou: quem cancelar compromisso é a equipe. Diga à pessoa que você avisou a equipe " +
+            "e que ela retorna. Não diga que está feito.",
+        };
+      }
       const r = await cancelarAgendamentoHandler(
         ctx.supabase,
         { organization_id: ctx.organizationId, actor: ctx.actor, requestId: ctx.requestId },

@@ -294,18 +294,19 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/v1/ai/followup-flows — create draft", () => {
-  it("agent (< manager) → 403 forbidden_role, sem insert", async () => {
+  // ia.vek v1.7.6: configuração só do admin — manager também é recusado
+  it.each(["agent", "manager"] as const)("%s (< admin) → 403 forbidden_role, sem insert", async (papel) => {
     const db = makeDb([], []);
-    session("agent", db);
+    session(papel, db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/route");
     const res = await POST(req("POST", { name: "Recuperação carrinho" }));
     expect(res.status).toBe(403);
     expect(db.from("followup_flow_pointers")).toBeDefined();
   });
 
-  it("manager → 201, draft com status='draft' e draft_graph null", async () => {
+  it("admin → 201, draft com status='draft' e draft_graph null", async () => {
     const db = makeDb([], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/route");
     const res = await POST(req("POST", { name: "Recuperação carrinho" }));
     expect(res.status).toBe(201);
@@ -322,7 +323,7 @@ describe("POST /api/v1/ai/followup-flows — create draft", () => {
       [{ id: randomUUID(), organization_id: ORG_ID, name: "Recuperação carrinho" }],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/route");
     const res = await POST(req("POST", { name: "Recuperação carrinho" }));
     expect(res.status).toBe(409);
@@ -332,7 +333,7 @@ describe("POST /api/v1/ai/followup-flows — create draft", () => {
 
   it("body inválido (name vazio) → 422 validation_failed", async () => {
     const db = makeDb([], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/route");
     const res = await POST(req("POST", { name: "" }));
     expect(res.status).toBe(422);
@@ -410,9 +411,10 @@ describe("PATCH /api/v1/ai/followup-flows/:id", () => {
     };
   }
 
-  it("agent (< manager) → 403", async () => {
+  // ia.vek v1.7.6: configuração só do admin — manager também é recusado
+  it.each(["agent", "manager"] as const)("%s (< admin) → 403", async (papel) => {
     const db = makeDb([pointerRow()], []);
-    session("agent", db);
+    session(papel, db);
     const { PATCH } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await PATCH(req("PATCH", { name: "B" }), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(403);
@@ -420,7 +422,7 @@ describe("PATCH /api/v1/ai/followup-flows/:id", () => {
 
   it("draft_graph com shape inválido (nó desconhecido) → 422 validation_failed", async () => {
     const db = makeDb([pointerRow()], []);
-    session("manager", db);
+    session("admin", db);
     const { PATCH } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await PATCH(
       req("PATCH", { draft_graph: { nodes: [{ id: "x", type: "bogus" }], edges: [] } }),
@@ -431,7 +433,7 @@ describe("PATCH /api/v1/ai/followup-flows/:id", () => {
 
   it("draft_graph com shape válido + trigger_config + handoff_policy → 200, persiste tudo", async () => {
     const db = makeDb([pointerRow()], []);
-    session("manager", db);
+    session("admin", db);
     const { PATCH } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await PATCH(
       req("PATCH", {
@@ -452,7 +454,7 @@ describe("PATCH /api/v1/ai/followup-flows/:id", () => {
 
   it("pointer inexistente na org → 404", async () => {
     const db = makeDb([], []);
-    session("manager", db);
+    session("admin", db);
     const { PATCH } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await PATCH(req("PATCH", { name: "B" }), ctx("55555555-5555-4555-8555-555555555555"));
     expect(res.status).toBe(404);
@@ -460,7 +462,7 @@ describe("PATCH /api/v1/ai/followup-flows/:id", () => {
 
   it("body {} (nada a mudar) → 200, recarrega o pointer da própria org (reload filtra organization_id)", async () => {
     const db = makeDb([pointerRow({ name: "nome-original" })], []);
-    session("manager", db);
+    session("admin", db);
     const { PATCH } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await PATCH(req("PATCH", {}), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(200);
@@ -471,7 +473,7 @@ describe("PATCH /api/v1/ai/followup-flows/:id", () => {
 
   it("renomeia → 200 com o nome novo", async () => {
     const db = makeDb([pointerRow({ name: "Antigo" })], []);
-    session("manager", db);
+    session("admin", db);
     const { PATCH } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await PATCH(
       req("PATCH", { name: "Novo nome" }),
@@ -493,7 +495,7 @@ describe("PATCH /api/v1/ai/followup-flows/:id", () => {
       ],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { PATCH } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await PATCH(
       req("PATCH", { name: "B" }),
@@ -515,7 +517,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       [{ id: "33333333-3333-4333-8333-333333333333", organization_id: ORG_ID, status: "draft", draft_graph: null }],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(422);
@@ -529,7 +531,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       [{ id: "33333333-3333-4333-8333-333333333333", organization_id: ORG_ID, status: "draft", draft_graph: INVALID_GRAPH }],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(422);
@@ -561,7 +563,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
         { organization_id: ORG_ID, provider: "meta_cloud", archived_at: "2026-09-01T00:00:00Z" },
         { organization_id: OTHER_ORG_ID, provider: "meta_cloud", archived_at: null },
       ]);
-      session("manager", db);
+      session("admin", db);
       const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
       const res = await POST(req("POST"), ctx(PID));
       expect(res.status).toBe(200);
@@ -572,7 +574,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
         { organization_id: ORG_ID, provider: "waha", archived_at: null },
         { organization_id: ORG_ID, provider: "meta_cloud", archived_at: null },
       ]);
-      session("manager", db);
+      session("admin", db);
       const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
       const res = await POST(req("POST"), ctx(PID));
       expect(res.status).toBe(422);
@@ -586,7 +588,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       [{ id: "33333333-3333-4333-8333-333333333333", organization_id: ORG_ID, status: "draft", draft_graph: VALID_GRAPH }],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(200);
@@ -611,7 +613,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       [{ id: "33333333-3333-4333-8333-333333333333", organization_id: OTHER_ORG_ID, status: "draft", draft_graph: VALID_GRAPH }],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(404);
@@ -647,7 +649,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       [],
       [{ id: STAGE_ID, organization_id: ORG_ID, name: "Proposta enviada", is_archived: false }],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(200);
@@ -692,7 +694,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
         [],
         stages,
       );
-      session("manager", db);
+      session("admin", db);
       const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
       return POST(req("POST"), ctx(POINTER_ID));
     };
@@ -744,7 +746,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       ],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(422);
@@ -775,7 +777,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       ],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status, "kind sem motor não pode publicar, mesmo sendo desconhecido").toBe(422);
@@ -799,7 +801,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       ],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(200);
@@ -808,7 +810,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
   it("appointment_no_show com consumidor ativo publica versão e mantém gatilhos desconhecidos recusados",async()=>{
     const id="33333333-3333-4333-8333-333333333333";
     const db=makeDb([{id,organization_id:ORG_ID,status:"draft",draft_graph:VALID_GRAPH,trigger_config:{kind:"appointment_no_show"}}],[]);
-    session("manager",db);
+    session("admin", db);
     const {POST}=await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     expect((await POST(req("POST"),ctx(id))).status).toBe(200);
     const {data}=(await db.from("followup_flow_pointers").select().eq("id",id)) as {data:Row[]};
@@ -828,7 +830,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish", () => {
       ],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(200);
@@ -870,7 +872,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish — roteiro que encadeia (r
 
   it("⭐ A → B com B → A publicado: 422 roteiro_em_ciclo, nada publicado", async () => {
     const db = cenario(A);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     const res = await POST(req("POST"), ctx(A));
     expect(res.status).toBe(422);
@@ -883,7 +885,7 @@ describe("POST /api/v1/ai/followup-flows/:id/publish — roteiro que encadeia (r
 
   it("A → B com B terminando: publica", async () => {
     const db = cenario(null);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/publish/route");
     expect((await POST(req("POST"), ctx(A))).status).toBe(200);
   });
@@ -902,7 +904,7 @@ describe("POST /api/v1/ai/followup-flows/:id/rollback", () => {
       [{ id: P1, organization_id: ORG_ID, status: "active", active_version_id: "66666666-6666-4666-8666-666666666666" }],
       [{ id: "88888888-8888-4888-8888-888888888888", organization_id: OTHER_ORG_ID, pointer_id: P1, graph: VALID_GRAPH }],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/rollback/route");
     const res = await POST(req("POST", { version_id: "88888888-8888-4888-8888-888888888888" }), ctx(P1));
     expect(res.status).toBe(404);
@@ -913,7 +915,7 @@ describe("POST /api/v1/ai/followup-flows/:id/rollback", () => {
       [{ id: P1, organization_id: ORG_ID, status: "active", active_version_id: "66666666-6666-4666-8666-666666666666" }],
       [{ id: "77777777-7777-4777-8777-777777777777", organization_id: ORG_ID, pointer_id: OTHER_POINTER, graph: VALID_GRAPH }],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/rollback/route");
     const res = await POST(req("POST", { version_id: "77777777-7777-4777-8777-777777777777" }), ctx(P1));
     expect(res.status).toBe(404);
@@ -924,7 +926,7 @@ describe("POST /api/v1/ai/followup-flows/:id/rollback", () => {
       [{ id: P1, organization_id: ORG_ID, status: "active", active_version_id: "66666666-6666-4666-8666-666666666666" }],
       [{ id: "77777777-7777-4777-8777-777777777777", organization_id: ORG_ID, pointer_id: null, graph: VALID_GRAPH }],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/rollback/route");
     const res = await POST(req("POST", { version_id: "77777777-7777-4777-8777-777777777777" }), ctx(P1));
     expect(res.status).toBe(404);
@@ -938,7 +940,7 @@ describe("POST /api/v1/ai/followup-flows/:id/rollback", () => {
         { id: "77777777-7777-4777-8777-777777777777", organization_id: ORG_ID, pointer_id: P1, graph: VALID_GRAPH },
       ],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/rollback/route");
     const res = await POST(req("POST", { version_id: "77777777-7777-4777-8777-777777777777" }), ctx(P1));
     expect(res.status).toBe(200);
@@ -958,7 +960,7 @@ describe("POST /api/v1/ai/followup-flows/:id/rollback", () => {
         { id: "77777777-7777-4777-8777-777777777777", organization_id: ORG_ID, pointer_id: P1, graph: VALID_GRAPH },
       ],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/rollback/route");
     const res = await POST(req("POST", { version_id: "77777777-7777-4777-8777-777777777777" }), ctx(P1));
     expect(res.status).toBe(200);
@@ -975,7 +977,7 @@ describe("POST /api/v1/ai/followup-flows/:id/rollback", () => {
 describe("POST /api/v1/ai/followup-flows/:id/disable", () => {
   it("pointer ativo → 200, status='disabled', audit emitido", async () => {
     const db = makeDb([{ id: "33333333-3333-4333-8333-333333333333", organization_id: ORG_ID, status: "active" }], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/disable/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(200);
@@ -988,7 +990,7 @@ describe("POST /api/v1/ai/followup-flows/:id/disable", () => {
 
   it("pointer já disabled → 200 no-op, sem novo audit", async () => {
     const db = makeDb([{ id: "33333333-3333-4333-8333-333333333333", organization_id: ORG_ID, status: "disabled" }], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/disable/route");
     const res = await POST(req("POST"), ctx("33333333-3333-4333-8333-333333333333"));
     expect(res.status).toBe(200);
@@ -997,7 +999,7 @@ describe("POST /api/v1/ai/followup-flows/:id/disable", () => {
 
   it("pointer inexistente na org → 404", async () => {
     const db = makeDb([], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/disable/route");
     const res = await POST(req("POST"), ctx("55555555-5555-4555-8555-555555555555"));
     expect(res.status).toBe(404);
@@ -1007,9 +1009,9 @@ describe("POST /api/v1/ai/followup-flows/:id/disable", () => {
 describe("DELETE /api/v1/ai/followup-flows/:id", () => {
   const P1 = "33333333-3333-4333-8333-333333333333";
 
-  it("manager → 200, pointer some, audit emitido", async () => {
+  it("admin → 200, pointer some, audit emitido", async () => {
     const db = makeDb([{ id: P1, organization_id: ORG_ID, status: "disabled" }], []);
-    session("manager", db);
+    session("admin", db);
     const { DELETE } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await DELETE(req("DELETE"), ctx(P1));
     expect(res.status).toBe(200);
@@ -1022,15 +1024,16 @@ describe("DELETE /api/v1/ai/followup-flows/:id", () => {
 
   it("pointer inexistente na org → 404", async () => {
     const db = makeDb([], []);
-    session("manager", db);
+    session("admin", db);
     const { DELETE } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await DELETE(req("DELETE"), ctx("55555555-5555-4555-8555-555555555555"));
     expect(res.status).toBe(404);
   });
 
-  it("agent (< manager) → 403", async () => {
+  // ia.vek v1.7.6: configuração só do admin — manager também é recusado
+  it.each(["agent", "manager"] as const)("%s (< admin) → 403", async (papel) => {
     const db = makeDb([{ id: P1, organization_id: ORG_ID, status: "draft" }], []);
-    session("agent", db);
+    session(papel, db);
     const { DELETE } = await import("@/app/api/v1/ai/followup-flows/[id]/route");
     const res = await DELETE(req("DELETE"), ctx(P1));
     expect(res.status).toBe(403);
@@ -1061,9 +1064,10 @@ describe("POST /api/v1/ai/followup-flows/:id/duplicate", () => {
     };
   }
 
-  it("agent (< manager) → 403, sem insert", async () => {
+  // ia.vek v1.7.6: configuração só do admin — manager também é recusado
+  it.each(["agent", "manager"] as const)("%s (< admin) → 403, sem insert", async (papel) => {
     const db = makeDb([origem()], []);
-    session("agent", db);
+    session(papel, db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/duplicate/route");
     const res = await POST(req("POST"), ctx(P1));
     expect(res.status).toBe(403);
@@ -1073,7 +1077,7 @@ describe("POST /api/v1/ai/followup-flows/:id/duplicate", () => {
 
   it("pointer de outra org → 404", async () => {
     const db = makeDb([origem({ organization_id: OTHER_ORG_ID })], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/duplicate/route");
     const res = await POST(req("POST"), ctx(P1));
     expect(res.status).toBe(404);
@@ -1081,7 +1085,7 @@ describe("POST /api/v1/ai/followup-flows/:id/duplicate", () => {
 
   it("clona rascunho, gatilho e handoff — nasce draft, sem versão publicada", async () => {
     const db = makeDb([origem()], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/duplicate/route");
     const res = await POST(req("POST"), ctx(P1));
     expect(res.status).toBe(201);
@@ -1110,7 +1114,7 @@ describe("POST /api/v1/ai/followup-flows/:id/duplicate", () => {
       [origem({ draft_graph: null })],
       [{ id: VID, organization_id: ORG_ID, pointer_id: P1, graph: VALID_GRAPH }],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/duplicate/route");
     const res = await POST(req("POST"), ctx(P1));
     expect(res.status).toBe(201);
@@ -1124,7 +1128,7 @@ describe("POST /api/v1/ai/followup-flows/:id/duplicate", () => {
       [origem(), origem({ id: P2, name: "Carrinho (cópia)", status: "draft", active_version_id: null })],
       [],
     );
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followup-flows/[id]/duplicate/route");
     const res = await POST(req("POST"), ctx(P1));
     expect(res.status).toBe(201);

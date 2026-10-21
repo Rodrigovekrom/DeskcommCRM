@@ -53,7 +53,7 @@ export default async function KanbanPickerPage() {
 
   const todos = (data ?? []) as Array<FunilDaLista & { is_archived: boolean }>;
   const funis = todos.filter((f) => !f.is_archived);
-  const podeGerenciar = ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
+  const podeGerenciar = ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin;
   // O arquivo só vai para quem pode mexer nele: tirar do arquivo e excluir são
   // `requireRole("manager")` nas rotas, e mostrar a gaveta a quem receberia 403
   // seria prometer o que não se cumpre — mesmo critério de `podeGerenciar`.

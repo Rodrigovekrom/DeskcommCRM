@@ -25,6 +25,10 @@ vi.mock("@/app/api/v1/agenda/agendamentos/_handler", () => ({
 
 import { crmBookAppointment } from "./agendamento";
 
+// ia.vek v1.7.6: a IA registra PEDIDO por padrão; esta suíte mede o motor
+// de marcar (o caminho preparado para a IA agendar sozinha), então o religa.
+process.env.IAVEK_IA_AGENDA_SOZINHA = "1";
+
 const CTX = {
   supabase: {
     from: () => ({

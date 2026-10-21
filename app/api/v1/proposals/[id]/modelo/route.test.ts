@@ -34,6 +34,8 @@ interface MundoOpts {
   sugestao?: string | null;
   modeloResolve?: { slug: string; version: number } | null;
   secoesEditadas?: Record<string, string> | null;
+  /** ia.vek v1.7.6: dono do lead da proposta (o vendedor só mexe no lead dele). */
+  donoDoLead?: string | null;
 }
 
 function montarMundo(opts: MundoOpts = {}) {
@@ -43,7 +45,7 @@ function montarMundo(opts: MundoOpts = {}) {
     const minRank = ROLE_RANK[minRole] ?? 0;
     return rank < minRank
       ? { ok: false, response: new Response(JSON.stringify({ error: { code: "forbidden_role" } }), { status: 403 }) }
-      : { ok: true, user: { id: "u1", idioma: "pt-BR" }, org: { orgId: ORG_ID } };
+      : { ok: true, user: { id: "u1", idioma: "pt-BR" }, org: { orgId: ORG_ID, role: papel } };
   });
   mocks.requireSupportWrite.mockResolvedValue(null);
 
@@ -53,6 +55,7 @@ function montarMundo(opts: MundoOpts = {}) {
     template_slug: opts.templateSlug ?? null,
     template_slug_sugerido: opts.sugestao ?? null,
     secoes_editadas: opts.secoesEditadas ?? null,
+    lead_id: "lead-1",
   };
 
   let updateCapturado: Record<string, unknown> | undefined;
@@ -71,6 +74,18 @@ function montarMundo(opts: MundoOpts = {}) {
             updateCapturado = payload;
             return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) };
           },
+        };
+      }
+      // ia.vek v1.7.6: a régua "proposta do próprio lead" lê o dono do lead.
+      if (tabela === "crm_leads") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { owner_user_id: opts.donoDoLead ?? "outro-vendedor" } }),
+              }),
+            }),
+          }),
         };
       }
       throw new Error(`tabela inesperada no mock: ${tabela}`);
@@ -155,5 +170,27 @@ describe("PATCH /api/v1/proposals/[id]/modelo", () => {
     const res = await PATCH(reqComBody({ template_slug: "landing_page" }), ctx());
     expect(res.status).toBe(200);
     expect(mundo.updateCapturado()).not.toHaveProperty("secoes_editadas");
+  });
+
+  // ia.vek v1.7.6: modelo saiu de requireRole("manager") para "agent" + lead próprio.
+  it("ia.vek v1.7.6: pede papel agent (não mais manager)", async () => {
+    montarMundo({ sugestao: "landing_page" });
+    await PATCH(reqComBody({ template_slug: "landing_page" }), ctx());
+    expect(mocks.requireRole).toHaveBeenCalledWith("agent", expect.anything());
+  });
+
+  it("ia.vek v1.7.6: agent dono do lead confirma o modelo", async () => {
+    const mundo = montarMundo({ papel: "agent", donoDoLead: "u1", sugestao: "landing_page" });
+    const res = await PATCH(reqComBody({ template_slug: "landing_page" }), ctx());
+    expect(res.status).toBe(200);
+    expect(mundo.updateCapturado()).toMatchObject({ template_slug: "landing_page" });
+  });
+
+  it("ia.vek v1.7.6: agent que não é dono do lead: 403 forbidden, nada muda", async () => {
+    const mundo = montarMundo({ papel: "agent", donoDoLead: "outro-vendedor" });
+    const res = await PATCH(reqComBody({ template_slug: "landing_page" }), ctx());
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.code).toBe("forbidden");
+    expect(mundo.updateCapturado()).toBeUndefined();
   });
 });

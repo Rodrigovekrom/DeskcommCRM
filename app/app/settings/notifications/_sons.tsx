@@ -39,7 +39,7 @@ export function SonsDosAvisos() {
   const { user, activeOrg } = useAuth();
   const podeTrocar =
     (user.is_platform_admin && !user.support) ||
-    (activeOrg !== null && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager);
+    (activeOrg !== null && ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin);
   const [enviando, setEnviando] = React.useState<TipoDeSom | null>(null);
   const { data: urls } = useQuery({
     queryKey: ["settings-sons"],

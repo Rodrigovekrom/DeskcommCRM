@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("manager", { requestId, resource: "honorarios_parcelas" });
+  const authz = await requireRole("admin", { requestId, resource: "honorarios_parcelas" });
   if (!authz.ok) return authz.response;
   const { id: contratoId } = await ctx.params;
 

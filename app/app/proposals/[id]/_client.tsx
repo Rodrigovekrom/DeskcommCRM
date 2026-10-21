@@ -27,6 +27,8 @@ interface ProposalItem {
 
 interface Proposta {
   id: string;
+  /** ia.vek v1.7.6: motivo da última devolução pelo gerente (rascunho devolvido). */
+  devolucao_motivo?: string | null;
   titulo: string;
   condicoes: string | null;
   valid_until: string | null;
@@ -131,7 +133,21 @@ function camposRecusados(details: Record<string, unknown> | undefined): string[]
   return Object.keys(mapa).map(campoRecusado);
 }
 
-export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { id: string; podeEditar: boolean; podeRevisar?: boolean }) {
+export function ProposalEditorClient({
+  id,
+  podeEditar,
+  podeRevisar = false,
+  aprova = true,
+  podeDescartar = true,
+}: {
+  id: string;
+  podeEditar: boolean;
+  podeRevisar?: boolean;
+  /** ia.vek v1.7.6: gerente/admin aprovam (enviam); o vendedor pede aprovação. */
+  aprova?: boolean;
+  /** ia.vek v1.7.6: descartar rascunho é só do admin. */
+  podeDescartar?: boolean;
+}) {
   const t = useT();
   const [proposta, setProposta] = useState<Proposta | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -144,6 +160,9 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
   // Salvar prazo/itens muda o documento (prazo e investimento): o canvas recarrega.
   const [versaoDoDocumento, setVersaoDoDocumento] = useState(0);
   const [gerandoPrevia, setGerandoPrevia] = useState(false);
+  // ia.vek v1.7.6: a devolução pede motivo escrito (campo na própria tela).
+  const [devolvendo, setDevolvendo] = useState(false);
+  const [motivoDevolucao, setMotivoDevolucao] = useState("");
   const abortController = useRef<AbortController | null>(null);
   /**
    * O que estava GRAVADO na última gravação. `null` = ainda não carregou, e aí
@@ -376,6 +395,47 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
     } catch (e) {
       setErro(t("Não foi possível enviar. Confira se você tem papel de gestor."));
       showApiError(e);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  /** ia.vek v1.7.6: o vendedor pede a aprovação do gerente (grava antes, se mudou algo). */
+  async function pedirAprovacao() {
+    if (!proposta) return;
+    const sujo = ultimaGravacao.current !== null && ultimaGravacao.current !== assinaturaDoRascunho(proposta);
+    if (sujo) {
+      const salvou = await salvar();
+      if (!salvou) return;
+    }
+    await acaoDeAprovacao({ acao: "pedir" }, t("Não foi possível pedir a aprovação."));
+  }
+
+  /** ia.vek v1.7.6: o gerente devolve ao vendedor, com o motivo. */
+  async function devolver() {
+    const ok = await acaoDeAprovacao(
+      { acao: "devolver", motivo: motivoDevolucao },
+      t("Não foi possível devolver a proposta."),
+    );
+    if (ok) {
+      setDevolvendo(false);
+      setMotivoDevolucao("");
+    }
+  }
+
+  async function acaoDeAprovacao(corpo: Record<string, string>, falha: string): Promise<boolean> {
+    setSalvando(true);
+    setErro(null);
+    try {
+      await apiClient.post(`/api/v1/proposals/${id}/aprovacao`, corpo);
+      const res = await apiClient.get<ApiSuccess<Proposta>>(`/api/v1/proposals/${id}`);
+      ultimaGravacao.current = assinaturaDoRascunho(res.data);
+      setProposta(res.data);
+      return true;
+    } catch (e) {
+      setErro(falha);
+      showApiError(e);
+      return false;
     } finally {
       setSalvando(false);
     }
@@ -704,14 +764,84 @@ export function ProposalEditorClient({ id, podeEditar, podeRevisar = false }: { 
       {proposta.status === "rascunho" && !proposta.template_slug && (
         <p className="text-sm text-warning-fg">{t("Escolha e confirme o modelo da proposta antes de enviar.")}</p>
       )}
+      {proposta.status === "rascunho" && proposta.devolucao_motivo && (
+        <div
+          data-testid="proposta-devolvida"
+          className="rounded-lg border border-warning/40 bg-warning-bg p-3 text-sm text-warning-fg"
+        >
+          {t("Devolvida pelo gerente")}: {proposta.devolucao_motivo}
+        </div>
+      )}
       {proposta.status === "rascunho" && (
         <div className="flex gap-2">
-          <Button onClick={enviar} disabled={salvando || !proposta.template_slug} className="flex-1">
-            {t("Enviar ao cliente")}
-          </Button>
-          <Button onClick={descartar} disabled={salvando} variant="outline">
-            {t("Descartar rascunho")}
-          </Button>
+          {aprova ? (
+            <Button onClick={enviar} disabled={salvando || !proposta.template_slug} className="flex-1">
+              {t("Enviar ao cliente")}
+            </Button>
+          ) : (
+            <Button
+              onClick={pedirAprovacao}
+              disabled={salvando || !proposta.template_slug || !podeEditar}
+              className="flex-1"
+              data-testid="pedir-aprovacao"
+            >
+              {t("Pedir aprovação do gerente")}
+            </Button>
+          )}
+          {podeDescartar && (
+            <Button onClick={descartar} disabled={salvando} variant="outline">
+              {t("Descartar rascunho")}
+            </Button>
+          )}
+        </div>
+      )}
+      {proposta.status === "aguardando_aprovacao" && (
+        <div
+          data-testid="proposta-aguardando-aprovacao"
+          className="space-y-2 rounded-lg border border-border bg-muted p-3 text-sm"
+        >
+          <p>
+            {aprova
+              ? t("O vendedor pediu a sua aprovação. Confira e envie, ou devolva com o motivo.")
+              : t("Aguardando a aprovação do gerente. Você é avisado quando ela sair.")}
+          </p>
+          {aprova && !devolvendo && (
+            <div className="flex gap-2">
+              <Button onClick={enviar} disabled={salvando} className="flex-1" data-testid="aprovar-e-enviar">
+                {t("Aprovar e enviar")}
+              </Button>
+              <Button onClick={() => setDevolvendo(true)} disabled={salvando} variant="outline">
+                {t("Devolver ao vendedor")}
+              </Button>
+            </div>
+          )}
+          {aprova && devolvendo && (
+            <div className="space-y-2">
+              <label htmlFor="motivo-devolucao" className="block text-xs font-medium">
+                {t("Motivo da devolução")}
+              </label>
+              <textarea
+                id="motivo-devolucao"
+                value={motivoDevolucao}
+                onChange={(e) => setMotivoDevolucao(e.target.value)}
+                maxLength={500}
+                rows={3}
+                className="w-full rounded-md border border-border bg-background p-2 text-sm"
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={devolver}
+                  disabled={salvando || motivoDevolucao.trim().length < 3}
+                  data-testid="confirmar-devolucao"
+                >
+                  {t("Devolver")}
+                </Button>
+                <Button variant="outline" onClick={() => setDevolvendo(false)} disabled={salvando}>
+                  {t("Cancelar")}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* C2 — a prévia é leitura: serve em qualquer status, e o arquivo sai da

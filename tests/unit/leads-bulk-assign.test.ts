@@ -2,9 +2,10 @@
  * G3-04 — atribuição em massa de leads (spec 04 §6.5).
  *
  * Prova, contra o Route Handler REAL (auth e Supabase mockados):
- *  - gate ≥manager por-action: agent tentando `assign` → 403 forbidden_role,
- *    sem UPDATE nem audit agregado (move/tag/delete continuam agent+, fora daqui);
- *  - sucesso (manager): UPDATE único de owner_user_id, retorna updated_count e
+ *  - gate admin (ia.vek v1.7.6 — antes ≥manager por-action): agent ou manager
+ *    tentando `assign` → 403 forbidden_role, sem UPDATE nem audit agregado
+ *    (desde a v1.7.6 toda ação em lote exige admin);
+ *  - sucesso (admin): UPDATE único de owner_user_id, retorna updated_count e
  *    audita UMA entrada agregada `leads.bulk_assigned` com count + owner_user_id;
  *  - owner fora da org / não-membro / viewer → 422 invalid_owner (código estável),
  *    sem UPDATE;
@@ -145,10 +146,11 @@ beforeEach(() => {
   vi.mocked(isServiceRoleConfigured).mockReturnValue(false);
 });
 
-describe("POST /api/v1/leads/bulk — assign gate ≥manager", () => {
-  it("agent tentando assign → 403 forbidden_role, sem UPDATE", async () => {
+describe("POST /api/v1/leads/bulk — assign gate admin", () => {
+  // ia.vek v1.7.6: configuração só do admin — manager também é recusado
+  it.each(["agent", "manager"] as const)("%s tentando assign → 403 forbidden_role, sem UPDATE", async (papel) => {
     const state = stubState();
-    session("agent", state);
+    session(papel, state);
     const { POST } = await import("@/app/api/v1/leads/bulk/route");
     const res = await POST(postReq(assignBody(OWNER_ID)));
     expect(res.status).toBe(403);
@@ -158,18 +160,18 @@ describe("POST /api/v1/leads/bulk — assign gate ≥manager", () => {
     expect(vi.mocked(audit).mock.calls.some(([e]) => e.action === "leads.bulk_assigned")).toBe(
       false,
     );
-    // A negação passa pelo requireRole("manager") da G2-01 (que emite o
+    // A negação passa pelo requireRole("admin") da G2-01 (que emite o
     // authz.denied internamente) — não por um fail(403) na mão.
     expect(vi.mocked(requireRole)).toHaveBeenCalledWith(
-      "manager",
+      "admin",
       expect.objectContaining({ resource: "crm_leads" }),
     );
   });
 
-  it("manager → 200, UPDATE único, audit agregado leads.bulk_assigned com count", async () => {
+  it("admin → 200, UPDATE único, audit agregado leads.bulk_assigned com count", async () => {
     vi.mocked(isServiceRoleConfigured).mockReturnValue(true);
     const state = stubState({ targetMember: { role: "agent" } });
-    session("manager", state);
+    session("admin", state);
     const { POST } = await import("@/app/api/v1/leads/bulk/route");
     const res = await POST(postReq(assignBody(OWNER_ID)));
     expect(res.status).toBe(200);
@@ -189,7 +191,7 @@ describe("POST /api/v1/leads/bulk — validação de owner", () => {
   it("owner não-membro da org → 422 invalid_owner, sem UPDATE", async () => {
     vi.mocked(isServiceRoleConfigured).mockReturnValue(true);
     const state = stubState({ targetMember: null });
-    session("manager", state);
+    session("admin", state);
     const { POST } = await import("@/app/api/v1/leads/bulk/route");
     const res = await POST(postReq(assignBody(OWNER_ID)));
     expect(res.status).toBe(422);
@@ -201,7 +203,7 @@ describe("POST /api/v1/leads/bulk — validação de owner", () => {
   it("owner viewer da org → 422 invalid_owner", async () => {
     vi.mocked(isServiceRoleConfigured).mockReturnValue(true);
     const state = stubState({ targetMember: { role: "viewer" } });
-    session("manager", state);
+    session("admin", state);
     const { POST } = await import("@/app/api/v1/leads/bulk/route");
     const res = await POST(postReq(assignBody(OWNER_ID)));
     expect(res.status).toBe(422);
@@ -212,7 +214,7 @@ describe("POST /api/v1/leads/bulk — validação de owner", () => {
   it("INB-09 nota 1: sem service role + owner não-null → 422 owner_validation_unavailable, sem UPDATE (fail-closed)", async () => {
     vi.mocked(isServiceRoleConfigured).mockReturnValue(false);
     const state = stubState();
-    session("manager", state);
+    session("admin", state);
     const { POST } = await import("@/app/api/v1/leads/bulk/route");
     const res = await POST(postReq(assignBody(OWNER_ID)));
     expect(res.status).toBe(422);
@@ -224,7 +226,7 @@ describe("POST /api/v1/leads/bulk — validação de owner", () => {
   it("desatribuir (owner_user_id null) → 200, pula validação de membership", async () => {
     vi.mocked(isServiceRoleConfigured).mockReturnValue(true);
     const state = stubState({ targetMember: null });
-    session("manager", state);
+    session("admin", state);
     const { POST } = await import("@/app/api/v1/leads/bulk/route");
     const res = await POST(postReq(assignBody(null)));
     expect(res.status).toBe(200);
@@ -235,7 +237,7 @@ describe("POST /api/v1/leads/bulk — validação de owner", () => {
 describe("POST /api/v1/leads/bulk — limite (MAX_BULK=50)", () => {
   it("acima do teto → 422, sem UPDATE", async () => {
     const state = stubState();
-    session("manager", state);
+    session("admin", state);
     const tooMany = Array.from(
       { length: 51 },
       (_, i) => `66666666-6666-4666-8666-${String(i).padStart(12, "0")}`,

@@ -13,6 +13,7 @@ import { type NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
 import { fail, ok, noContent } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { roleAtLeast } from "@/lib/auth/types";
 import { updateTemplateSchema } from "@/lib/schemas/templates";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -45,13 +46,15 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  // ia.vek v1.7.6: quem não é admin só mexe nas PRÓPRIAS respostas rápidas; as
+  // padrão da loja (sem dono) são do admin.
+  let alvo = supabase
     .from("message_templates")
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("organization_id", org.orgId)
-    .select(COLS)
-    .single();
+  if (!roleAtLeast(org.role, "admin")) alvo = alvo.eq("owner_user_id", user.id);
+  const { data, error } = await alvo.select(COLS).single();
   if (error || !data) return fail("not_found", t("Template não encontrado."), 404, { requestId });
 
   void audit({
@@ -81,13 +84,14 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
   // .select() confirma que a linha existia E era visível/apagável pela RLS.
   // Sem isso, um DELETE barrado pela RLS afeta 0 linhas mas ainda retornaria
   // 204 + audit falso (mutação que não ocorreu). Espelha a semântica do PATCH.
-  const { data: deleted, error } = await supabase
+  // ia.vek v1.7.6: quem não é admin só apaga as PRÓPRIAS; as padrão são do admin.
+  let alvo = supabase
     .from("message_templates")
     .delete()
     .eq("id", id)
-    .eq("organization_id", org.orgId)
-    .select("id")
-    .maybeSingle();
+    .eq("organization_id", org.orgId);
+  if (!roleAtLeast(org.role, "admin")) alvo = alvo.eq("owner_user_id", user.id);
+  const { data: deleted, error } = await alvo.select("id").maybeSingle();
   if (error) return fail("internal_error", "Erro ao excluir template.", 500, { requestId });
   if (!deleted) return fail("not_found", t("Template não encontrado."), 404, { requestId });
 

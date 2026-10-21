@@ -5,6 +5,8 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { exigirPropostaDoProprioLead } from "@/lib/iavek/proposta-do-vendedor";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { resolverItensDaProposta } from "@/lib/propostas/itens";
@@ -98,6 +100,17 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     return fail("validation_failed", t("Campos inválidos."), 422, { requestId, details: params.error.flatten() });
   }
   const { id } = params.data;
+  // ia.vek v1.7.6: o vendedor prepara só a proposta de lead dele; gerente e admin, qualquer uma.
+  const doLeadProprio = await exigirPropostaDoProprioLead({
+    db: createAdminClient(),
+    orgId: authz.org.orgId,
+    propostaId: id,
+    userId: authz.user.id,
+    role: authz.org.role,
+    requestId,
+    idioma: authz.user.idioma,
+  });
+  if (doLeadProprio) return doLeadProprio;
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return fail("validation_failed", t("Campos inválidos."), 422, { requestId, details: parsed.error.flatten() });
@@ -207,7 +220,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "crm_proposals" });
+  const authz = await requireRole("admin", { requestId, resource: "crm_proposals" });
   if (!authz.ok) return authz.response;
   const desligada = await sePropostasDesligadas(authz.org.orgId, requestId);
   if (desligada) return desligada;

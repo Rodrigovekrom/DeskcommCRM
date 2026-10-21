@@ -22,7 +22,7 @@ export async function GET(): Promise<Response> {
 export async function PATCH(req: Request): Promise<Response> {
   const denied = await requireSupportWrite(); if (denied) return denied;
   const requestId = randomUUID();
-  const auth = await requireRole("manager", { requestId, resource: "settings_routing", allowPlatformAdmin: true });
+  const auth = await requireRole("admin", { requestId, resource: "settings_routing", allowPlatformAdmin: true });
   if (!auth.ok) return auth.response;
   if (await mfaEmDivida()) return fail("mfa_required", "Confirme a verificação em duas etapas.", 403, { requestId });
   const parsed = channelRoutingPatchSchema.safeParse(await req.json().catch(() => null));

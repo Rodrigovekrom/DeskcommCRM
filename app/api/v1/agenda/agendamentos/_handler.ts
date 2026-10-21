@@ -1,3 +1,4 @@
+import { cabeMaisUm } from "@/lib/iavek/capacidade-da-agenda";
 import { randomUUID } from "node:crypto";
 import type { Json } from "@/lib/database.types";
 /**
@@ -28,7 +29,7 @@ import {
   type RecorteDoCompromisso,
   type TipoDoAtendimento,
 } from "@/lib/agenda/aviso-do-compromisso";
-import { coletaOQueOcupa, horariosLivresDaOrg } from "@/lib/agenda/consulta";
+import { capacidadeDaOrg, coletaOQueOcupa, horariosLivresDaOrg } from "@/lib/agenda/consulta";
 import { colide } from "@/lib/agenda/horarios-livres";
 import {
   atividadeDaTransicao,
@@ -918,8 +919,11 @@ async function exigeSemSobreposicao(
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, "Não foi possível conferir a agenda.");
   }
   const pedido = { inicio: args.inicio.getTime(), fim: args.fim.getTime() };
-  const cruza = oQueOcupa.ocupados.some((o) => colide(o.inicio.getTime(), o.fim.getTime(), pedido));
-  if (cruza) {
+  // ia.vek v1.7.6: a loja não trava horário — vários compromissos no mesmo
+  // horário cabem até a capacidade da organização (sem número = sem limite).
+  const capacidade = await capacidadeDaOrg(supabase, ctx.organization_id);
+  const cruzam = oQueOcupa.ocupados.filter((o) => colide(o.inicio.getTime(), o.fim.getTime(), pedido)).length;
+  if (!cabeMaisUm(cruzam, capacidade)) {
     throw new ApiError(
       422,
       "agenda_horario_indisponivel",

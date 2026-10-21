@@ -4,12 +4,13 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { AGUARDANDO_APROVACAO, podeSerEnviada } from "@/lib/iavek/proposta-do-vendedor";
+import { avisarQuemPediuAprovacao } from "@/lib/iavek/avisos-da-proposta";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { adiarAteAJanelaAbrir } from "@/lib/automation/janela-do-canal";
 import { checkDailyLimit, espacarEnvio } from "@/lib/automation/throttle";
 import { sendMessageHandler } from "@/app/api/v1/messages/_handler";
 import { alocarNumero } from "@/lib/propostas/numeracao";
-import { decidirVersao } from "@/lib/propostas/versao";
 import { salvarPdfDaProposta } from "@/lib/propostas/storage";
 import { montarPdfDaProposta } from "@/lib/propostas/pdf-da-proposta";
 import { montarDocumentoDaProposta } from "@/lib/propostas/documento/documento-da-proposta";
@@ -65,11 +66,12 @@ export async function POST(_req: NextRequest, ctx: Ctx): Promise<Response> {
   // A chamada vale pelo efeito de validação: lança para qualquer status que
   // não seja `rascunho`, e o catch abaixo vira o 409 (o valor de retorno não
   // é mais usado — só rascunho chega até aqui).
-  try {
-    decidirVersao(proposta as never);
-  } catch {
+  // ia.vek v1.7.6: "aprovar e enviar" — além do rascunho (gerente enviando
+  // direto), a proposta que o vendedor deixou aguardando aprovação.
+  if (!podeSerEnviada(String(proposta.status))) {
     return fail("proposal_context_stale", t("Esta proposta não pode ser enviada neste estado."), 409, { requestId });
   }
+  const aguardavaAprovacao = proposta.status === AGUARDANDO_APROVACAO;
 
   const { data: itens } = await admin
     .from("crm_proposal_items")
@@ -300,6 +302,15 @@ export async function POST(_req: NextRequest, ctx: Ctx): Promise<Response> {
       .update({ pdf_path: pdfPath, message_id: mensagem.id })
       .eq("organization_id", authz.org.orgId).eq("id", propostaAlvo.id)
       .select("*").single();
+    // ia.vek v1.7.6: quem pediu a aprovação fica sabendo que ela saiu.
+    if (aguardavaAprovacao) {
+      await avisarQuemPediuAprovacao(admin, {
+        orgId: authz.org.orgId,
+        proposta: proposta as never,
+        atorId: authz.user.id,
+        tipo: "proposta_aprovada",
+      });
+    }
     return ok(emFila, { requestId });
   }
 
@@ -427,5 +438,14 @@ export async function POST(_req: NextRequest, ctx: Ctx): Promise<Response> {
     metadata: { numero: numeroEAno.numero, ano: numeroEAno.ano },
   });
 
+  // ia.vek v1.7.6: quem pediu a aprovação fica sabendo que ela saiu.
+  if (aguardavaAprovacao) {
+    await avisarQuemPediuAprovacao(admin, {
+      orgId: authz.org.orgId,
+      proposta: proposta as never,
+      atorId: authz.user.id,
+      tipo: "proposta_aprovada",
+    });
+  }
   return ok(enviada, { requestId });
 }

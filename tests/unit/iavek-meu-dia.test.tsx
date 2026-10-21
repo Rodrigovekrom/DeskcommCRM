@@ -15,10 +15,13 @@ const mocks = vi.hoisted(() => ({
     interface_settings: { preset: "completa", funcao: "sdr" },
   } as Record<string, unknown>,
   resposta: {} as unknown,
+  // ia.vek v1.7.6: o Meu dia também busca os pedidos de agendamento (e os tipos).
+  pedidos: { pedidos: [], pode_decidir: false } as unknown,
+  user: { id: "eu" } as Record<string, unknown>,
   get: vi.fn(),
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
-  useAuth: () => ({ activeOrg: mocks.org, user: { id: "eu" } }),
+  useAuth: () => ({ activeOrg: mocks.org, user: mocks.user }),
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -26,6 +29,12 @@ vi.mock("@/lib/api/client", () => ({
   apiClient: {
     get: (url: string) => {
       mocks.get(url);
+      // ia.vek v1.7.6: cada URL com a sua resposta — <PedidosDeAgendamento/> lê
+      // `pedidos`/`pode_decidir`, e a lista de tipos é um array.
+      if (url.startsWith("/api/v1/iavek/pedidos-de-agendamento")) {
+        return Promise.resolve({ data: mocks.pedidos });
+      }
+      if (url.startsWith("/api/v1/agenda/tipos")) return Promise.resolve({ data: [] });
       return Promise.resolve({ data: mocks.resposta });
     },
     patch: vi.fn(),
@@ -53,6 +62,8 @@ function montar() {
 beforeEach(() => {
   window.localStorage.clear();
   mocks.get.mockClear();
+  mocks.pedidos = { pedidos: [], pode_decidir: false };
+  mocks.user = { id: "eu" };
 });
 
 describe("contas do Meu dia", () => {
@@ -265,6 +276,109 @@ describe("painéis do Meu dia", () => {
     expect(screen.getByTestId("lista-tarefas-equipe").textContent).toContain(
       "Nenhuma tarefa concluída nos últimos 7 dias.",
     );
+  });
+});
+
+// ia.vek v1.7.6: meta e capacidade são do admin; o gerente só lê. Propostas
+// aguardando aprovação e pedidos de agendamento aparecem no dia.
+describe("Meu dia v1.7.6", () => {
+  it("gerente vê a meta só para leitura, sem campo de meta nem de capacidade", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    mocks.org.role = "manager";
+    mocks.resposta = { funcao: "gerente", gerente: { ...GERENTE_VAZIO, meta_agendamentos_dia: 8 } };
+    montar();
+    const leitura = await screen.findByTestId("meta-agendamentos-leitura");
+    expect(leitura.textContent).toContain("8");
+    expect(screen.queryByTestId("meta-agendamentos")).toBeNull();
+    expect(screen.queryByTestId("capacidade-por-horario")).toBeNull();
+  });
+
+  it("admin da loja vê os campos de meta e de capacidade por horário", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    mocks.org.role = "admin";
+    mocks.resposta = {
+      funcao: "gerente",
+      gerente: { ...GERENTE_VAZIO, meta_agendamentos_dia: 8, agenda_capacidade_por_horario: 2 },
+    };
+    montar();
+    const meta = (await screen.findByTestId("meta-agendamentos")) as HTMLInputElement;
+    expect(meta.value).toBe("8");
+    expect((screen.getByTestId("capacidade-por-horario") as HTMLInputElement).value).toBe("2");
+    expect(screen.queryByTestId("meta-agendamentos-leitura")).toBeNull();
+  });
+
+  it("super-admin da plataforma (fora do suporte) também edita, mesmo como gerente na loja", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    mocks.org.role = "manager";
+    mocks.user = { id: "eu", is_platform_admin: true, support: null };
+    mocks.resposta = { funcao: "gerente", gerente: GERENTE_VAZIO };
+    montar();
+    expect(await screen.findByTestId("meta-agendamentos")).toBeTruthy();
+  });
+
+  it("gerente vê as propostas aguardando aprovação, com vendedor e link", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    mocks.org.role = "manager";
+    mocks.resposta = {
+      funcao: "gerente",
+      gerente: {
+        ...GERENTE_VAZIO,
+        propostas_aguardando_aprovacao: [
+          {
+            id: "p1",
+            titulo: "Hilux 2026",
+            total_cents: 1_500_000,
+            moeda: "BRL",
+            lead_id: "l1",
+            pedida_em: new Date().toISOString(),
+            vendedor_nome: "Bruno",
+            contato_nome: "Ana",
+          },
+        ],
+      },
+    };
+    montar();
+    expect(await screen.findByText("Propostas aguardando aprovação")).toBeTruthy();
+    const link = screen.getByRole("link", { name: /Ana/ });
+    expect(link.getAttribute("href")).toBe("/app/proposals/p1");
+    expect(link.textContent).toContain("Bruno");
+  });
+
+  it("lista vazia de propostas aguardando mostra o estado amigável", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    mocks.org.role = "manager";
+    mocks.resposta = { funcao: "gerente", gerente: { ...GERENTE_VAZIO, propostas_aguardando_aprovacao: [] } };
+    montar();
+    expect(await screen.findByText("Nenhuma proposta esperando a sua aprovação.")).toBeTruthy();
+  });
+
+  it("o Meu dia busca os pedidos de agendamento e mostra os pendentes a quem decide", async () => {
+    mocks.org.interface_settings = { preset: "completa", funcao: "gerente" };
+    mocks.org.role = "admin";
+    mocks.pedidos = {
+      pode_decidir: true,
+      pedidos: [
+        {
+          id: "pd1",
+          contact_id: "c1",
+          conversation_id: null,
+          quando: new Date(Date.now() + 86_400_000).toISOString(),
+          event_type_id: null,
+          observacao: null,
+          origem: "pessoa",
+          status: "pendente",
+          motivo_da_recusa: null,
+          contato_nome: "Carlos",
+          pedido_por_nome: "Bia",
+        },
+      ],
+    };
+    mocks.resposta = { funcao: "gerente", gerente: GERENTE_VAZIO };
+    montar();
+    const bloco = await screen.findByTestId("bloco-pedidos-de-agendamento");
+    expect(bloco.textContent).toContain("Pedidos de agendamento");
+    expect(bloco.textContent).toContain("Carlos");
+    expect(mocks.get).toHaveBeenCalledWith("/api/v1/iavek/pedidos-de-agendamento");
   });
 });
 

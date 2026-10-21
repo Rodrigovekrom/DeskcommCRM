@@ -54,19 +54,23 @@ function noBanco(script: string): string {
 const ORG = "dddddddd-0553-4000-8000-00000000000a";
 const MANAGER = "dddddddd-0553-4000-8000-0000000000a1";
 const AGENT = "dddddddd-0553-4000-8000-0000000000a2";
+// ia.vek v1.7.6 (0581/0582/0583): a escrita do catálogo passou de manager para admin.
+const ADMIN = "dddddddd-0553-4000-8000-0000000000a3";
 
 beforeAll(() => {
   sql(`
     insert into auth.users (id, email) values
       ('${MANAGER}', 'catalogo-0553-mgr@invariant.test'),
-      ('${AGENT}',   'catalogo-0553-agent@invariant.test')
+      ('${AGENT}',   'catalogo-0553-agent@invariant.test'),
+      ('${ADMIN}',   'catalogo-0553-admin@invariant.test')
       on conflict (id) do nothing;
     insert into public.organizations (id, slug, legal_name, display_name)
       values ('${ORG}', 'catalogo-0553', 'Catalogo 0553', 'Catalogo 0553')
       on conflict (id) do nothing;
     insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
       ('${MANAGER}', '${ORG}', 'manager', now()),
-      ('${AGENT}',   '${ORG}', 'agent',   now())
+      ('${AGENT}',   '${ORG}', 'agent',   now()),
+      ('${ADMIN}',   '${ORG}', 'admin',   now())
       on conflict do nothing;
   `);
 });
@@ -93,27 +97,39 @@ describe("catalog_products — a leitura não avalia a regra de escrita", () => 
     expect(n).toBe("0");
   });
 
-  it("o manager CADASTRA e APAGA; o agent não apaga (o trio cobre o que o for all cobria)", () => {
+  it("o admin CADASTRA e APAGA; manager e agent não (o trio cobre o que o for all cobria)", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): o trio insert/write/delete passou de manager para admin.
     const quantos = () =>
       noBanco(`select count(*) from public.catalog_products where codigo = 'INV-0553';`);
 
     comoUsuario(
       MANAGER,
+      `do $$ begin
+         insert into public.catalog_products (organization_id, codigo, nome, preco_cents)
+           values ('${ORG}', 'INV-0553', 'Sonda do manager', 100) on conflict do nothing;
+       exception when others then null; end $$;`,
+    );
+    expect(quantos()).toBe("0");
+
+    comoUsuario(
+      ADMIN,
       `insert into public.catalog_products (organization_id, codigo, nome, preco_cents)
          values ('${ORG}', 'INV-0553', 'Sonda da 0553', 100) on conflict do nothing;`,
     );
     expect(quantos()).toBe("1");
 
-    comoUsuario(
-      AGENT,
-      `do $$ begin
-         delete from public.catalog_products where organization_id = '${ORG}' and codigo = 'INV-0553';
-       exception when others then null; end $$;`,
-    );
-    expect(quantos()).toBe("1");
+    for (const quem of [AGENT, MANAGER]) {
+      comoUsuario(
+        quem,
+        `do $$ begin
+           delete from public.catalog_products where organization_id = '${ORG}' and codigo = 'INV-0553';
+         exception when others then null; end $$;`,
+      );
+      expect(quantos()).toBe("1");
+    }
 
     comoUsuario(
-      MANAGER,
+      ADMIN,
       `delete from public.catalog_products where organization_id = '${ORG}' and codigo = 'INV-0553';`,
     );
     expect(quantos()).toBe("0");

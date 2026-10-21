@@ -288,7 +288,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const authz = await resolveAuthDual(req, {
     requestId,
     resource: "calendar_event_types",
-    role: "manager",
+    role: "admin",
     scope: "mcp:write",
   });
   if (!authz.ok) return authz.response;
@@ -341,7 +341,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   const authz = await resolveAuthDual(req, {
     requestId,
     resource: "calendar_event_types",
-    role: "manager",
+    role: "admin",
     scope: "mcp:write",
   });
   if (!authz.ok) return authz.response;
@@ -398,7 +398,7 @@ export async function DELETE(req: NextRequest): Promise<Response> {
   const authz = await resolveAuthDual(req, {
     requestId,
     resource: "calendar_event_types",
-    role: "manager",
+    role: "admin",
     scope: "mcp:write",
   });
   if (!authz.ok) return authz.response;

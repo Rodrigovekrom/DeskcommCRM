@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Webhooks" };
 export default async function WebhooksPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
-  const canManage = !!activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
+  const canManage = !!activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin;
   if (!canManage) redirect("/app/inbox");
   const idioma = user.idioma;
 

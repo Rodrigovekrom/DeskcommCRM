@@ -28,7 +28,7 @@ export default async function Page() {
   // Sem organização ativa não há catálogo — mesmo caminho da tela irmã de
   // Agenda, e não um 500 por `org.role` de null.
   if (!org) redirect("/app");
-  const podeEditar = ROLE_RANK[org.role] >= ROLE_RANK.manager;
+  const podeEditar = ROLE_RANK[org.role] >= ROLE_RANK.admin;
   // Server Component não tem `useT`: a tradução vem do idioma do usuário, como
   // na tela irmã de Agenda. Texto solto aqui reprova o gate de espanhol — e com
   // razão, porque é texto que a pessoa lê.

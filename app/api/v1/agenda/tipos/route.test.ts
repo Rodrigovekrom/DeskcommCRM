@@ -413,7 +413,7 @@ describe("isolamento entre organizações", () => {
     expect(daOutra.reminder_minutes_before).toBe(1440);
   });
 
-  it("alterar exige manager", async () => {
+  it("alterar exige admin", async () => {
     vi.mocked(requireRole).mockResolvedValue({
       ok: false,
       response: fail("forbidden", "sem permissão", 403, {}),
@@ -428,7 +428,8 @@ describe("isolamento entre organizações", () => {
     expect(db.escritas).toEqual([]);
     // O teste acima recusaria igual se a rota pedisse `viewer` — quem prende o
     // papel é a asserção sobre o argumento.
-    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin
+    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("admin");
   });
 });
 

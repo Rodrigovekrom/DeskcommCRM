@@ -35,7 +35,8 @@ interface MundoOpts {
 }
 
 function montarMundo(opts: MundoOpts = {}) {
-  const papel = opts.papel ?? "manager";
+  // ia.vek v1.7.6: configuração só do admin
+  const papel = opts.papel ?? "admin";
   const rank = ROLE_RANK[papel] ?? 0;
   mocks.requireRole.mockImplementation(async (minRole: keyof typeof ROLE_RANK) => {
     const minRank = ROLE_RANK[minRole] ?? 0;
@@ -107,8 +108,9 @@ describe("POST /api/v1/settings/proposal-templates", () => {
     return new Request("http://x", { method: "POST", body: JSON.stringify(payload) });
   }
 
-  it("personalizar como agent → 403 e nenhum insert", async () => {
-    const mundo = montarMundo({ papel: "agent" });
+  // ia.vek v1.7.6: configuração só do admin — manager também recebe 403
+  it.each(["agent", "manager"] as const)("personalizar como %s → 403 e nenhum insert", async (papel) => {
+    const mundo = montarMundo({ papel });
     const res = await POST(post({ acao: "personalizar", base_slug: "ecommerce" }) as never);
     expect(res.status).toBe(403);
     expect(mundo.capturado()).toBeUndefined();
@@ -160,8 +162,9 @@ describe("POST /api/v1/settings/proposal-templates", () => {
     expect(mundo.capturado()).toBeUndefined();
   });
 
-  it("ocultar como agent → 403 e nenhum update", async () => {
-    const mundo = montarMundo({ papel: "agent" });
+  // ia.vek v1.7.6: configuração só do admin — manager também recebe 403
+  it.each(["agent", "manager"] as const)("ocultar como %s → 403 e nenhum update", async (papel) => {
+    const mundo = montarMundo({ papel });
     const res = await POST(post({ acao: "ocultar", slug: "ecommerce" }) as never);
     expect(res.status).toBe(403);
     expect(mundo.atualizado()).toBeUndefined();

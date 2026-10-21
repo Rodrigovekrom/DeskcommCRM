@@ -26,7 +26,7 @@ export async function DELETE(
   if (negado) return negado;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "campaign_suppressions" });
+  const authz = await requireRole("admin", { requestId, resource: "campaign_suppressions" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { id } = await ctx.params;

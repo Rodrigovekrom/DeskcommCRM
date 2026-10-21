@@ -82,6 +82,8 @@ const onboarding = vi.hoisted(() => ({ guardar: vi.fn(), padrao: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app/actions/onboarding/_shared", () => ({
   requireOnboardingCtx: vi.fn(async () => ({ orgId: ORG, userId: "u1", role: "admin" })),
+  // ia.vek v1.7.6: configuração só do admin — o passo da chave pede o contexto de admin
+  requireOnboardingAdminCtx: vi.fn(async () => ({ orgId: ORG, userId: "u1", role: "admin" })),
   OnboardingError: class extends Error {},
 }));
 vi.mock("@/lib/ai/credenciais/guardar", async (importOriginal) => ({

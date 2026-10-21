@@ -52,7 +52,8 @@ import { POST } from "./route";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 const ROLE_RANK: Record<string, number> = { viewer: 1, agent: 2, manager: 3, admin: 4 };
 
-function montarMundo(papel: keyof typeof ROLE_RANK = "manager") {
+// ia.vek v1.7.6: configuração só do admin
+function montarMundo(papel: keyof typeof ROLE_RANK = "admin") {
   const rank = ROLE_RANK[papel] ?? 0;
   mocks.requireRole.mockImplementation(async (minRole: keyof typeof ROLE_RANK) => {
     const minRank = ROLE_RANK[minRole] ?? 0;
@@ -133,8 +134,9 @@ describe("POST /api/v1/settings/proposal-templates/importar", () => {
     expect(json.data.disponivel).toBe(false);
   });
 
-  it("agent → 403 e gerarModeloDoTexto não chamado", async () => {
-    montarMundo("agent");
+  // ia.vek v1.7.6: configuração só do admin — manager também recebe 403
+  it.each(["agent", "manager"] as const)("%s → 403 e gerarModeloDoTexto não chamado", async (papel) => {
+    montarMundo(papel);
     const res = await POST(arquivo("proposta.txt", "text/plain", TEXTO_LONGO) as never);
     expect(res.status).toBe(403);
     expect(mocks.gerarModeloDoTexto).not.toHaveBeenCalled();

@@ -177,7 +177,7 @@ export function PipelinePageClient({
           selectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
           leadInicial={searchParams.get("lead")}
-          podeRenomearEtapa={ROLE_RANK[role] >= ROLE_RANK.manager}
+          podeRenomearEtapa={ROLE_RANK[role] >= ROLE_RANK.admin}
         />
       )}
       <BulkActionBar

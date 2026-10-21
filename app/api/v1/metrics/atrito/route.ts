@@ -200,7 +200,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "metrics" });
+  const authz = await requireRole("admin", { requestId, resource: "metrics" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg, user } = authz;

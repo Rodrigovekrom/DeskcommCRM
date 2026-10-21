@@ -60,7 +60,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (desligado) return desligado;
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
-  const authz = await requireRole("manager", { requestId, resource: "imports" });
+  const authz = await requireRole("admin", { requestId, resource: "imports" });
   if (!authz.ok) return authz.response;
 
   try {

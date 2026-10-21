@@ -50,7 +50,7 @@ export default async function ProdutosPage({
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
 
-  const podeEditar = (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
+  const podeEditar = (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin;
 
   // Busca e página moram na URL: o servidor traz só a página pedida, de TODO o
   // catálogo. Antes eram os 500 primeiros, filtrados no navegador — o resto não

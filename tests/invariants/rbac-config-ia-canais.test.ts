@@ -28,6 +28,8 @@ import {
 
 const AGENTE_CONFIG = "eeeeeeee-1111-4000-8000-000000000001";
 const CRED_CONFIG = "eeeeeeee-2222-4000-8000-000000000001";
+// ia.vek v1.7.6 (0581): o telefone (DID) da organização sai da dívida de RBAC.
+const TELEFONE_CONFIG = "eeeeeeee-3333-4000-8000-000000000581";
 
 function seedConfig(): void {
   sql(`
@@ -38,6 +40,9 @@ function seedConfig(): void {
       (id, organization_id, provider, label, api_key_encrypted, api_key_iv, api_key_tag, api_key_last4)
       values ('${CRED_CONFIG}', '${GOV_ORG}', 'anthropic', 'Chave principal',
               '\\x01'::bytea, '\\x02'::bytea, '\\x03'::bytea, '9999')
+      on conflict do nothing;
+    insert into public.phone_numbers (id, organization_id, number, label, trunk_endpoint)
+      values ('${TELEFONE_CONFIG}', '${GOV_ORG}', 'iavek-0581-did', 'ORIGINAL', 'trunk-0581')
       on conflict do nothing;
   `);
 }
@@ -123,6 +128,47 @@ describe("0150 — escrita de config de IA/canais exige admin", () => {
   });
 });
 
+describe("ia.vek 0581 — telefone (phone_numbers) é configuração de admin", () => {
+  // ia.vek v1.7.6 (0581/0582/0583): phone_numbers tinha UMA policy FOR ALL só por
+  // organização — qualquer membro, até viewer, gravava. Virou leitura para membros
+  // + escrita só para admin. O par abaixo é o que tira a tabela da dívida.
+  for (const [papel, usuario] of [
+    ["viewer", GOV_VIEWER],
+    ["manager", GOV_MANAGER],
+  ] as const) {
+    it(`${papel} NÃO reescreve nem cadastra telefone`, () => {
+      expect(
+        writeCountAs(
+          usuario,
+          `update public.phone_numbers set label = 'SEQUESTRADO' where id = '${TELEFONE_CONFIG}'`,
+        ),
+      ).toBe(0);
+      expect(
+        writeCountAs(
+          usuario,
+          `insert into public.phone_numbers (organization_id, number, trunk_endpoint)
+             values ('${GOV_ORG}', 'iavek-0581-${papel}', 'trunk-0581')`,
+        ),
+      ).toBe(0);
+    });
+  }
+
+  it("CONTROLE POSITIVO: admin altera o telefone", () => {
+    expect(
+      writeCountAs(
+        GOV_ADMIN,
+        `update public.phone_numbers set label = 'TROCADO PELO ADMIN' where id = '${TELEFONE_CONFIG}'`,
+      ),
+    ).toBe(1);
+  });
+
+  it("CONTROLE POSITIVO: viewer continua LENDO o telefone", () => {
+    expect(
+      countAs(GOV_VIEWER, `select count(*) from public.phone_numbers where id = '${TELEFONE_CONFIG}';`),
+    ).toBe(1);
+  });
+});
+
 describe("0150 — o segredo cifrado some da superfície do browser", () => {
   // O SELECT foi revogado POR COLUNA: as três colunas do segredo saem, as doze
   // que a view consome ficam. Por isso o que se mede aqui é o acesso à COLUNA,
@@ -189,14 +235,14 @@ const DIVIDA_RBAC_CONHECIDA = new Set([
   "followup_enrollments", "followup_flow_pointers",
   "idempotency_keys", "incidents", "job_queue", "judge_alignment_pool", "knowledge_searches",
   "lead_checkpoints", "lead_notes", "lead_state", "lead_state_transitions", "llm_calls",
-  "meta_templates", "metrics", "nuvemshop_products", "orders", "org_memory_entries",
+  // meta_templates saiu na 0581 (ia.vek v1.7.6): o par de casos está em
+  // meta-templates-rls.test.ts.
+  "metrics", "nuvemshop_products", "orders", "org_memory_entries",
   "org_memory_pointers", "org_memory_versions", "organizations", "outbound_copies",
   "pacing_ledger",
-  // phone_numbers (SIP module, #677): a leitura/escrita e org-scoped, mas o
-  // segundo eixo (so agent+ resolve numero, so manager+ configura roteamento)
-  // ainda nao tem par de casos provando papel de baixo barrado. Divida
-  // herdada de antes desta varredura existir, nao introduzida agora.
-  "phone_numbers", "playbook_pointers", "playbook_versions", "promise_table_pointers",
+  // phone_numbers saiu na 0581 (ia.vek v1.7.6): o par de casos está no describe
+  // "ia.vek 0581 — telefone" acima.
+  "playbook_pointers", "playbook_versions", "promise_table_pointers",
   "promise_table_versions", "reentry_knob_pointers", "reentry_knob_versions",
   "reentry_template_pointers", "reentry_template_versions", "send_ledger",
   "skill_activations", "skill_pointers", "skill_versions", "storage_redaction_queue",
@@ -215,6 +261,8 @@ describe("0150 — a dívida de RBAC não cresce", () => {
       // A trilha e as versões de follow-up saíram da dívida na 0490 (#1915): o
       // par de casos está em followup-trilha-e-versoes-rls-por-operacao.test.ts.
       "followup_enrollment_events", "followup_flow_versions",
+      // ia.vek v1.7.6 (0581): a FOR ALL só-tenancy virou `_select` + `_admin_write`.
+      "phone_numbers", "meta_templates",
     ];
     const semRole = sql(`
       select coalesce(string_agg(distinct tablename, ','), '') from pg_policies

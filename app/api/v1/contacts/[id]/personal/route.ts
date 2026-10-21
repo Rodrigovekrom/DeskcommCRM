@@ -165,7 +165,7 @@ export async function POST(_req: NextRequest, ctx: Context): Promise<Response> {
 
   // Só gerente e dono marcam (spec decisão 1). Atendente recebe 403 — é ele
   // quem NÃO pode esconder conversa da operação.
-  const authz = await requireRole("manager", { requestId, resource: "contacts" });
+  const authz = await requireRole("admin", { requestId, resource: "contacts" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -484,7 +484,7 @@ export async function DELETE(_req: NextRequest, ctx: Context): Promise<Response>
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("manager", { requestId, resource: "contacts" });
+  const authz = await requireRole("admin", { requestId, resource: "contacts" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

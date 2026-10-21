@@ -80,7 +80,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   // (`fn_role_at_least(p_org, 'manager')`, que não conhece platform admin), e
   // deixar passar aqui só adiava o 42501 → 403 para depois do clique. A leitura
   // acima segue a mesma régua, para a tela não oferecer o que a escrita recusa.
-  const auth = await requireRole("manager", { requestId, resource: "settings_tags" });
+  const auth = await requireRole("admin", { requestId, resource: "settings_tags" });
   if (!auth.ok) return auth.response;
   if (await mfaEmDivida())
     return fail("mfa_required", "Confirme a verificação em duas etapas.", 403, { requestId });

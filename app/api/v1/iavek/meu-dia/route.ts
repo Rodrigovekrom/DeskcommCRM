@@ -17,6 +17,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { requireRole } from "@/lib/auth/require-role";
+import { capacidadePorHorario } from "@/lib/iavek/capacidade-da-agenda";
 import { cronometroDoLead, entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
 import { FUNCOES, funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
@@ -187,19 +188,23 @@ export async function GET(req: NextRequest): Promise<Response> {
             `id, titulo, status, total_cents, moeda, valid_until, contact_id, lead_id, ${CONTATO}`,
           )
           .eq("organization_id", orgId)
-          .eq("sent_by_user_id", eu)
-          .in("status", ["rascunho", "enviando", "enviada"])
+          // v1.7.6: as que eu enviei e as que eu pedi para o gerente aprovar.
+          .or(`sent_by_user_id.eq.${eu},aprovacao_pedida_por.eq.${eu}`)
+          .in("status", ["rascunho", "aguardando_aprovacao", "enviando", "enviada"])
           .order("updated_at", { ascending: false })
           .limit(30),
         ehSdr ? leadsComPrazo(200) : Promise.resolve([]),
+        // v1.7.6: a meta conta os PEDIDOS DESTE SDR que o admin confirmou hoje
+        // (o SDR não marca mais direto; pedido recusado ou pendente não conta).
         ehSdr
           ? supabase
-              .from("calendar_appointments")
+              .from("iavek_pedidos_de_agendamento")
               .select("id", { count: "exact", head: true })
               .eq("organization_id", orgId)
-              .neq("status", "cancelled")
-              .gte("created_at", inicio.toISOString())
-              .lt("created_at", fim.toISOString())
+              .eq("pedido_por", eu)
+              .eq("status", "confirmado")
+              .gte("decidido_em", inicio.toISOString())
+              .lt("decidido_em", fim.toISOString())
           : Promise.resolve({ count: 0, error: null }),
       ]);
       const falha = agenda.error ?? meus.error ?? propostas.error ?? agendadosHoje.error;
@@ -412,6 +417,29 @@ export async function GET(req: NextRequest): Promise<Response> {
     ]);
     const nomeDe = (u: string | null) => (u ? (nomes.get(u) ?? null) : null);
     const comPessoa = (abertas.data ?? []).filter((c) => c.assigned_to_user_id).length;
+    // v1.7.6: as propostas que os vendedores deixaram aguardando a aprovação.
+    const { data: aguardando, error: erroAguardando } = await supabase
+      .from("crm_proposals")
+      .select("id, titulo, total_cents, moeda, lead_id, aprovacao_pedida_em, aprovacao_pedida_por, contacts(name, display_name)")
+      .eq("organization_id", orgId)
+      .eq("status", "aguardando_aprovacao")
+      .order("aprovacao_pedida_em", { ascending: true })
+      .limit(50);
+    if (erroAguardando) throw new Error(erroAguardando.message);
+    type LinhaAguardando = {
+      id: string;
+      titulo: string;
+      total_cents: number;
+      moeda: string;
+      lead_id: string | null;
+      aprovacao_pedida_em: string | null;
+      aprovacao_pedida_por: string | null;
+      contacts?: unknown;
+    };
+    const linhasAguardando = (aguardando ?? []) as unknown as LinhaAguardando[];
+    const nomesDosPedintes = await nomesDosAtendentes(
+      linhasAguardando.map((p) => p.aprovacao_pedida_por).filter((u): u is string => Boolean(u)),
+    );
 
     return ok(
       {
@@ -437,6 +465,25 @@ export async function GET(req: NextRequest): Promise<Response> {
           },
           perdas_30d: perdasPorMotivo(perdidos.data ?? []),
           meta_agendamentos_dia: metaDoDia,
+          agenda_capacidade_por_horario: capacidadePorHorario(settings),
+          propostas_aguardando_aprovacao: linhasAguardando.map((p) => {
+            const c = (Array.isArray(p.contacts) ? p.contacts[0] : p.contacts) as
+              | { name?: string | null; display_name?: string | null }
+              | null
+              | undefined;
+            return {
+              id: p.id,
+              titulo: p.titulo,
+              total_cents: p.total_cents,
+              moeda: p.moeda,
+              lead_id: p.lead_id,
+              pedida_em: p.aprovacao_pedida_em,
+              vendedor_nome: p.aprovacao_pedida_por
+                ? (nomesDosPedintes.get(p.aprovacao_pedida_por) ?? null)
+                : null,
+              contato_nome: c ? rotuloDoContato(c as never) : null,
+            };
+          }),
           tarefas_da_equipe: {
             por_pessoa: resumoDasTarefas.map((p) => ({ ...p, nome: nomeDe(p.user_id) })),
             itens: tarefasDaEquipe.map((t) => ({
@@ -463,9 +510,13 @@ export async function GET(req: NextRequest): Promise<Response> {
   }
 }
 
-const metaSchema = z.strictObject({
-  meta_agendamentos_dia: z.number().int().min(0).max(1000).nullable(),
-});
+const metaSchema = z
+  .strictObject({
+    meta_agendamentos_dia: z.number().int().min(0).max(1000).nullable().optional(),
+    // v1.7.6: quantos atendimentos cabem no mesmo horário (null = sem limite).
+    agenda_capacidade_por_horario: z.number().int().min(1).max(1000).nullable().optional(),
+  })
+  .refine((v) => v.meta_agendamentos_dia !== undefined || v.agenda_capacidade_por_horario !== undefined);
 
 /**
  * A meta de agendamentos do dia (o contador "agendamentos x meta" do SDR).
@@ -475,7 +526,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "organizations" });
+  const authz = await requireRole("admin", { requestId, resource: "organizations" });
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId;
 
@@ -495,9 +546,18 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     return fail("internal_error", "Não consegui ler a configuração.", 500, { requestId });
   const atual = (org.settings ?? {}) as Record<string, unknown>;
   const iavek = { ...((atual.iavek as Record<string, unknown> | undefined) ?? {}) };
-  const meta = parsed.data.meta_agendamentos_dia;
-  if (meta && meta > 0) iavek.meta_agendamentos_dia = meta;
-  else delete iavek.meta_agendamentos_dia;
+  const metaPedida = parsed.data.meta_agendamentos_dia;
+  if (metaPedida !== undefined) {
+    if (metaPedida && metaPedida > 0) iavek.meta_agendamentos_dia = metaPedida;
+    else delete iavek.meta_agendamentos_dia;
+  }
+  const capacidade = parsed.data.agenda_capacidade_por_horario;
+  if (capacidade !== undefined) {
+    if (capacidade) iavek.agenda_capacidade_por_horario = capacidade;
+    else delete iavek.agenda_capacidade_por_horario;
+  }
+  const metaGravada = Number(iavek.meta_agendamentos_dia);
+  const meta = Number.isFinite(metaGravada) && metaGravada > 0 ? metaGravada : null;
   const { error } = await admin
     .from("organizations")
     .update({ settings: { ...atual, iavek } })
@@ -511,7 +571,16 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     resourceType: "organization",
     resourceId: orgId,
     requestId,
-    metadata: { meta_agendamentos_dia: meta && meta > 0 ? meta : null },
+    metadata: {
+      meta_agendamentos_dia: meta,
+      agenda_capacidade_por_horario: (iavek.agenda_capacidade_por_horario as number | undefined) ?? null,
+    },
   });
-  return ok({ meta_agendamentos_dia: meta && meta > 0 ? meta : null }, { requestId });
+  return ok(
+    {
+      meta_agendamentos_dia: meta,
+      agenda_capacidade_por_horario: (iavek.agenda_capacidade_por_horario as number | undefined) ?? null,
+    },
+    { requestId },
+  );
 }

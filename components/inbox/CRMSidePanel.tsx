@@ -5,6 +5,7 @@ import { AcervoSearch } from "./AcervoSearch";
 import { LeadEnrichment } from "./LeadEnrichment";
 import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
+import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import type { Locale } from "date-fns";
@@ -532,7 +533,8 @@ function CamposDoFunil({
 }
 
 export function CRMSidePanel({ conversation }: Props) {
-  const { user } = useAuth();
+  const { user, activeOrg } = useAuth();
+  const ehAdminDaLoja = (user.is_platform_admin && !user.support) || activeOrg?.role === "admin";
   const readonly = user.support?.access_mode === "support_readonly";
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -697,7 +699,9 @@ export function CRMSidePanel({ conversation }: Props) {
             </div>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
-            {contactId&&conversation?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
+            {/* ia.vek v1.7.6: só o admin marca; os demais PEDEM o agendamento. */}
+            {contactId&&conversation&&ehAdminDaLoja?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
+            {contactId&&conversation&&!ehAdminDaLoja?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
             <Button
               size="sm"
               variant="outline"

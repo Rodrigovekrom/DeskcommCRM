@@ -1,7 +1,7 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { seedGov, GOV_MANAGER, GOV_ORG, GOV_VIEWER } from "./gov-helpers";
+import { seedGov, GOV_ADMIN, GOV_MANAGER, GOV_ORG, GOV_VIEWER } from "./gov-helpers";
 
 /**
  * Vocabulário de tags (issue #852, fatia S4) — o aceite combinado no fio da issue:
@@ -47,8 +47,9 @@ async function actor(user: string | null, sql: string, args: unknown[] = []) {
 }
 
 function operar(org: string, acao: string, tag: string, destino: string | null) {
+  // ia.vek v1.7.6 (0581/0582/0583): fn_vocabulario_de_tags_operar passou de manager para admin.
   return actor(
-    GOV_MANAGER,
+    GOV_ADMIN,
     "select public.fn_vocabulario_de_tags_operar($1,$2,$3,$4) as r",
     [org, acao, tag, destino],
   );
@@ -170,6 +171,18 @@ describe("fatia S4 — vocabulário de tags", () => {
   it("viewer é recusado antes de qualquer escrita", async () => {
     await expect(
       actor(GOV_VIEWER, "select public.fn_vocabulario_de_tags_operar($1,$2,$3,$4)", [
+        GOV_ORG,
+        "excluir",
+        "obra",
+        null,
+      ]),
+    ).rejects.toThrow(/insufficient_role/);
+  });
+
+  it("manager é recusado antes de qualquer escrita", async () => {
+    // ia.vek v1.7.6 (0581/0582/0583): o gerente deixou de mexer no vocabulário de etiquetas.
+    await expect(
+      actor(GOV_MANAGER, "select public.fn_vocabulario_de_tags_operar($1,$2,$3,$4)", [
         GOV_ORG,
         "excluir",
         "obra",

@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { SecaoRecolhivel } from "@/components/inbox/SecaoRecolhivel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PedidosDeAgendamento } from "@/components/iavek/PedidosDeAgendamento";
 
 /**
  * ia.vek v1.6 (parte B): o "Meu dia" — a tela inicial de cada FUNÇÃO, com só o
@@ -92,6 +93,19 @@ interface DadosDoDia {
     conversas_abertas: { com_pessoa: number; com_ia_ou_sem_dono: number };
     perdas_30d: Array<{ motivo: string; total: number }>;
     meta_agendamentos_dia: number | null;
+    /** v1.7.6: atendimentos no mesmo horário (null = sem limite). */
+    agenda_capacidade_por_horario?: number | null;
+    /** v1.7.6: propostas dos vendedores esperando a aprovação do gerente. */
+    propostas_aguardando_aprovacao?: Array<{
+      id: string;
+      titulo: string;
+      total_cents: number;
+      moeda: string;
+      lead_id: string | null;
+      pedida_em: string | null;
+      vendedor_nome: string | null;
+      contato_nome: string | null;
+    }>;
     /** v1.7.5: quem tem o quê — as abertas e as feitas nos últimos 7 dias. */
     tarefas_da_equipe?: {
       por_pessoa: Array<{
@@ -141,6 +155,8 @@ export function MeuDia() {
         <h1 className="text-xl font-semibold">{t("Meu dia")}</h1>
         <span className="text-sm text-muted-foreground">{t(ROTULO_DA_FUNCAO[funcao])}</span>
       </header>
+      {/* ia.vek v1.7.6: pedidos de agendamento (o admin decide; os demais acompanham os seus). */}
+      <PedidosDeAgendamento />
       {isLoading ? (
         <div className="space-y-3">
           <Skeleton className="h-24 w-full" />
@@ -518,6 +534,8 @@ function Numero({
 }
 
 function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
+  const { user, activeOrg } = useAuth();
+  const ehAdminDaLoja = (user.is_platform_admin && !user.support) || activeOrg?.role === "admin";
   const t = useT();
   const agora = useAgora();
   const { agendou, veio, comprou } = d.funil_30d;
@@ -535,6 +553,29 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
         <Numero rotulo={t("Conversas com a IA")} valor={ia} />
         <Numero rotulo={t("Conversas com pessoas")} valor={humano} />
       </div>
+      {d.propostas_aguardando_aprovacao && (
+        <Bloco
+          id="gerente-propostas-aguardando"
+          titulo={t("Propostas aguardando aprovação")}
+          extra={<Contagem n={d.propostas_aguardando_aprovacao.length} />}
+        >
+          {d.propostas_aguardando_aprovacao.length === 0 ? (
+            <Vazio>{t("Nenhuma proposta esperando a sua aprovação.")}</Vazio>
+          ) : (
+            <ul className="divide-y divide-border">
+              {d.propostas_aguardando_aprovacao.map((p) => (
+                <Linha
+                  key={p.id}
+                  href={`/app/proposals/${p.id}`}
+                  principal={p.contato_nome ?? p.titulo}
+                  secundario={`${p.vendedor_nome ?? t("Vendedor")} · ${p.titulo}`}
+                  direita={formatCents(p.total_cents, p.moeda)}
+                />
+              ))}
+            </ul>
+          )}
+        </Bloco>
+      )}
       {d.tarefas_da_equipe && <TarefasDaEquipe dados={d.tarefas_da_equipe} />}
       <div className="grid gap-4 lg:grid-cols-2">
         <Bloco
@@ -628,7 +669,17 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
           )}
         </Bloco>
       </div>
-      <MetaDeAgendamentos meta={d.meta_agendamentos_dia} />
+      {/* v1.7.6: só o admin define a meta e a capacidade; o gerente VÊ a meta. */}
+      {ehAdminDaLoja ? (
+        <MetaDeAgendamentos
+          meta={d.meta_agendamentos_dia}
+          capacidade={d.agenda_capacidade_por_horario ?? null}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground" data-testid="meta-agendamentos-leitura">
+          {t("Meta de agendamentos por dia (para o SDR)")}: {d.meta_agendamentos_dia ?? t("sem meta")}
+        </p>
+      )}
     </div>
   );
 }
@@ -799,16 +850,21 @@ function TarefasDaEquipe({
 }
 
 /** A meta de agendamentos do dia que o SDR vê; o gerente define aqui. */
-function MetaDeAgendamentos({ meta }: { meta: number | null }) {
+function MetaDeAgendamentos({ meta, capacidade }: { meta: number | null; capacidade: number | null }) {
   const t = useT();
   const qc = useQueryClient();
   const [valor, setValor] = useState(meta ? String(meta) : "");
+  const [cap, setCap] = useState(capacidade ? String(capacidade) : "");
   const [salvando, setSalvando] = useState(false);
   async function salvar() {
     setSalvando(true);
     try {
       const n = valor.trim() === "" ? null : Math.max(0, Math.floor(Number(valor)));
-      await apiClient.patch("/api/v1/iavek/meu-dia", { meta_agendamentos_dia: n });
+      const c = cap.trim() === "" ? null : Math.min(1000, Math.max(1, Math.floor(Number(cap))));
+      await apiClient.patch("/api/v1/iavek/meu-dia", {
+        meta_agendamentos_dia: n,
+        agenda_capacidade_por_horario: c,
+      });
       toast.success(t("Meta salva."));
       await qc.invalidateQueries({ queryKey: ["iavek", "meu-dia"] });
     } catch {
@@ -831,6 +887,20 @@ function MetaDeAgendamentos({ meta }: { meta: number | null }) {
           onChange={(e) => setValor(e.target.value)}
           className="h-9 w-28 rounded-md border border-input bg-background px-2 text-sm"
           data-testid="meta-agendamentos"
+        />
+      </label>
+      <label className="space-y-1">
+        <span className="block text-xs text-muted-foreground">
+          {t("Atendimentos no mesmo horário (vazio = sem limite)")}
+        </span>
+        <input
+          type="number"
+          min={1}
+          max={1000}
+          value={cap}
+          onChange={(e) => setCap(e.target.value)}
+          className="h-9 w-28 rounded-md border border-input bg-background px-2 text-sm"
+          data-testid="capacidade-por-horario"
         />
       </label>
       <Button size="sm" variant="outline" disabled={salvando} onClick={() => void salvar()}>

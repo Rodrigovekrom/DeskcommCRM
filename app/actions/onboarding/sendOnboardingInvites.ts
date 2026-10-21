@@ -18,7 +18,7 @@ import { buildInviteEmail } from "@/lib/email/templates/invite";
 import { sendEmail } from "@/lib/email/roteador";
 import { marcaDaSaida } from "@/lib/branding/saida";
 import { inviteOnboardingSchema } from "@/lib/schemas/onboarding";
-import { requireOnboardingCtx, patchOnboardingState, OnboardingError } from "./_shared";
+import { requireOnboardingAdminCtx, patchOnboardingState, OnboardingError } from "./_shared";
 
 type PapelHumano = "viewer" | "agent" | "manager" | "admin";
 
@@ -43,7 +43,7 @@ interface InvitePayload {
 export async function sendOnboardingInvites(payload: InvitePayload): Promise<SendInvitesResult> {
   let ctx;
   try {
-    ctx = await requireOnboardingCtx();
+    ctx = await requireOnboardingAdminCtx();
   } catch (err) {
     if (err instanceof OnboardingError) return { ok: false, error: err.code as never };
     throw err;

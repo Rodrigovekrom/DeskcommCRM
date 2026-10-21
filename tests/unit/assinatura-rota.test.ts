@@ -90,7 +90,8 @@ describe("/api/v1/settings/assinatura", () => {
   });
 
   it("PATCH grava a chave SEM apagar as outras, e audita", async () => {
-    sessao("manager");
+    // ia.vek v1.7.6: configuração só do admin
+    sessao("admin");
     const res = await patch({ humanos: true, ia: true, nome_ia: "Bia" });
     expect(res.status).toBe(200);
     expect(estado.settings).toEqual({
@@ -112,13 +113,15 @@ describe("/api/v1/settings/assinatura", () => {
     ["nome vazio", { humanos: true, ia: true, nome_ia: "   " }],
     ["booleano como texto", { humanos: "true", ia: true, nome_ia: "Bia" }],
   ])("PATCH recusa %s (422) e não grava", async (_rotulo, corpo) => {
-    sessao("manager");
+    // ia.vek v1.7.6: configuração só do admin
+    sessao("admin");
     expect((await patch(corpo)).status).toBe(422);
     expect(estado.updates).toHaveLength(0);
   });
 
   it("leitura que falhou NÃO vira gravação (apagaria o settings inteiro)", async () => {
-    sessao("manager");
+    // ia.vek v1.7.6: configuração só do admin
+    sessao("admin");
     estado.erroDeLeitura = true;
     expect((await patch({ humanos: true, ia: false, nome_ia: "Bia" })).status).toBe(500);
     expect(estado.updates).toHaveLength(0);
@@ -126,6 +129,13 @@ describe("/api/v1/settings/assinatura", () => {
 
   it("atendente (agent) não liga a assinatura da organização", async () => {
     sessao("agent");
+    expect((await patch({ humanos: true, ia: true, nome_ia: "Bia" })).status).toBe(403);
+    expect(estado.updates).toHaveLength(0);
+  });
+
+  // ia.vek v1.7.6: configuração só do admin
+  it("gerente (manager) também não liga a assinatura da organização", async () => {
+    sessao("manager");
     expect((await patch({ humanos: true, ia: true, nome_ia: "Bia" })).status).toBe(403);
     expect(estado.updates).toHaveLength(0);
   });

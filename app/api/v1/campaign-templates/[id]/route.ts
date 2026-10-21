@@ -30,7 +30,7 @@ export async function PATCH(
   if (negado) return negado;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "campaign_templates" });
+  const authz = await requireRole("admin", { requestId, resource: "campaign_templates" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { id } = await ctx.params;
@@ -73,7 +73,7 @@ export async function DELETE(
   if (negado) return negado;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "campaign_templates" });
+  const authz = await requireRole("admin", { requestId, resource: "campaign_templates" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { id } = await ctx.params;

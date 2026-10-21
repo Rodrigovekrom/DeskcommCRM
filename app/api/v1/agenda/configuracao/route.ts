@@ -25,7 +25,7 @@ export async function PATCH(req: Request) {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const auth = await requireRole("manager", { requestId, resource: "agenda" });
+  const auth = await requireRole("admin", { requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const parsed = agendaSettingsWriteSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)

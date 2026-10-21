@@ -53,7 +53,7 @@ export default async function TagsPage() {
   // A tela e o banco passam a dizer a MESMA coisa. Se um dia o platform admin
   // DEVER operar aqui, o lugar de mudar é o portão da função (e um invariante
   // que prove), nunca só esta linha.
-  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) {
+  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {
     redirect("/403");
   }
 

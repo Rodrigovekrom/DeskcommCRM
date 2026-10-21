@@ -9571,11 +9571,23 @@ create index if not exists meta_templates_org_status_idx
 
 alter table public.meta_templates enable row level security;
 
+-- ia.vek v1.7.6 (0581): era UMA policy FOR ALL só por organização — qualquer
+-- membro, até viewer, gravava. Leitura para membros, escrita só para admin.
 drop policy if exists tenant_isolation_meta_templates_all on public.meta_templates;
-create policy tenant_isolation_meta_templates_all on public.meta_templates
-  for all
-  using (organization_id in (select public.fn_user_org_ids()))
-  with check (organization_id in (select public.fn_user_org_ids()));
+drop policy if exists meta_templates_select on public.meta_templates;
+create policy meta_templates_select on public.meta_templates
+  for select using (organization_id in (select public.fn_user_org_ids()));
+drop policy if exists meta_templates_admin_write on public.meta_templates;
+create policy meta_templates_admin_write on public.meta_templates
+  for all using (
+    public.fn_is_platform_admin_full()
+    or (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+  ) with check (
+    public.fn_is_platform_admin_full()
+    or (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+  );
 
 -- ---- message type: template (migration 0091) ----
 -- Espelho idempotente. Racional completo no arquivo da migration: `template` NAO
@@ -15951,15 +15963,16 @@ create policy calendar_appointments_select on public.calendar_appointments
   );
 drop policy if exists calendar_appointments_write on public.calendar_appointments;
 create policy calendar_appointments_write on public.calendar_appointments
+  -- ia.vek v1.7.6 (0583): criar, remarcar e cancelar compromisso é só do admin.
   using (
     public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
+        and public.fn_role_at_least(organization_id, 'admin'))
   )
   with check (
     public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
+        and public.fn_role_at_least(organization_id, 'admin'))
   );
 revoke all on public.calendar_appointments from anon;
 
@@ -15976,12 +15989,14 @@ create policy calendar_availability_exceptions_write on public.calendar_availabi
   using (
     public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
-        and (user_id = auth.uid() or public.fn_role_at_least(organization_id, 'manager')))
+        -- ia.vek v1.7.6 (0581): bloqueios da agenda são só do admin
+        and public.fn_role_at_least(organization_id, 'admin'))
   )
   with check (
     public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
-        and (user_id = auth.uid() or public.fn_role_at_least(organization_id, 'manager')))
+        -- ia.vek v1.7.6 (0581): bloqueios da agenda são só do admin
+        and public.fn_role_at_least(organization_id, 'admin'))
   );
 revoke all on public.calendar_availability_exceptions from anon;
 
@@ -16062,48 +16077,11 @@ notify pgrst, 'reload schema';
 -- duplicata destruiria um compromisso combinado com uma pessoa real, e isso uma
 -- migration não faz. Nenhum clone tem linha nesta tabela hoje (nasceu na 0177 e
 -- a rota que grava não existe); o bloco é para o clone que vier a ter.
--- ─── 1 · deduplicar deslocando, sem perder nenhum compromisso ──────────────
--- Empurra a 2ª, 3ª… ocorrência em 1 segundo cada, levando `ends_at` junto para
--- a duração não mudar. Em laço porque um deslocamento pode cair em cima de
--- outro instante já ocupado; 10 passadas cobrem qualquer caso real e o teto
--- impede laço infinito num dado patológico.
-do $$
-declare
-  mexidas integer;
-  passada integer := 0;
-begin
-  loop
-    with duplicadas as (
-      select id,
-             row_number() over (
-               partition by organization_id, owner_user_id, starts_at
-               order by created_at, id
-             ) - 1 as posicao
-        from public.calendar_appointments
-       where status in ('pending', 'confirmed')
-         and owner_user_id is not null
-    )
-    update public.calendar_appointments a
-       set starts_at = a.starts_at + (d.posicao * interval '1 second'),
-           ends_at   = a.ends_at   + (d.posicao * interval '1 second')
-      from duplicadas d
-     where d.id = a.id
-       and d.posicao > 0;
-
-    get diagnostics mexidas = row_count;
-    passada := passada + 1;
-    exit when mexidas = 0 or passada >= 10;
-  end loop;
-end
-$$;
-
--- ─── 2 · a guarda ─────────────────────────────────────────────────────────
-create unique index if not exists calendar_appointments_sem_duplicata_idx
-  on public.calendar_appointments (organization_id, owner_user_id, starts_at)
-  where status in ('pending', 'confirmed') and owner_user_id is not null;
-
-comment on index public.calendar_appointments_sem_duplicata_idx is
-  'Fecha a janela entre a validação do motor de slots e o INSERT: dois POSTs simultâneos para o mesmo instante e o mesmo atendente não viram dois compromissos. Parcial em (pending, confirmed) porque cancelado e realizado não ocupam ninguém, e em owner_user_id não nulo porque NULL não colide com NULL numa UNIQUE — e porque agendamento sem atendente não ocupa agenda. Quem captura o 23505 é a rota, que devolve 409 dizendo qual compromisso está ali.';
+-- ia.vek v1.7.6 (migration 0583): a loja NÃO trava horário — vários
+-- compromissos da mesma pessoa no mesmo instante são permitidos (decisão do
+-- dono do produto). O índice único e a deduplicação que o precedia (ela
+-- DESLOCAVA em segundos os compromissos simultâneos a cada atualização) saem.
+drop index if exists public.calendar_appointments_sem_duplicata_idx;
 
 notify pgrst, 'reload schema';
 
@@ -27312,7 +27290,8 @@ create policy calendar_locations_insert on public.calendar_locations
   for insert with check (
     public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
+        and -- ia.vek v1.7.6 (0581): endereços da agenda são só do admin
+        public.fn_role_at_least(organization_id, 'admin'))
   );
 
 revoke all on public.calendar_locations from anon;
@@ -32687,10 +32666,23 @@ create index if not exists idx_phone_numbers_active on public.phone_numbers(numb
 
 alter table public.phone_numbers enable row level security;
 
+-- ia.vek v1.7.6 (0581): era UMA policy FOR ALL só por organização — qualquer
+-- membro, até viewer, gravava. Leitura para membros, escrita só para admin.
 drop policy if exists phone_numbers_isolation on public.phone_numbers;
-create policy phone_numbers_isolation on public.phone_numbers
-  using (organization_id in (select fn_user_org_ids()))
-  with check (organization_id in (select fn_user_org_ids()));
+drop policy if exists phone_numbers_select on public.phone_numbers;
+create policy phone_numbers_select on public.phone_numbers
+  for select using (organization_id in (select public.fn_user_org_ids()));
+drop policy if exists phone_numbers_admin_write on public.phone_numbers;
+create policy phone_numbers_admin_write on public.phone_numbers
+  for all using (
+    public.fn_is_platform_admin_full()
+    or (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+  ) with check (
+    public.fn_is_platform_admin_full()
+    or (organization_id in (select public.fn_user_org_ids())
+        and public.fn_role_at_least(organization_id, 'admin'))
+  );
 
 drop trigger if exists trg_phone_numbers_updated_at on public.phone_numbers;
 create trigger trg_phone_numbers_updated_at
@@ -40566,7 +40558,9 @@ grant execute on function public.fn_proposta_aloca_numero(uuid, int) to service_
 -- D3 — estado intermediário `enviando`: separa "número reservado" de "entregue".
 alter table public.crm_proposals drop constraint if exists crm_proposals_status_check;
 alter table public.crm_proposals add constraint crm_proposals_status_check
-  check (status in ('rascunho','enviando','enviada','aceita','recusada','vencida','cancelada','substituida'));
+  -- ia.vek v1.7.6 (0582): 'aguardando_aprovacao' — a proposta do vendedor espera o OK do gerente.
+  check (status in ('rascunho','aguardando_aprovacao','enviando','enviada','aceita',
+                    'recusada','vencida','cancelada','substituida'));
 
 alter table public.crm_proposals add column if not exists message_id uuid references public.messages(id) on delete set null;
 alter table public.crm_proposals add column if not exists ultima_falha_envio text;
@@ -45745,7 +45739,14 @@ create table if not exists public.notificacoes (
     'guardiao_ganho',
     'guardiao_perda',
     'guardiao_tarefa_vencida',
-    'tarefa_vencida'
+    'tarefa_vencida',
+    -- ia.vek v1.7.6 (0582)
+    'proposta_aguardando_aprovacao',
+    'proposta_aprovada',
+    'proposta_devolvida',
+    'pedido_de_agendamento',
+    'pedido_de_agendamento_confirmado',
+    'pedido_de_agendamento_recusado'
   ))
 );
 
@@ -46010,6 +46011,40 @@ drop trigger if exists trg_iavek_clone_herda_guardiao on public.crm_leads;
 create trigger trg_iavek_clone_herda_guardiao
   before insert on public.crm_leads
   for each row execute function public.fn_iavek_clone_herda_guardiao();
+
+-- ---- ia.vek: LGPD do pedido de agendamento (migration 0583) ----
+-- Antes da varredura de anon, como toda função do apêndice. A tabela nasce mais
+-- abaixo (bloco da 0583); a função só a lê quando dispara.
+-- LGPD: o pedido guarda TEXTO LIVRE (observação, motivo da recusa) que pode
+-- nomear a pessoa. Na virada de `is_anonymized` do contato — a porta por onde
+-- passam os dois caminhos de anonimização (desenho da 0391) — os dois campos
+-- são apagados; o resto (dia/hora, status, quem pediu e decidiu) é dado de
+-- operação da agenda e fica.
+create or replace function public.fn_iavek_redigir_pedidos_ao_anonimizar()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.iavek_pedidos_de_agendamento
+     set observacao = null,
+         motivo_da_recusa = null,
+         updated_at = now()
+   where contact_id = new.id
+     and organization_id = new.organization_id
+     and (observacao is not null or motivo_da_recusa is not null);
+  return new;
+end;
+$$;
+revoke execute on function public.fn_iavek_redigir_pedidos_ao_anonimizar() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_redigir_pedidos_ao_anonimizar on public.contacts;
+create trigger trg_iavek_redigir_pedidos_ao_anonimizar
+  after update of is_anonymized on public.contacts
+  for each row
+  when (new.is_anonymized = true and old.is_anonymized is distinct from true)
+  execute function public.fn_iavek_redigir_pedidos_ao_anonimizar();
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
@@ -48046,5 +48081,196 @@ alter table public.campaign_recipients
     'pending','queued','sending','sent','delivered','read','replied',
     'failed','skipped','cancelled','opted_out','personal'
   ));
+
+-- ---- ia.vek: configuração só do admin (migration 0581) ----
+-- Ver o cabeçalho de supabase/migrations/20261022000000_0581_iavek_configuracao_so_do_admin.sql.
+do $iavek_0581$
+declare
+  alvo record;
+  p record;
+  nova_using text;
+  nova_check text;
+  sql text;
+begin
+  for alvo in
+    select * from (values
+      ('crm_pipelines', 'crm_pipelines_manager_write'),
+      ('crm_stages', 'crm_stages_manager_write'),
+      ('automation_rules', 'automation_rules_manager_write'),
+      ('webhook_sources', 'webhook_sources_manager_write'),
+      ('calendar_event_types', 'calendar_event_types_write'),
+      ('ai_knowledge_sources', 'tenant_isolation_ai_knowledge_sources_write'),
+      ('ai_faq_items', 'tenant_isolation_ai_faq_items_write'),
+      ('followup_flow_pointers', 'followup_flow_pointers_insert'),
+      ('followup_flow_pointers', 'followup_flow_pointers_update'),
+      ('followup_flow_pointers', 'followup_flow_pointers_delete'),
+      ('followup_flow_versions', 'followup_flow_versions_delete'),
+      ('followup_enrollments', 'followup_enrollments_insert'),
+      ('followup_enrollments', 'followup_enrollments_update'),
+      ('followup_enrollments', 'followup_enrollments_delete'),
+      ('catalog_products', 'catalog_products_insert'),
+      ('catalog_products', 'catalog_products_write'),
+      ('catalog_products', 'catalog_products_delete'),
+      ('campaigns', 'campaigns_write'),
+      ('campaign_channel_sessions', 'campaign_channel_sessions_write'),
+      ('campaign_recipients', 'campaign_recipients_write'),
+      ('campaign_suppressions', 'campaign_suppressions_write'),
+      ('campaign_templates', 'campaign_templates_write'),
+      ('proposal_templates', 'proposal_templates_write'),
+      ('tenant_integrations', 'tenant_integrations_admin_write'),
+      ('import_batches', 'import_batches_insert'),
+      ('import_batches', 'import_batches_update'),
+      ('import_batches', 'import_batches_delete'),
+      ('import_rows', 'import_rows_insert'),
+      ('import_rows', 'import_rows_update'),
+      ('import_rows', 'import_rows_delete'),
+      ('message_templates', 'message_templates_write')
+    ) as t(tabela, policy)
+  loop
+    select * into p from pg_policies
+     where schemaname = 'public' and tablename = alvo.tabela and policyname = alvo.policy;
+    if not found then
+      raise exception 'ia.vek 0581: policy %.% não existe', alvo.tabela, alvo.policy;
+    end if;
+    nova_using := replace(p.qual, '''manager''::text', '''admin''::text');
+    nova_check := replace(p.with_check, '''manager''::text', '''admin''::text');
+    if coalesce(nova_using, '') = coalesce(p.qual, '')
+       and coalesce(nova_check, '') = coalesce(p.with_check, '') then
+      -- Nada a trocar: tem de ser porque já está em admin.
+      if coalesce(p.qual, '') || coalesce(p.with_check, '') not like '%''admin''::text%' then
+        raise exception 'ia.vek 0581: policy %.% sem régua de papel reconhecível', alvo.tabela, alvo.policy;
+      end if;
+      continue;
+    end if;
+    sql := format('alter policy %I on public.%I', alvo.policy, alvo.tabela);
+    if nova_using is not null then sql := sql || format(' using (%s)', nova_using); end if;
+    if nova_check is not null then sql := sql || format(' with check (%s)', nova_check); end if;
+    execute sql;
+  end loop;
+end
+$iavek_0581$;
+
+-- (horários, bloqueios, endereços, telefones e modelos Meta: trocados NO LUGAR
+-- das policies originais neste arquivo — cerca baseline-nao-constroi-o-que-derruba.)
+
+-- Funções que checavam gerente por dentro: a mesma definição em vigor, com a
+-- régua trocada. Lida do catálogo (não copiada) para não ressuscitar versão velha.
+do $iavek_0581_fn$
+declare
+  f record;
+  def text;
+  nova text;
+  achadas int := 0;
+begin
+  for f in
+    select p.oid, p.proname
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname in ('fn_agenda_settings', 'fn_set_channel_routing',
+                         'fn_vocabulario_de_tags_operar',
+                         'fn_definir_colegas_podem_mexer_na_agenda')
+  loop
+    def := pg_get_functiondef(f.oid);
+    nova := regexp_replace(def, 'fn_role_at_least\((\s*p_org\s*),\s*''manager''\)',
+                           'fn_role_at_least(\1, ''admin'')', 'g');
+    if nova <> def then
+      execute nova;
+    elsif def !~ 'fn_role_at_least\(\s*p_org\s*,\s*''admin''\)' then
+      raise exception 'ia.vek 0581: % sem régua de gerente reconhecível', f.proname;
+    end if;
+    achadas := achadas + 1;
+  end loop;
+  if achadas <> 4 then
+    raise exception 'ia.vek 0581: esperava 4 funções de configuração, achei %', achadas;
+  end if;
+end
+$iavek_0581_fn$;
+
+
+-- ---- ia.vek: aprovação de proposta pelo gerente (migration 0582) ----
+-- Ver o cabeçalho de supabase/migrations/20261022010000_0582_iavek_aprovacao_de_proposta.sql.
+-- (O CHECK de status foi trocado no lugar, acima; o do sino é refeito aqui para
+-- quem já tinha a tabela.)
+alter table public.crm_proposals add column if not exists aprovacao_pedida_em timestamptz;
+alter table public.crm_proposals add column if not exists aprovacao_pedida_por uuid
+  references auth.users(id) on delete set null;
+alter table public.crm_proposals add column if not exists devolvida_em timestamptz;
+alter table public.crm_proposals add column if not exists devolvida_por uuid
+  references auth.users(id) on delete set null;
+alter table public.crm_proposals add column if not exists devolucao_motivo text;
+
+-- O bloco do Meu dia do gerente lista as que aguardam, por organização.
+create index if not exists crm_proposals_aguardando_aprovacao_idx
+  on public.crm_proposals (organization_id, aprovacao_pedida_em)
+  where status = 'aguardando_aprovacao';
+
+alter table public.notificacoes drop constraint if exists notificacoes_tipo_check;
+alter table public.notificacoes add constraint notificacoes_tipo_check check (tipo in (
+  'lead_passado',
+  'guardiao_etapa',
+  'guardiao_ganho',
+  'guardiao_perda',
+  'guardiao_tarefa_vencida',
+  'tarefa_vencida',
+  'proposta_aguardando_aprovacao',
+  'proposta_aprovada',
+  'proposta_devolvida',
+  'pedido_de_agendamento',
+  'pedido_de_agendamento_confirmado',
+  'pedido_de_agendamento_recusado'
+));
+
+
+-- ---- ia.vek: pedido de agendamento (migration 0583) ----
+-- Ver o cabeçalho de supabase/migrations/20261022020000_0583_iavek_pedido_de_agendamento_e_agenda_sem_trava.sql.
+-- (O índice que travava horário e a policy de escrita dos compromissos foram
+-- trocados NO LUGAR, acima.)
+create table if not exists public.iavek_pedidos_de_agendamento (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  contact_id uuid not null references public.contacts(id) on delete cascade,
+  lead_id uuid references public.crm_leads(id) on delete set null,
+  conversation_id uuid references public.conversations(id) on delete set null,
+  -- O que o pedido traz para o admin confirmar sem redigitar.
+  quando timestamptz not null,
+  event_type_id uuid references public.calendar_event_types(id) on delete set null,
+  observacao text,
+  -- Quem pediu: uma pessoa (SDR, vendedor) ou a IA.
+  origem text not null default 'pessoa' check (origem in ('pessoa', 'ia')),
+  pedido_por uuid references auth.users(id) on delete set null,
+  pedido_por_agente uuid references public.ai_agents(id) on delete set null,
+  status text not null default 'pendente'
+    check (status in ('pendente', 'confirmado', 'recusado', 'cancelado')),
+  decidido_por uuid references auth.users(id) on delete set null,
+  decidido_em timestamptz,
+  motivo_da_recusa text,
+  -- O compromisso que o admin criou ao confirmar.
+  appointment_id uuid references public.calendar_appointments(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint iavek_pedidos_observacao_tamanho check (observacao is null or length(observacao) <= 1000),
+  constraint iavek_pedidos_quem_pediu check (
+    (origem = 'pessoa' and pedido_por is not null) or origem = 'ia'
+  )
+);
+
+create index if not exists iavek_pedidos_de_agendamento_pendentes_idx
+  on public.iavek_pedidos_de_agendamento (organization_id, quando)
+  where status = 'pendente';
+create index if not exists iavek_pedidos_de_agendamento_por_pessoa_idx
+  on public.iavek_pedidos_de_agendamento (organization_id, pedido_por, decidido_em);
+
+alter table public.iavek_pedidos_de_agendamento enable row level security;
+
+drop policy if exists iavek_pedidos_de_agendamento_select on public.iavek_pedidos_de_agendamento;
+create policy iavek_pedidos_de_agendamento_select on public.iavek_pedidos_de_agendamento
+  for select to authenticated
+  using (organization_id in (select public.fn_user_org_ids()));
+
+revoke all on table public.iavek_pedidos_de_agendamento from anon, authenticated;
+grant select on table public.iavek_pedidos_de_agendamento to authenticated;
+grant all on table public.iavek_pedidos_de_agendamento to service_role;
+
+
 
 notify pgrst, 'reload schema';

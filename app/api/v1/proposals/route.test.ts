@@ -55,6 +55,9 @@ interface MundoOpts {
   fusoDaOrganizacao?: string | null;
   /** Moeda lida de organizations.currency (D11). Default: "BRL". */
   moedaDaOrganizacao?: string;
+  /** ia.vek v1.7.6: dono do lead (`owner_user_id`). Default: o próprio usuário —
+   * o vendedor cria proposta só para lead dele. */
+  donoDoLead?: string | null;
 }
 
 function montarMundoDeProposta(opts: MundoOpts = {}) {
@@ -76,7 +79,8 @@ function montarMundoDeProposta(opts: MundoOpts = {}) {
     return {
       ok: true,
       user: { id: USER_ID, idioma: "pt-BR" },
-      org: { orgId: ORG_ID },
+      // ia.vek v1.7.6: o org carrega o papel — a régua do lead próprio depende dele.
+      org: { orgId: ORG_ID, role: papel },
     } as never;
   });
 
@@ -88,7 +92,13 @@ function montarMundoDeProposta(opts: MundoOpts = {}) {
             eq: () => ({
               eq: () => ({
                 maybeSingle: async () => ({
-                  data: opts.leadPertenceAOutraOrg ? null : { id: LEAD_ID, contact_id: CONTACT_ID },
+                  data: opts.leadPertenceAOutraOrg
+                    ? null
+                    : {
+                        id: LEAD_ID,
+                        contact_id: CONTACT_ID,
+                        owner_user_id: opts.donoDoLead === undefined ? USER_ID : opts.donoDoLead,
+                      },
                   error: null,
                 }),
               }),
@@ -294,11 +304,39 @@ describe("POST /api/v1/proposals", () => {
     }
   });
 
+  // ia.vek v1.7.6: como gerente — o vendedor esbarra antes na régua do lead próprio (caso abaixo).
   it("rejeita lead de OUTRA organização (422/404, nunca 500 silencioso)", async () => {
-    const mundo = montarMundoDeProposta({ leadPertenceAOutraOrg: true });
+    const mundo = montarMundoDeProposta({ leadPertenceAOutraOrg: true, papel: "manager" });
     const res = await mundo.POST({ lead_id: mundo.leadId, titulo: "x", itens: [] });
     expect([404, 422]).toContain(res.status);
     expect(mundo.propostasCriadas).toHaveLength(0);
+  });
+
+  it("ia.vek v1.7.6: vendedor com lead de OUTRA organização: 403 forbidden, nada gravado", async () => {
+    const mundo = montarMundoDeProposta({ leadPertenceAOutraOrg: true });
+    const res = await mundo.POST({ lead_id: mundo.leadId, titulo: "x", itens: [] });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("forbidden");
+    expect(mundo.propostasCriadas).toHaveLength(0);
+  });
+
+  it("ia.vek v1.7.6: vendedor que NÃO é dono do lead não cria (403 forbidden)", async () => {
+    const mundo = montarMundoDeProposta({ donoDoLead: "outro-vendedor" });
+    const res = await mundo.POST({ lead_id: mundo.leadId, titulo: "x", itens: [] });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("forbidden");
+    expect(mundo.propostasCriadas).toHaveLength(0);
+  });
+
+  it("ia.vek v1.7.6: gerente cria proposta para lead de outro vendedor", async () => {
+    const mundo = montarMundoDeProposta({ papel: "manager", donoDoLead: "outro-vendedor" });
+    const res = await mundo.POST({
+      lead_id: mundo.leadId,
+      titulo: "x",
+      itens: [{ product_id: null, descricao: "Site", quantidade: 1, preco_unitario_cents: 1000, desconto_cents: 0, position: 1000 }],
+    });
+    expect(res.status).toBe(201);
+    expect(mundo.propostasCriadas).toHaveLength(1);
   });
 
   it("papel viewer não cria (403)", async () => {

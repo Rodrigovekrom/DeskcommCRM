@@ -26,5 +26,5 @@ export default async function DossieDoFollowupPage({ params }: { params: Promise
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
 
-  return <DossieDoFollowup id={id} canWrite={ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager} />;
+  return <DossieDoFollowup id={id} canWrite={ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin} />;
 }

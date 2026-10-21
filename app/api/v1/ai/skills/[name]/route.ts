@@ -126,7 +126,7 @@ export async function PUT(
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "ai_skills" });
+  const authz = await requireRole("admin", { requestId, resource: "ai_skills" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;
@@ -277,7 +277,7 @@ export async function DELETE(
 
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "ai_skills" });
+  const authz = await requireRole("admin", { requestId, resource: "ai_skills" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;

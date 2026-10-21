@@ -207,9 +207,10 @@ beforeEach(() => {
 });
 
 describe("POST /api/v1/ai/followups/enrollments", () => {
-  it("agent (< manager) → 403, sem insert", async () => {
+  // ia.vek v1.7.6: configuração só do admin — manager também é recusado
+  it.each(["agent", "manager"] as const)("%s (< admin) → 403, sem insert", async (papel) => {
     const db = makeDb([activePointer()], [version()], [contact()]);
-    session("agent", db);
+    session(papel, db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(403);
@@ -217,7 +218,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("body inválido (pointer_id não é uuid) → 422 validation_failed", async () => {
     const db = makeDb([activePointer()], [version()], [contact()]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: "not-a-uuid", contact_id: CONTACT_ID }));
     expect(res.status).toBe(422);
@@ -225,7 +226,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("pointer inexistente na org → 404", async () => {
     const db = makeDb([], [], [contact()]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(404);
@@ -233,7 +234,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("pointer de outra org → 404 (nunca vaza flow_not_active)", async () => {
     const db = makeDb([activePointer({ organization_id: OTHER_ORG_ID })], [version()], [contact()]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(404);
@@ -241,7 +242,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("pointer status='draft' → 422 flow_not_active", async () => {
     const db = makeDb([activePointer({ status: "draft", active_version_id: null })], [], [contact()]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(422);
@@ -251,7 +252,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("pointer status='disabled' → 422 flow_not_active mesmo com active_version_id presente", async () => {
     const db = makeDb([activePointer({ status: "disabled" })], [version()], [contact()]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(422);
@@ -261,7 +262,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("contato inexistente na org → 404", async () => {
     const db = makeDb([activePointer()], [version()], []);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(404);
@@ -269,7 +270,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("contato de outra org → 404", async () => {
     const db = makeDb([activePointer()], [version()], [contact({ organization_id: OTHER_ORG_ID })]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(404);
@@ -277,7 +278,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
 
   it("happy path → 201, current_node_id resolvido pro nó trigger do grafo pinado", async () => {
     const db = makeDb([activePointer()], [version()], [contact()]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(201);
@@ -294,7 +295,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
   it("enrollment vivo já existe (23505) → 409 conflict", async () => {
     const existing = { id: randomUUID(), pointer_id: POINTER_ID, contact_id: CONTACT_ID, status: "active" };
     const db = makeDb([activePointer()], [version()], [contact()], [existing]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(409);
@@ -305,7 +306,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
   it("enrollment anterior já 'completed' (não é vivo) → novo insert passa, sem 409", async () => {
     const finished = { id: randomUUID(), pointer_id: POINTER_ID, contact_id: CONTACT_ID, status: "completed" };
     const db = makeDb([activePointer()], [version()], [contact()], [finished]);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(201);
@@ -317,7 +318,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
   it("agent_id explícito no body válido na org → 201 e pinado no enrollment", async () => {
     const agents = [{ id: AGENT_ID, organization_id: ORG_ID }];
     const db = makeDb([activePointer()], [version()], [contact()], [], agents);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID, agent_id: AGENT_ID }));
     expect(res.status).toBe(201);
@@ -328,7 +329,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
   it("agent_id de OUTRA org → 404 (nunca confia no body pra tenancy)", async () => {
     const agents = [{ id: AGENT_ID, organization_id: OTHER_ORG_ID }];
     const db = makeDb([activePointer()], [version()], [contact()], [], agents);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID, agent_id: AGENT_ID }));
     expect(res.status).toBe(404);
@@ -344,7 +345,7 @@ describe("POST /api/v1/ai/followups/enrollments", () => {
       },
     ];
     const db = makeDb([activePointer()], [version()], [contact()], [], [{ id: AGENT_ID, organization_id: ORG_ID }], agentVersions);
-    session("manager", db);
+    session("admin", db);
     const { POST } = await import("@/app/api/v1/ai/followups/enrollments/route");
     const res = await POST(req("POST", { pointer_id: POINTER_ID, contact_id: CONTACT_ID }));
     expect(res.status).toBe(201);

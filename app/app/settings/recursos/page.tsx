@@ -42,7 +42,7 @@ export default async function RecursosOpcionaisPage() {
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
   const dono = user.is_platform_admin && !user.support;
-  if (!dono && ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) redirect("/403");
+  if (!dono && ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) redirect("/403");
 
   const idioma = user.idioma;
   // Admin client: `platform_config` não tem policy. O id da organização vem da sessão.

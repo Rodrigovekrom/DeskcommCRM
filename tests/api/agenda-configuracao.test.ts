@@ -21,7 +21,8 @@ it('suporte somente leitura é barrado antes de leitura ou efeito',async()=>{
  expect(deps.role).not.toHaveBeenCalled();expect(deps.rpc).not.toHaveBeenCalled();expect(deps.audit).not.toHaveBeenCalled();
 });
 it('gestão autorizada altera a organização da sessão e audita autoria',async()=>{
- expect((await PATCH(request())).status).toBe(200);expect(deps.role).toHaveBeenCalledWith('manager',expect.anything());
+ // ia.vek v1.7.6: configuração só do admin
+ expect((await PATCH(request())).status).toBe(200);expect(deps.role).toHaveBeenCalledWith('admin',expect.anything());
  expect(deps.rpc).toHaveBeenCalledWith('fn_agenda_settings',{p_org:'trusted-org',p_config:gravado});expect(deps.audit).toHaveBeenCalledWith(expect.objectContaining({actorUserId:'human',organizationId:'trusted-org',action:'agenda.settings_updated'}));
 });
 it('prazo inválido não chega à escrita',async()=>{

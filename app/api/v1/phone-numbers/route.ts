@@ -58,7 +58,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (acompanhamentoNegado) return acompanhamentoNegado;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "phone_numbers" });
+  const authz = await requireRole("admin", { requestId, resource: "phone_numbers" });
   if (!authz.ok) return authz.response;
   const { user: authUser, org: activeOrg } = authz;
 

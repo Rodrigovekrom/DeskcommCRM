@@ -12,6 +12,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { exigirPropostaDoProprioLead } from "@/lib/iavek/proposta-do-vendedor";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { resolverItensDaProposta } from "@/lib/propostas/itens";
 import { decidirRevisao } from "@/lib/propostas/versao";
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "crm_proposals" });
+  const authz = await requireRole("agent", { requestId, resource: "crm_proposals" });
   if (!authz.ok) return authz.response;
   const desligada = await sePropostasDesligadas(authz.org.orgId, requestId);
   if (desligada) return desligada;
@@ -39,6 +40,17 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const parsedBody = bodySchema.safeParse(await req.json().catch(() => ({})));
   const motivo = parsedBody.success ? (parsedBody.data.motivo ?? null) : null;
   const admin = createAdminClient();
+  // ia.vek v1.7.6: o vendedor prepara só a proposta de lead dele; gerente e admin, qualquer uma.
+  const doLeadProprio = await exigirPropostaDoProprioLead({
+    db: admin,
+    orgId: authz.org.orgId,
+    propostaId: id,
+    userId: authz.user.id,
+    role: authz.org.role,
+    requestId,
+    idioma: authz.user.idioma,
+  });
+  if (doLeadProprio) return doLeadProprio;
 
   const { data: proposta } = await admin
     .from("crm_proposals")

@@ -1,7 +1,7 @@
 /**
  * A gravação do interruptor POR EMPRESA do `ai_decide` (#2367).
  *
- * O que se prova: quem pode gravar (manager+), DE ONDE vem o org (da sessão,
+ * O que se prova: quem pode gravar (admin — ia.vek v1.7.6), DE ONDE vem o org (da sessão,
  * nunca do argumento), que o merge do jsonb preserva o que não é desta chave
  * — nos dois níveis — e que a troca entra no audit log.
  */
@@ -70,12 +70,14 @@ beforeEach(() => {
   fake = adminQueGrava();
   mocks.createAdminClient.mockReturnValue(fake.admin);
   mocks.loadAuthUser.mockResolvedValue(USER);
-  mocks.resolveActiveOrg.mockResolvedValue({ orgId: ORG_DA_SESSAO, role: "manager" });
+  // ia.vek v1.7.6: configuração só do admin
+  mocks.resolveActiveOrg.mockResolvedValue({ orgId: ORG_DA_SESSAO, role: "admin" });
   mocks.mfaEmDivida.mockResolvedValue(false);
 });
 
 describe("definirAiDecideDaEmpresa", () => {
-  it.each(["viewer", "agent"])("%s é recusado e nada é gravado", async (role) => {
+  // ia.vek v1.7.6: configuração só do admin — manager também é recusado
+  it.each(["viewer", "agent", "manager"])("%s é recusado e nada é gravado", async (role) => {
     mocks.resolveActiveOrg.mockResolvedValue({ orgId: ORG_DA_SESSAO, role });
 
     expect(await definirAiDecideDaEmpresa(false)).toEqual({ ok: false, error: "forbidden_role" });
@@ -88,7 +90,7 @@ describe("definirAiDecideDaEmpresa", () => {
     expect(mocks.loadAuthUser).not.toHaveBeenCalled();
   });
 
-  it("manager grava no org DA SESSÃO, preservando as outras chaves nos dois níveis", async () => {
+  it("admin grava no org DA SESSÃO, preservando as outras chaves nos dois níveis", async () => {
     expect(await definirAiDecideDaEmpresa(false)).toEqual({ ok: true });
 
     expect(fake.gravado.leituras).toEqual([ORG_DA_SESSAO]);

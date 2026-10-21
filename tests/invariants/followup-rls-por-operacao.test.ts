@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
+  GOV_ADMIN,
   GOV_AGENT_A,
   GOV_MANAGER,
   GOV_ORG,
@@ -25,6 +26,10 @@ import {
  * Agora a escrita espelha as rotas: toda rota que escreve nestas tabelas pela
  * sessão exige `manager`. Os casos com ⭐ são os que a policy `for all` deixava
  * passar.
+ *
+ * ia.vek v1.7.6 (0581): a régua subiu de `manager` para `admin` — o gerente
+ * opera, quem configura follow-up é o admin. O gerente entrou no grupo de quem
+ * lê e não escreve, e o controle positivo passou a ser o admin.
  */
 const ORG_B = "cccccccc-1913-4000-8000-00000000000b";
 const CONTATO_B = "cccccccc-1913-4000-8000-0000000000cb";
@@ -87,10 +92,12 @@ beforeAll(() => {
   `);
 });
 
-describe("viewer e agent leem, mas não escrevem", () => {
+describe("viewer, agent e manager leem, mas não escrevem", () => {
   for (const [papel, usuario] of [
     ["viewer", GOV_VIEWER],
     ["agent", GOV_AGENT_A],
+    // ia.vek v1.7.6 (0581/0582/0583): o manager deixou de escrever em follow-up.
+    ["manager", GOV_MANAGER],
   ] as const) {
     it(`⭐ ${papel} não apaga a inscrição nem o fluxo`, () => {
       expect(writeCountAs(usuario, `delete from public.followup_enrollments where id = '${INSCRICAO}'`)).toBe(0);
@@ -126,28 +133,32 @@ describe("viewer e agent leem, mas não escrevem", () => {
 });
 
 describe("ninguém toca outra organização", () => {
-  it("manager da org A não lê, não altera, não apaga nem inscreve na org B", () => {
-    expect(countAs(GOV_MANAGER, `select count(*) from public.followup_enrollments where id = '${INSCRICAO_B}';`)).toBe(0);
-    expect(countAs(GOV_MANAGER, `select count(*) from public.followup_flow_pointers where id = '${FLUXO_B}';`)).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, `update public.followup_enrollments set cancel_reason = 'rls-1913' where id = '${INSCRICAO_B}'`)).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, `delete from public.followup_enrollments where id = '${INSCRICAO_B}'`)).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, `delete from public.followup_flow_pointers where id = '${FLUXO_B}'`)).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, inscricaoNova(ORG_B, FLUXO_B, VERSAO_B, CONTATO_B))).toBe(0);
+  // ia.vek v1.7.6 (0581/0582/0583): o ator passou a ser o admin da org A — com
+  // o manager, que já não escreve nem na própria org, o 0 viria do papel e não
+  // do isolamento.
+  it("admin da org A não lê, não altera, não apaga nem inscreve na org B", () => {
+    expect(countAs(GOV_ADMIN, `select count(*) from public.followup_enrollments where id = '${INSCRICAO_B}';`)).toBe(0);
+    expect(countAs(GOV_ADMIN, `select count(*) from public.followup_flow_pointers where id = '${FLUXO_B}';`)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, `update public.followup_enrollments set cancel_reason = 'rls-1913' where id = '${INSCRICAO_B}'`)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, `delete from public.followup_enrollments where id = '${INSCRICAO_B}'`)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, `delete from public.followup_flow_pointers where id = '${FLUXO_B}'`)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, inscricaoNova(ORG_B, FLUXO_B, VERSAO_B, CONTATO_B))).toBe(0);
     expect(existe("followup_enrollments", INSCRICAO_B)).toBe(true);
     expect(existe("followup_flow_pointers", FLUXO_B)).toBe(true);
   });
 });
 
-describe("manager escreve (as rotas são manager) — controle positivo", () => {
+describe("admin escreve (as rotas são admin) — controle positivo", () => {
+  // ia.vek v1.7.6 (0581/0582/0583): o controle positivo passou de manager para admin.
   it("inscreve, altera, apaga a inscrição; cria, altera e apaga o fluxo", () => {
-    expect(writeCountAs(GOV_MANAGER, inscricaoNova(GOV_ORG, FLUXO, VERSAO, CONTATO_3))).toBe(1);
-    expect(writeCountAs(GOV_MANAGER, `update public.followup_enrollments set cancel_reason = 'rls-1913' where id = '${INSCRICAO}'`)).toBe(1);
-    expect(writeCountAs(GOV_MANAGER, `delete from public.followup_enrollments where id = '${INSCRICAO_DESCARTE}'`)).toBe(1);
+    expect(writeCountAs(GOV_ADMIN, inscricaoNova(GOV_ORG, FLUXO, VERSAO, CONTATO_3))).toBe(1);
+    expect(writeCountAs(GOV_ADMIN, `update public.followup_enrollments set cancel_reason = 'rls-1913' where id = '${INSCRICAO}'`)).toBe(1);
+    expect(writeCountAs(GOV_ADMIN, `delete from public.followup_enrollments where id = '${INSCRICAO_DESCARTE}'`)).toBe(1);
 
     expect(
-      writeCountAs(GOV_MANAGER, `insert into public.followup_flow_pointers (organization_id, name) values ('${GOV_ORG}', '${PREFIXO_CRIADO}-manager')`),
+      writeCountAs(GOV_ADMIN, `insert into public.followup_flow_pointers (organization_id, name) values ('${GOV_ORG}', '${PREFIXO_CRIADO}-admin')`),
     ).toBe(1);
-    expect(writeCountAs(GOV_MANAGER, `update public.followup_flow_pointers set name = 'rls-1913 fluxo renomeado' where id = '${FLUXO}'`)).toBe(1);
-    expect(writeCountAs(GOV_MANAGER, `delete from public.followup_flow_pointers where id = '${FLUXO_DESCARTE}'`)).toBe(1);
+    expect(writeCountAs(GOV_ADMIN, `update public.followup_flow_pointers set name = 'rls-1913 fluxo renomeado' where id = '${FLUXO}'`)).toBe(1);
+    expect(writeCountAs(GOV_ADMIN, `delete from public.followup_flow_pointers where id = '${FLUXO_DESCARTE}'`)).toBe(1);
   });
 });

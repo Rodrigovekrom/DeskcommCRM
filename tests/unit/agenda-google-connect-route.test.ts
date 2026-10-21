@@ -44,9 +44,10 @@ const usuario: AuthUser = {
   // `organizations` é obrigatório em `AuthUser` e o dublê não o tinha — o
   // typecheck da árvore integrada pegou, o vitest não pegaria nunca: esbuild
   // apaga tipo sem conferir. É o motivo de `pnpm typecheck` não ser opcional.
-  organizations: [{ organization_id: ORG, organization_name: "Clínica", role: "agent" }],
+  organizations: [{ organization_id: ORG, organization_name: "Clínica", role: "admin" }],
 };
-const orgAtiva: ActiveOrg = { orgId: ORG, name: "Clínica", role: "agent" };
+// ia.vek v1.7.6: configuração só do admin
+const orgAtiva: ActiveOrg = { orgId: ORG, name: "Clínica", role: "admin" };
 
 function pedido(): NextRequest {
   return new NextRequest("https://crm.exemplo/api/v1/agenda/google/connect", {
@@ -160,10 +161,12 @@ describe("GET /api/v1/agenda/google/connect", () => {
     expect(res.status).toBe(403);
   });
 
-  it("pede `agent`, que é o mesmo piso que a 0177 exige para escrever compromisso", async () => {
+  // ia.vek v1.7.6: configuração só do admin — conectar o Google Agenda é configuração
+  // da agenda da loja; o piso da 0177 (`agent` para escrever compromisso) segue no banco.
+  it("pede `admin`: conectar o Google Agenda é configuração", async () => {
     const { GET } = await rotaComEnv(CONFIGURADO);
     await GET(pedido());
-    expect(requireRole).toHaveBeenCalledWith("agent", expect.objectContaining({ resource: "calendar_connections" }));
+    expect(requireRole).toHaveBeenCalledWith("admin", expect.objectContaining({ resource: "calendar_connections" }));
   });
 });
 

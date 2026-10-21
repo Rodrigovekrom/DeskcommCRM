@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
+  GOV_ADMIN,
   GOV_AGENT_A,
   GOV_MANAGER,
   GOV_ORG,
@@ -131,10 +132,12 @@ describe("escrita por papel no banco (RLS por operação)", () => {
     expect(writeCountAs(GOV_AGENT_A, editar)).toBe(1);
   });
 
-  it("agent não escreve no importador; manager escreve", () => {
+  it("agent e manager não escrevem no importador; admin escreve", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): import_batches/import_rows passaram de manager para admin.
     const lote = `insert into public.import_batches (organization_id, filename) values ('${GOV_ORG}', 'x.csv')`;
     expect(writeCountAs(GOV_AGENT_A, lote)).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, lote)).toBe(1);
+    expect(writeCountAs(GOV_MANAGER, lote)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, lote)).toBe(1);
   });
 
   it("manager de B não cria empresa em A", () => {

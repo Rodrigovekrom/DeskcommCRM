@@ -39,8 +39,9 @@ const patchSourceSchema = z.object({
 // Shared: resolve auth + role gate
 // ---------------------------------------------------------------------------
 
-async function resolveContext(requestId: string) {
-  const authz = await requireRole("manager", { requestId, resource: "ai_knowledge" });
+// ia.vek v1.7.6: ler segue manager+; editar e apagar conhecimento é só do admin.
+async function resolveContext(requestId: string, minimo: "manager" | "admin" = "manager") {
+  const authz = await requireRole(minimo, { requestId, resource: "ai_knowledge" });
   if (!authz.ok) return { error: authz.response };
   return { authUser: authz.user, activeOrg: authz.org };
 }
@@ -108,7 +109,7 @@ export async function PATCH(
   const requestId = randomUUID();
   const { id: sourceId } = await params;
 
-  const ctx = await resolveContext(requestId);
+  const ctx = await resolveContext(requestId, "admin");
   if (ctx.error) return ctx.error;
   const { activeOrg } = ctx as Exclude<typeof ctx, { error: Response }>;
 
@@ -256,7 +257,7 @@ export async function DELETE(
   const requestId = randomUUID();
   const { id: sourceId } = await params;
 
-  const ctx = await resolveContext(requestId);
+  const ctx = await resolveContext(requestId, "admin");
   if (ctx.error) return ctx.error;
   const { activeOrg } = ctx as Exclude<typeof ctx, { error: Response }>;
 

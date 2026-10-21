@@ -16,7 +16,8 @@ async function asUser(user: string, text: string, args: unknown[] = [], aal = "a
     const result = await c.query(text, args); await c.query("commit"); return result;
   } catch (error) { await c.query("rollback"); throw error; } finally { c.release(); }
 }
-const policy = (users: string[], reset = false) => asUser(manager, "select fn_set_channel_routing($1,$2,$3,$4) result", [org, channel, users, reset]);
+// ia.vek v1.7.6 (0581/0582/0583): fn_set_channel_routing passou de manager para admin.
+const policy = (users: string[], reset = false) => asUser(admin, "select fn_set_channel_routing($1,$2,$3,$4) result", [org, channel, users, reset]);
 const claim = (conversation = conv, user = ana, expectedChannel = channel) => query("select fn_channel_routing_claim($1,$2,$3,$4,'{}') result", [org, conversation, expectedChannel, user]).then(r => r.rows[0].result);
 
 beforeAll(() => seedGov());
@@ -82,8 +83,10 @@ describe("roteamento instalado e transacional", () => {
   it("canal divergente é terminal sem atribuir", async () => {
     expect(await claim(conv, ana, "00000000-0000-4000-8000-000000000000")).toBe("conversation_changed");
   });
-  it("viewer não grava; usuário estranho não provoca substituição parcial", async () => {
+  it("viewer e manager não gravam; usuário estranho não provoca substituição parcial", async () => {
     await expect(asUser(viewer,"select fn_set_channel_routing($1,$2,$3,false)",[org,channel,[ana]])).rejects.toThrow("routing_forbidden");
+    // ia.vek v1.7.6 (0581/0582/0583): o gerente deixou de configurar o roteamento.
+    await expect(asUser(manager,"select fn_set_channel_routing($1,$2,$3,false)",[org,channel,[ana]])).rejects.toThrow("routing_forbidden");
     await policy([ana]);
     await expect(policy(["00000000-0000-4000-8000-000000000000"])).rejects.toThrow("routing_invalid_members");
     expect(await claim()).toBe("assigned");

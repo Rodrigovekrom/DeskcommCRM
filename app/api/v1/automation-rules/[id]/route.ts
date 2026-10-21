@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 
   const requestId = randomUUID();
   const { id } = await ctx.params;
-  const authz = await requireRole("manager", { requestId, resource: "automation_rules" });
+  const authz = await requireRole("admin", { requestId, resource: "automation_rules" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
@@ -124,7 +124,7 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
 
   const requestId = randomUUID();
   const { id } = await ctx.params;
-  const authz = await requireRole("manager", { requestId, resource: "automation_rules" });
+  const authz = await requireRole("admin", { requestId, resource: "automation_rules" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;

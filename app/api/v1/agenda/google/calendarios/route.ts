@@ -76,7 +76,7 @@ export async function PATCH(req: Request) {
   const denied = await requireSupportWrite();
   if (denied) return denied;
   const requestId = randomUUID();
-  const auth = await requireRole("agent", { requestId, resource: "agenda" });
+  const auth = await requireRole("admin", { requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const parsed = selectionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)

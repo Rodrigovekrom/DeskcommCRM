@@ -383,11 +383,13 @@ describe("desligada — o padrão de toda organização", () => {
 });
 
 describe("ligada — a transição", () => {
-  it("I2 · marcação pela sessão de um agent: data, etiqueta e UM contact.tag_added que a automação vê", async () => {
+  it("I2 · marcação pela sessão de quem mexe na agenda: data, etiqueta e UM contact.tag_added que a automação vê", async () => {
     const contato = await criarContato(ORG_A, "Joana");
 
+    // ia.vek v1.7.6 (0581/0582/0583): só o admin marca pela sessão (calendar_appointments_write
+    // passou de agent+ para admin); o caminho medido continua sendo o da SESSÃO.
     await comoUsuario(
-      AGENT_A,
+      ADMIN_A,
       `insert into calendar_appointments (organization_id, title, starts_at, ends_at, contact_id)
        values ($1, 'Pela sessão', '2026-03-12T14:00:00Z', '2026-03-12T15:00:00Z', $2)`,
       [ORG_A, contato],
@@ -510,7 +512,8 @@ describe("cancelado e falta não contam", () => {
     expect((await lerContato(contato)).first_service_at).not.toBeNull();
 
     // `no_show` só se registra por um humano com papel (fn_appointment_stamp).
-    await comoUsuario(AGENT_A, "update calendar_appointments set status = 'no_show' where id = $1", [ag]);
+    // ia.vek v1.7.6 (0581/0582/0583): a escrita direta na agenda passou a ser só do admin.
+    await comoUsuario(ADMIN_A, "update calendar_appointments set status = 'no_show' where id = $1", [ag]);
 
     const depois = await lerContato(contato);
     expect(depois.first_service_at).toBeNull();
@@ -529,9 +532,10 @@ describe("cancelado e falta não contam", () => {
     expect(depois.tags.filter((t) => t === TAG_DE_CLIENTE)).toHaveLength(1);
   });
 
-  it("I7b · apagar horário pela sessão de um agent: o anterior move a data, o último tira a etiqueta, sem evento", async () => {
-    // A policy `calendar_appointments_write` deixa um agent apagar. Sem o
-    // trigger de DELETE o contato ficava cliente de um horário que não existe.
+  it("I7b · apagar horário pela sessão do admin: o anterior move a data, o último tira a etiqueta, sem evento", async () => {
+    // A policy `calendar_appointments_write` deixa o admin apagar (era agent+
+    // até o ia.vek v1.7.6, migration 0583). Sem o trigger de DELETE o contato
+    // ficava cliente de um horário que não existe.
     const contato = await criarContato(ORG_A, "Apagaram os horários");
     const primeiro = await marcar(ORG_A, contato, "2025-04-01T10:00:00Z");
     const segundo = await marcar(ORG_A, contato, "2025-05-01T10:00:00Z");
@@ -539,9 +543,10 @@ describe("cancelado e falta não contam", () => {
     expect(eventos, "controle: a primeira marcação emitiu").toBe(1);
 
     const apagar = (id: string) =>
-      comoUsuario(AGENT_A, "delete from calendar_appointments where id = $1 and organization_id = $2", [id, ORG_A]);
+      // ia.vek v1.7.6 (0581/0582/0583): de AGENT_A para ADMIN_A.
+      comoUsuario(ADMIN_A, "delete from calendar_appointments where id = $1 and organization_id = $2", [id, ORG_A]);
 
-    expect((await apagar(primeiro)).rowCount, "a policy deixa o agent apagar").toBe(1);
+    expect((await apagar(primeiro)).rowCount, "a policy deixa o admin apagar").toBe(1);
     const meio = await lerContato(contato);
     expect(meio.first_service_at?.toISOString()).toBe("2025-05-01T10:00:00.000Z");
     expect(meio.tags).toContain(TAG_DE_CLIENTE);
@@ -1089,8 +1094,9 @@ describe("as três colunas são do sistema", () => {
     // escrita do sistema também passa pelo trigger, com o `auth.uid()` da
     // sessão que marcou.
     const contato = await criarContato(ORG_A, "O sistema grava");
+    // ia.vek v1.7.6 (0581/0582/0583): quem marca pela sessão passou a ser o admin.
     const r = await tentarComoUsuario(
-      AGENT_A,
+      ADMIN_A,
       `insert into calendar_appointments (organization_id, title, starts_at, ends_at, contact_id, status)
        values ($1, 'Pela sessão', $2::timestamptz, $2::timestamptz + interval '1 hour', $3, 'confirmed')`,
       [ORG_A, "2026-07-05T10:00:00Z", contato],

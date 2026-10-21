@@ -57,7 +57,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("manager", { requestId, resource: "financeiro" });
+  const authz = await requireRole("admin", { requestId, resource: "financeiro" });
   if (!authz.ok) return authz.response;
 
   const lido = estornarSchema.safeParse(await req.json().catch(() => ({})));

@@ -64,7 +64,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const authz = await resolveAuthDual(req, {
     requestId,
     resource: "followup_flows",
-    role: "manager",
+    role: "admin",
     scope: "mcp:write",
   });
   if (!authz.ok) return authz.response;

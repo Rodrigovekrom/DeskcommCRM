@@ -19,16 +19,17 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 const SESS = "22222222-2222-4222-8222-222222222222";
 const ctx = { params: Promise.resolve({ id: SESS }) };
 const autorizado = () =>
-  vi.mocked(requireRole).mockResolvedValue({ ok: true, user: { id: "u1" }, org: { orgId: ORG, role: "manager" } } as never);
+  vi.mocked(requireRole).mockResolvedValue({ ok: true, user: { id: "u1" }, org: { orgId: ORG, role: "admin" } } as never); // ia.vek v1.7.6: configuração só do admin
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("grupos do número", () => {
-  it("atendente não liga grupo (a rota exige gerente)", async () => {
+  // ia.vek v1.7.6: configuração só do admin — atendente E gerente são recusados
+  it("atendente e gerente não ligam grupo (a rota exige admin)", async () => {
     vi.mocked(requireRole).mockResolvedValue({ ok: false, response: new Response(null, { status: 403 }) } as never);
     const res = await PUT(new NextRequest("http://x", { method: "PUT", body: JSON.stringify({ group_chat_id: "1@g.us", enabled: true }) }), ctx);
     expect(res.status).toBe(403);
-    expect(requireRole).toHaveBeenCalledWith("manager", expect.anything());
+    expect(requireRole).toHaveBeenCalledWith("admin", expect.anything());
     expect(alternarGrupo).not.toHaveBeenCalled();
   });
   it("lista os grupos com a organização da sessão, nunca do body", async () => {

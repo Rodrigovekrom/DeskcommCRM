@@ -73,6 +73,18 @@ export async function PATCH(
     throw err;
   }
 
+  // ia.vek v1.7.6: horário (schedule) e capacidade de atendimento são
+  // configuração da loja — só o admin. Ficar disponível/indisponível segue de
+  // cada um (a mesma linha guarda a presença, por isso a RLS não mudou).
+  if ((input.schedule !== undefined || input.capacity !== undefined) && !roleAtLeast(activeOrg.role, "admin")) {
+    return fail(
+      "forbidden_role",
+      t("Horário e capacidade de atendimento são definidos pelo administrador."),
+      403,
+      { requestId },
+    );
+  }
+
   const supabase = await createClient();
 
   // Manager alterando outro: alvo tem que ser membro da org (evita linha órfã;

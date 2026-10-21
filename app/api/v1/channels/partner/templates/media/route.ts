@@ -60,7 +60,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
 
-  const authz = await requireRole("agent", { requestId, resource: "channel_templates" });
+  const authz = await requireRole("admin", { requestId, resource: "channel_templates" });
   if (!authz.ok) return authz.response;
   const { user, org } = authz;
   const t = (texto: string) => traduzir(texto, user.idioma);

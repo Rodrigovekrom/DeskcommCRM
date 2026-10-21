@@ -13,7 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { aiAgentDefaultSchema, type PromptTemplate } from "@/lib/schemas/onboarding";
 import { publicarMemoriaDaOrg } from "@/lib/ai/memoria-da-org";
 import {
-  requireOnboardingCtx,
+  requireOnboardingAdminCtx,
   patchOnboardingState,
   loadOnboardingState,
   OnboardingError,
@@ -107,7 +107,7 @@ export type CreateAgentResult =
 export async function createDefaultAgent(formData: FormData): Promise<CreateAgentResult> {
   let ctx;
   try {
-    ctx = await requireOnboardingCtx();
+    ctx = await requireOnboardingAdminCtx();
   } catch (err) {
     if (err instanceof OnboardingError) return { ok: false, error: err.code as never };
     throw err;
@@ -313,7 +313,7 @@ export async function createDefaultAgent(formData: FormData): Promise<CreateAgen
 }
 
 export async function skipAi(): Promise<void> {
-  const ctx = await requireOnboardingCtx();
+  const ctx = await requireOnboardingAdminCtx();
   await patchOnboardingState(ctx.orgId, {
     ai: { agent_id: "", prompt_template: "skipped", skipped: true },
   });

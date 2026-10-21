@@ -5,7 +5,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { seedGov, GOV_AGENT_A, GOV_AGENT_B, GOV_VIEWER } from "./gov-helpers";
+import { seedGov, GOV_ADMIN, GOV_AGENT_A, GOV_AGENT_B, GOV_VIEWER } from "./gov-helpers";
 import { criarOrigemDeFollowup } from "./followup-service-origin";
 import { appointmentSnapshotSchema, expectedAppointment } from "@/lib/agenda/google/sync-store";
 import { assertMeetingDeliveryPg } from "@/lib/agenda/meet-delivery";
@@ -751,8 +751,23 @@ it("booking aceita somente contexto interno do job original; metadados diretos s
   await expect(
     pool.query(insert, [f.org, f.contact, f.boundary.conversation_id, GOV_AGENT_A, intent]),
   ).rejects.toThrow("meet_booking_stale");
+  // ia.vek v1.7.6 (0581/0582/0583): calendar_appointments_write passou de agent+ para admin
+  // (0583). O agent já não alcança a linha pela RLS (UPDATE de 0 linhas, sem chegar ao
+  // gatilho); quem alcança é o admin — e o gatilho o recusa igual.
+  expect(
+    (
+      await actor(GOV_AGENT_A, "update calendar_appointments set meeting_delivery=$1 where id=$2", [
+        intent,
+        a.id,
+      ])
+    ).rowCount,
+  ).toBe(0);
+  await pool.query(
+    "insert into user_organizations(organization_id,user_id,role,accepted_at) values($1,$2,'admin',now()) on conflict do nothing",
+    [f.org, GOV_ADMIN],
+  );
   await expect(
-    actor(GOV_AGENT_A, "update calendar_appointments set meeting_delivery=$1 where id=$2", [
+    actor(GOV_ADMIN, "update calendar_appointments set meeting_delivery=$1 where id=$2", [
       intent,
       a.id,
     ]),

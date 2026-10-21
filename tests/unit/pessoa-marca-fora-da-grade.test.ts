@@ -239,6 +239,9 @@ function agenda(
   } = {},
 ): Banco {
   return bancoEmMemoria({
+    // ia.vek v1.7.6: a loja não trava horário por padrão; esta suíte mede a
+    // trava do produto, então liga a capacidade 1 (um por pessoa).
+    organizations: [{ id: ORG, settings: { iavek: { agenda_capacidade_por_horario: 1 } } }],
     calendar_event_types: [
       {
         id: TIPO,

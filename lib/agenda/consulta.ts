@@ -1,3 +1,4 @@
+import { capacidadePorHorario } from "@/lib/iavek/capacidade-da-agenda";
 import { googleRpc } from "./google/sync-store";
 import { lerCorposDoLembrete } from "./lembretes";
 /**
@@ -346,7 +347,11 @@ export async function horariosLivresDaOrg(
     fimMinuto: linha.end_minute,
   }));
 
+  // ia.vek v1.7.6: a loja não trava horário (capacidade da organização).
+  const capacidade = await capacidadeDaOrg(supabase, organizationId);
+
   const slots = horariosLivres({
+    capacidade,
     jornada: leitura.jornada,
     excecoes,
     ocupados,
@@ -1164,4 +1169,21 @@ export async function listaTiposDeAtendimento(
           : Number(t.default_price_cents),
     })),
   };
+}
+
+/**
+ * ia.vek v1.7.6: quantos compromissos cabem no mesmo horário nesta organização
+ * (`null` = sem limite, o padrão da loja). Ler a organização falhar NÃO trava a
+ * agenda: cai no padrão.
+ */
+export async function capacidadeDaOrg(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<number | null> {
+  const { data } = await supabase
+    .from("organizations")
+    .select("settings")
+    .eq("id", organizationId)
+    .maybeSingle();
+  return capacidadePorHorario((data as { settings?: unknown } | null)?.settings);
 }

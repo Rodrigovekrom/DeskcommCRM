@@ -389,7 +389,7 @@ export const NAV_CATALOG = [
     icon: "FileText",
     group: "crm",
     section: "Preparar a venda",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     // Módulo opcional da instalação, desligado por padrão (doc 68, #1621).
     modulo: "crm_b2b",
   },
@@ -432,7 +432,7 @@ export const NAV_CATALOG = [
     icon: "FileText",
     group: "organizacao",
     section: "Sua empresa",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     // Doc 79: é aqui que a EMPRESA liga — então a porta depende só da chave da
     // INSTALAÇÃO (a capacidade da empresa ainda está desligada quando se chega).
     modulo: "propostas",
@@ -447,7 +447,7 @@ export const NAV_CATALOG = [
     icon: "FileText",
     group: "organizacao",
     section: "Sua empresa",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     capacidade: "propostas",
     // SEM `sidebar`, como a tela-mãe de Propostas: chega-se por Configurações.
   },
@@ -512,7 +512,7 @@ export const NAV_CATALOG = [
     icon: "Funnel",
     group: "crm",
     section: "Preparar a venda",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     // SEM `sidebar`: mora atrás de "Ver tudo em CRM".
     //
     // ⚠️ O ACHADO ORIGINAL NÃO FOI DESFEITO. Ele era "esta tela está enterrada
@@ -533,7 +533,7 @@ export const NAV_CATALOG = [
     icon: "Robot",
     group: "ia",
     section: "Montar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     sidebar: true,
   },
   {
@@ -543,7 +543,7 @@ export const NAV_CATALOG = [
     icon: "FlowArrow",
     group: "ia",
     section: "Montar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     sidebar: true,
   },
   {
@@ -561,7 +561,7 @@ export const NAV_CATALOG = [
     icon: "ListChecks",
     group: "ia",
     section: "Montar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     modulo: "fluxos_atendimento",
   },
   {
@@ -571,7 +571,7 @@ export const NAV_CATALOG = [
     icon: "Signpost",
     group: "ia",
     section: "Montar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     // Saiu do sidebar para dar lugar a Casos: roteador se configura poucas
     // vezes, e o caso pede resposta no mesmo dia. A troca é um-por-um porque o
     // menu inteiro tem de caber em 900px (e2e `navegacao.spec.ts`).
@@ -589,7 +589,7 @@ export const NAV_CATALOG = [
     // agora tiraria a tela do lugar onde o hub promete que ela está.
     group: "ia",
     section: "Montar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     // O sistema chama modelo em 23 lugares e, até esta tela, a escolha vivia
@@ -604,7 +604,7 @@ export const NAV_CATALOG = [
     icon: "Plugs",
     group: "ia",
     section: "Montar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     // SEM `sidebar: true`, como as outras nove telas deste grupo. Adicionar as
     // duas telas novas à sidebar estourou a dobra em 900px — medido pelo e2e
     // `navegacao.spec.ts`, que existe justamente porque agrupar o menu o faz
@@ -618,7 +618,7 @@ export const NAV_CATALOG = [
     icon: "BookOpen",
     group: "ia",
     section: "Ensinar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     href: "/app/ai/memory",
@@ -627,7 +627,7 @@ export const NAV_CATALOG = [
     icon: "Brain",
     group: "ia",
     section: "Ensinar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     href: "/app/ai/skills",
@@ -636,7 +636,7 @@ export const NAV_CATALOG = [
     icon: "PuzzlePiece",
     group: "ia",
     section: "Ensinar o agente",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     href: "/app/ai/cases",
@@ -760,7 +760,7 @@ export const NAV_CATALOG = [
     description: "Avise outros sistemas quando algo acontecer aqui dentro.",
     icon: "WebhooksLogo",
     group: "canais",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
     sidebar: true,
   },
 
@@ -917,7 +917,7 @@ export const NAV_CATALOG = [
     icon: "UsersThree",
     group: "organizacao",
     section: "Sua empresa",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     // A porta do freio POR EMPRESA do passo `ai_decide` (issue #2367). O #2228
@@ -932,7 +932,7 @@ export const NAV_CATALOG = [
     icon: "FlowArrow",
     group: "organizacao",
     section: "Sua empresa",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     // A porta que faltava para o vocabulário de etiquetas (issue #852). Até
@@ -953,7 +953,7 @@ export const NAV_CATALOG = [
     icon: "Tag",
     group: "organizacao",
     section: "Sua empresa",
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     // A área única dos recursos opcionais (pedido do mantenedor, doc 73/80):
@@ -967,7 +967,7 @@ export const NAV_CATALOG = [
     section: "Sua empresa",
     // `manager`: o gerente decide metade das chaves da lista. Atendente e
     // leitor não ajustam nenhuma, e a tela redireciona os dois para /403.
-    minRole: "manager",
+    minRole: "admin" /* ia.vek v1.7.6: configuração */,
   },
   {
     href: "/app/settings/tenant",

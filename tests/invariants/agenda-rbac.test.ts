@@ -128,23 +128,38 @@ function novaExcecao(quem: string, dono: string, dia: number): boolean {
   );
 }
 
-describe("tipos de agendamento — configuração do negócio, escreve manager+", () => {
+describe("tipos de agendamento — configuração do negócio, escreve admin", () => {
   it("o agent NÃO cria um tipo de agendamento", () => {
     expect(novoTipo(AGENT, "tipo-do-agent")).toBe(false);
   });
 
-  it("...e o manager cria (senão a proteção seria a feature quebrada)", () => {
-    expect(novoTipo(MANAGER, "tipo-do-manager")).toBe(true);
+  it("o manager NÃO cria um tipo de agendamento", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): calendar_event_types_write passou de manager para admin.
+    expect(novoTipo(MANAGER, "tipo-do-manager")).toBe(false);
+  });
+
+  it("...e o admin cria (senão a proteção seria a feature quebrada)", () => {
+    expect(novoTipo(ADMIN, "tipo-do-admin")).toBe(true);
   });
 });
 
-describe("compromissos — a operação do dia, escreve agent+", () => {
+describe("compromissos — a agenda da loja, escreve só o admin", () => {
   it("o viewer NÃO marca um compromisso", () => {
     expect(novoCompromisso(VIEWER, "marcado pelo viewer")).toBe(false);
   });
 
-  it("...e o agent marca — é o trabalho dele", () => {
-    expect(novoCompromisso(AGENT, "marcado pelo agent")).toBe(true);
+  it("o agent NÃO marca direto — ele faz um pedido de agendamento", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): calendar_appointments_write passou de agent+ para admin (0583).
+    expect(novoCompromisso(AGENT, "marcado pelo agent")).toBe(false);
+  });
+
+  it("o manager também NÃO marca direto", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): só o admin mexe na agenda (0583).
+    expect(novoCompromisso(MANAGER, "marcado pelo manager")).toBe(false);
+  });
+
+  it("...e o admin marca — senão a agenda não teria quem a escrevesse", () => {
+    expect(novoCompromisso(ADMIN, "marcado pelo admin")).toBe(true);
   });
 
   it("mas o viewer LÊ a agenda: o gate é de escrita, não de acesso", () => {
@@ -158,19 +173,25 @@ describe("compromissos — a operação do dia, escreve agent+", () => {
   });
 });
 
-describe("exceções de agenda — a de cada um é de cada um", () => {
-  it("o agent escreve a PRÓPRIA exceção, sem depender de ninguém", () => {
-    expect(novaExcecao(AGENT, AGENT, 10)).toBe(true);
+describe("exceções de agenda — só o admin bloqueia agenda", () => {
+  it("o agent NÃO escreve nem a PRÓPRIA exceção", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): calendar_availability_exceptions_write perdeu
+    // o caminho "o próprio usuário" — não existe agenda pessoal.
+    expect(novaExcecao(AGENT, AGENT, 10)).toBe(false);
   });
 
   it("o agent NÃO escreve a exceção de OUTRA pessoa", () => {
-    // O caso que distingue esta tabela das outras: aqui não basta o papel, tem
-    // de ser o dono. Um atendente bloqueando a agenda do colega é o defeito.
+    // Um atendente bloqueando a agenda do colega continua sendo o defeito.
     expect(novaExcecao(OUTRO_AGENT, AGENT, 11)).toBe(false);
   });
 
-  it("...e o manager escreve a de qualquer um — escala é trabalho de quem coordena", () => {
-    expect(novaExcecao(MANAGER, AGENT, 12)).toBe(true);
+  it("o manager NÃO escreve a exceção de ninguém", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): de manager+ para admin.
+    expect(novaExcecao(MANAGER, AGENT, 12)).toBe(false);
+  });
+
+  it("...e o admin escreve a de qualquer um — a agenda da loja é dele", () => {
+    expect(novaExcecao(ADMIN, AGENT, 13)).toBe(true);
   });
 });
 

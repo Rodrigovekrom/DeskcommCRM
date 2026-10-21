@@ -54,7 +54,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (supportDenied) return supportDenied;
   const requestId = req.headers.get("x-request-id") ?? undefined;
 
-  const autorizado = await requireRole("agent", { requestId, resource: "calendar_connections" });
+  // ia.vek v1.7.6: conectar Google Agenda é configuração da agenda da loja — só admin.
+  const autorizado = await requireRole("admin", { requestId, resource: "calendar_connections" });
   if (!autorizado.ok) return autorizado.response;
   const { user, org } = autorizado;
 

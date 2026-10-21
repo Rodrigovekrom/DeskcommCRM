@@ -383,6 +383,16 @@ beforeAll(() => {
             values (v_org, 'rls-' || v_org::text, 'trunk-endpoint');
         end if;
 
+        -- ia.vek v1.7.6 (0583): o pedido de agendamento (SDR/IA pedem, o admin
+        -- confirma). Guarda cliente, dia e hora desejados e a observação de quem
+        -- pediu — vazar entregaria ao vizinho a agenda comercial da loja. A
+        -- leitura é de todo membro (o 'agent' semeado é controle positivo
+        -- legítimo); a sessão não tem escrita. origem = 'ia' dispensa pedido_por.
+        if not exists (select 1 from public.iavek_pedidos_de_agendamento where organization_id = v_org) then
+          insert into public.iavek_pedidos_de_agendamento (organization_id, contact_id, quando, origem, observacao)
+            values (v_org, v_contact, now() + interval '2 days', 'ia', 'RLS invariant pedido');
+        end if;
+
         if not exists (select 1 from public.ai_provider_credentials where organization_id = v_org) then
           insert into public.ai_provider_credentials
             (organization_id, provider, label, api_key_encrypted, api_key_iv, api_key_tag, api_key_last4)
@@ -624,9 +634,14 @@ export const TABLES = [
   // ai_provider_credentials) e NAO e medida aqui.
   "voip_trunk_settings",
   // phone_numbers (SIP module, #677): numeros (DID) que recebem ligacao.
-  // Leitura/escrita org-scoped (sem segundo eixo medido aqui -- ver a nota
-  // de DIVIDA_RBAC_CONHECIDA em rbac-config-ia-canais.test.ts).
+  // Leitura org-scoped. ia.vek v1.7.6 (0581): a escrita passou a exigir admin
+  // (phone_numbers_admin_write); esse segundo eixo e medido em
+  // rbac-config-ia-canais.test.ts, nao aqui.
   "phone_numbers",
+  // ia.vek v1.7.6 (0583) — o pedido de agendamento. Leitura org-scoped sem
+  // gate de papel (todo membro vê a agenda), escrita só do servidor (a sessão
+  // não tem INSERT/UPDATE/DELETE). Semeado no bloco acima, uma linha por org.
+  "iavek_pedidos_de_agendamento",
   // 0232/0235 — chamada de voz. Guarda `peer_phone` (telefone da outra ponta) e
   // `owner_user_id` (quem atendeu): vazar a linha entrega ao vizinho com quem a
   // organização falou, quando, por quanto tempo e por meio de quem. A policy

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { exigirPropostaDoProprioLead } from "@/lib/iavek/proposta-do-vendedor";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { resolverModelo } from "@/lib/propostas/modelos/resolver";
@@ -28,12 +29,23 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "crm_proposals" });
+  const authz = await requireRole("agent", { requestId, resource: "crm_proposals" });
   if (!authz.ok) return authz.response;
   const desligada = await sePropostasDesligadas(authz.org.orgId, requestId);
   if (desligada) return desligada;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { id } = await ctx.params;
+  // ia.vek v1.7.6: o vendedor prepara só a proposta de lead dele; gerente e admin, qualquer uma.
+  const doLeadProprio = await exigirPropostaDoProprioLead({
+    db: createAdminClient(),
+    orgId: authz.org.orgId,
+    propostaId: id,
+    userId: authz.user.id,
+    role: authz.org.role,
+    requestId,
+    idioma: authz.user.idioma,
+  });
+  if (doLeadProprio) return doLeadProprio;
 
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail("validation_failed", t("Campos inválidos."), 422, { requestId });

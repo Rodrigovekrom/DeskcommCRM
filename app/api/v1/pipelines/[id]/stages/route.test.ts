@@ -43,12 +43,13 @@ describe("POST /api/v1/pipelines/[id]/stages", () => {
    * igual se a criação pedisse `agent` ou `viewer`. Quem prova o papel é este,
    * num caminho com auth OK.
    */
-  it("exige manager", async () => {
+  it("exige admin", async () => {
     authOk();
     makeDb({ stages: funil() });
     const { POST } = await import("./route");
     await POST(reqPost({ name: "Retorno" }), ctx);
-    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin — "manager" já não basta
+    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("admin");
   });
 
   /**

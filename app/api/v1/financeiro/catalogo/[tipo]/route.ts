@@ -78,7 +78,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const e = await entidade(ctx, requestId);
   if (!e.ok) return e.response;
 
-  const authz = await requireRole("manager", { requestId, resource: "financeiro" });
+  const authz = await requireRole("admin", { requestId, resource: "financeiro" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -141,7 +141,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   const e = await entidade(ctx, requestId);
   if (!e.ok) return e.response;
 
-  const authz = await requireRole("manager", { requestId, resource: "financeiro" });
+  const authz = await requireRole("admin", { requestId, resource: "financeiro" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -202,7 +202,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx): Promise<Response> {
   const e = await entidade(ctx, requestId);
   if (!e.ok) return e.response;
 
-  const authz = await requireRole("manager", { requestId, resource: "financeiro" });
+  const authz = await requireRole("admin", { requestId, resource: "financeiro" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

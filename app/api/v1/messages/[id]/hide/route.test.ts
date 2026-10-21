@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const state = vi.hoisted(() => ({
-  role: "manager",
+  role: "admin", // ia.vek v1.7.6: configuração só do admin
   message: null as Record<string, unknown> | null,
   calls: [] as Array<{ table: string; update: Record<string, unknown> }>,
   audit: vi.fn(async () => undefined),
@@ -45,7 +45,7 @@ const ctx = { params: Promise.resolve({ id }) };
 const url = `http://localhost/api/v1/messages/${id}/hide`;
 
 beforeEach(() => {
-  state.role = "manager";
+  state.role = "admin"; // ia.vek v1.7.6: configuração só do admin
   state.calls.length = 0;
   state.audit.mockClear();
   state.message = {
@@ -71,6 +71,15 @@ describe("ocultar mensagem recebida no CRM", () => {
     expect(res.status).toBe(200);
     expect(state.calls[0]).toEqual({ table: "messages", update: { metadata: { source: "canal" } } });
     expect(state.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "message.restored_in_crm" }));
+  });
+
+  // ia.vek v1.7.6: configuração só do admin — gerente não oculta nem restaura
+  it("gerente recebe 403 ao ocultar e ao restaurar, sem update nem audit", async () => {
+    state.role = "manager";
+    expect((await POST(new NextRequest(url, { method: "POST" }), ctx)).status).toBe(403);
+    expect((await DELETE(new NextRequest(url, { method: "DELETE" }), ctx)).status).toBe(403);
+    expect(state.calls).toEqual([]);
+    expect(state.audit).not.toHaveBeenCalled();
   });
 
   it("não permite ocultar mensagem enviada", async () => {

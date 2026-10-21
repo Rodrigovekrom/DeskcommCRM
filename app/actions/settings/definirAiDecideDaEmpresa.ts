@@ -50,7 +50,8 @@ export async function definirAiDecideDaEmpresa(ligar: boolean): Promise<Resultad
   if (!org) return { ok: false, error: "forbidden_tenant" };
   // Mesmo gate da tela: manager+ é quem monta a regra, e é para quem a regra
   // decide — nada aqui apaga conversa nem muda dinheiro.
-  if (ROLE_RANK[org.role] < ROLE_RANK.manager) return { ok: false, error: "forbidden_role" };
+  // ia.vek v1.7.6: distribuição de atendimento é configuração — só admin.
+  if (ROLE_RANK[org.role] < ROLE_RANK.admin) return { ok: false, error: "forbidden_role" };
   if (await mfaEmDivida()) return { ok: false, error: "mfa_required" };
 
   const admin = createAdminClient();

@@ -1,5 +1,6 @@
 export type ProposalStatus =
-  | "rascunho" | "enviando" | "enviada" | "aceita" | "recusada" | "vencida" | "cancelada" | "substituida";
+  // ia.vek v1.7.6: "aguardando_aprovacao" — a proposta do vendedor espera o OK do gerente.
+  | "rascunho" | "aguardando_aprovacao" | "enviando" | "enviada" | "aceita" | "recusada" | "vencida" | "cancelada" | "substituida";
 
 export interface ProposalItemInput {
   id?: string;

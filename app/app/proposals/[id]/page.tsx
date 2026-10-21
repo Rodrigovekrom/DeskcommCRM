@@ -18,8 +18,20 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
   const suporteLiberaEscrita =
     !user.support || (user.support.status === "active" && user.support.access_mode === "full");
   const podeEditar = roleAtLeast(activeOrg.role, "agent") && suporteLiberaEscrita;
-  // O documento só é editável por manager+ — o mesmo papel que a rota PATCH /documento exige.
-  const podeRevisar = roleAtLeast(activeOrg.role, "manager") && suporteLiberaEscrita;
+  // ia.vek v1.7.6: o vendedor prepara o documento da proposta do PRÓPRIO lead
+  // (a rota PATCH /documento confere o dono); gerente e admin, de qualquer uma.
+  const podeRevisar = roleAtLeast(activeOrg.role, "agent") && suporteLiberaEscrita;
+  // Gerente e admin aprovam (enviam); o vendedor pede aprovação. Descartar é do admin.
+  const aprova = roleAtLeast(activeOrg.role, "manager") && suporteLiberaEscrita;
+  const podeDescartar = roleAtLeast(activeOrg.role, "admin") && suporteLiberaEscrita;
 
-  return <ProposalEditorClient id={id} podeEditar={podeEditar} podeRevisar={podeRevisar} />;
+  return (
+    <ProposalEditorClient
+      id={id}
+      podeEditar={podeEditar}
+      podeRevisar={podeRevisar}
+      aprova={aprova}
+      podeDescartar={podeDescartar}
+    />
+  );
 }

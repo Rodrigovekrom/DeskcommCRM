@@ -19,8 +19,11 @@ import { beforeAll, describe, expect, it } from "vitest";
  * "simplificar" a policy para o padrão org-flat do resto do repo, o caso do
  * agent-que-escreve reprova. Sem ele, o afrouxamento passa verde.
  *
- * A rota HTTP também exige `manager`, e isso NÃO substitui esta prova: a rota
- * não é a única porta. O PostgREST atende direto.
+ * A rota HTTP também exige `admin` (era `manager` até o ia.vek v1.7.6), e isso
+ * NÃO substitui esta prova: a rota não é a única porta. O PostgREST atende direto.
+ *
+ * ia.vek v1.7.6 (0581): a escrita do catálogo subiu de `manager` para `admin`.
+ * O gerente passou a ser controle negativo; o admin, o positivo.
  *
  * Conectar como `postgres` mediria NADA (rolbypassrls = t). Aqui é `set role
  * authenticated` + `request.jwt.claims`, o mesmo caminho da produção.
@@ -66,6 +69,9 @@ const ORG_B = "dddddddd-0000-4000-8000-00000000000b";
 const MANAGER_A = "dddddddd-1111-4000-8000-00000000000a";
 const AGENT_A = "dddddddd-1111-4000-8000-00000000000c";
 const MANAGER_B = "dddddddd-1111-4000-8000-00000000000b";
+// ia.vek v1.7.6 (0581/0582/0583): quem muda preço passou a ser o admin.
+const ADMIN_A = "dddddddd-1111-4000-8000-00000000000e";
+const ADMIN_B = "dddddddd-1111-4000-8000-00000000000f";
 
 const PRECO_ORIGINAL = 549900;
 
@@ -74,7 +80,9 @@ beforeAll(() => {
     insert into auth.users (id, email) values
       ('${MANAGER_A}', 'catalogo-mgr-a@invariant.test'),
       ('${AGENT_A}',   'catalogo-agent-a@invariant.test'),
-      ('${MANAGER_B}', 'catalogo-mgr-b@invariant.test')
+      ('${MANAGER_B}', 'catalogo-mgr-b@invariant.test'),
+      ('${ADMIN_A}',   'catalogo-admin-a@invariant.test'),
+      ('${ADMIN_B}',   'catalogo-admin-b@invariant.test')
       on conflict (id) do nothing;
 
     insert into public.organizations (id, slug, legal_name, display_name) values
@@ -85,7 +93,9 @@ beforeAll(() => {
     insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
       ('${MANAGER_A}', '${ORG_A}', 'manager', now()),
       ('${AGENT_A}',   '${ORG_A}', 'agent',   now()),
-      ('${MANAGER_B}', '${ORG_B}', 'manager', now())
+      ('${MANAGER_B}', '${ORG_B}', 'manager', now()),
+      ('${ADMIN_A}',   '${ORG_A}', 'admin',   now()),
+      ('${ADMIN_B}',   '${ORG_B}', 'admin',   now())
       on conflict do nothing;
 
     insert into public.catalog_products (organization_id, codigo, nome, preco_cents)
@@ -151,11 +161,29 @@ describe("catalog_products — quem lê e quem muda preço", () => {
     expect(forjados).toBe("0");
   });
 
-  it("o manager da org A MUDA o preço (controle positivo — a policy não é um muro)", () => {
-    // Sem este caso, uma policy que negasse escrita a TODO MUNDO passaria nos
-    // dois casos acima e a tabela seria inútil pela tela.
+  it("o manager da org A NÃO muda o preço — configuração é do admin", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): catalog_products_write passou de manager para admin.
     comoUsuario(
       MANAGER_A,
+      `do $$ begin
+         update public.catalog_products set preco_cents = 1
+          where organization_id = '${ORG_A}' and codigo = 'INV-IP15';
+       exception when others then null; end $$;
+       select 1;`,
+    );
+
+    const preco = noBanco(
+      `select preco_cents from public.catalog_products
+        where organization_id = '${ORG_A}' and codigo = 'INV-IP15';`,
+    );
+    expect(preco).toBe(String(PRECO_ORIGINAL));
+  });
+
+  it("o admin da org A MUDA o preço (controle positivo — a policy não é um muro)", () => {
+    // Sem este caso, uma policy que negasse escrita a TODO MUNDO passaria nos
+    // casos acima e a tabela seria inútil pela tela.
+    comoUsuario(
+      ADMIN_A,
       `update public.catalog_products set preco_cents = ${PRECO_ORIGINAL + 100}
         where organization_id = '${ORG_A}' and codigo = 'INV-IP15';
        select 1;`,
@@ -168,11 +196,13 @@ describe("catalog_products — quem lê e quem muda preço", () => {
     expect(preco).toBe(String(PRECO_ORIGINAL + 100));
   });
 
-  it("o manager da org A não muda o preço da org B", () => {
-    // Ser `manager` em algum lugar não é ser manager em todo lugar — e o preço
+  it("o admin da org A não muda o preço da org B", () => {
+    // Ser `admin` em algum lugar não é ser admin em todo lugar — e o preço
     // do vizinho é o dado mais sensível deste catálogo.
+    // ia.vek v1.7.6 (0581/0582/0583): ator trocado de manager para admin, senão o
+    // 0 viria do papel e não do isolamento.
     comoUsuario(
-      MANAGER_A,
+      ADMIN_A,
       `do $$ begin
          update public.catalog_products set preco_cents = 1
           where organization_id = '${ORG_B}' and codigo = 'INV-IP15';
@@ -187,9 +217,10 @@ describe("catalog_products — quem lê e quem muda preço", () => {
     expect(preco).toBe(String(PRECO_ORIGINAL));
   });
 
-  it("o manager da org B muda o dele (controle positivo do outro lado)", () => {
+  it("o admin da org B muda o dele (controle positivo do outro lado)", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): era o manager da org B.
     comoUsuario(
-      MANAGER_B,
+      ADMIN_B,
       `update public.catalog_products set preco_cents = ${PRECO_ORIGINAL + 7}
         where organization_id = '${ORG_B}' and codigo = 'INV-IP15';
        select 1;`,

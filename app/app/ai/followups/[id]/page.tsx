@@ -22,7 +22,7 @@ export default async function FollowupFlowBuilderPage({
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
-  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) {
+  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {
     redirect("/403");
   }
 

@@ -3,7 +3,7 @@
  * A rota dos sons dos avisos (`app/api/v1/settings/sons`).
  *
  * Os modos de falha vigiados:
- *   - trocar o som exige `manager` (ouvir, qualquer membro);
+ *   - trocar o som exige `admin` (ia.vek v1.7.6; ouvir, qualquer membro);
  *   - o arquivo é aceito pelos BYTES, nunca pela extensão;
  *   - corpo declarado grande demais é recusado ANTES de bufferizar;
  *   - o caminho é gerado no servidor, sob a pasta da organização da SESSÃO;
@@ -86,7 +86,7 @@ function sessao() {
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: "u1", idioma: "pt-BR" },
-    org: { orgId: ORG, role: "manager" },
+    org: { orgId: ORG, role: "admin" },
   } as never);
 }
 
@@ -105,10 +105,11 @@ beforeEach(() => {
 });
 
 describe("POST /api/v1/settings/sons", () => {
-  it("exige manager — e é a rota que diz, não a tela", async () => {
+  // ia.vek v1.7.6: configuração só do admin
+  it("exige admin — e é a rota que diz, não a tela", async () => {
     banco({});
     await POST(upload("venda", WAV));
-    expect(vi.mocked(requireRole).mock.calls[0]![0]).toBe("manager");
+    expect(vi.mocked(requireRole).mock.calls[0]![0]).toBe("admin");
   });
 
   it("aceita pelos bytes: WAV com nome .mp3 entra como .wav, sob a pasta da organização", async () => {
@@ -167,7 +168,8 @@ describe("DELETE /api/v1/settings/sons", () => {
     const b = banco({ outra_chave: 1, sons_de_aviso: { venda: `${ORG}/venda-a.mp3`, pessoa: `${ORG}/pessoa-b.mp3` } });
     const r = await DELETE(new NextRequest("http://localhost/api/v1/settings/sons?tipo=venda", { method: "DELETE" }));
     expect(r.status).toBe(200);
-    expect(vi.mocked(requireRole).mock.calls[0]![0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin
+    expect(vi.mocked(requireRole).mock.calls[0]![0]).toBe("admin");
     expect(b.updates[0]).toEqual({ settings: { outra_chave: 1, sons_de_aviso: { pessoa: `${ORG}/pessoa-b.mp3` } } });
     expect(b.removidos).toEqual([`${ORG}/venda-a.mp3`]);
   });

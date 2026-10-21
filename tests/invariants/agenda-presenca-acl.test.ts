@@ -7,6 +7,9 @@ const pool = new pg.Pool({
 });
 const tenants = [0, 1].map(() => ({
   org: randomUUID(),
+  // ia.vek v1.7.6 (0581/0582/0583): os RPCs de configuração da agenda passaram
+  // de manager para admin — o admin é o controle positivo, o manager o negativo.
+  admin: randomUUID(),
   manager: randomUUID(),
   agent: randomUUID(),
   viewer: randomUUID(),
@@ -45,7 +48,7 @@ beforeAll(async () => {
       "insert into organizations(id,slug,legal_name,display_name) values($1::uuid,$1::text,'ACL agenda','ACL agenda')",
       [tenant.org],
     );
-    for (const role of ["manager", "agent", "viewer"] as const) {
+    for (const role of ["admin", "manager", "agent", "viewer"] as const) {
       const user = tenant[role];
       await pool.query("insert into auth.users(id,email) values($1,$2)", [
         user,
@@ -98,44 +101,49 @@ describe("agenda: superfícies humanas e recibo privado têm autorização compo
   });
 
   it("MFA direto de settings distingue sem fator, fator aal1 e mesmo fator aal2", async () => {
+    // ia.vek v1.7.6 (0581/0582/0583): ator trocado de manager para admin (fn_agenda_settings exige admin).
     const tenant = tenants[0]!, factor = randomUUID();
     const config = { confirmation_delay_minutes: 17, unknown_protection_minutes: 130 };
-    await asRole("authenticated", tenant.manager, settingsQuery, [tenant.org, config]);
-    await pool.query("insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')", [factor, tenant.manager]);
+    await asRole("authenticated", tenant.admin, settingsQuery, [tenant.org, config]);
+    await pool.query("insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')", [factor, tenant.admin]);
     const next = { confirmation_delay_minutes: 18, unknown_protection_minutes: 140 };
     try {
       const before = (await pool.query("select settings from organizations where id=$1", [tenant.org])).rows[0].settings;
-      await expect(asRole("authenticated", tenant.manager, settingsQuery, [tenant.org, next], "aal1")).rejects.toMatchObject({ code: "42501" });
+      await expect(asRole("authenticated", tenant.admin, settingsQuery, [tenant.org, next], "aal1")).rejects.toMatchObject({ code: "42501" });
       expect((await pool.query("select settings from organizations where id=$1", [tenant.org])).rows[0].settings).toEqual(before);
-      expect((await asRole("authenticated", tenant.manager, settingsQuery, [tenant.org, next], "aal2")).rows[0].result).toEqual(next);
+      expect((await asRole("authenticated", tenant.admin, settingsQuery, [tenant.org, next], "aal2")).rows[0].result).toEqual(next);
       expect((await pool.query("select settings->'agenda' config from organizations where id=$1", [tenant.org])).rows[0].config).toEqual(next);
     } finally { await pool.query("delete from auth.mfa_factors where id=$1", [factor]); }
   });
 
-  it("a opção da agenda dos colegas: manager da PRÓPRIA org com fator grava, e papéis, sessão sem prova e org vizinha não gravam", async () => {
+  it("a opção da agenda dos colegas: admin da PRÓPRIA org com fator grava, e papéis, sessão sem prova e org vizinha não gravam", async () => {
     const a = tenants[0]!, b = tenants[1]!;
     const factor = randomUUID();
     await pool.query(
       "insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')",
-      [factor, a.manager],
+      [factor, a.admin],
     );
     try {
       const antes = (await pool.query("select settings from organizations where id=$1", [a.org]))
         .rows[0].settings;
-      // Abaixo de manager: Atendente e Somente-leitura.
+      // Abaixo de admin: Gerente, Atendente e Somente-leitura.
+      // ia.vek v1.7.6 (0581/0582/0583): o gerente passou a ser recusado.
+      await expect(
+        asRole("authenticated", a.manager, colegasQuery, [a.org, false], "aal2"),
+      ).rejects.toMatchObject({ code: "42501" });
       await expect(
         asRole("authenticated", a.agent, colegasQuery, [a.org, false], "aal2"),
       ).rejects.toMatchObject({ code: "42501" });
       await expect(
         asRole("authenticated", a.viewer, colegasQuery, [a.org, false], "aal2"),
       ).rejects.toMatchObject({ code: "42501" });
-      // A org VIZINHA: manager de A pedindo em nome de B.
+      // A org VIZINHA: admin de A pedindo em nome de B.
       await expect(
-        asRole("authenticated", a.manager, colegasQuery, [b.org, false], "aal2"),
+        asRole("authenticated", a.admin, colegasQuery, [b.org, false], "aal2"),
       ).rejects.toMatchObject({ code: "42501" });
-      // O mesmo manager, com fator verificado, numa sessão que NÃO provou o fator.
+      // O mesmo admin, com fator verificado, numa sessão que NÃO provou o fator.
       await expect(
-        asRole("authenticated", a.manager, colegasQuery, [a.org, false], "aal1"),
+        asRole("authenticated", a.admin, colegasQuery, [a.org, false], "aal1"),
       ).rejects.toMatchObject({ code: "42501" });
       // Sem sessão nenhuma.
       await expect(asRole("anon", null, colegasQuery, [a.org, false])).rejects.toMatchObject({
@@ -146,9 +154,9 @@ describe("agenda: superfícies humanas e recibo privado têm autorização compo
         (await pool.query("select settings from organizations where id=$1", [a.org])).rows[0]
           .settings,
       ).toEqual(antes);
-      // O positivo: manager da própria org, com o fator provado.
+      // O positivo: admin da própria org, com o fator provado.
       expect(
-        (await asRole("authenticated", a.manager, colegasQuery, [a.org, false], "aal2")).rows[0]
+        (await asRole("authenticated", a.admin, colegasQuery, [a.org, false], "aal2")).rows[0]
           .result,
       ).toEqual({ ligado: false, mudou: true });
       expect(
@@ -165,7 +173,7 @@ describe("agenda: superfícies humanas e recibo privado têm autorização compo
       ).toBe(false);
       // Idempotente: pedir o que já está diz que não mudou — e não reescreve.
       expect(
-        (await asRole("authenticated", a.manager, colegasQuery, [a.org, false], "aal2")).rows[0]
+        (await asRole("authenticated", a.admin, colegasQuery, [a.org, false], "aal2")).rows[0]
           .result,
       ).toEqual({ ligado: false, mudou: false });
     } finally {
@@ -220,14 +228,15 @@ describe("agenda: superfícies humanas e recibo privado têm autorização compo
     }
   });
 
-  it("RPC dos prazos aceita manager da própria org; agent/viewer, manager vizinho e anon não escrevem", async () => {
+  it("RPC dos prazos aceita admin da própria org; manager/agent/viewer, admin vizinho e anon não escrevem", async () => {
     for (const tenant of tenants) {
       const other = tenants.find((t) => t.org !== tenant.org)!;
       const config = { confirmation_delay_minutes: 15, unknown_protection_minutes: 120 };
       const before = (
         await pool.query("select settings from organizations where id=$1", [tenant.org])
       ).rows[0].settings;
-      for (const user of [tenant.agent, tenant.viewer, other.manager]) {
+      // ia.vek v1.7.6 (0581/0582/0583): o manager da própria org passou a ser recusado.
+      for (const user of [tenant.manager, tenant.agent, tenant.viewer, other.admin]) {
         await expect(
           asRole("authenticated", user, settingsQuery, [tenant.org, config]),
         ).rejects.toMatchObject({ code: "42501" });
@@ -243,7 +252,7 @@ describe("agenda: superfícies humanas e recibo privado têm autorização compo
           .settings,
       ).toEqual(before);
       expect(
-        (await asRole("authenticated", tenant.manager, settingsQuery, [tenant.org, config])).rows[0]
+        (await asRole("authenticated", tenant.admin, settingsQuery, [tenant.org, config])).rows[0]
           .result,
       ).toEqual(config);
       expect(

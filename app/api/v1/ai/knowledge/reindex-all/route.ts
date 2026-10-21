@@ -34,7 +34,7 @@ export async function POST(): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "ai_knowledge" });
+  const authz = await requireRole("admin", { requestId, resource: "ai_knowledge" });
   if (!authz.ok) return authz.response;
   const { org, user } = authz;
 

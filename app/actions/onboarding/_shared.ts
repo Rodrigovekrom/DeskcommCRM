@@ -147,3 +147,17 @@ export async function patchOnboardingState(
     throw new OnboardingError("org_ja_configurada", "Organização já configurada.");
   }
 }
+
+/**
+ * ia.vek v1.7.6: as ações do onboarding que CONFIGURAM a empresa (convites,
+ * agente padrão, quadro, chave da IA) são só do admin. Antes, só o redirect do
+ * layout as protegia: a Server Action é endpoint público e podia ser chamada
+ * direto por qualquer membro.
+ */
+export async function requireOnboardingAdminCtx(orgIdDaAba?: string): Promise<OnboardingCtx> {
+  const ctx = await requireOnboardingCtx(orgIdDaAba);
+  if (ctx.role !== "admin") {
+    throw new OnboardingError("forbidden", "Só o administrador configura a empresa.");
+  }
+  return ctx;
+}

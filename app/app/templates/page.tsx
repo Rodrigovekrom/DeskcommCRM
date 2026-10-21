@@ -12,7 +12,7 @@ export default async function TemplatesPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app/inbox");
-  const canShare = ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
+  const canShare = ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin;
   // `t` local em vez do hook: esta página é componente de SERVIDOR, e lá o
   // idioma vem resolvido em `user.idioma` (a cadeia pessoa → organização →
   // padrão vive em `lib/auth/server.ts`), sem reler o `locale` cru.

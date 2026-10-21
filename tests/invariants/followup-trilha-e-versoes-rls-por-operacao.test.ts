@@ -24,8 +24,9 @@ import {
  * A escrita agora espelha quem escreve pela SESSÃO:
  * - trilha: INSERT `manager` (as rotas de intervenção gravam o evento manual);
  *   UPDATE/DELETE sem policy — append-only para a equipe, só o motor reescreve;
- * - versões: DELETE `manager` (DELETE do fluxo); INSERT/UPDATE sem policy — a
- *   versão nasce só por `fn_publish_followup_flow_version` (definer, service_role).
+ * - versões: DELETE `admin` (DELETE do fluxo — era `manager` até a 0581 do
+ *   ia.vek v1.7.6); INSERT/UPDATE sem policy — a versão nasce só por
+ *   `fn_publish_followup_flow_version` (definer, service_role).
  *
  * Os casos com ⭐ são os que a policy `for all` deixava passar.
  */
@@ -151,19 +152,30 @@ describe("a trilha é append-only para a equipe inteira", () => {
 });
 
 describe("ninguém toca outra organização", () => {
-  it("manager da org A não lê, não grava nem apaga na trilha e nas versões da org B", () => {
-    expect(countAs(GOV_MANAGER, `select count(*) from public.followup_enrollment_events where id = '${EVENTO_B}';`)).toBe(0);
-    expect(countAs(GOV_MANAGER, `select count(*) from public.followup_flow_versions where id = '${VERSAO_B}';`)).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, eventoNovo(ORG_B, INSCRICAO_B))).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, `delete from public.followup_flow_versions where id = '${VERSAO_B}'`)).toBe(0);
+  // ia.vek v1.7.6 (0581/0582/0583): o ator é o admin da org A — o manager já não
+  // apaga versão nem na própria org, e o 0 viria do papel, não do isolamento.
+  it("admin da org A não lê, não grava nem apaga na trilha e nas versões da org B", () => {
+    expect(countAs(GOV_ADMIN, `select count(*) from public.followup_enrollment_events where id = '${EVENTO_B}';`)).toBe(0);
+    expect(countAs(GOV_ADMIN, `select count(*) from public.followup_flow_versions where id = '${VERSAO_B}';`)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, eventoNovo(ORG_B, INSCRICAO_B))).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, `delete from public.followup_flow_versions where id = '${VERSAO_B}'`)).toBe(0);
     expect(existe("followup_flow_versions", VERSAO_B)).toBe(true);
   });
 });
 
-describe("manager faz o que as rotas fazem — controle positivo", () => {
-  it("grava o evento manual da intervenção e apaga a versão (DELETE do fluxo)", () => {
+describe("quem faz o que as rotas fazem — controle positivo", () => {
+  it("manager grava o evento manual da intervenção", () => {
     expect(writeCountAs(GOV_MANAGER, eventoNovo(GOV_ORG, INSCRICAO))).toBe(1);
-    expect(writeCountAs(GOV_MANAGER, `delete from public.followup_flow_versions where id = '${VERSAO_DESCARTE}'`)).toBe(1);
+  });
+
+  it("manager NÃO apaga a versão (DELETE do fluxo é do admin)", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): followup_flow_versions_delete passou de manager para admin.
+    expect(writeCountAs(GOV_MANAGER, `delete from public.followup_flow_versions where id = '${VERSAO_DESCARTE}'`)).toBe(0);
+    expect(existe("followup_flow_versions", VERSAO_DESCARTE)).toBe(true);
+  });
+
+  it("admin apaga a versão (DELETE do fluxo)", () => {
+    expect(writeCountAs(GOV_ADMIN, `delete from public.followup_flow_versions where id = '${VERSAO_DESCARTE}'`)).toBe(1);
     expect(existe("followup_flow_versions", VERSAO_DESCARTE)).toBe(false);
   });
 });

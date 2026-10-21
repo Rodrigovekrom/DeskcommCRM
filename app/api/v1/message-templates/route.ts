@@ -64,8 +64,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   // Compartilhado exige manager+. requireRole já resolveu o role efetivo do
   // banco em org.role — reusar em vez de uma 2ª chamada/RPC. A RLS with_check
   // barra de qualquer forma; isto só dá um erro claro antes do insert.
-  if (shared && !roleAtLeast(org.role, "manager")) {
-    return fail("forbidden", t("Só manager+ cria template compartilhado."), 403, { requestId });
+  // ia.vek v1.7.6: as respostas PADRÃO da loja (compartilhadas) são só do admin.
+  if (shared && !roleAtLeast(org.role, "admin")) {
+    return fail("forbidden", t("Só o administrador cria resposta rápida padrão."), 403, { requestId });
   }
   // Idempotency-Key, quando vem, tem de ser UUID — mesma régua de
   // `admin/tenants` e do contrato (spec 01 §7.3). Chave malformada não vira

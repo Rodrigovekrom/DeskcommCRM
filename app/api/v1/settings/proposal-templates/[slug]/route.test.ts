@@ -29,7 +29,8 @@ interface MundoOpts {
 }
 
 function montarMundo(opts: MundoOpts = {}) {
-  const papel = opts.papel ?? "manager";
+  // ia.vek v1.7.6: configuração só do admin
+  const papel = opts.papel ?? "admin";
   const rank = ROLE_RANK[papel] ?? 0;
   mocks.requireRole.mockImplementation(async (minRole: keyof typeof ROLE_RANK) => {
     const minRank = ROLE_RANK[minRole] ?? 0;
@@ -142,8 +143,9 @@ describe("PATCH /api/v1/settings/proposal-templates/[slug]", () => {
     expect(mundo.atualizado()).toBeUndefined();
   });
 
-  it("como agent → 403", async () => {
-    montarMundo({ papel: "agent", copiaAtiva: COPIA });
+  // ia.vek v1.7.6: configuração só do admin — manager também recebe 403
+  it.each(["agent", "manager"] as const)("como %s → 403", async (papel) => {
+    montarMundo({ papel, copiaAtiva: COPIA });
     const res = await PATCH(patchValido() as never, ctx("ecommerce"));
     expect(res.status).toBe(403);
   });
@@ -152,8 +154,9 @@ describe("PATCH /api/v1/settings/proposal-templates/[slug]", () => {
 describe("DELETE /api/v1/settings/proposal-templates/[slug]", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("como agent → 403", async () => {
-    montarMundo({ papel: "agent", copiaAtiva: COPIA });
+  // ia.vek v1.7.6: configuração só do admin — manager também recebe 403
+  it.each(["agent", "manager"] as const)("como %s → 403", async (papel) => {
+    montarMundo({ papel, copiaAtiva: COPIA });
     const res = await DELETE(new Request("http://x") as never, ctx("ecommerce"));
     expect(res.status).toBe(403);
   });

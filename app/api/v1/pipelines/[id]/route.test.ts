@@ -39,12 +39,13 @@ beforeEach(() => {
 });
 
 describe("PATCH /api/v1/pipelines/[id]", () => {
-  it("exige manager", async () => {
+  it("exige admin", async () => {
     authOk();
     makeDb({ pipelines: doisFunis() });
     const { PATCH } = await import("./route");
     await PATCH(reqPatch({ name: "Consultório" }), ctx());
-    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin — "manager" já não basta
+    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("admin");
   });
 
   it("sem auth → repassa a resposta, sem escrever", async () => {

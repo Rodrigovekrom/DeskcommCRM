@@ -82,7 +82,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "contact" });
+  const authz = await requireRole("admin", { requestId, resource: "contact" });
   if (!authz.ok) return authz.response;
   const { user, org } = authz;
 

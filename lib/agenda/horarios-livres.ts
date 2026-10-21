@@ -128,6 +128,12 @@ export interface EntradaDeHorariosLivres {
   ate: Date;
   /** INJETADO. Nunca `new Date()` aqui dentro. */
   agora: Date;
+  /**
+   * ia.vek v1.7.6: quantos compromissos cabem no mesmo horário. Ausente = 1 (o
+   * comportamento do produto: um por pessoa); `null` = sem limite. Bloqueio de
+   * data bloqueia sempre, qualquer que seja a capacidade.
+   */
+  capacidade?: number | null;
 }
 
 const MINUTO = 60_000;
@@ -300,6 +306,7 @@ export function colide(inicio: number, fim: number, faixa: FaixaEmInstantes): bo
 
 export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
   const { jornada, excecoes, ocupados, tipo, de, ate, agora } = entrada;
+  const capacidade = entrada.capacidade === undefined ? 1 : entrada.capacidade;
   const fuso = jornada.timezone;
   const passo = tipo.intervaloMin ?? tipo.duracaoMin;
   if (passo <= 0 || tipo.duracaoMin <= 0) return [];
@@ -373,10 +380,9 @@ export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
     // volta a divergir no caso que ninguém previu; ser o mesmo caminho não tem
     // como divergir. O buffer passa a valer contra bloqueio de graça, pela
     // mesma razão.
-    const bloqueiosDoDia = [
-      ...compromissos,
-      ...excecoesDoDia.filter((e) => e.indisponivel).map(emInstantes),
-    ];
+    // ia.vek v1.7.6: compromissos contam contra a capacidade; bloqueio de
+    // data bloqueia sempre.
+    const bloqueiosDoDia = excecoesDoDia.filter((e) => e.indisponivel).map(emInstantes);
 
     for (const faixa of janelasDoDia(jornada, excecoesDoDia, dow)) {
       const fimDaFaixa = instanteDe(paredeDeMinutos(ano, mes, dia, faixa.fim), fuso).getTime();
@@ -395,6 +401,10 @@ export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
 
         const comFolga = slotInflado(inicio, fim, tipo);
         if (bloqueiosDoDia.some((b) => colide(comFolga.inicio, comFolga.fim, b))) continue;
+        if (capacidade !== null) {
+          const cruzam = compromissos.filter((b) => colide(comFolga.inicio, comFolga.fim, b)).length;
+          if (cruzam >= capacidade) continue;
+        }
 
         slots.push({ inicio: new Date(inicio), fim: new Date(fim) });
       }

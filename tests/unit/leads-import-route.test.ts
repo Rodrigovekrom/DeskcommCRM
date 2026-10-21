@@ -13,7 +13,7 @@
  *    o mesmo erro 300 vezes".
  *  - O mesmo telefone repetido vira UM contato. O original criava um contato por
  *    linha, e o produto passava a ter a duplicata que ele mesmo fabricou.
- *  - `viewer` não importa.
+ *  - Só o admin importa (ia.vek v1.7.6): `viewer`, `agent` e `manager` recebem 403.
  *  - `stage_id` é OPCIONAL: o `ImportarLeads.tsx` real NUNCA manda esse campo
  *    (só tem seletor de FUNIL). Toda suíte anterior mandava `stage_id` no
  *    `pedido()` por padrão — verde medindo um caminho que o usuário nunca
@@ -202,7 +202,8 @@ function pedido(csv: string, campos: Record<string, string | null> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  sessao("agent");
+  // ia.vek v1.7.6: configuração só do admin
+  sessao("admin");
   vi.mocked(createLeadHandler).mockResolvedValue({ id: "lead" } as never);
 });
 
@@ -410,8 +411,9 @@ describe("POST /api/v1/leads/import", () => {
     expect(vi.mocked(createLeadHandler).mock.calls[0]![2]).toMatchObject({ stage_id: ETAPA });
   });
 
-  it("viewer não importa", async () => {
-    sessao("viewer");
+  // ia.vek v1.7.6: configuração só do admin — agent e manager também não importam
+  it.each(["viewer", "agent", "manager"] as const)("%s não importa", async (papel) => {
+    sessao(papel);
     fazerSupabase(null);
     const { POST } = await import("@/app/api/v1/leads/import/route");
     const res = await POST(pedido("nome\nAna"));

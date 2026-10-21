@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { seedGov, GOV_ORG, GOV_AGENT_A, GOV_AGENT_B, GOV_VIEWER } from "./gov-helpers";
+import { seedGov, GOV_ORG, GOV_ADMIN, GOV_AGENT_A, GOV_AGENT_B, GOV_VIEWER } from "./gov-helpers";
 import { checkpoint, localProjection } from "@/lib/agenda/google/sync-model";
 import { appointmentSnapshotSchema, expectedAppointment } from "@/lib/agenda/google/sync-store";
 const pool = new pg.Pool({
@@ -535,9 +535,18 @@ it("sucesso/erro/lease são privados; membro vizinho não pode rearmar publicaç
     "google_claim_token=gen_random_uuid()",
     "google_synced_local_revision=google_local_revision",
   ]) {
+    // ia.vek v1.7.6 (0581/0582/0583): calendar_appointments_write passou de agent+ para
+    // admin (0583). O dono `agent` já é barrado pela RLS (0 linhas, sem chegar ao
+    // gatilho); quem ainda alcança a linha é o admin — e o gatilho o recusa igual.
+    const doDono = await asUser(
+      GOV_AGENT_A,
+      `update calendar_appointments set ${patch} where organization_id=$1 and id=$2`,
+      [GOV_ORG, f.id],
+    );
+    expect(doDono.rowCount).toBe(0);
     await expect(
       asUser(
-        GOV_AGENT_A,
+        GOV_ADMIN,
         `update calendar_appointments set ${patch} where organization_id=$1 and id=$2`,
         [GOV_ORG, f.id],
       ),
@@ -547,9 +556,11 @@ it("sucesso/erro/lease são privados; membro vizinho não pode rearmar publicaç
     "update calendar_appointments set google_next_attempt_at=now()+interval '1 hour' where id=$1",
     [f.id],
   );
+  // ia.vek v1.7.6 (0581/0582/0583): o membro que não é dono e ainda alcança a
+  // linha pela RLS é o admin (o agent B já recebe 0 linhas da policy).
   await expect(
     asUser(
-      GOV_AGENT_B,
+      GOV_ADMIN,
       "update calendar_appointments set google_next_attempt_at=now() where organization_id=$1 and id=$2",
       [GOV_ORG, f.id],
     ),

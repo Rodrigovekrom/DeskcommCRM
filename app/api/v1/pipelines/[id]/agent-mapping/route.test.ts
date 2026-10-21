@@ -296,12 +296,13 @@ describe("PUT /api/v1/pipelines/[id]/agent-mapping", () => {
    * O 403 acima mocka o `requireRole` para falhar SEMPRE — passaria igual se a
    * escrita pedisse `agent`. Quem prova o papel da escrita é este.
    */
-  it("exige manager para escrever", async () => {
+  it("exige admin para escrever", async () => {
     authOk();
     makeDb({ stages: funil() });
     const { PUT } = await import("./route");
     await PUT(reqPut({ mapeamento: mapa({ new: "e1", won: "e3", lost: "e4" }) }), ctx);
-    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin — "manager" já não basta
+    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("admin");
   });
 
   /**

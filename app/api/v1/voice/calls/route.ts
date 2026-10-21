@@ -11,6 +11,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { exigirContatoProprioParaLigar } from "@/lib/iavek/contato-proprio";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
@@ -68,6 +69,16 @@ export async function POST(req: Request): Promise<Response> {
     instalacaoOferece: true,
   });
   if (vozDesligada) return vozDesligada;
+
+  // ia.vek v1.7.6: quem não é admin liga só para lead/cliente seu.
+  const naoEhSeu = await exigirContatoProprioParaLigar(supabase, {
+    orgId: activeOrg.orgId,
+    contatoId: parsed.data.contactId,
+    userId: user.id,
+    role: activeOrg.role,
+    requestId,
+  });
+  if (naoEhSeu) return naoEhSeu;
 
   const session = await resolveWacallsSession(supabase, activeOrg.orgId);
   if (!session) {

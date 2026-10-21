@@ -7,7 +7,7 @@ import { usePropostasDoLead } from "@/hooks/kanban/usePropostasDoLead";
 import { formatCents } from "@/lib/money";
 
 const ROTULO_DE_STATUS: Record<string, string> = {
-  rascunho: "Rascunho", enviando: "Enviando", enviada: "Enviada", aceita: "Aceita",
+  rascunho: "Rascunho", aguardando_aprovacao: "Aguardando aprovação", enviando: "Enviando", enviada: "Enviada", aceita: "Aceita",
   recusada: "Recusada", vencida: "Vencida", cancelada: "Cancelada", substituida: "Substituída",
 };
 

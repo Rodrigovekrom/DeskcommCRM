@@ -182,7 +182,8 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "tests/invariants/proposta-templates-isolamento-entre-organizacoes.test.ts " +
       "— isolamento cross-org com `countAs` real (membro da org A não vê a " +
       "cópia de modelo da org B) + `writeCountAs` provando o piso de papel na " +
-      "escrita (viewer barrado, agent permitido), migration 0471 (M0).",
+      "escrita (viewer, agent e manager barrados, admin permitido — ia.vek " +
+      "v1.7.6/0581 subiu a régua de manager para admin), migration 0471 (M0).",
   },
   {
     tabela: "webhook_lead_captures",

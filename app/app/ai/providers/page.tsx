@@ -24,7 +24,7 @@ export default async function ProvedoresPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
-  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) redirect("/403");
+  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) redirect("/403");
 
   return <PainelDeProvedores />;
 }

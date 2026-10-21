@@ -275,6 +275,12 @@ const DECISOES: Record<string, Decisao> = {
     decidida: "manter",
     razao: "Trilha de estados do roteiro (ponte, nó atual, status, motivo de cancelamento — vocabulário fechado), sem texto livre. A virada de is_anonymizado ENCERRA o roteiro em curso pelo gatilho da 0394; encerrar não é redigir, e não sobra nada legível da pessoa.",
   },
+  // ia.vek v1.7.6 (0583): tabela nova com FK para contacts — precisa de decisão escrita.
+  iavek_pedidos_de_agendamento: {
+    decidida: "redigir",
+    caminho: "gatilho",
+    razao: "ia.vek 0583: observacao e motivo_da_recusa são TEXTO LIVRE da equipe/IA e podem nomear a pessoa — zerados na virada de is_anonymized pelo gatilho fn_iavek_redigir_pedidos_ao_anonimizar. Dia/hora, status e quem pediu/decidiu são dado de operação da agenda e ficam.",
+  },
   google_ads_click_refs: {
     decidida: "manter",
     razao: "gclid/token de clique da plataforma e a query de aterrissagem — identificador de campanha que existe para casar o clique ao contato. Sem nome, telefone ou e-mail; apagar desfaria a atribuição da conversão.",

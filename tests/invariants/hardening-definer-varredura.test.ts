@@ -133,7 +133,7 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
   },
   {
     fn: "fn_set_channel_routing(uuid,uuid,uuid[],boolean)",
-    razao: "PATCH app/api/v1/settings/routing/channels/route.ts usa createClient da sessão; RPC exige manager, suporte de escrita, MFA e canal/membros da org na mesma transação. tests/invariants/channel-routing.test.ts prova viewer, tenants A/B, membro revogado, policy vazia e MFA platform aal1/aal2.",
+    razao: "PATCH app/api/v1/settings/routing/channels/route.ts usa createClient da sessão; RPC exige admin (era manager até a 0581, ia.vek v1.7.6), suporte de escrita, MFA e canal/membros da org na mesma transação. tests/invariants/channel-routing.test.ts prova viewer, manager, tenants A/B, membro revogado, policy vazia e MFA platform aal1/aal2.",
   },
   {
     fn: "fn_reserve_channel_connection(uuid,uuid,text,text,boolean)",
@@ -179,18 +179,20 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
     fn: "fn_agenda_settings(uuid,jsonb)",
     razao:
       "PATCH app/api/v1/agenda/configuracao/route.ts chama com createClient " +
-      "da sessão; auth.uid() exige manager e suporte de escrita. " +
-      "tests/invariants/agenda-presenca-acl.test.ts prova manager A/B próprio, " +
-      "negação agent/viewer/cross-org e ausência de efeito recusado.",
+      "da sessão; auth.uid() exige admin (era manager até a 0581, ia.vek v1.7.6) " +
+      "e suporte de escrita. tests/invariants/agenda-presenca-acl.test.ts prova " +
+      "admin A/B próprio, negação manager/agent/viewer/cross-org e ausência de " +
+      "efeito recusado.",
   },
   {
     fn: "fn_definir_colegas_podem_mexer_na_agenda(uuid,boolean)",
     razao:
       "app/actions/settings/definirAgendaDosColegas.ts chama por rpc com o " +
       "createClient da SESSÃO, e a própria função reconfere auth.uid(), " +
-      "manager, suporte de escrita e MFA comprovado antes de gravar. " +
-      "tests/invariants/agenda-presenca-acl.test.ts prova manager da própria " +
-      "org com fator provado e a negação de agent, viewer, sessão aal1, anon " +
+      "admin (era manager até a 0581, ia.vek v1.7.6), suporte de escrita e MFA " +
+      "comprovado antes de gravar. tests/invariants/agenda-presenca-acl.test.ts " +
+      "prova admin da própria org com fator provado e a negação de manager, " +
+      "agent, viewer, sessão aal1, anon " +
       "e da org vizinha, com a configuração intacta depois das recusas.",
   },
   {
@@ -254,8 +256,9 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
     fn: "fn_vocabulario_de_tags_operar(uuid,text,text,text,text)",
     razao:
       "POST app/api/v1/tags/vocabulario/route.ts chama com createClient da " +
-      "sessão (a tela de Tags é manager+, com suporte de escrita e MFA). A " +
-      "função exige fn_role_at_least(p_org,'manager') ANTES de qualquer escrita, " +
+      "sessão (a tela de Tags é admin desde o ia.vek v1.7.6, com suporte de " +
+      "escrita e MFA). A função exige fn_role_at_least(p_org,'admin') (era " +
+      "'manager' até a 0581) ANTES de qualquer escrita, " +
       "recusa ação fora do vocabulário e roda os três arrays, as sementes da " +
       "organização e as ações add_tag de automation_rules numa transação só — é " +
       "essa atomicidade que impede o rename de deixar a regra do agente " +

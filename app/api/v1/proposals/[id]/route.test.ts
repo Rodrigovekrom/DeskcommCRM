@@ -9,11 +9,14 @@ const mocks = vi.hoisted(() => ({
   audit: vi.fn(),
   requireSupportWrite: vi.fn(),
   resolverAvisoDeRevisaoSeProntaOuEncerrada: vi.fn(),
+  createAdminClient: vi.fn(),
 }));
 
 vi.mock("@/lib/propostas/porta", () => ({ sePropostasDesligadas: vi.fn(async () => null) }));
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: mocks.requireRole }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
+// ia.vek v1.7.6: a régua "proposta do próprio lead" lê proposta e lead pelo service role.
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/audit", () => ({ audit: mocks.audit }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: mocks.requireSupportWrite }));
 vi.mock("@/lib/propostas/aviso-de-revisao", () => ({ resolverAvisoDeRevisaoSeProntaOuEncerrada: mocks.resolverAvisoDeRevisaoSeProntaOuEncerrada }));
@@ -177,9 +180,40 @@ function montarMundoDeEdicao(opts: MundoOpts = {}) {
   };
 }
 
+const LEAD_ID = "99999999-9999-4999-8999-999999999999";
+const ROLE_RANK: Record<string, number> = { viewer: 1, agent: 2, manager: 3, admin: 4 };
+
+/** ia.vek v1.7.6: papel efetivo + dono do lead da proposta (service role). */
+function comoPapel(papel: keyof typeof ROLE_RANK, donoDoLead = "outro-vendedor") {
+  mocks.requireRole.mockImplementation(async (minRole: string) =>
+    (ROLE_RANK[papel] ?? 0) < (ROLE_RANK[minRole] ?? 0)
+      ? { ok: false, response: fail("forbidden_role", "Sem permissão", 403) }
+      : { ok: true, user: { id: USER_ID, idioma: "pt-BR" }, org: { orgId: ORG_ID, role: papel } },
+  );
+  const leituras: string[] = [];
+  mocks.createAdminClient.mockReturnValue({
+    from(tabela: string) {
+      leituras.push(tabela);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cadeia: any = {
+        select: () => cadeia,
+        eq: () => cadeia,
+        maybeSingle: async () =>
+          tabela === "crm_proposals"
+            ? { data: { id: PROPOSAL_ID, lead_id: LEAD_ID }, error: null }
+            : { data: { owner_user_id: donoDoLead }, error: null },
+      };
+      return cadeia;
+    },
+  });
+  return leituras;
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.requireRole.mockResolvedValue({ ok: true, user: { id: USER_ID, idioma: "pt-BR" }, org: { orgId: ORG_ID } });
+  // ia.vek v1.7.6: o org mockado ganha papel — sem ele, a régua do lead próprio
+  // trata como vendedor. Os casos genéricos da rota rodam como admin.
+  comoPapel("admin");
   mocks.requireSupportWrite.mockResolvedValue(null);
   mocks.audit.mockResolvedValue(undefined);
 });
@@ -355,6 +389,32 @@ describe("PATCH /api/v1/proposals/[id]", () => {
     expect(mundo.propostaAtualizada).toBeNull();
   });
 
+  it("ia.vek v1.7.6: vendedor (agent) dono do lead edita a proposta", async () => {
+    comoPapel("agent", USER_ID);
+    const mundo = montarMundoDeEdicao();
+    const res = await mundo.PATCH({ revision: 1, itens: [item] });
+    expect(res.status).toBe(200);
+    expect(mundo.propostaAtualizada).toMatchObject({ revision: 2 });
+  });
+
+  it("ia.vek v1.7.6: vendedor (agent) que NÃO é dono do lead: 403 forbidden, sem tocar na proposta", async () => {
+    const leituras = comoPapel("agent", "outro-vendedor");
+    const mundo = montarMundoDeEdicao();
+    const res = await mundo.PATCH({ revision: 1, itens: [item] });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: { code: "forbidden" } });
+    expect(leituras).toEqual(["crm_proposals", "crm_leads"]);
+    expect(mundo.consultas).toHaveLength(0);
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it("ia.vek v1.7.6: gerente edita qualquer proposta sem consultar o dono do lead", async () => {
+    const leituras = comoPapel("manager");
+    const mundo = montarMundoDeEdicao();
+    expect((await mundo.PATCH({ revision: 1, itens: [item] })).status).toBe(200);
+    expect(leituras).toEqual([]);
+  });
+
   it("omitir prazo e pagamento não os apaga", async () => {
     const mundo = montarMundoDeEdicao();
     await mundo.PATCH({ revision: 1, itens: [item] });
@@ -383,12 +443,22 @@ describe("DELETE /api/v1/proposals/[id]", () => {
     expect(mocks.audit).not.toHaveBeenCalled();
   });
 
-  it("papel agent (abaixo de manager): 403, não descarta", async () => {
-    mocks.requireRole.mockResolvedValue({ ok: false, response: fail("forbidden_role", "Sem permissão", 403) });
+  // ia.vek v1.7.6: descartar passou de manager para admin.
+  it("papel agent: 403, não descarta", async () => {
+    comoPapel("agent", USER_ID);
     const mundo = montarMundoDeEdicao({ status: "rascunho" });
     const res = await mundo.DELETE();
     expect(res.status).toBe(403);
     expect(mundo.propostaAtualizada).toBeNull();
+  });
+
+  it("ia.vek v1.7.6: gerente (abaixo de admin): 403, não descarta; a rota pede admin", async () => {
+    comoPapel("manager");
+    const mundo = montarMundoDeEdicao({ status: "rascunho" });
+    const res = await mundo.DELETE();
+    expect(res.status).toBe(403);
+    expect(mundo.propostaAtualizada).toBeNull();
+    expect(mocks.requireRole).toHaveBeenCalledWith("admin", expect.objectContaining({ resource: "crm_proposals" }));
   });
 
   it("proposta de outra organização: 404 (via 409 do filtro, nunca vaza a existência)", async () => {

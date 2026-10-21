@@ -42,7 +42,7 @@ export default async function CredentialsPage() {
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
   const idioma = user.idioma;
-  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.manager) {
+  if (ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {
     redirect("/403");
   }
 

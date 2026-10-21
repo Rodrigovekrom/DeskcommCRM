@@ -79,7 +79,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("manager", { requestId, resource: "honorarios_contratos" });
+  const authz = await requireRole("admin", { requestId, resource: "honorarios_contratos" });
   if (!authz.ok) return authz.response;
 
   const lido = criarSchema.safeParse(await req.json().catch(() => ({})));

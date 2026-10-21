@@ -1,7 +1,7 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { GOV_MANAGER, GOV_ORG, GOV_VIEWER, seedGov } from "./gov-helpers";
+import { GOV_ADMIN, GOV_MANAGER, GOV_ORG, GOV_VIEWER, seedGov } from "./gov-helpers";
 
 /**
  * A COR DA ETIQUETA (issue #1271, fatia S6 da #852) — medida no Postgres, não
@@ -65,8 +65,9 @@ async function actor(user: string | null, sql: string, args: unknown[] = []) {
 }
 
 function operar(org: string, acao: string, tag: string, destino: string | null, cor: string | null) {
+  // ia.vek v1.7.6 (0581/0582/0583): fn_vocabulario_de_tags_operar passou de manager para admin.
   return actor(
-    GOV_MANAGER,
+    GOV_ADMIN,
     "select public.fn_vocabulario_de_tags_operar($1,$2,$3,$4,$5) as r",
     [org, acao, tag, destino, cor],
   );
@@ -153,6 +154,21 @@ describe("fatia S6 — a cor da etiqueta", () => {
     await limparVocabulario(GOV_ORG);
     await expect(
       actor(GOV_VIEWER, "select public.fn_vocabulario_de_tags_operar($1,$2,$3,$4,$5)", [
+        GOV_ORG,
+        "definir_cor",
+        "vip",
+        null,
+        "#0091ff",
+      ]),
+    ).rejects.toThrow(/insufficient_role/);
+    expect(await vocabulario(GOV_ORG)).toEqual([]);
+  });
+
+  it("manager é recusado antes de qualquer escrita", async () => {
+    // ia.vek v1.7.6 (0581/0582/0583): o gerente deixou de mexer na cor das etiquetas.
+    await limparVocabulario(GOV_ORG);
+    await expect(
+      actor(GOV_MANAGER, "select public.fn_vocabulario_de_tags_operar($1,$2,$3,$4,$5)", [
         GOV_ORG,
         "definir_cor",
         "vip",

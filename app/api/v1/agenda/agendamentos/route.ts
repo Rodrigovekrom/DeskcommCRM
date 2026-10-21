@@ -354,7 +354,9 @@ async function despachar<T>(
   const authz = await resolveAuthDual(req, {
     requestId,
     resource: "agenda",
-    role: "agent",
+    // ia.vek v1.7.6: a agenda da loja é mexida só pelo admin (criar, remarcar,
+    // cancelar). SDR e vendedor fazem PEDIDO (/api/v1/iavek/pedidos-de-agendamento).
+    role: "admin",
     scope: "mcp:write",
     // O MESMO papel das tools MCP de escrita na agenda (`lib/mcp/tools/
     // agendamento.ts`, `requiresRole: "ai_operator"`), que chamam estes mesmos

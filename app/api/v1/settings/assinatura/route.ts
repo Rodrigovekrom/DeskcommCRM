@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   if (negado) return negado;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "message_signature" });
+  const authz = await requireRole("admin", { requestId, resource: "message_signature" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

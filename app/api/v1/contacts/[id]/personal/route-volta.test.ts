@@ -100,7 +100,7 @@ beforeEach(() => {
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: ORG, idioma: "pt-BR" },
-    org: { orgId: ORG, role: "manager" },
+    org: { orgId: ORG, role: "admin" }, // ia.vek v1.7.6: configuração só do admin
   } as Awaited<ReturnType<typeof requireRole>>);
   vi.mocked(createAdminClient).mockReturnValue({
     // Negócio aberto: nenhum (o D6 manda pular a timeline em silêncio); a
@@ -111,14 +111,15 @@ beforeEach(() => {
 });
 
 describe("desmarcar contato pessoal (spec 21, etapa 5)", () => {
-  it("só gerente e dono desmarcam — atendente recebe 403", async () => {
+  // ia.vek v1.7.6: configuração só do admin — atendente e gerente recebem 403
+  it("só admin desmarca — atendente e gerente recebem 403", async () => {
     vi.mocked(requireRole).mockResolvedValue({
       ok: false,
       response: fail("forbidden", "Acesso negado.", 403),
     });
     const resposta = await DELETE(req(), contexto());
     expect(resposta.status).toBe(403);
-    expect(requireRole).toHaveBeenCalledWith("manager", expect.objectContaining({ resource: "contacts" }));
+    expect(requireRole).toHaveBeenCalledWith("admin", expect.objectContaining({ resource: "contacts" }));
     expect(audit).not.toHaveBeenCalled();
   });
 

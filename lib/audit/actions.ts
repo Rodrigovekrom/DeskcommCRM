@@ -719,6 +719,14 @@ export const AUDIT_ACTIONS = [
   // decisão do cliente — cada um muda o que o negócio vale ou o que foi
   // oferecido, e é disputa comum entre quem atende e quem fecha.
   "proposal.drafted",
+  // ia.vek v1.7.6: aprovação da proposta do vendedor pelo gerente.
+  "proposal.approval_requested",
+  "proposal.approval_returned",
+  // ia.vek v1.7.6: pedido de agendamento (SDR/IA pedem, o admin decide).
+  "agenda.request_created",
+  "agenda.request_cancelled",
+  "agenda.request_refused",
+  "agenda.request_confirmed",
   "proposal.edited",
   "proposal.assistant_applied",
   "proposal.sent",

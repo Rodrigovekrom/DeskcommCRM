@@ -181,6 +181,7 @@ export function useActiveOrg(): ActiveOrg | null {
  * Permission gate based on role rank. Action mapping is intentionally
  * minimal here — feature-specific gates can extend with custom logic.
  */
+// ia.vek v1.7.6: configuração (criar funil, skills, webhooks...) é só do admin.
 const ACTION_MIN_ROLE: Record<string, Role> = {
   "inbox.view": "viewer",
   "inbox.reply": "agent",
@@ -190,7 +191,7 @@ const ACTION_MIN_ROLE: Record<string, Role> = {
   "contact.update": "agent",
   "contact.delete": "manager",
   "pipeline.view": "viewer",
-  "pipeline.create": "manager",
+  "pipeline.create": "admin",
   "pipeline.move_card": "agent",
   "team.invite": "admin",
   "team.change_role": "admin",
@@ -211,13 +212,13 @@ const ACTION_MIN_ROLE: Record<string, Role> = {
   "ai.memory.view": "manager",
   "ai.memory.publish": "admin",
   "ai.skills.view": "manager",
-  "ai.skills.manage": "manager",
+  "ai.skills.manage": "admin",
   "ai.routers.view": "manager",
   "ai.evolution.view": "manager",
   "ai.routers.manage": "admin",
   "ai.credentials.view": "manager",
   "ai.credentials.write": "admin",
-  "webhooks.manage": "manager",
+  "webhooks.manage": "admin",
   // Mesmo mínimo de lib/navigation/catalogo.ts (destino /app/calls) e de
   // requireRole("manager") em app/api/v1/calls/route.ts — a RLS de crm_calls
   // é só por organização, então sem este gate o aviso ao vivo de ligação

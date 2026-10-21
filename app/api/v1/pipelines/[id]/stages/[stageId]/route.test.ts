@@ -61,12 +61,13 @@ describe("PATCH /api/v1/pipelines/[id]/stages/[stageId]", () => {
    * O 403 acima mocka o `requireRole` para falhar SEMPRE — passaria igual se a
    * edição pedisse `agent`. Quem prova o papel da escrita é este.
    */
-  it("exige manager", async () => {
+  it("exige admin", async () => {
     authOk();
     makeDb({ stages: funil() });
     const { PATCH } = await import("./route");
     await PATCH(reqPatch({ name: "Orçamento" }), ctx());
-    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin — "manager" já não basta
+    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("admin");
   });
 
   /**
@@ -424,12 +425,13 @@ describe("PATCH /api/v1/pipelines/[id]/stages/[stageId]", () => {
 });
 
 describe("DELETE /api/v1/pipelines/[id]/stages/[stageId]", () => {
-  it("exige manager", async () => {
+  it("exige admin", async () => {
     authOk();
     makeDb({ stages: funil() });
     const { DELETE } = await import("./route");
     await DELETE(reqDelete(), ctx());
-    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin — "manager" já não basta
+    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("admin");
   });
 
   it("etapa de outra organização → 404 e NENHUMA escrita", async () => {

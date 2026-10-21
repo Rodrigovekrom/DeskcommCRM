@@ -59,7 +59,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "organizations" });
+  const authz = await requireRole("admin", { requestId, resource: "organizations" });
   if (!authz.ok) return authz.response;
   const desligado = await seModuloDesligado(requestId);
   if (desligado) return desligado;

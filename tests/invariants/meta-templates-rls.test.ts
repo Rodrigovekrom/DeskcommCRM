@@ -43,21 +43,27 @@ const MT_ORG_A = "0088aaaa-0000-4000-8000-000000000001";
 const MT_ORG_B = "0088bbbb-0000-4000-8000-000000000002";
 const MT_MEMBER_A = "0088aaaa-1111-4000-8000-000000000001";
 const MT_MEMBER_B = "0088bbbb-1111-4000-8000-000000000002";
+// ia.vek v1.7.6 (0581/0582/0583): a escrita virou só do admin; o gerente da org A
+// é o controle negativo do papel (lê, mas não grava).
+const MT_MANAGER_A = "0088aaaa-1111-4000-8000-000000000003";
 const WABA = "waba-inv-0088";
 
 function seed(): void {
   sql(`
     insert into auth.users (id, email) values
       ('${MT_MEMBER_A}', 'mt-member-a@invariant.test'),
-      ('${MT_MEMBER_B}', 'mt-member-b@invariant.test')
+      ('${MT_MEMBER_B}', 'mt-member-b@invariant.test'),
+      ('${MT_MANAGER_A}', 'mt-manager-a@invariant.test')
       on conflict do nothing;
     insert into public.organizations (id, slug, legal_name, display_name) values
       ('${MT_ORG_A}', 'mt-inv-a', 'Meta Templates Inv A', 'MT Inv A'),
       ('${MT_ORG_B}', 'mt-inv-b', 'Meta Templates Inv B', 'MT Inv B')
       on conflict do nothing;
     insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
-      ('${MT_MEMBER_A}', '${MT_ORG_A}', 'manager', now()),
-      ('${MT_MEMBER_B}', '${MT_ORG_B}', 'manager', now())
+      -- ia.vek v1.7.6 (0581/0582/0583): os membros que gravam passam a ser admin.
+      ('${MT_MEMBER_A}', '${MT_ORG_A}', 'admin', now()),
+      ('${MT_MEMBER_B}', '${MT_ORG_B}', 'admin', now()),
+      ('${MT_MANAGER_A}', '${MT_ORG_A}', 'manager', now())
       on conflict do nothing;
   `);
 }
@@ -84,10 +90,23 @@ describe("0088 · o espelho de templates da Meta chega ao clone", () => {
   it("a tabela nasce com RLS ligada e a policy de tenant", () => {
     seed();
     expect(sql(`select relrowsecurity from pg_class where relname = 'meta_templates'`)).toBe("t");
+    // ia.vek v1.7.6 (0581/0582/0583): a policy FOR ALL só-tenancy virou leitura
+    // para membros + escrita só para admin.
     expect(
-      sql(`select policyname from pg_policies
-            where schemaname = 'public' and tablename = 'meta_templates' and permissive = 'PERMISSIVE' order by 1`),
-    ).toBe("tenant_isolation_meta_templates_all");
+      sql(`select string_agg(policyname, ',' order by policyname) from pg_policies
+            where schemaname = 'public' and tablename = 'meta_templates' and permissive = 'PERMISSIVE'`),
+    ).toBe("meta_templates_admin_write,meta_templates_select");
+  });
+
+  it("gerente da org A NÃO escreve template (escrita é só do admin) — mas lê", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): antes qualquer membro gravava.
+    expect(
+      writeCountAs(
+        MT_MANAGER_A,
+        `insert into public.meta_templates ${COLS} values ${values(MT_ORG_A, "do_gerente", "pt_BR")}`,
+      ),
+    ).toBe(0);
+    expect(sql(`select count(*) from public.meta_templates where name = 'do_gerente'`)).toBe("0");
   });
 
   it("membro da org A escreve na própria org e lê de volta", () => {
@@ -101,6 +120,15 @@ describe("0088 · o espelho de templates da Meta chega ao clone", () => {
       countAs(
         MT_MEMBER_A,
         `select count(*) from public.meta_templates where organization_id = '${MT_ORG_A}';`,
+      ),
+    ).toBe(1);
+  });
+
+  it("CONTROLE: o gerente da org A continua LENDO o template que o admin gravou", () => {
+    expect(
+      countAs(
+        MT_MANAGER_A,
+        `select count(*) from public.meta_templates where organization_id = '${MT_ORG_A}' and name = 'pedido_confirmado';`,
       ),
     ).toBe(1);
   });

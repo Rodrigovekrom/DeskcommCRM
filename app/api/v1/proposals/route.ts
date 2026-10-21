@@ -11,6 +11,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { exigirLeadProprio } from "@/lib/iavek/proposta-do-vendedor";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { resolverItensDaProposta } from "@/lib/propostas/itens";
 import { moedaDaOrganizacao } from "@/lib/catalogo/moeda-da-org";
@@ -71,6 +72,17 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const input = parsed.data;
   const supabase = await createClient();
+  // ia.vek v1.7.6: o vendedor cria proposta só para lead dele.
+  const doLeadProprio = await exigirLeadProprio({
+    db: supabase,
+    orgId: authz.org.orgId,
+    leadId: (input as { lead_id?: string | null }).lead_id ?? null,
+    userId: authz.user.id,
+    role: authz.org.role,
+    requestId,
+    idioma: authz.user.idioma,
+  });
+  if (doLeadProprio) return doLeadProprio;
 
   // O lead_id do body nunca é confiado sozinho: confirma que pertence à
   // organização ativa ANTES de gravar qualquer coisa vinculada a ele

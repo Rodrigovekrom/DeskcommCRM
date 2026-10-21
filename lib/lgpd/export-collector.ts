@@ -119,6 +119,16 @@ export interface OrderRow {
   ordered_at: string | null;
 }
 
+/** ia.vek v1.7.6: o pedido de agendamento do titular (migration 0583). */
+export interface PedidoDeAgendamentoRow {
+  id: string;
+  quando: string;
+  status: string;
+  observacao: string | null;
+  motivo_da_recusa: string | null;
+  created_at: string;
+}
+
 export interface ActivityRow {
   id: string;
   lead_id: string | null;
@@ -637,6 +647,8 @@ export interface ExportPayload {
   honorarios_parcelas: HonorariosParcelaRow[];
   orders: OrderRow[];
   activities: ActivityRow[];
+  /** ia.vek v1.7.6 — opcional: payloads antigos (e os PDFs de teste) não o trazem. */
+  pedidos_de_agendamento?: PedidoDeAgendamentoRow[];
   checkpoints: CheckpointRow[];
   appointments: AppointmentRow[];
   sales: SaleRow[];
@@ -1389,6 +1401,28 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     } else if (data) {
       conferirTeto("activities", data, 500);
       activities = data;
+    }
+  }
+
+  // ia.vek v1.7.6: pedidos de agendamento — contact_id direto. O que a
+  // anonimização apaga (observação, motivo) é o que o titular recebe aqui.
+  let pedidosDeAgendamento: PedidoDeAgendamentoRow[] = [];
+  if (contactId) {
+    const { data, error } = await admin
+      .from("iavek_pedidos_de_agendamento")
+      .select("id, quando, status, observacao, motivo_da_recusa, created_at")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      logger.warn("[lgpd-export-worker] pedidos de agendamento load failed", {
+        request_id: requestId,
+        error: error.message,
+      });
+    } else if (data) {
+      conferirTeto("pedidos_de_agendamento", data, 500);
+      pedidosDeAgendamento = data;
     }
   }
 
@@ -2232,6 +2266,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     honorarios_parcelas,
     orders,
     activities,
+    pedidos_de_agendamento: pedidosDeAgendamento,
     checkpoints,
     appointments,
     sales,
@@ -2425,6 +2460,7 @@ function emptyPayload(
     honorarios_parcelas: [],
     orders: [],
     activities: [],
+    pedidos_de_agendamento: [],
     checkpoints: [],
     appointments: [],
     sales: [],

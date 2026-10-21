@@ -54,7 +54,7 @@ const CONTATO = "44444444-4444-4444-8444-444444444444";
 const CHAMADA = "55555555-5555-4555-8555-555555555555";
 
 /** O que cada `from(<tabela>)` devolve nesta rodada, e o que foi escrito nela. */
-type Resposta = { data: unknown; error: { message: string; code?: string } | null };
+type Resposta = { data: unknown; error: { message: string; code?: string } | null; count?: number };
 let respostas: Record<string, Resposta | (() => Resposta)>;
 let escritas: Array<{ tabela: string; patch: unknown; filtros: Array<[string, unknown]> }>;
 let inseridas: Array<{ tabela: string; linha: Record<string, unknown> }>;
@@ -74,6 +74,11 @@ function dubleSupabase() {
       for (const m of ["is", "order", "limit"]) {
         cadeia[m] = () => cadeia;
       }
+      // ia.vek v1.7.6: "o contato é meu?" filtra dono OU SDR com `.or(...)`.
+      cadeia.or = (expr: string) => {
+        filtrosLidos.push({ tabela, coluna: "or", valor: expr });
+        return cadeia;
+      };
       cadeia.select = (colunas?: string) => {
         selecionadas.push({ tabela, colunas: colunas ?? "*" });
         return cadeia;
@@ -160,6 +165,10 @@ beforeEach(() => {
   // garante a guarda nas rotas é
   // `tests/unit/voz-consentimento-e-portao-de-verdade.test.ts`.
   respostas["org_voice_calls"] = { data: { enabled: true, risco_aceito_em: null }, error: null };
+  // ia.vek v1.7.6: quem não é admin só liga para lead/cliente SEU. Por padrão o
+  // contato é meu (sou dono de um negócio dele); a recusa tem bloco próprio no fim.
+  respostas["crm_leads"] = { data: null, error: null, count: 1 };
+  respostas["conversations"] = { data: null, error: null, count: 0 };
   vi.mocked(createClient).mockResolvedValue(dubleSupabase() as never);
   vi.mocked(getWacallsClient).mockReturnValue(wacalls as never);
 });
@@ -691,5 +700,88 @@ describe("podeEncerrar — a regra, isolada", () => {
   it("chamada de ninguém não é de todos", () => {
     expect(podeEncerrar(base, EU)).toBe(false);
     expect(podeEncerrar(base, COLEGA)).toBe(false);
+  });
+});
+
+// ia.vek v1.7.6 — vendedor e SDR ligam só para o PRÓPRIO lead/cliente; admin liga para qualquer um.
+describe("ia.vek v1.7.6: só se liga para lead ou cliente seu", () => {
+  const SESSAO_PAREADA = {
+    data: { id: "canal-de-voz", wacalls_session_id: "sessao-up" },
+    error: null,
+  };
+
+  async function discar() {
+    const { POST } = await import("@/app/api/v1/voice/calls/route");
+    return POST(
+      new Request("http://x/api/v1/voice/calls", {
+        method: "POST",
+        body: JSON.stringify({ contactId: CONTATO }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  }
+
+  function comoPapel(role: string) {
+    vi.mocked(requireRole).mockResolvedValue({
+      ok: true,
+      user: { id: EU, idioma: "pt-BR" },
+      org: { orgId: ORG, role },
+    } as never);
+  }
+
+  beforeEach(() => {
+    respostas["channel_sessions"] = SESSAO_PAREADA;
+    respostas["contacts"] = {
+      data: { id: CONTATO, phone_number: "5511900000000", name: "Fulano", is_blocked: false, is_anonymized: false },
+      error: null,
+    };
+    respostas["voice_calls"] = { data: { id: CHAMADA }, error: null };
+  });
+
+  it("vendedor sem negócio nem conversa do contato: 403, nada sai para o telefone", async () => {
+    respostas["crm_leads"] = { data: null, error: null, count: 0 };
+    respostas["conversations"] = { data: null, error: null, count: 0 };
+    const res = await discar();
+    expect(res.status).toBe(403);
+    expect((await corpo(res)).error).toMatchObject({ code: "forbidden" });
+    expect(wacalls.startCall).not.toHaveBeenCalled();
+    expect(inseridas).toEqual([]);
+  });
+
+  it("a pergunta filtra organização, contato e dono OU SDR — sou eu nos dois", async () => {
+    await discar();
+    const doLead = filtrosLidos.filter((f) => f.tabela === "crm_leads");
+    expect(doLead).toEqual(
+      expect.arrayContaining([
+        { tabela: "crm_leads", coluna: "organization_id", valor: ORG },
+        { tabela: "crm_leads", coluna: "contact_id", valor: CONTATO },
+        { tabela: "crm_leads", coluna: "or", valor: `owner_user_id.eq.${EU},sdr_user_id.eq.${EU}` },
+      ]),
+    );
+  });
+
+  it("vendedor com a conversa do contato atribuída a ele liga", async () => {
+    respostas["crm_leads"] = { data: null, error: null, count: 0 };
+    respostas["conversations"] = { data: null, error: null, count: 1 };
+    const res = await discar();
+    expect(res.status).toBe(201);
+    expect(wacalls.startCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("gerente também só liga para o que é seu (403 no contato alheio)", async () => {
+    comoPapel("manager");
+    respostas["crm_leads"] = { data: null, error: null, count: 0 };
+    const res = await discar();
+    expect(res.status).toBe(403);
+    expect(wacalls.startCall).not.toHaveBeenCalled();
+  });
+
+  it("admin liga para qualquer contato, sem perguntar de quem é", async () => {
+    comoPapel("admin");
+    respostas["crm_leads"] = { data: null, error: null, count: 0 };
+    const res = await discar();
+    expect(res.status).toBe(201);
+    expect(wacalls.startCall).toHaveBeenCalledTimes(1);
+    expect(filtrosLidos.some((f) => f.tabela === "crm_leads" || f.tabela === "conversations")).toBe(false);
   });
 });

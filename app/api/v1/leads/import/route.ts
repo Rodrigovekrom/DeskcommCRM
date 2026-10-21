@@ -54,7 +54,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
   // Mesma régua do POST unitário de lead: escrita é `agent` para cima.
-  const authz = await requireRole("agent", { requestId, resource: "crm_leads" });
+  const authz = await requireRole("admin", { requestId, resource: "crm_leads" });
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);

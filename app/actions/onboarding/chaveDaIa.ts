@@ -34,7 +34,7 @@ import {
   MENSAGEM_PROVEDOR_DESLIGADO,
   provedorDesligadoNaInstalacao,
 } from "@/lib/ai/pontos/provedores-oferecidos";
-import { requireOnboardingCtx, OnboardingError } from "./_shared";
+import { requireOnboardingAdminCtx, OnboardingError } from "./_shared";
 
 export type ResultadoDaChave =
   | {
@@ -61,7 +61,7 @@ export type ResultadoDaChave =
 export async function salvarChaveDaIa(formData: FormData): Promise<ResultadoDaChave> {
   let ctx;
   try {
-    ctx = await requireOnboardingCtx();
+    ctx = await requireOnboardingAdminCtx();
   } catch (err) {
     if (err instanceof OnboardingError) return { ok: false, erro: "Sua sessão expirou. Entre de novo." };
     throw err;

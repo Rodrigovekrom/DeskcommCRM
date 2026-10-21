@@ -14,7 +14,7 @@ interface Ctx { params: Promise<{ id: string }> }
 
 async function alterar(req: NextRequest, ctx: Ctx, ocultar: boolean): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "messages" });
+  const authz = await requireRole("admin", { requestId, resource: "messages" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { id } = await ctx.params;

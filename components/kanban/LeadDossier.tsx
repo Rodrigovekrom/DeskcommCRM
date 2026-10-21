@@ -69,8 +69,17 @@ export function LeadDossier({
   // esta é a primeira, no padrão já estabelecido do kanban.
   const user = useUser();
   const activeOrg = useActiveOrg();
+  // ia.vek v1.7.6: o vendedor/SDR cria a proposta do PRÓPRIO lead (e pede a
+  // aprovação do gerente); gerente e admin, de qualquer lead.
+  const ehDono =
+    (lead as { owner_user_id?: string | null }).owner_user_id != null &&
+    (lead as { owner_user_id?: string | null }).owner_user_id === user.id;
   const podeCriarProposta =
-    user.is_platform_admin || (activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager) || false;
+    user.is_platform_admin ||
+    (activeOrg != null &&
+      (ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager ||
+        (ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent && ehDono))) ||
+    false;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

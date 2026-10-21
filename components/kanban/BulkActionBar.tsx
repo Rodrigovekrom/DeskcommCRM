@@ -103,7 +103,7 @@ export function BulkActionBar({
   // controle decorativo, o pior tipo: parece que o sistema falhou, quando ele
   // só nunca teve permissão de mostrar aquilo.
   const podeAtribuir = Boolean(
-    user.is_platform_admin || (activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager),
+    user.is_platform_admin || (activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin),
   );
   const { data: members } = useAssignableMembers(podeAtribuir);
 
@@ -117,7 +117,8 @@ export function BulkActionBar({
     return () => window.removeEventListener("keydown", handler);
   }, [selectedIds.length, onClear]);
 
-  if (selectedIds.length === 0) return null;
+  // ia.vek v1.7.6: ação em massa é só do admin (a rota recusa os outros).
+  if (selectedIds.length === 0 || !podeAtribuir) return null;
 
   // O substantivo do funil só entra no SINGULAR. Plural de palavra livre é
   // heurística que erra ("Negociação" → "Negociaçãos"), e a contagem já diz

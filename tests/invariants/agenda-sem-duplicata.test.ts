@@ -3,6 +3,14 @@ import { execFileSync } from "node:child_process";
 import { beforeAll, describe, expect, it } from "vitest";
 
 /**
+ * ia.vek v1.7.6 (migration 0583): A LOJA NÃO TRAVA HORÁRIO. O índice
+ * `calendar_appointments_sem_duplicata_idx` saiu — a loja tem 7 vendedores e
+ * atende mais de 10 pessoas ao mesmo tempo, e vários compromissos da mesma
+ * pessoa no MESMO instante são permitidos (decisão do dono do produto). O
+ * teto, quando o admin quiser um, é de código (capacidade por horário). Os
+ * casos abaixo foram invertidos onde a regra inverteu; o resto segue igual.
+ *
+ * (Texto original, do produto:)
  * DOIS CLIQUES NÃO MARCAM DUAS VEZES — E O ENCAIXE CONTINUA PERMITIDO.
  *
  * ═══ As duas metades, e a segunda é a que quase ninguém escreve ═══
@@ -84,11 +92,18 @@ describe("a guarda barra o duplo clique", () => {
     expect(marca(base(DONO, QUANDO, "2026-11-10 15:00:00+00"))).toBe(true);
   });
 
-  it("o segundo, mesmo dono e MESMO INSTANTE, é recusado", () => {
-    expect(marca(base(DONO, QUANDO, "2026-11-10 15:00:00+00"))).toBe(false);
+  it("ia.vek: o segundo, mesmo dono e MESMO INSTANTE, também entra (a loja não trava)", () => {
+    expect(marca(base(DONO, QUANDO, "2026-11-10 15:00:00+00"))).toBe(true);
   });
 
-  it("mas cancelar o primeiro LIBERA o instante — a guarda é só sobre o que está de pé", () => {
+  it("e o índice que travava não existe mais", () => {
+    expect(
+      sql(`select count(*) from pg_indexes where schemaname = 'public'
+            and indexname = 'calendar_appointments_sem_duplicata_idx';`).trim(),
+    ).toBe("0");
+  });
+
+  it("cancelar o primeiro segue liberando o instante", () => {
     sql(`
       update public.calendar_appointments
          set status = 'cancelled', cancelled_at = now()

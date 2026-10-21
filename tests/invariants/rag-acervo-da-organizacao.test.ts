@@ -300,12 +300,22 @@ describe("0181 — o papel mais fraco não apaga a base de conhecimento", () => 
     ).toBe(0);
   });
 
-  it("manager EDITA o acervo — o par positivo do gate", () => {
-    // Sem ele, os dois casos acima ficariam verdes com a policy negando todo
-    // mundo, e a tela de conhecimento estaria quebrada para o dono do negócio.
+  it("manager NÃO edita o acervo — configuração da IA é do admin", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): tenant_isolation_ai_knowledge_sources_write passou de manager para admin.
     expect(
       writeCountAs(
         GOV_MANAGER,
+        `update public.ai_knowledge_sources set name='Editado pelo gerente' where id='${FONTE_A}'`,
+      ),
+    ).toBe(0);
+  });
+
+  it("admin EDITA o acervo — o par positivo do gate", () => {
+    // Sem ele, os casos acima ficariam verdes com a policy negando todo
+    // mundo, e a tela de conhecimento estaria quebrada para o dono do negócio.
+    expect(
+      writeCountAs(
+        GOV_ADMIN,
         `update public.ai_knowledge_sources set name='Manual do suporte' where id='${FONTE_A}'`,
       ),
     ).toBe(1);

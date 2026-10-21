@@ -71,7 +71,7 @@ export async function POST(req: Request) {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const auth = await requireRole("agent", { requestId, resource: "agenda" });
+  const auth = await requireRole("admin", { requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const parsed = corpo.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail("validation_failed", "Confira o endereço.", 422, { requestId });

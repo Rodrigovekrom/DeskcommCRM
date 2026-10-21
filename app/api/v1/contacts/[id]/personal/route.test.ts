@@ -26,7 +26,7 @@ const FUNIL = "55555555-5555-4555-8555-555555555555";
  * o que `negocioAbertoDoContato` faz — por isso o fake é thenable.
  *
  * ─── SABOTAGEM (prova no CI) ───────────────────────────────────────────────
- * - Trocar `"manager"` por `"agent"` na rota: atendente marcaria e o caso
+ * - Trocar `"admin"` por `"agent"` na rota: atendente marcaria e o caso
  *   "atendente recebe 403" acusaria.
  * - Reutilizar `contact.blocked` na auditoria: o caso "nomes exatos" acusa
  *   (critério 9 — evento novo de propósito, nunca o de descadastro).
@@ -117,7 +117,7 @@ beforeEach(() => {
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: ORG, idioma: "pt-BR" },
-    org: { orgId: ORG, role: "manager" },
+    org: { orgId: ORG, role: "admin" }, // ia.vek v1.7.6: configuração só do admin
   } as Awaited<ReturnType<typeof requireRole>>);
   vi.mocked(createAdminClient).mockReturnValue({
     from: (tabela: string) => fakeQuery(tabela),
@@ -128,14 +128,15 @@ beforeEach(() => {
 });
 
 describe("marcar contato como pessoal (spec 21, etapa 3)", () => {
-  it("só gerente e dono marcam — atendente recebe 403", async () => {
+  // ia.vek v1.7.6: configuração só do admin — atendente e gerente recebem 403
+  it("só admin marca — atendente e gerente recebem 403", async () => {
     vi.mocked(requireRole).mockResolvedValue({
       ok: false,
       response: fail("forbidden", "Acesso negado.", 403),
     });
     const resposta = await POST(req(), contexto());
     expect(resposta.status).toBe(403);
-    expect(requireRole).toHaveBeenCalledWith("manager", expect.objectContaining({ resource: "contacts" }));
+    expect(requireRole).toHaveBeenCalledWith("admin", expect.objectContaining({ resource: "contacts" }));
     expect(createAdminClient).not.toHaveBeenCalled();
     expect(audit).not.toHaveBeenCalled();
   });
@@ -164,7 +165,7 @@ describe("marcar contato como pessoal (spec 21, etapa 3)", () => {
     expect(contatos[CONTATO]!.is_personal).toBe(false);
   });
 
-  it("manager marca: liga a coluna e audita o evento NOVO, sem telefone", async () => {
+  it("admin marca: liga a coluna e audita o evento NOVO, sem telefone", async () => {
     const resposta = await POST(req(), contexto());
     expect(resposta.status).toBe(200);
     expect(contatos[CONTATO]!.is_personal).toBe(true);

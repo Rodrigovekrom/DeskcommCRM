@@ -66,7 +66,7 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "channel_session_groups" });
+  const authz = await requireRole("admin", { requestId, resource: "channel_session_groups" });
   if (!authz.ok) return authz.response;
   const id = idSchema.safeParse((await ctx.params).id);
   const corpo = corpoSchema.safeParse(await req.json().catch(() => null));

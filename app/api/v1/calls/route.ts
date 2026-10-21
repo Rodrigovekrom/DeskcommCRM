@@ -29,6 +29,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { ApiError } from "@/lib/api/types";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { exigirContatoProprioParaLigar } from "@/lib/iavek/contato-proprio";
 import { createCallSchema, listCallsQuerySchema } from "@/lib/schemas/calls";
 import { validateRequest } from "@/lib/schemas/_validate";
 import { createClient } from "@/lib/supabase/server";
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (acompanhamentoNegado) return acompanhamentoNegado;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "voice_calls" });
+  const authz = await requireRole("agent", { requestId, resource: "voice_calls" });
   if (!authz.ok) return authz.response;
   const { user: authUser, org: activeOrg } = authz;
 
@@ -197,6 +198,15 @@ export async function POST(req: NextRequest): Promise<Response> {
         return fail("forbidden", "Contato marcado como pessoal.", 403, { requestId });
       }
     }
+    // ia.vek v1.7.6: quem não é admin liga só para lead/cliente seu.
+    const naoEhSeu = await exigirContatoProprioParaLigar(supabase, {
+      orgId: activeOrg.orgId,
+      contatoId,
+      userId: authUser.id,
+      role: activeOrg.role,
+      requestId,
+    });
+    if (naoEhSeu) return naoEhSeu;
   }
 
   // Trunk da organização (Configurações > Trunk SIP) — fallback pro env pra

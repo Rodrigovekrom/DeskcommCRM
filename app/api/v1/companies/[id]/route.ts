@@ -70,7 +70,7 @@ export async function DELETE(req: NextRequest, { params }: Ctx): Promise<Respons
   if (desligado) return desligado;
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
-  const authz = await requireRole("manager", { requestId, resource: "companies" });
+  const authz = await requireRole("admin", { requestId, resource: "companies" });
   if (!authz.ok) return authz.response;
   const { id } = await params;
 

@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: USER_ID, idioma: "pt-BR" },
-    org: { orgId: ORG_ID, role: "manager" },
+    org: { orgId: ORG_ID, role: "admin" }, // ia.vek v1.7.6: configuração só do admin
   } as never);
 
   const leitura = {
@@ -66,10 +66,11 @@ beforeEach(() => {
 });
 
 describe("POST /api/v1/ai/knowledge/reindex-all", () => {
-  it("exige manager e lê só a organização da sessão", async () => {
+  it("exige admin e lê só a organização da sessão", async () => {
     const { POST } = await import("./route");
     await POST();
-    expect(requireRole).toHaveBeenCalledWith("manager", expect.objectContaining({ resource: "ai_knowledge" }));
+    // ia.vek v1.7.6: configuração só do admin
+    expect(requireRole).toHaveBeenCalledWith("admin", expect.objectContaining({ resource: "ai_knowledge" }));
     expect(filtrosDaLeitura).toContainEqual(["organization_id", ORG_ID]);
   });
 

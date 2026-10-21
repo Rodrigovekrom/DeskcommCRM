@@ -23,7 +23,7 @@ import {
   type PropostaDeFunil,
 } from "@/lib/onboarding/proposta-de-funil";
 import { escolherPacotePorTexto, sugerirFunil, type Sugestao } from "@/lib/onboarding/sugerir-funil";
-import { requireOnboardingCtx, patchOnboardingState, loadOnboardingState, OnboardingError } from "./_shared";
+import { requireOnboardingAdminCtx, patchOnboardingState, loadOnboardingState, OnboardingError } from "./_shared";
 
 /** O funil que o gatilho semeou — o que a pessoa tem antes deste passo. */
 export interface QuadroAtual {
@@ -190,7 +190,7 @@ export type ResultadoDoQuadro =
 export async function aplicarQuadro(formData: FormData): Promise<ResultadoDoQuadro> {
   let ctx;
   try {
-    ctx = await requireOnboardingCtx();
+    ctx = await requireOnboardingAdminCtx();
   } catch (err) {
     if (err instanceof OnboardingError) return { ok: false, erro: "Sua sessão expirou. Entre de novo." };
     throw err;
@@ -294,7 +294,7 @@ function explicarRecusa(motivo: string | undefined, quantos: number | undefined)
 }
 
 export async function pularQuadro(): Promise<void> {
-  const ctx = await requireOnboardingCtx();
+  const ctx = await requireOnboardingAdminCtx();
   await patchOnboardingState(ctx.orgId, { funil: { skipped: true } });
   // Pular também é decisão, e é a que deixa o quadro de e-commerce de pé numa
   // clínica: sem registro, ninguém consegue explicar depois por que aquele

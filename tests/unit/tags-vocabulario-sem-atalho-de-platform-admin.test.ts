@@ -101,10 +101,11 @@ describe("platform admin sem papel de gerente NESTA organização", () => {
   });
 });
 
-describe("CONTROLE: com papel de gerente a porta abre — senão os casos acima mediriam uma rota quebrada", () => {
+// ia.vek v1.7.6: configuração só do admin — o controle passa a ser o papel de admin.
+describe("CONTROLE: com papel de admin a porta abre — senão os casos acima mediriam uma rota quebrada", () => {
   beforeEach(() => {
-    estado.papelNoBanco = "manager";
-    estado.papelDaMembresia = "manager";
+    estado.papelNoBanco = "admin";
+    estado.papelDaMembresia = "admin";
   });
 
   it("GET devolve 200 e lê o vocabulário", async () => {
@@ -123,5 +124,24 @@ describe("CONTROLE: com papel de gerente a porta abre — senão os casos acima 
     await TagsPage();
     expect(redirecionar).not.toHaveBeenCalled();
     expect(chamadas()).toContain("fn_vocabulario_de_tags");
+  });
+});
+
+// ia.vek v1.7.6: configuração só do admin — o gerente ainda LÊ o vocabulário
+// (GET segue em manager), mas não opera nem abre a tela de configuração.
+describe("ia.vek v1.7.6: gerente não opera o vocabulário de etiquetas", () => {
+  beforeEach(() => {
+    estado.papelNoBanco = "manager";
+    estado.papelDaMembresia = "manager";
+  });
+
+  it("POST recusa com 403 antes de chamar a operação", async () => {
+    const resposta = await postar({ acao: "renomear", tag: "vip", destino: "cliente-vip" });
+    expect(resposta.status).toBe(403);
+    expect(chamadas()).not.toContain("fn_vocabulario_de_tags_operar");
+  });
+
+  it("a página manda para /403", async () => {
+    await expect(TagsPage()).rejects.toThrow("REDIRECT:/403");
   });
 });

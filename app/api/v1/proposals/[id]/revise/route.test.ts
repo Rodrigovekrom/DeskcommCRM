@@ -58,6 +58,8 @@ interface MundoOpts {
   templateSnapshot?: Record<string, unknown> | null;
   briefingJson?: Record<string, unknown> | null;
   secoesEditadas?: Record<string, string> | null;
+  /** ia.vek v1.7.6: dono do lead da proposta (o vendedor só revisa a do lead dele). */
+  donoDoLead?: string | null;
 }
 
 function montarMundoDeRevisao(opts: MundoOpts = {}) {
@@ -67,7 +69,7 @@ function montarMundoDeRevisao(opts: MundoOpts = {}) {
     const minRank = ROLE_RANK[minRole] ?? 0;
     return rank < minRank
       ? { ok: false, response: new Response(JSON.stringify({ error: { code: "forbidden_role" } }), { status: 403 }) }
-      : { ok: true, user: { id: USER_ID, idioma: "pt-BR" }, org: { orgId: ORG_ID } };
+      : { ok: true, user: { id: USER_ID, idioma: "pt-BR" }, org: { orgId: ORG_ID, role: papel } };
   });
   mocks.requireSupportWrite.mockResolvedValue(null);
 
@@ -204,6 +206,18 @@ function montarMundoDeRevisao(opts: MundoOpts = {}) {
             itensCopiados = dados as Array<Record<string, unknown>>;
             return { error: null };
           },
+        };
+      }
+      // ia.vek v1.7.6: a régua "proposta do próprio lead" lê o dono do lead.
+      if (tabela === "crm_leads") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { owner_user_id: opts.donoDoLead ?? "outro-vendedor" }, error: null }),
+              }),
+            }),
+          }),
         };
       }
       throw new Error(`Tabela desconhecida: ${tabela}`);
@@ -364,8 +378,25 @@ describe("POST /api/v1/proposals/[id]/revise", () => {
     );
   });
 
-  it("papel agent (abaixo de manager): 403", async () => {
-    const mundo = montarMundoDeRevisao({ papel: "agent", status: "enviada" });
+  // ia.vek v1.7.6: revisar saiu de requireRole("manager") para "agent" + lead próprio.
+  it("papel agent que não é dono do lead: 403 forbidden", async () => {
+    const mundo = montarMundoDeRevisao({ papel: "agent", status: "enviada", donoDoLead: "outro-vendedor" });
+    const res = await mundo.POST();
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.code).toBe("forbidden");
+    expect(mundo.propostaCriada).toBeNull();
+    expect(mocks.requireRole).toHaveBeenCalledWith("agent", expect.anything());
+  });
+
+  it("ia.vek v1.7.6: papel agent dono do lead revisa (201)", async () => {
+    const mundo = montarMundoDeRevisao({ papel: "agent", status: "enviada", donoDoLead: USER_ID });
+    const res = await mundo.POST();
+    expect(res.status).toBe(201);
+    expect(mundo.propostaCriada).toMatchObject({ versao: 2, status: "rascunho" });
+  });
+
+  it("ia.vek v1.7.6: viewer segue barrado pelo papel (403)", async () => {
+    const mundo = montarMundoDeRevisao({ papel: "viewer", status: "enviada" });
     const res = await mundo.POST();
     expect(res.status).toBe(403);
     expect(mundo.propostaCriada).toBeNull();

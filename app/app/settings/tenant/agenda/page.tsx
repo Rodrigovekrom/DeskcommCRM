@@ -40,7 +40,7 @@ export default async function TiposDeAgendamentoPage() {
   // `viewer` vê a lista (é informação de operação: quanto dura uma consulta);
   // criar e alterar é `manager`, e a rota cobra de novo — a tela esconder não é
   // autorização, é cortesia.
-  const podeEditar = (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
+  const podeEditar = (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin;
 
   const supabase = await createClient();
   // ⚠️ O `error` NÃO é descartável, e descartá-lo já mentiu para quem opera.
@@ -118,7 +118,7 @@ export default async function TiposDeAgendamentoPage() {
         colegasPodemMexerNaAgendaLigado={colegasPodemMexerNaAgendaLigado(org?.settings)}
         // `manager` aqui, e não o `admin` de clientes: esta é regra da AGENDA, a
         // mesma tela dos prazos, e não reescreve dado nenhum. A RPC cobra de novo.
-        podeMudarAgendaDosColegas={ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager}
+        podeMudarAgendaDosColegas={ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin}
         // `admin`, e não `manager` como os prazos ao lado: ligar reescreve as
         // etiquetas de todo contato com histórico. A RPC cobra de novo.
         podeLigarClientePelaAgenda={ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin}

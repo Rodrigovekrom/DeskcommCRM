@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
+  GOV_ADMIN,
   GOV_AGENT_A,
   GOV_CONV_UNASSIGNED,
   GOV_MANAGER,
@@ -18,6 +19,9 @@ import {
  * agent+ (viewer read-only). SELECT permanece org-flat — os controles de
  * leitura abaixo garantem que a migration NÃO estreitou visibilidade
  * (escopo own/unassigned é G4-01, fora daqui).
+ *
+ * ia.vek v1.7.6 (0581): a régua de escrita de funil e etapa subiu de manager
+ * para admin. O gerente opera, não configura.
  */
 
 beforeAll(() => {
@@ -25,12 +29,21 @@ beforeAll(() => {
 });
 
 describe("eixo 1 — RBAC de escrita em config (migration 0030)", () => {
-  it("manager ESCREVE config de pipeline (spec 13 §4: manager+)", () => {
+  it("admin ESCREVE config de pipeline", () => {
+    const updated = writeCountAs(
+      GOV_ADMIN,
+      `update public.crm_pipelines set name = name where id = '${GOV_PIPELINE}'`,
+    );
+    expect(updated).toBe(1);
+  });
+
+  it("manager NÃO escreve config de pipeline", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): crm_pipelines_manager_write passou a exigir admin.
     const updated = writeCountAs(
       GOV_MANAGER,
       `update public.crm_pipelines set name = name where id = '${GOV_PIPELINE}'`,
     );
-    expect(updated).toBe(1);
+    expect(updated).toBe(0);
   });
 
   it("agent NÃO escreve em crm_stages (config de pipeline, spec 13 §4 nota 4)", () => {
@@ -41,12 +54,21 @@ describe("eixo 1 — RBAC de escrita em config (migration 0030)", () => {
     expect(updated).toBe(0);
   });
 
-  it("manager ESCREVE em crm_stages", () => {
+  it("admin ESCREVE em crm_stages", () => {
+    const updated = writeCountAs(
+      GOV_ADMIN,
+      `update public.crm_stages set name = name where id = '${GOV_STAGE}'`,
+    );
+    expect(updated).toBe(1);
+  });
+
+  it("manager NÃO escreve em crm_stages", () => {
+    // ia.vek v1.7.6 (0581/0582/0583): crm_stages_manager_write passou a exigir admin.
     const updated = writeCountAs(
       GOV_MANAGER,
       `update public.crm_stages set name = name where id = '${GOV_STAGE}'`,
     );
-    expect(updated).toBe(1);
+    expect(updated).toBe(0);
   });
 
   it("agent continua escrevendo em conversations (controle positivo do write agent+)", () => {

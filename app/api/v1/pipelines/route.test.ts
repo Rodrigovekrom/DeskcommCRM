@@ -39,12 +39,13 @@ describe("POST /api/v1/pipelines", () => {
   });
 
   /** O teste de 401 passaria igual se a rota pedisse `viewer`. Quem prova o papel é este. */
-  it("exige manager", async () => {
+  it("exige admin", async () => {
     authOk();
     makeDb({ pipelines: umFunil() });
     const { POST } = await import("./route");
     await POST(reqPost({ name: "Clínica" }));
-    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("manager");
+    // ia.vek v1.7.6: configuração só do admin — "manager" já não basta
+    expect(vi.mocked(requireRole).mock.calls[0]?.[0]).toBe("admin");
   });
 
   it("nome já usado → 422 com a mensagem da regra, e NENHUMA escrita", async () => {

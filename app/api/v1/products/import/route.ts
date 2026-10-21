@@ -60,7 +60,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
   // Preço de venda é escrita de gestão: o mesmo papel do POST unitário.
-  const authz = await requireRole("manager", { requestId, resource: "catalog_products" });
+  const authz = await requireRole("admin", { requestId, resource: "catalog_products" });
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
