@@ -78,4 +78,36 @@ describe("SnoozeButton", () => {
 
     await waitFor(() => expect(showApiErrorMock).toHaveBeenCalled());
   });
+
+  it("ia.vek v1.7.6: 'Data e horário…' abre o campo e grava a data escolhida (ISO)", async () => {
+    postMock.mockResolvedValue({ data: { snooze_until: "2030-01-01T12:00:00.000Z" } });
+    render(wrap(<SnoozeButton conversationId="conv-1" snoozeUntil={null} />));
+    openTrigger(screen.getByRole("button", { name: /lembrar/i }));
+    fireEvent.click(await screen.findByText("Data e horário…"));
+
+    const campo = await screen.findByLabelText("Quando");
+    const alvo = new Date(Date.now() + 2 * 86_400_000);
+    alvo.setSeconds(0, 0);
+    const p = (n: number) => String(n).padStart(2, "0");
+    const local = `${alvo.getFullYear()}-${p(alvo.getMonth() + 1)}-${p(alvo.getDate())}T${p(alvo.getHours())}:${p(alvo.getMinutes())}`;
+    fireEvent.change(campo, { target: { value: local } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar lembrete" }));
+
+    await waitFor(() =>
+      expect(postMock).toHaveBeenCalledWith("/api/v1/conversations/conv-1/snooze", {
+        until: alvo.toISOString(),
+      }),
+    );
+  });
+
+  it("ia.vek v1.7.6: data no passado não deixa salvar", async () => {
+    render(wrap(<SnoozeButton conversationId="conv-1" snoozeUntil={null} />));
+    openTrigger(screen.getByRole("button", { name: /lembrar/i }));
+    fireEvent.click(await screen.findByText("Data e horário…"));
+    fireEvent.change(await screen.findByLabelText("Quando"), {
+      target: { value: "2020-01-01T10:00" },
+    });
+    expect(screen.getByRole("button", { name: "Salvar lembrete" })).toBeDisabled();
+    expect(postMock).not.toHaveBeenCalled();
+  });
 });

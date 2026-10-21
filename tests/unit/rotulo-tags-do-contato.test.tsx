@@ -43,18 +43,23 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { support:
 
 beforeEach(() => {
   get.mockReset();
-  get.mockResolvedValue({ data: { leads: [], orders: [], activities: [], demandas: [], fatos: [], historico: [] } });
+  get.mockResolvedValue({
+    data: { leads: [], orders: [], activities: [], demandas: [], fatos: [], historico: [] },
+  });
 });
 
 describe("painel do inbox — o botão de tags diz de quem é a tag", () => {
-  it("o botão se chama 'Tags do contato', e não só 'Tag'", async () => {
+  // ia.vek v1.7.6: "Etiquetas do cliente" (e "Etiquetas deste atendimento" na conversa).
+  it("o botão se chama 'Etiquetas do cliente', e não só 'Tag'", async () => {
     render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
         <CRMSidePanel conversation={conversation} />
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole("button", { name: "Tags do contato" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Etiquetas do cliente" })).toBeTruthy();
     // Guarda contra a volta do rótulo ambíguo: "Tag" exato, não o prefixo.
     expect(screen.queryByRole("button", { name: "Tag" })).toBeNull();
   });

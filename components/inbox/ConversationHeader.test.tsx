@@ -19,8 +19,10 @@ const startCall = vi.hoisted(() => vi.fn());
 
 // ia.vek v1.5: o selo das 72h lê a rota do painel (react-query); aqui não interessa.
 vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () => null }));
+// ia.vek v1.7.6: arquivar é de gerente e admin; o papel é trocável por caso.
+const papel = vi.hoisted(() => ({ role: "manager" as string }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
-  useAuth: () => ({ user: { id: "u1", support: null } }),
+  useAuth: () => ({ user: { id: "u1", support: null }, activeOrg: { role: papel.role } }),
 }));
 vi.mock("@/hooks/inbox/useClaimConversation", () => ({
   useClaimConversation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -215,5 +217,16 @@ describe("ConversationHeader — busca dentro da conversa (#1793)", () => {
     expect(buscar).toHaveBeenCalledOnce();
     expect(closeMutate).not.toHaveBeenCalled();
     expect(arquivarMutate).not.toHaveBeenCalled();
+  });
+
+  it("ia.vek v1.7.6: o atendente (vendedor, SDR, suporte) não vê Arquivar; Fechar continua", () => {
+    papel.role = "agent";
+    try {
+      render(<ConversationHeader conversation={conversa("open")} />);
+      expect(screen.queryByRole("button", { name: "Arquivar" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Fechar" })).toBeTruthy();
+    } finally {
+      papel.role = "manager";
+    }
   });
 });

@@ -7503,6 +7503,15 @@ export const DICIONARIO: Traducoes = {
   "Sem tags no contato.": { es: "Sin etiquetas en el contacto." },
   "Adicionar tag ao contato": { es: "Agregar etiqueta al contacto" },
   "Remover tag": { es: "Quitar etiqueta" },
+  // ia.vek v1.7.6
+  "Etiquetas do cliente": { es: "Etiquetas del cliente" },
+  "Etiquetas deste atendimento": { es: "Etiquetas de esta atención" },
+  "Data e horário…": { es: "Fecha y hora…" },
+  "Lembrar em data e horário": { es: "Recordar en fecha y hora" },
+  "Você recebe o aviso nesse momento se o lead não tiver respondido.": { es: "Recibirás el aviso en ese momento si el lead no ha respondido." },
+  "Escolha um momento no futuro, em até 90 dias.": { es: "Elige un momento en el futuro, dentro de 90 días." },
+  "Salvar lembrete": { es: "Guardar recordatorio" },
+  "Só o administrador cria etiquetas novas. Escolha uma etiqueta da lista.": { es: "Solo el administrador crea etiquetas nuevas. Elige una etiqueta de la lista." },
   "Tags da conversa": { es: "Etiquetas de la conversación" },
 
   "Aguarde uma nova mensagem do cliente para reabrir o atendimento nesta rede.": { es: "Espera un nuevo mensaje del cliente para reabrir la atención en esta red." },

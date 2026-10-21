@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Tag, Receipt, Users, ArrowRight } from "@/lib/ui/icons";
+import { Tag, Users, ArrowRight } from "@/lib/ui/icons";
 import { apiClient } from "@/lib/api/client";
 import { toast } from "sonner";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
@@ -706,7 +706,7 @@ export function CRMSidePanel({ conversation }: Props) {
               aria-pressed={tagEditorOpen}
               onClick={() => setTagEditorOpen((v) => !v)}
             >
-              <Tag size={12} className="mr-1" weight="regular" aria-hidden /> {t("Tags do contato")}
+              <Tag size={12} className="mr-1" weight="regular" aria-hidden /> {t("Etiquetas do cliente")}
             </Button>
             <Button
               size="sm"
@@ -891,35 +891,8 @@ export function CRMSidePanel({ conversation }: Props) {
 
       <Separator />
 
-      <SecaoRecolhivel id="pedidos" titulo={t("Pedidos recentes")}>
-        {sectionsLoading ? (
-          <Skeleton className="mt-2 h-14 w-full" />
-        ) : orders && orders.length > 0 ? (
-          <ul className="mt-2 space-y-1.5">
-            {orders.map((o) => (
-              <li
-                key={o.id}
-                className="flex items-center justify-between rounded-md border border-border p-2 text-xs"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1 truncate font-medium">
-                    <Receipt size={11} weight="regular" aria-hidden />
-                    {o.external_id ?? o.id.slice(0, 8)}
-                  </div>
-                  <div className="text-muted-foreground">
-                    {o.status ?? "—"} · {formatMoney(o.total_cents, o.currency)}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <SemLista vazio="Sem pedidos." erro={erro} onTentarDeNovo={() => setTentativa((n) => n + 1)} />
-        )}
-      </SecaoRecolhivel>
-
-      <Separator />
-
+      {/* ia.vek v1.7.6: sem "Pedidos recentes" — é de delivery, e uma loja de
+          carros não tem pedido de e-commerce. */}
       <SecaoRecolhivel id="atividade" titulo={t("Linha do tempo")}>
         {sectionsLoading ? (
           <Skeleton className="mt-2 h-14 w-full" />

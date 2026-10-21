@@ -15,6 +15,7 @@ import { audit, isServiceRoleConfigured } from "@/lib/audit";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaEtiquetaNova } from "@/lib/iavek/etiquetas";
 import { resolveOwnerPatch } from "@/lib/leads/owner-patch";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
 import { registraFalhaDeAtividade } from "@/lib/leads/activity-write-failure";
@@ -77,6 +78,17 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (input.lead_ids.length > MAX_BULK) {
     return fail("bulk_too_large", `${t("Máximo")} ${MAX_BULK} ${t("leads por bulk.")}`, 422, { requestId });
   }
+
+  // ia.vek v1.7.6: etiqueta NOVA só o admin cria; aplicar as que existem segue livre.
+  const etiquetaNova = await recusaEtiquetaNova({
+    supabase: supabase,
+    orgId: authz.org.orgId,
+    tags: input.action === "tag" ? input.params.add : undefined,
+    requestId,
+    idioma: user.idioma,
+    role: authz.org.role,
+  });
+  if (etiquetaNova) return etiquetaNova;
 
   // G3-04: assign é reatribuição de dono em lote → piso ≥manager (spec 04 §6.5,
   // INB-03). Gate por-action: move/tag/delete continuam agent+ (piso acima);

@@ -12,6 +12,7 @@ import { type NextRequest } from "next/server";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail, noContent } from "@/lib/api/wrappers";
 import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
+import { recusaEtiquetaNova } from "@/lib/iavek/etiquetas";
 import { loadAuthUser } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { contactPatchSchemaDoPais, validateRequest } from "@/lib/schemas";
@@ -102,6 +103,17 @@ export async function PATCH(
     }
     throw err;
   }
+
+  // ia.vek v1.7.6: etiqueta NOVA só o admin cria; aplicar as que existem segue livre.
+  const etiquetaNova = await recusaEtiquetaNova({
+    supabase: supabase,
+    orgId: activeOrg.orgId,
+    tags: input.tags,
+    requestId,
+    idioma: user.idioma,
+    role: activeOrg.role,
+  });
+  if (etiquetaNova) return etiquetaNova;
 
   try {
     const contact = await patchContactHandler(

@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
 import { resolveAuthDual, tetoDeEscritaDoToken } from "@/lib/api/auth-dual";
+import { recusaEtiquetaNova } from "@/lib/iavek/etiquetas";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { updateLeadSchema, validateRequest } from "@/lib/schemas";
@@ -55,6 +56,19 @@ export async function PATCH(
       });
     }
     throw err;
+  }
+
+  // ia.vek v1.7.6: etiqueta NOVA só o admin cria (quem entra pela tela; token
+  // de integração segue o escopo dele).
+  if (authz.via === "session") {
+    const etiquetaNova = await recusaEtiquetaNova({
+      supabase,
+      orgId: organizationId,
+      tags: input.tags,
+      requestId,
+      idioma,
+    });
+    if (etiquetaNova) return etiquetaNova;
   }
 
   try {

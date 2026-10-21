@@ -136,6 +136,9 @@ export function ConversationHeader({
   const podeMarcarPessoal =
     (user.is_platform_admin && !user.support) ||
     (activeOrg != null && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager);
+  const podeArquivar =
+    (user.is_platform_admin && !user.support) ||
+    (activeOrg != null && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager);
   const marcarPessoal = useMarkPersonalContact(c?.id ?? "");
   const desmarcarPessoal = useUnmarkPersonalContact(c?.id ?? "");
 
@@ -418,7 +421,9 @@ export function ConversationHeader({
             faz a aba "Arquivadas" deixar de ser uma pasta morta.
             A permissão é a mesma de fechar (a rota `/conversations/[id]` é
             `requireSupportWrite`): quem pode encerrar, pode arquivar. */}
-        {status !== "archived" && (
+        {/* ia.vek v1.7.6: arquivar não aparece para o atendente (vendedor,
+            SDR, suporte) — só gerente e admin; a rota recusa o resto. */}
+        {status !== "archived" && podeArquivar && (
           <Button
             size="sm"
             variant="ghost"

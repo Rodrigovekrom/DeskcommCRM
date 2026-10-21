@@ -45,7 +45,7 @@ export function ConversationTagsEditor({ conversationId, orgId, tags }: Props) {
   return (
     <section>
       <h3 className="text-xs font-semibold text-text">
-        {t("Tags da conversa")}
+        {t("Etiquetas deste atendimento")}
       </h3>
 
       <div className="mt-2 flex flex-wrap gap-1">

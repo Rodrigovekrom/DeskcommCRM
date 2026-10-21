@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import type { Actor } from "@/lib/api/handlers/types";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaEtiquetaNova } from "@/lib/iavek/etiquetas";
 import { extractBearer, validateBearerToken, ensureRole, ensureScope, McpAuthError } from "@/lib/mcp/auth";
 import { traduzir } from "@/lib/i18n/dicionario";
 import type { Idioma } from "@/lib/i18n/idiomas";
@@ -187,6 +188,17 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
     throw err;
   }
+
+  // ia.vek v1.7.6: etiqueta NOVA só o admin cria; aplicar as que existem segue livre.
+  const etiquetaNova = await recusaEtiquetaNova({
+    supabase: supabase,
+    orgId: activeOrg.orgId,
+    tags: input.tags,
+    requestId,
+    idioma: user.idioma,
+    role: activeOrg.role,
+  });
+  if (etiquetaNova) return etiquetaNova;
 
   try {
     const result = await createContactHandler(

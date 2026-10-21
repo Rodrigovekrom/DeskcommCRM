@@ -39,6 +39,8 @@ export const ApiErrorCodes = {
   // Platform admin `support_readonly` tentando ESCREVER (`requirePlatformAdminEscrita`).
   forbidden_scope: "forbidden_scope",
   lgpd_anonymization_irreversible: "lgpd_anonymization_irreversible",
+  // ia.vek v1.7.6: criar etiqueta nova é só do admin (lib/iavek/etiquetas.ts).
+  tag_creation_admin_only: "tag_creation_admin_only",
 
   // 404
   not_found: "not_found",
