@@ -2266,7 +2266,8 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     honorarios_parcelas,
     orders,
     activities,
-    pedidos_de_agendamento: pedidosDeAgendamento,
+    // Só aparece quando há pedido: o data.json de quem não tem fica igual ao de antes.
+    ...(pedidosDeAgendamento.length > 0 ? { pedidos_de_agendamento: pedidosDeAgendamento } : {}),
     checkpoints,
     appointments,
     sales,
@@ -2460,7 +2461,6 @@ function emptyPayload(
     honorarios_parcelas: [],
     orders: [],
     activities: [],
-    pedidos_de_agendamento: [],
     checkpoints: [],
     appointments: [],
     sales: [],

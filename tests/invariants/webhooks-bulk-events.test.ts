@@ -299,7 +299,7 @@ const FAKE_USER: AuthUser = {
   avatar_url: null,
   is_platform_admin: false,
   idioma: "pt-BR" as const,
-  organizations: [{ organization_id: ORG, organization_name: "Gov Inv BulkEv", role: "manager" }],
+  organizations: [{ organization_id: ORG, organization_name: "Gov Inv BulkEv", role: "admin" }],
 };
 
 beforeAll(() => {
@@ -331,7 +331,8 @@ beforeAll(() => {
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: FAKE_USER,
-    org: { orgId: ORG, name: "Gov Inv BulkEv", role: "manager" },
+    // ia.vek v1.7.6: ação em massa e etiqueta nova são só do admin.
+    org: { orgId: ORG, name: "Gov Inv BulkEv", role: "admin" },
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(createClient).mockResolvedValue(fakeClient() as any);
