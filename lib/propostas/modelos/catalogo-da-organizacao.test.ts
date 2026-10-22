@@ -20,9 +20,9 @@ function db(linhas: Array<Record<string, unknown>>, settings: unknown = {}) {
 }
 
 describe("listarModelosDaOrganizacao", () => {
-  it("sem cópia nenhuma: os 8 da plataforma, com o rótulo do código", async () => {
+  it("sem cópia nenhuma: os 9 da plataforma (8 de site + veículo, ia.vek), com o rótulo do código", async () => {
     const lista = await listarModelosDaOrganizacao(db([]), "org-1");
-    expect(lista).toHaveLength(8);
+    expect(lista).toHaveLength(9);
     expect(lista[0]).toMatchObject({ slug: "site_institucional", nome: "Site institucional", origem: "plataforma", oculto: false });
   });
 
@@ -31,7 +31,7 @@ describe("listarModelosDaOrganizacao", () => {
       db([{ slug: "catalogo_imobiliario", nome: null, version: 3, sections: [{}, {}] }]),
       "org-1",
     );
-    expect(lista).toHaveLength(8);
+    expect(lista).toHaveLength(9);
     expect(lista.find((m) => m.slug === "catalogo_imobiliario")).toMatchObject({
       origem: "personalizado",
       nome: "Catálogo imobiliário",
@@ -46,8 +46,8 @@ describe("listarModelosDaOrganizacao", () => {
       db([{ slug: "empresa_locacao", nome: "Locação por temporada", version: 1, sections: [{}] }]),
       "org-1",
     );
-    expect(lista).toHaveLength(9);
-    expect(lista[8]).toEqual({ slug: "empresa_locacao", nome: "Locação por temporada", origem: "empresa", secoes: 1, version: 1, oculto: false });
+    expect(lista).toHaveLength(10);
+    expect(lista[9]).toEqual({ slug: "empresa_locacao", nome: "Locação por temporada", origem: "empresa", secoes: 1, version: 1, oculto: false });
   });
 
   it("slug em modelos_ocultos marca oculto no modelo da plataforma", async () => {
@@ -77,7 +77,7 @@ describe("listarModelosDaOrganizacao", () => {
   it("settings ausente ou malformado não lança e não oculta ninguém", async () => {
     for (const settings of [undefined, null, "texto", [], { proposals: null }, { proposals: { modelos_ocultos: "não é lista" } }, { proposals: { modelos_ocultos: [42, null] } }]) {
       const lista = await listarModelosDaOrganizacao(db([], settings), "org-1");
-      expect(lista).toHaveLength(8);
+      expect(lista).toHaveLength(9);
       expect(lista.every((m) => m.oculto === false)).toBe(true);
     }
   });
@@ -89,7 +89,7 @@ describe("listarModelosAtivos", () => {
       db([], { proposals: { modelos_ocultos: ["site_institucional", "automacao"] } }),
       "org-1",
     );
-    expect(lista).toHaveLength(6);
+    expect(lista).toHaveLength(7);
     expect(lista.map((m) => m.slug)).not.toContain("site_institucional");
     expect(lista.map((m) => m.slug)).toContain("ecommerce");
   });

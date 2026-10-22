@@ -236,6 +236,8 @@ function agenda(
     bufferAntesMin?: number;
     /** Intervalo depois do atendimento (`buffer_after_minutes`). */
     bufferDepoisMin?: number;
+    /** ia.vek v1.7.6: `"sem_linha"` = nunca publicou; `"vazia"` = publicou nenhuma janela. */
+    jornada?: "sem_linha" | "vazia";
   } = {},
 ): Banco {
   return bancoEmMemoria({
@@ -260,16 +262,20 @@ function agenda(
         location_details: null,
       },
     ],
-    attendant_availability: [
-      {
-        organization_id: ORG,
-        user_id: DONO,
-        schedule: {
-          timezone: "America/Sao_Paulo",
-          windows: [{ dow: 3, start: "09:00", end: args.fimDaJornada ?? "18:00" }],
-        },
-      },
-    ],
+    attendant_availability:
+      args.jornada === "sem_linha"
+        ? []
+        : [
+            {
+              organization_id: ORG,
+              user_id: DONO,
+              schedule: {
+                timezone: "America/Sao_Paulo",
+                windows:
+                  args.jornada === "vazia" ? [] : [{ dow: 3, start: "09:00", end: args.fimDaJornada ?? "18:00" }],
+              },
+            },
+          ],
     calendar_availability_exceptions: (args.diasBloqueados ?? []).map((dia) => ({
       organization_id: ORG,
       user_id: DONO,
@@ -637,5 +643,37 @@ describe("o intervalo antes do atendimento vale na ESCRITA, não só na leitura 
       marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE }),
     ).rejects.toMatchObject(RECUSA);
     expect(criados(banco)).toHaveLength(0);
+  });
+});
+
+/**
+ * ia.vek v1.7.6 — a loja NÃO tem horário fixo: o horário é combinado com o
+ * cliente, caso a caso. O admin confirma o pedido de agendamento no dia e hora
+ * combinados mesmo que o vendedor nunca tenha publicado horário. A IA segue
+ * presa à grade publicada, e a ocupação real segue contando contra a capacidade.
+ */
+describe("ia.vek: pessoa marca sem horário publicado", () => {
+  it.each(["sem_linha", "vazia"] as const)("PESSOA marca no horário combinado (jornada %s)", async (jornada) => {
+    const banco = agenda({ jornada });
+    await marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE });
+    const [novo] = criados(banco);
+    expect(novo, "o admin não conseguiu confirmar sem horário publicado").toBeDefined();
+    expect(novo!.starts_at).toBe(FORA_DA_GRADE);
+    expect(novo!.time_zone).toBe("America/Sao_Paulo");
+  });
+
+  it("a IA continua recusada sem horário publicado", async () => {
+    const banco = agenda({ jornada: "sem_linha" });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE }),
+    ).rejects.toMatchObject({ status: 422 });
+    expect(criados(banco)).toHaveLength(0);
+  });
+
+  it("sem horário publicado a ocupação real ainda conta (capacidade 1)", async () => {
+    const banco = agenda({ jornada: "sem_linha", agendamentos: [agendamento(FORA_DA_GRADE, FIM_DO_ENCAIXE)] });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
   });
 });

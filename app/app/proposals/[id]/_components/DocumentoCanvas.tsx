@@ -63,6 +63,8 @@ interface Documento {
   secoes: SecaoDocumento[];
   variaveisFaltando: string[];
   camposFaltando?: CampoFaltando[];
+  /** ia.vek v1.7.6: campos das seções opcionais que ainda não entraram no documento. */
+  camposOpcionais?: CampoFaltando[];
   temSecaoEditada?: boolean;
   prontidao: { status: string; checklist: Record<string, boolean> } | null;
   resumoComercial: string | null;
@@ -266,6 +268,8 @@ export function DocumentoCanvas({ propostaId, podeRevisar = false, emRascunho = 
 
   const secoes = doc.secoes ?? [];
   const camposFaltando = doc.camposFaltando ?? [];
+  const camposOpcionais = doc.camposOpcionais ?? [];
+  const botaoDaIaNasPendencias = camposFaltando.some((c) => c.onde === "briefing");
   // Resposta de rota antiga (sem camposFaltando) ainda conta pelas ocorrências.
   const totalDePendencias = camposFaltando.length > 0 ? camposFaltando.length : (doc.variaveisFaltando ?? []).length;
   const editavel = podeRevisar && emRascunho;
@@ -376,6 +380,35 @@ export function DocumentoCanvas({ propostaId, podeRevisar = false, emRascunho = 
               </ul>
             </>
           )}
+        </div>
+      )}
+
+      {editavel && camposOpcionais.length > 0 && (
+        <div className="rounded-md border p-3 text-sm space-y-2">
+          <p className="font-medium">{t("Opcional (só entra no documento se preenchido)")}</p>
+          {!botaoDaIaNasPendencias && (
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={preenchendo || ocupado} onClick={preencherComConversa}>
+                {preenchendo ? t("Lendo a conversa…") : t("Preencher com a conversa")}
+              </Button>
+              {avisoDeSugestao && <span className="text-gray-500">{avisoDeSugestao}</span>}
+            </div>
+          )}
+          <ul className="space-y-2">
+            {camposOpcionais.map((c) => (
+              <CampoQueFalta
+                key={`opcional:${c.caminho}:${sugestoes[c.caminho] ?? ""}`}
+                campo={c}
+                editavel={editavel}
+                ocupado={ocupado}
+                valorInicial={sugestoes[c.caminho]}
+                t={t}
+                onPreencher={(valor) =>
+                  executar(() => apiClient.patch(`/api/v1/proposals/${propostaId}/documento`, { campo: c.caminho, valor }))
+                }
+              />
+            ))}
+          </ul>
         </div>
       )}
 

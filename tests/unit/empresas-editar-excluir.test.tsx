@@ -9,16 +9,18 @@
  *     navega — a tela não troca o aviso por "excluído".
  *  3. Exclusão aceita: volta pra listagem.
  *
- * Papel: `manager` no AuthProvider falso, que é o piso de DELETE /companies/:id.
+ * Papel: `admin` no AuthProvider falso — desde a ia.vek v1.7.6 (migration 0584)
+ * editar e excluir empresa é só do admin. O gerente não vê os botões.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (texto: string) => texto }));
+const papel = vi.hoisted(() => ({ atual: "admin" }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({
     user: { id: "u-1", email: "dono@acme.com", is_platform_admin: false },
-    activeOrg: { orgId: "11111111-1111-4111-8111-111111111111", name: "ACME", role: "manager" },
+    activeOrg: { orgId: "11111111-1111-4111-8111-111111111111", name: "ACME", role: papel.atual },
     isAuthenticated: true,
     refreshing: false,
     signOut: async () => undefined,
@@ -75,6 +77,7 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  papel.atual = "admin";
   deleteResposta = { ok: true, payload: { data: { deleted: true, id: EMPRESA } } };
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -150,5 +153,15 @@ describe("excluir empresa (#1937)", () => {
     const deletions = fetchMock.mock.calls.filter((c) => c[1]?.method === "DELETE");
     expect(deletions).toHaveLength(1);
     expect(deletions[0]![0]).toBe(`/api/v1/companies/${EMPRESA}`);
+  });
+});
+
+describe("ia.vek v1.7.6: cadastro B2B só do admin", () => {
+  it.each(["manager", "agent"])("%s não vê editar, excluir nem enriquecer", async (role) => {
+    papel.atual = role;
+    await renderTela();
+    expect(screen.queryByRole("button", { name: "Editar empresa" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Excluir empresa" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Enriquecer CNPJ" })).toBeNull();
   });
 });

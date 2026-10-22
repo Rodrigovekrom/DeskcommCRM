@@ -22,7 +22,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx): Promise<Response
   if (desligado) return desligado;
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
-  const authz = await requireRole("agent", { requestId, resource: "company_people" });
+  // ia.vek v1.7.6: empresas, pessoas e vínculos B2B são só do admin (decisão do dono).
+  const authz = await requireRole("admin", { requestId, resource: "company_people" });
   if (!authz.ok) return authz.response;
   const { id } = await params;
 

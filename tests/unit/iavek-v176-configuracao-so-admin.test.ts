@@ -72,6 +72,12 @@ const SO_ADMIN = [
   "channels/partner/templates/media POST",
   "companies/[id]/enrich POST",
   "companies/[id] DELETE",
+  // 0584: o cadastro B2B inteiro é do admin.
+  "companies/[id] PATCH",
+  "companies/lookup GET",
+  "company-people/[id] PATCH",
+  "people/[id] PATCH",
+  "contacts/[id]/person PATCH",
   "companies POST",
   "company-people POST",
   "contacts/[id]/personal POST",

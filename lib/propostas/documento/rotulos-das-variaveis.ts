@@ -39,6 +39,18 @@ export const ROTULO_DA_VARIAVEL: Readonly<Record<string, string>> = Object.freez
   "scope.user_roles": "Perfis de usuário",
   "scope.workflow": "Fluxo principal da automação",
   "scope.workflows": "Fluxos principais",
+  // ia.vek v1.7.6: modelo "Proposta de veículo".
+  "observacoes.texto": "Observações",
+  "pagamento.entrada": "Valor da entrada",
+  "pagamento.forma": "Forma de pagamento",
+  "pagamento.parcelas": "Número de parcelas",
+  "pagamento.valor_da_parcela": "Valor da parcela",
+  "troca.valor_avaliado": "Valor avaliado da troca",
+  "troca.veiculo": "Veículo na troca",
+  "veiculo.ano": "Ano/modelo do veículo",
+  "veiculo.cor": "Cor do veículo",
+  "veiculo.km": "Quilometragem",
+  "veiculo.marca_modelo": "Marca, modelo e versão do veículo",
 });
 
 export function rotuloDaVariavel(caminho: string): string {

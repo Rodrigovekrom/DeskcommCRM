@@ -10,10 +10,11 @@ const SLUGS_ESPERADOS = [
   "sistema_web",
   "automacao",
   "projeto_personalizado",
+  "veiculo",
 ];
 
 describe("MODELOS_BASE — catálogo de modelos da plataforma (código, não banco)", () => {
-  it("tem os 8 modelos-piloto (pacote de modelos do dono, trazido em 25/09/2026)", () => {
+  it("tem os 8 modelos-piloto (pacote de modelos do dono, trazido em 25/09/2026) e o de veículo (ia.vek)", () => {
     expect(Object.keys(MODELOS_BASE).sort()).toEqual([...SLUGS_ESPERADOS].sort());
   });
 

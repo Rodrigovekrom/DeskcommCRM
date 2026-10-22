@@ -93,11 +93,11 @@ const corpo = (res: Response) => res.json() as Promise<{ data?: unknown; error?:
 describe("GET /api/v1/settings/proposal-templates", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("como viewer devolve 8 itens quando o banco não tem cópia", async () => {
+  it("como viewer devolve 9 itens (8 de site + veículo, ia.vek) quando o banco não tem cópia", async () => {
     montarMundo({ papel: "viewer" });
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(((await corpo(res)).data as unknown[])).toHaveLength(8);
+    expect(((await corpo(res)).data as unknown[])).toHaveLength(9);
   });
 });
 

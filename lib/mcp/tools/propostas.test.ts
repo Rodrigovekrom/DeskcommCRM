@@ -921,7 +921,7 @@ describe("crm_preparar_proposta", () => {
       categorias?: Array<{ chave: string; rotulo: string; orientacao: string }>;
       instrucao?: string;
     };
-    expect(r.modelos).toHaveLength(8);
+    expect(r.modelos).toHaveLength(9);
     expect(r.modelos?.[0]).toEqual({ slug: "site_institucional", nome: "Site institucional", origem: "plataforma" });
     expect(r.categorias?.map((c) => c.chave)).toEqual([
       "objetivo",
@@ -946,7 +946,7 @@ describe("crm_preparar_proposta", () => {
       modelos?: Array<{ slug: string }>;
     };
     expect(r.modelos?.map((m) => m.slug)).not.toContain("site_institucional");
-    expect(r.modelos).toHaveLength(7);
+    expect(r.modelos).toHaveLength(8);
   });
 
   it("com template_slug válido e ativo devolve campos_do_modelo legíveis, sem os calculados", async () => {

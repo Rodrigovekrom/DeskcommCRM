@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolverModelo, type ModeloResolvido } from "../modelos/resolver";
 import { montarDadosDoDocumento, type ContatoParaDocumento, type DadosDaPropostaParaDocumento } from "./montar-dados";
 import { renderizarDocumento, type SecaoRenderizada } from "./renderer";
+import { extrairVariaveis } from "./variaveis";
 import { ondePreencher, rotuloDaVariavel, type OndePreencher } from "./rotulos-das-variaveis";
 
 export interface PropostaParaDocumento extends DadosDaPropostaParaDocumento {
@@ -29,6 +30,12 @@ export interface DocumentoDaProposta {
   pendencias: string[];
   /** Uma entrada por VARIÁVEL, na ordem em que aparece no documento. */
   camposFaltando: CampoFaltando[];
+  /**
+   * ia.vek v1.7.6: campos das seções opcionais que ainda não entraram no
+   * documento (nenhum dado). NÃO são pendência: não travam o envio. Preencher
+   * um deles faz a seção aparecer, e aí o resto dela vira pendência.
+   */
+  camposOpcionais: CampoFaltando[];
 }
 
 /** `secoes_editadas` é jsonb sem CHECK: só entra o que for texto. */
@@ -61,6 +68,26 @@ function camposFaltandoDe(secoes: SecaoDoDocumento[]): CampoFaltando[] {
   return [...porCaminho.values()];
 }
 
+function camposOpcionaisDe(
+  omitidas: Array<{ id: string; body: string }>,
+  jaPendentes: CampoFaltando[],
+): CampoFaltando[] {
+  const pendentes = new Set(jaPendentes.map((c) => c.caminho));
+  const porCaminho = new Map<string, CampoFaltando>();
+  for (const secao of omitidas) {
+    for (const caminho of extrairVariaveis(secao.body)) {
+      if (pendentes.has(caminho) || ondePreencher(caminho) !== "briefing") continue;
+      const existente = porCaminho.get(caminho);
+      if (existente) {
+        if (!existente.secoes.includes(secao.id)) existente.secoes.push(secao.id);
+        continue;
+      }
+      porCaminho.set(caminho, { caminho, rotulo: rotuloDaVariavel(caminho), onde: "briefing", secoes: [secao.id] });
+    }
+  }
+  return [...porCaminho.values()];
+}
+
 /**
  * O ÚNICO lugar que resolve modelo + dados + reescritas + pendências (D1 da
  * spec de 26/09). A rota do documento, a trava de envio, o snapshot e o PDF
@@ -87,10 +114,12 @@ export async function montarDocumentoDaProposta(
       : { ...s, editada: false },
   );
 
+  const camposFaltando = camposFaltandoDe(secoes);
   return {
     modelo,
     secoes,
     pendencias: secoes.flatMap((s) => s.faltantes),
-    camposFaltando: camposFaltandoDe(secoes),
+    camposFaltando,
+    camposOpcionais: camposOpcionaisDe(renderizado.secoesOmitidas, camposFaltando),
   };
 }

@@ -12,6 +12,12 @@ export interface SecaoRenderizada {
 export interface DocumentoRenderizado {
   secoes: SecaoRenderizada[];
   variaveisFaltando: string[];
+  /**
+   * ia.vek v1.7.6: as condicionais que ficaram de fora por não ter dado. Sem
+   * isto o vendedor nunca via os campos delas (troca, entrada e parcelas): a
+   * seção só aparece com um dado, e o dado só se preenche onde a seção aparece.
+   */
+  secoesOmitidas: SecaoDoModelo[];
 }
 
 /** Uma condicional só aparece sozinha (sem `required`) quando tem PELO MENOS
@@ -27,13 +33,15 @@ export function renderizarDocumento(modelo: ModeloBase, dados: Record<string, un
   const porId = new Map(modelo.sections.map((s) => [s.id, s]));
   const secoes: SecaoRenderizada[] = [];
   const variaveisFaltando: string[] = [];
+  const secoesOmitidas: SecaoDoModelo[] = [];
 
   for (const id of modelo.sectionOrder) {
     const secao = porId.get(id);
     if (!secao) continue; // sectionOrder citando id fantasma: pula, não lança.
 
     if (secao.conditional && !secao.required && !condicionalTemAlgumDado(secao, dados)) {
-      continue; // omitida por inteiro, sem rastro.
+      secoesOmitidas.push(secao);
+      continue; // omitida do documento por inteiro (o rastro é só para a tela oferecer os campos).
     }
 
     const { textoRenderizado, faltantes } = substituirVariaveis(secao.body, dados);
@@ -41,5 +49,5 @@ export function renderizarDocumento(modelo: ModeloBase, dados: Record<string, un
     variaveisFaltando.push(...faltantes);
   }
 
-  return { secoes, variaveisFaltando };
+  return { secoes, variaveisFaltando, secoesOmitidas };
 }

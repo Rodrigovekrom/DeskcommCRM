@@ -41526,20 +41526,21 @@ drop policy if exists companies_select on public.companies;
 create policy companies_select on public.companies
   for select using (organization_id in (select public.fn_user_org_ids()));
 drop policy if exists companies_insert on public.companies;
+-- ia.vek v1.7.6 (0584): escrever no cadastro B2B é só do admin.
 create policy companies_insert on public.companies
   for insert with check (organization_id in (select public.fn_user_org_ids())
-                         and public.fn_role_at_least(organization_id, 'manager'));
+                         and public.fn_role_at_least(organization_id, 'admin'));
 drop policy if exists companies_update on public.companies;
 create policy companies_update on public.companies
   for update
   using (organization_id in (select public.fn_user_org_ids())
-         and public.fn_role_at_least(organization_id, 'agent'))
+         and public.fn_role_at_least(organization_id, 'admin'))
   with check (organization_id in (select public.fn_user_org_ids())
-              and public.fn_role_at_least(organization_id, 'agent'));
+              and public.fn_role_at_least(organization_id, 'admin'));
 drop policy if exists companies_delete on public.companies;
 create policy companies_delete on public.companies
   for delete using (organization_id in (select public.fn_user_org_ids())
-                    and public.fn_role_at_least(organization_id, 'manager'));
+                    and public.fn_role_at_least(organization_id, 'admin'));
 
 revoke all on table public.companies from anon;
 grant select, insert, update, delete on table public.companies to authenticated;
@@ -41579,20 +41580,21 @@ drop policy if exists people_select on public.people;
 create policy people_select on public.people
   for select using (organization_id in (select public.fn_user_org_ids()));
 drop policy if exists people_insert on public.people;
+-- ia.vek v1.7.6 (0584): escrever no cadastro B2B é só do admin.
 create policy people_insert on public.people
   for insert with check (organization_id in (select public.fn_user_org_ids())
-                         and public.fn_role_at_least(organization_id, 'manager'));
+                         and public.fn_role_at_least(organization_id, 'admin'));
 drop policy if exists people_update on public.people;
 create policy people_update on public.people
   for update
   using (organization_id in (select public.fn_user_org_ids())
-         and public.fn_role_at_least(organization_id, 'agent'))
+         and public.fn_role_at_least(organization_id, 'admin'))
   with check (organization_id in (select public.fn_user_org_ids())
-              and public.fn_role_at_least(organization_id, 'agent'));
+              and public.fn_role_at_least(organization_id, 'admin'));
 drop policy if exists people_delete on public.people;
 create policy people_delete on public.people
   for delete using (organization_id in (select public.fn_user_org_ids())
-                    and public.fn_role_at_least(organization_id, 'manager'));
+                    and public.fn_role_at_least(organization_id, 'admin'));
 
 revoke all on table public.people from anon;
 grant select, insert, update, delete on table public.people to authenticated;
@@ -41637,20 +41639,21 @@ drop policy if exists company_people_select on public.company_people;
 create policy company_people_select on public.company_people
   for select using (organization_id in (select public.fn_user_org_ids()));
 drop policy if exists company_people_insert on public.company_people;
+-- ia.vek v1.7.6 (0584): escrever no cadastro B2B é só do admin.
 create policy company_people_insert on public.company_people
   for insert with check (organization_id in (select public.fn_user_org_ids())
-                         and public.fn_role_at_least(organization_id, 'manager'));
+                         and public.fn_role_at_least(organization_id, 'admin'));
 drop policy if exists company_people_update on public.company_people;
 create policy company_people_update on public.company_people
   for update
   using (organization_id in (select public.fn_user_org_ids())
-         and public.fn_role_at_least(organization_id, 'agent'))
+         and public.fn_role_at_least(organization_id, 'admin'))
   with check (organization_id in (select public.fn_user_org_ids())
-              and public.fn_role_at_least(organization_id, 'agent'));
+              and public.fn_role_at_least(organization_id, 'admin'));
 drop policy if exists company_people_delete on public.company_people;
 create policy company_people_delete on public.company_people
   for delete using (organization_id in (select public.fn_user_org_ids())
-                    and public.fn_role_at_least(organization_id, 'manager'));
+                    and public.fn_role_at_least(organization_id, 'admin'));
 
 revoke all on table public.company_people from anon;
 grant select, insert, update, delete on table public.company_people to authenticated;

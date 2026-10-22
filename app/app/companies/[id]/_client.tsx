@@ -140,14 +140,12 @@ export function CompanyDetailClient({ id }: Props) {
     router.push("/app/companies");
   }
 
-  // Mesmos degraus de app/app/contacts/[id]: `agent` para editar, `manager`
-  // para excluir — o mesmo piso de requireRole() nas rotas.
+  // ia.vek v1.7.6: editar e excluir empresa é só do admin — o mesmo piso de
+  // requireRole() nas rotas (decisão do dono).
   const podeEditar =
     Boolean(user.is_platform_admin && !user.support) ||
-    Boolean(activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent);
-  const podeExcluir =
-    Boolean(user.is_platform_admin && !user.support) ||
-    Boolean(activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager);
+    Boolean(activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin);
+  const podeExcluir = podeEditar;
 
   if (!data) {
     return <div className="p-6 text-muted-foreground">{t("Carregando…")}</div>;
@@ -168,9 +166,11 @@ export function CompanyDetailClient({ id }: Props) {
           <p className="font-mono text-sm text-muted-foreground">{(c.cnpj as string) || "—"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => void enrich()} disabled={enriching}>
-            {enriching ? t("Enriquecendo…") : t("Enriquecer CNPJ")}
-          </Button>
+          {podeEditar ? (
+            <Button variant="outline" onClick={() => void enrich()} disabled={enriching}>
+              {enriching ? t("Enriquecendo…") : t("Enriquecer CNPJ")}
+            </Button>
+          ) : null}
           {podeEditar ? (
             <Button variant="outline" onClick={abrirEdicao}>
               {t("Editar empresa")}

@@ -25,7 +25,8 @@ export async function GET(req: NextRequest): Promise<Response> {
   const requestId = requestIdOf(req);
   const desligado = await seModuloB2bDesligado(requestId);
   if (desligado) return desligado;
-  const authz = await requireRole("manager", { requestId, resource: "companies" });
+  // ia.vek v1.7.6: a busca por CNPJ só serve a quem cadastra empresa — o admin.
+  const authz = await requireRole("admin", { requestId, resource: "companies" });
   if (!authz.ok) return authz.response;
 
   try {

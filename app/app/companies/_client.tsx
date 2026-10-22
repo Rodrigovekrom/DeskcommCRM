@@ -22,7 +22,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
+import { ROLE_RANK } from "@/lib/auth/types";
 
 interface CompanyRow {
   id: string;
@@ -38,6 +40,11 @@ interface CompanyRow {
 
 export function CompaniesListClient() {
   const t = useT();
+  const { user, activeOrg } = useAuth();
+  // ia.vek v1.7.6: cadastrar é só do admin — o mesmo piso da rota.
+  const podeCadastrar =
+    Boolean(user.is_platform_admin && !user.support) ||
+    Boolean(activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin);
   const [rows, setRows] = useState<CompanyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -175,10 +182,12 @@ export function CompaniesListClient() {
             {t("Cadastro B2B com CNPJ e enriquecimento via BrasilAPI.")}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          {t("Nova empresa")}
-        </Button>
+        {podeCadastrar ? (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            {t("Nova empresa")}
+          </Button>
+        ) : null}
       </div>
 
       <div className="relative max-w-sm">

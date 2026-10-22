@@ -13,6 +13,10 @@ import type { ModeloBase } from "./tipos";
  * `template.json` de origem. `titleEs`/`bodyEs` ficam `null`: a
  * arquitetura bilíngue já existe (i18n pronta desde a M0/M2), o conteúdo em
  * espanhol é onda futura (spec §9 — decisão do dono, conteúdo depois).
+ *
+ * ia.vek v1.7.6: + `veiculo` ("Proposta de veículo"), o modelo da loja de
+ * carros. Sem CPF, RG, placa, chassi nem FIPE — decisão do dono; o admin
+ * personaliza na tela (Configurações › Propostas › Modelos).
  */
 export const MODELOS_BASE: Readonly<Record<string, ModeloBase>> = Object.freeze(
 {
@@ -1668,6 +1672,94 @@ export const MODELOS_BASE: Readonly<Record<string, ModeloBase>> = Object.freeze(
       "support",
       "terms",
       "approval"
+    ]
+  },
+  "veiculo": {
+    "slug": "veiculo",
+    "version": 1,
+    "sections": [
+      {
+        "id": "resumo",
+        "title": "Resumo da proposta",
+        "titleEs": null,
+        "body": "Proposta de venda do veículo {{veiculo.marca_modelo}}, preparada para {{client.name}}.",
+        "bodyEs": null,
+        "required": true,
+        "conditional": false
+      },
+      {
+        "id": "veiculo",
+        "title": "Veículo",
+        "titleEs": null,
+        "body": "Veículo: {{veiculo.marca_modelo}}\nAno/modelo: {{veiculo.ano}}\nQuilometragem: {{veiculo.km}}\nCor: {{veiculo.cor}}",
+        "bodyEs": null,
+        "required": true,
+        "conditional": false
+      },
+      {
+        "id": "valores",
+        "title": "Valor e forma de pagamento",
+        "titleEs": null,
+        "body": "Valor do veículo: {{investment.total_formatted}}\nForma de pagamento: {{pagamento.forma}}",
+        "bodyEs": null,
+        "required": true,
+        "conditional": false
+      },
+      {
+        "id": "financiamento",
+        "title": "Entrada e parcelas",
+        "titleEs": null,
+        "body": "Entrada: {{pagamento.entrada}}\nParcelas: {{pagamento.parcelas}}x de {{pagamento.valor_da_parcela}}",
+        "bodyEs": null,
+        "required": false,
+        "conditional": true
+      },
+      {
+        "id": "troca",
+        "title": "Veículo na troca",
+        "titleEs": null,
+        "body": "Veículo na troca: {{troca.veiculo}}\nValor avaliado: {{troca.valor_avaliado}}",
+        "bodyEs": null,
+        "required": false,
+        "conditional": true
+      },
+      {
+        "id": "observacoes",
+        "title": "Observações",
+        "titleEs": null,
+        "body": "{{observacoes.texto}}",
+        "bodyEs": null,
+        "required": false,
+        "conditional": true
+      },
+      {
+        "id": "validade",
+        "title": "Validade",
+        "titleEs": null,
+        "body": "Esta proposta é válida por {{commercial_terms.validity_days}} dias. Valores e condições sujeitos à disponibilidade do veículo e, quando houver financiamento, à aprovação de crédito.",
+        "bodyEs": null,
+        "required": true,
+        "conditional": false
+      },
+      {
+        "id": "aceite",
+        "title": "Aceite",
+        "titleEs": null,
+        "body": "Ao aprovar esta proposta, o cliente declara concordância com o veículo, os valores e as condições acima. Cliente: {{client.name}} | Data: {{approval.date}} | Assinatura: ____________________",
+        "bodyEs": null,
+        "required": true,
+        "conditional": false
+      }
+    ],
+    "sectionOrder": [
+      "resumo",
+      "veiculo",
+      "valores",
+      "financiamento",
+      "troca",
+      "observacoes",
+      "validade",
+      "aceite"
     ]
   }
 } as Record<string, ModeloBase>,

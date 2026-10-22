@@ -12,4 +12,5 @@ export const ROTULO_DO_MODELO: Record<string, string> = {
   sistema_web: "Sistema web",
   automacao: "Automação",
   projeto_personalizado: "Projeto personalizado",
+  veiculo: "Proposta de veículo",
 };

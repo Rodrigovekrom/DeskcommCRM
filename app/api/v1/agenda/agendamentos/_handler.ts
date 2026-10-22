@@ -849,6 +849,22 @@ async function exigeHorarioLivre(
     ignorarAgendamentoId: args.ignorarAgendamentoId,
   });
 
+  const foraDaGrade = podeMarcarForaDaGrade(ctx.actor);
+
+  // ia.vek v1.7.6: a loja NÃO tem horário fixo — o horário é combinado com o
+  // cliente, caso a caso (decisão do dono). Para uma PESSOA da equipe (o admin
+  // confirmando um pedido, ou marcando direto), responsável sem horário
+  // publicado não bloqueia: vale o encaixe, que segue conferindo a ocupação
+  // real contra a capacidade da loja (sem número = sem limite). A IA e o token
+  // continuam presos à grade publicada.
+  const semJornadaPublicada =
+    (!consulta.ok && consulta.codigo === "jornada_mal_configurada") || (consulta.ok && !consulta.publicouHorarios);
+  if (foraDaGrade && semJornadaPublicada) {
+    await exigeSemSobreposicao(supabase, ctx, args);
+    const fusoDaLoja = consulta.ok ? consulta.fusoDaRegra : await fusoDaLojaOuPadrao(supabase, ctx.organization_id);
+    return { fusoDaRegra: fusoDaLoja };
+  }
+
   if (!consulta.ok) {
     const { status, code } = CODIGO_DA_RECUSA[consulta.codigo];
     throw new ApiError(status, code, undefined, ctx.requestId, consulta.motivoParaOperador);
@@ -863,7 +879,6 @@ async function exigeHorarioLivre(
     );
   }
 
-  const foraDaGrade = podeMarcarForaDaGrade(ctx.actor);
   if (foraDaGrade) {
     await exigeSemSobreposicao(supabase, ctx, args);
   } else if (!consulta.slots.some((s) => s.inicio.getTime() === args.inicio.getTime())) {
@@ -876,6 +891,17 @@ async function exigeHorarioLivre(
     );
   }
   return { fusoDaRegra: consulta.fusoDaRegra };
+}
+
+/**
+ * ia.vek v1.7.6: o fuso do compromisso quando o responsável não publicou
+ * horário — o da organização (`organizations.timezone`) ou, sem ele, o padrão
+ * da jornada (`America/Sao_Paulo`, o mesmo default de `availabilityScheduleSchema`).
+ */
+async function fusoDaLojaOuPadrao(supabase: SB, organizationId: string): Promise<string> {
+  const { data } = await supabase.from("organizations").select("timezone").eq("id", organizationId).maybeSingle();
+  const tz = (data as { timezone?: unknown } | null)?.timezone;
+  return typeof tz === "string" && tz.trim() ? tz.trim() : "America/Sao_Paulo";
 }
 
 /**

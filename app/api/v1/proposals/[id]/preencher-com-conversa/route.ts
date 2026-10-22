@@ -12,7 +12,7 @@ import { LlmBudgetExceededError, LlmProviderUnknownError, LlmModelNotEnabledErro
 import { getSkillsPool } from "@/lib/ai/skills/db";
 import { montarDocumentoDaProposta, type PropostaParaDocumento } from "@/lib/propostas/documento/documento-da-proposta";
 import type { ContatoParaDocumento } from "@/lib/propostas/documento/montar-dados";
-import { montarTranscricao, sugerirValoresDaConversa } from "@/lib/propostas/preencher-com-conversa";
+import { campoProibidoParaIa, montarTranscricao, sugerirValoresDaConversa } from "@/lib/propostas/preencher-com-conversa";
 import { orcamentoDeIaDisponivel } from "@/lib/propostas/orcamento-de-ia-disponivel";
 import { sePropostasDesligadas } from "@/lib/propostas/porta";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -64,7 +64,11 @@ export async function POST(_req: NextRequest, ctx: Ctx): Promise<Response> {
     : { data: null };
 
   const documento = await montarDocumentoDaProposta(admin, authz.org.orgId, p, contato as ContatoParaDocumento | null);
-  const camposDeBriefing = (documento?.camposFaltando ?? []).filter((c) => c.onde === "briefing");
+  // ia.vek v1.7.6: também os campos das seções opcionais (troca, entrada e
+  // parcelas) — e nunca placa, chassi ou FIPE (regra do dono: não vão à IA).
+  const camposDeBriefing = [...(documento?.camposFaltando ?? []), ...(documento?.camposOpcionais ?? [])]
+    .filter((c) => c.onde === "briefing")
+    .filter((c) => !campoProibidoParaIa(c));
 
   // Nada para sugerir: nem consulta mensagens, nem chama a IA (economiza
   // orçamento e evita um round-trip inútil quando só falta prazo/pagamento).
