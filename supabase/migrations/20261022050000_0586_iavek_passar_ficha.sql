@@ -11,6 +11,7 @@
 --      fn_user_org_ids() e fn_user_role_in_org() não o contam. Toda policy de
 --      tenant e todo requireRole() passam a negar — a pessoa só chega às fichas
 --      pelas rotas próprias (servidor, com a checagem explícita da função).
+--      O analista lê só a LINHA da própria organização (orgs_select_analista_de_ficha).
 --   2. iavek_fichas, iavek_ficha_documentos e iavek_ficha_leituras: RLS ligada e
 --      NENHUMA policy para a sessão. Só o servidor lê e escreve, depois de
 --      conferir quem pede (vendedor dono do lead, analista, admin). Toda leitura
@@ -40,6 +41,17 @@ returns text language sql stable security definer set search_path = public as $f
          and coalesce(interface_settings->>'funcao', '') <> 'analista_ficha' limit 1) end
  from (select public.fn_support_context() s) c;
 $f$;
+
+-- 1b. O analista ainda precisa da LINHA da própria organização (nome, status,
+-- configuração — nada de cliente): sem ela o app trata a loja como suspensa.
+-- Policy estreita, só para o vínculo do próprio usuário com a função analista.
+drop policy if exists orgs_select_analista_de_ficha on public.organizations;
+create policy orgs_select_analista_de_ficha on public.organizations
+  for select using (
+    id in (select uo.organization_id from public.user_organizations uo
+            where uo.user_id = auth.uid() and uo.revoked_at is null
+              and uo.interface_settings->>'funcao' = 'analista_ficha')
+  );
 
 -- 2. As fichas.
 create table if not exists public.iavek_fichas (

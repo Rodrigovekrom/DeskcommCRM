@@ -47,6 +47,11 @@ describe("a função analista_ficha fecha o CRM no banco", () => {
     }
   });
 
+  it("o analista lê SÓ a linha da própria organização (sem ela o app a trata como suspensa)", () => {
+    expect(countAs(ANALISTA, `select count(*) from public.organizations where id = '${GOV_ORG}';`)).toBe(1);
+    expect(countAs(ANALISTA, `select count(*) from public.organizations where id <> '${GOV_ORG}';`)).toBe(0);
+  });
+
   it("para o analista, fn_user_role_in_org é nulo (o requireRole nega)", () => {
     const out = sql(`
       set role authenticated;
