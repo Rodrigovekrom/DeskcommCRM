@@ -90,8 +90,8 @@ describe("rodízio de leads novos", () => {
     const contato = "a0d12000-4444-4000-8000-000000000001";
     sql(`
       insert into public.contacts (id, organization_id, name) values ('${contato}', '${ORG}', 'Cliente que volta') on conflict (id) do nothing;
-      insert into public.crm_leads (organization_id, pipeline_id, stage_id, contact_id, title, source, owner_user_id, owner_kind, status, closed_at, lost_reason)
-        values ('${ORG}', '${FUNIL}', '${ETAPA}', '${contato}', 'r7 antigo', 'manual', '${V2}', 'user', 'lost', now(), 'outro');
+      insert into public.crm_leads (organization_id, pipeline_id, stage_id, contact_id, title, source, owner_user_id, owner_kind)
+        values ('${ORG}', '${FUNIL}', '${ETAPA}', '${contato}', 'r7 antigo', 'manual', '${V2}', 'user');
       insert into public.conversations (organization_id, contact_id, channel_session_id, status) values ('${ORG}', '${contato}', '${SESSAO}', 'open');
     `);
     // V2 está desmarcado, e mesmo assim recebe: o cliente é dele.
