@@ -115,9 +115,14 @@ export function ConversaNoQuadro({
           <DadosDaCompraNoCardContext.Provider value={{ ligado: true }}>
             <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
           </DadosDaCompraNoCardContext.Provider>
-          {/* O padrão da loja (v1.8.0): some sozinho quando o admin o desligou. */}
-          <div className="max-h-40 overflow-y-auto rounded-md border px-2 py-1.5 empty:hidden">
-            <PadraoDoLead leadId={lead.id} />
+          {/* O padrão da loja (v1.8.0): some sozinho quando o admin o desligou.
+              No celular fica de fora: a tela é da conversa (medido em 390×844,
+              o checklist deixava ~150px de histórico). O selo continua no
+              cartão e a marcação, na ficha da Entrada. */}
+          <div className="hidden md:block">
+            <div className="max-h-40 overflow-y-auto rounded-md border px-2 py-1.5 empty:hidden">
+              <PadraoDoLead leadId={lead.id} />
+            </div>
           </div>
         </div>
 
