@@ -294,6 +294,7 @@ export function KanbanCard({
             conversa={lead.conversa}
             contactId={lead.contact_id}
             phone={lead.contact_phone}
+            leadId={lead.id}
           />
 
           {/* Telefone, e-mail e links do contato — some por inteiro quando o

@@ -149,6 +149,7 @@ export function LeadDossier({
           conversa={lead.conversa}
           contactId={lead.contact_id}
           phone={lead.contact_phone}
+          leadId={lead.id}
         />
 
         {/* Os dados do CLIENTE: telefone e e-mail numa aba, links (Instagram,

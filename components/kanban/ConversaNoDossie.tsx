@@ -1,5 +1,8 @@
 "use client";
 import Link from "next/link";
+import { useContext } from "react";
+
+import { ConversaNoQuadroContext } from "@/components/iavek/conversa-no-quadro-contexto";
 
 import { useT } from "@/hooks/i18n/useT";
 import { ArrowRight, ChatCircle } from "@/lib/ui/icons";
@@ -43,13 +46,36 @@ export function ConversaNoDossie({
   conversa,
   contactId,
   phone,
+  leadId,
 }: {
   conversa: Contact["conversa"] | null | undefined;
   contactId?: string | null;
   phone?: string | null;
+  /** ia.vek v1.8.1: dentro do quadro, a conversa abre na gaveta do quadro. */
+  leadId?: string;
 }) {
   const t = useT();
+  const abrirNoQuadro = useContext(ConversaNoQuadroContext);
   if (conversa === undefined) return null;
+  if (abrirNoQuadro && leadId && (conversa !== null || temAlvoParaAbrir(contactId, phone))) {
+    return (
+      <button
+        type="button"
+        onClick={() => abrirNoQuadro(leadId)}
+        className="group mt-3 flex w-full items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted"
+        data-testid="abrir-conversa-no-quadro-dossie"
+      >
+        <ChatCircle size={16} weight="regular" className="shrink-0 text-text-muted" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium text-text">{t("Abrir conversa aqui")}</span>
+          {conversa?.preview?.trim() && (
+            <span className="block truncate text-[11px] text-text-muted">{conversa.preview.trim()}</span>
+          )}
+        </span>
+        <ArrowRight size={14} weight="regular" className="shrink-0 text-text-muted" aria-hidden />
+      </button>
+    );
+  }
   if (conversa === null) {
     // Mesma guarda do card, antes de montar: sem contato e sem telefone o bloco
     // continua sumindo (regra de sempre), em vez de desenhar um botão mudo.

@@ -20,6 +20,7 @@ import { LeadDossier } from "./LeadDossier";
 import { RetomarComoNovoNegocioDialog } from "./RetomarComoNovoNegocioDialog";
 import { LoseLeadDialog } from "./LoseLeadDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
+import { ConversaNoQuadro, ConversaNoQuadroContext } from "@/components/iavek/ConversaNoQuadro";
 
 interface KanbanBoardProps {
   pipelineId: string;
@@ -174,6 +175,13 @@ export function KanbanBoard({
   // o histórico de captação tinha o id e nenhum lugar para levá-lo. Uma vez
   // aberto, o estado local manda (fechar não reabre pela URL).
   const [dossieId, setDossieId] = useState<string | null>(leadInicial ?? null);
+  // ia.vek v1.8.1: a conversa do lead numa gaveta sobre o quadro (sem ir à
+  // Entrada). Abrir pelo dossiê fecha o dossiê: um painel por vez.
+  const [conversaDoLeadId, setConversaDoLeadId] = useState<string | null>(null);
+  const abrirConversaNoQuadro = useCallback((leadId: string) => {
+    setDossieId(null);
+    setConversaDoLeadId(leadId);
+  }, []);
   const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
   const selectedLeadIds = useMemo(
     () => (selectedIds ? new Set(selectedIds) : internalSelected),
@@ -297,7 +305,12 @@ export function KanbanBoard({
     );
   }
 
+  const leadDaConversa = conversaDoLeadId
+    ? (data.leads.find((l) => l.id === conversaDoLeadId) ?? null)
+    : null;
+
   return (
+    <ConversaNoQuadroContext.Provider value={abrirConversaNoQuadro}>
     <DragDropContext onDragEnd={handleDragEnd}>
       {/* UM contêiner de rolagem só, nos dois eixos. Rolar cada coluna por
           conta própria seria o desenho "Trello", mas o @hello-pangea/dnd não
@@ -402,6 +415,15 @@ export function KanbanBoard({
           pipelineId={pipelineId}
         />
       )}
+      {leadDaConversa && (
+        <ConversaNoQuadro
+          lead={leadDaConversa}
+          pipelineId={pipelineId}
+          nomeDaEtapa={data.stages.find((st) => st.id === leadDaConversa.stage_id)?.name ?? "—"}
+          onFechar={() => setConversaDoLeadId(null)}
+        />
+      )}
     </DragDropContext>
+    </ConversaNoQuadroContext.Provider>
   );
 }

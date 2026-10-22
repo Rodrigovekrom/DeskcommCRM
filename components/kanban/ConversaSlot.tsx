@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
-import type { MouseEvent } from "react";
+import { useContext, type MouseEvent } from "react";
+
+import { ConversaNoQuadroContext } from "@/components/iavek/conversa-no-quadro-contexto";
 
 import { useT } from "@/hooks/i18n/useT";
 import { ChatCircle } from "@/lib/ui/icons";
@@ -42,13 +44,53 @@ export function ConversaSlot({
   conversa,
   contactId,
   phone,
+  leadId,
 }: {
   conversa: Lead["conversa"];
   contactId?: string | null;
   phone?: string | null;
+  /** ia.vek v1.8.1: com o quadro publicando a gaveta, o atalho abre a conversa nela. */
+  leadId?: string;
 }) {
   const t = useT();
+  const abrirNoQuadro = useContext(ConversaNoQuadroContext);
   if (conversa === undefined) return null;
+  // ia.vek v1.8.1: dentro do quadro, a conversa abre na gaveta (sem ir à Entrada).
+  // Sem conversa, a própria gaveta diz isso e oferece iniciar.
+  if (abrirNoQuadro && leadId && (conversa !== null || temAlvoParaAbrir(contactId, phone))) {
+    const preview = conversa?.preview?.trim();
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          abrirNoQuadro(leadId);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={cn(
+          "group/conversa mt-1 flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[11px]",
+          "text-text-muted transition-colors hover:bg-muted hover:text-foreground",
+        )}
+        title={t("Abrir a conversa aqui, sem sair do quadro")}
+        data-testid="abrir-conversa-no-quadro"
+      >
+        <ChatCircle size={12} weight="regular" className="shrink-0" aria-hidden />
+        <span className="truncate">
+          {conversa === null
+            ? t("Abrir conversa")
+            : preview || <span className="italic">{t("conversa sem mensagens")}</span>}
+        </span>
+        {conversa !== null && conversa.unread > 0 && (
+          <span
+            className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[10px] font-medium text-primary-foreground tabular-nums"
+            aria-label={`${conversa.unread} ${t("sem ler")}`}
+          >
+            {conversa.unread}
+          </span>
+        )}
+      </button>
+    );
+  }
   if (conversa === null) {
     // A guarda de alvo fica AQUI, antes de montar: montar o botão sem contato
     // nem telefone desenharia (e custaria router + query client) uma linha que
