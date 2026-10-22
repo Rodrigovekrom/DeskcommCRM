@@ -46,9 +46,14 @@ interface KanbanBoardProps {
    * então o cabeçalho fica só leitura para eles.
    */
   podeRenomearEtapa?: boolean;
+  /**
+   * ia.vek v1.7.7: `"chegada"` = o mais NOVO no topo de cada coluna (o Pipeline
+   * do vendedor). O padrão segue a posição manual (`position_in_stage`).
+   */
+  ordem?: "posicao" | "chegada";
 }
 
-function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> {
+function groupLeadsByStage(stages: Stage[], leads: Lead[], ordem: "posicao" | "chegada" = "posicao"): Map<string, Lead[]> {
   const map = new Map<string, Lead[]>();
   for (const stage of stages) map.set(stage.id, []);
   for (const lead of leads) {
@@ -57,7 +62,8 @@ function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> 
   }
   // Already ordered by position_in_stage at fetch time, but be defensive.
   for (const list of map.values()) {
-    list.sort((a, b) => a.position_in_stage - b.position_in_stage);
+    if (ordem === "chegada") list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    else list.sort((a, b) => a.position_in_stage - b.position_in_stage);
   }
   return map;
 }
@@ -90,6 +96,7 @@ export function KanbanBoard({
   onSelectionChange,
   leadInicial,
   podeRenomearEtapa = false,
+  ordem = "posicao",
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -170,8 +177,8 @@ export function KanbanBoard({
 
   const grouped = useMemo(() => {
     if (!data) return null;
-    return groupLeadsByStage(data.stages, data.leads);
-  }, [data]);
+    return groupLeadsByStage(data.stages, data.leads, ordem);
+  }, [data, ordem]);
 
   // Um conjunto por vez, e não um card por vez: o board recebe o resultado do
   // gesto já resolvido pela coluna (um card, um intervalo, a etapa inteira). A

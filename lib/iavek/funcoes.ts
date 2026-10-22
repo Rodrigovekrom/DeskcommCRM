@@ -61,6 +61,8 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   ],
   vendedor: [
     "/app/meu-dia",
+    // v1.7.7: a carteira dele no Kanban (antes de tudo o que é lista).
+    "/app/pipeline",
     "/app/inbox",
     "/app/agenda",
     "/app/kanban",

@@ -242,6 +242,18 @@ export const NAV_CATALOG = [
 
   // ---- CRM — o funil ----
   {
+    // ia.vek v1.7.7: o Pipeline do VENDEDOR — abre direto no Kanban da carteira
+    // de quem está conectado (funil padrão, etapas oficiais do admin), com os
+    // leads sem dono numa faixa no topo para assumir.
+    href: "/app/pipeline",
+    label: "Pipeline",
+    description: "Sua carteira no Kanban: arraste os clientes entre as etapas e assuma os que chegaram sem dono.",
+    icon: "Kanban",
+    group: "crm",
+    section: "O dia a dia da venda",
+    sidebar: true,
+  },
+  {
     // ⚠️ ERA "Kanban", e a URL continua sendo. O nome saiu da interface porque o
     // produto tinha CINCO vocabulários para a mesma coisa — "Kanban" no menu,
     // "Pipelines" no título desta tela, "Funis" no menu ao lado, "funil" em todo

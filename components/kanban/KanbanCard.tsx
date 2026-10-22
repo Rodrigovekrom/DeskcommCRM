@@ -13,6 +13,7 @@ import { ConversaSlot } from "./ConversaSlot";
 import { ScoreSlot } from "./ScoreSlot";
 import { OwnerBadge } from "./OwnerBadge";
 import { ContatoNoCard } from "./ContatoNoCard";
+import { DadosDaCompraNoCard } from "@/components/iavek/DadosDaCompraNoCard";
 
 /** Os dois gestos de seleção que o card sabe relatar. */
 export type GestoDeSelecao = "alterna" | "intervalo";
@@ -298,6 +299,9 @@ export function KanbanCard({
           {/* Telefone, e-mail e links do contato — some por inteiro quando o
               negócio não tem nada disso, como a conversa acima. */}
           <ContatoNoCard lead={lead} />
+
+          {/* ia.vek v1.7.7: troca e forma de pagamento — só no Pipeline do vendedor. */}
+          <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
 
           {/* ④ dono · ⑤ tempo no estágio */}
           <div className="mt-1 flex h-6 items-center justify-between gap-2">

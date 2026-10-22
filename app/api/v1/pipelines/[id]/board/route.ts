@@ -438,7 +438,7 @@ async function withNextActions(
   };
 }
 
-export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
+export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const requestId = randomUUID();
   const { id: pipelineId } = await ctx.params;
 
@@ -452,6 +452,17 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   }
   const authUser = await loadAuthUser();
   const t = (texto: string) => traduzir(texto, authUser?.idioma ?? "pt-BR");
+  // ia.vek v1.7.7: `?escopo=carteira` é o Pipeline do vendedor — só os leads
+  // de que ele é DONO. O corte acontece na consulta, e não no navegador: com o
+  // pool pequeno, cada carga do quadro (e cada evento do tempo real) deixa de
+  // ler o funil inteiro para ler só a carteira de quem pede.
+  const soMinhaCarteira = req.nextUrl.searchParams.get("escopo") === "carteira";
+  let consultaDeLeads = supabase
+    .from("crm_leads")
+    .select("*")
+    .eq("pipeline_id", pipelineId)
+    .neq("status", "archived");
+  if (soMinhaCarteira) consultaDeLeads = consultaDeLeads.eq("owner_user_id", user.id);
 
   const [
     { data: pipeline, error: pipelineErr },
@@ -465,12 +476,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
       .eq("pipeline_id", pipelineId)
       .eq("is_archived", false)
       .order("position"),
-    supabase
-      .from("crm_leads")
-      .select("*")
-      .eq("pipeline_id", pipelineId)
-      .neq("status", "archived")
-      .order("position_in_stage"),
+    consultaDeLeads.order("position_in_stage"),
   ]);
 
   if (pipelineErr) return fail("internal_error", pipelineErr.message, 500, { requestId });

@@ -298,6 +298,8 @@ export const AUDIT_ACTIONS = [
   "estoque_altimus.config_changed",
   // ia.vek v1.6: a meta de agendamentos do dia (Meu dia).
   "iavek.meta_agendamentos_changed",
+  // ia.vek v1.7.7: o vendedor assumiu um lead sem dono pelo Pipeline.
+  "iavek.lead_assumido",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser
   // lido — é mutação relevante, não preferência de exibição.

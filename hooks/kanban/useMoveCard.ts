@@ -73,27 +73,32 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
         ...(args.wonReason !== undefined ? { won_reason: args.wonReason } : {}),
       });
     },
+    // ia.vek v1.7.7: por PREFIXO (`setQueriesData`) — o mesmo funil pode estar
+    // em cache como quadro (`["board", id]`) e como carteira do vendedor
+    // (`["board", id, "carteira"]`); o card tem de andar nos dois.
     onMutate: async (args) => {
       await qc.cancelQueries({ queryKey });
-      const snapshot = qc.getQueryData<BoardData>(queryKey);
-      if (snapshot) {
-        qc.setQueryData<BoardData>(queryKey, {
-          ...snapshot,
-          leads: snapshot.leads.map((l) =>
-            l.id === args.leadId
-              ? { ...l, stage_id: args.stageId, position_in_stage: args.positionInStage }
-              : l,
-          ),
-        });
-      }
-      return { snapshot };
+      const snapshots = qc.getQueriesData<BoardData>({ queryKey });
+      qc.setQueriesData<BoardData>({ queryKey }, (atual) =>
+        atual
+          ? {
+              ...atual,
+              leads: atual.leads.map((l) =>
+                l.id === args.leadId
+                  ? { ...l, stage_id: args.stageId, position_in_stage: args.positionInStage }
+                  : l,
+              ),
+            }
+          : atual,
+      );
+      return { snapshots };
     },
     onSuccess: (res, args) => {
       // A resposta é o lead como o servidor o deixou, com o `updated_at` final.
       // Sem gravá-la aqui, o cache seguia com o valor de antes até o refetch do
       // `onSettled` chegar, e arrastar o mesmo card de novo nesse intervalo
       // mandava `expected_updated_at` velho → 409 (issue #916).
-      qc.setQueryData<BoardData>(queryKey, (atual) =>
+      qc.setQueriesData<BoardData>({ queryKey }, (atual) =>
         atual
           ? {
               ...atual,
@@ -103,7 +108,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
       );
     },
     onError: (err, args, ctx) => {
-      if (ctx?.snapshot) qc.setQueryData(queryKey, ctx.snapshot);
+      for (const [chave, dado] of ctx?.snapshots ?? []) qc.setQueryData(chave, dado);
       if (err instanceof ApiError && err.status === 409) {
         // Reconcile authoritative state — server already gave new updated_at.
         qc.invalidateQueries({ queryKey });

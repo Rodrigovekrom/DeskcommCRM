@@ -29,7 +29,8 @@ function gravaLeadNoQuadro(
   lead: Lead | undefined,
 ): void {
   if (!lead) return;
-  qc.setQueryData<BoardData>(queryKey, (atual) =>
+  // ia.vek v1.7.7: por prefixo — alcança o quadro e a carteira do vendedor.
+  qc.setQueriesData<BoardData>({ queryKey }, (atual) =>
     atual
       ? { ...atual, leads: atual.leads.map((l) => (l.id === leadId ? { ...l, ...lead } : l)) }
       : atual,

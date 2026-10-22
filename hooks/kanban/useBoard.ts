@@ -15,9 +15,9 @@ import type { BoardData } from "@/lib/kanban/types";
  * and PostgREST returns PGRST116. Routing through /api/v1/pipelines/[id]/board
  * uses the server-side cookie reader, identical to every other authed query.
  */
-async function fetchBoard(pipelineId: string): Promise<BoardData> {
+async function fetchBoard(pipelineId: string, escopo?: EscopoDoQuadro): Promise<BoardData> {
   const res = await apiClient.get<{ data: BoardData }>(
-    `/api/v1/pipelines/${pipelineId}/board`,
+    `/api/v1/pipelines/${pipelineId}/board${escopo ? `?escopo=${escopo}` : ""}`,
   );
   // apiClient unwraps { data, meta } envelope already in some helpers;
   // ours returns the parsed JSON literally. Handle both shapes safely.
@@ -60,9 +60,33 @@ export function chaveDoQuadro(pipelineId: string | null) {
   return ["board", pipelineId] as const;
 }
 
-export function useBoard(pipelineId: string | null) {
+/**
+ * ia.vek v1.7.7: `"carteira"` = só os leads de que quem pede é dono (o Pipeline
+ * do vendedor). A chave de cache COMEÇA pela do quadro (`["board", id, …]`), de
+ * propósito: toda invalidação por `["board", id]` alcança as duas, e quem
+ * atualiza o cache otimista usa `setQueriesData` com o prefixo.
+ */
+export type EscopoDoQuadro = "carteira";
+
+export function chaveDaCarteira(pipelineId: string | null) {
+  return ["board", pipelineId, "carteira"] as const;
+}
+
+export interface OpcoesDoQuadro {
+  escopo?: EscopoDoQuadro;
+  /**
+   * Agrupa os eventos do tempo real numa janela (ms) antes de buscar de novo.
+   * Sem isso, cada lead que muda dispara um refetch do quadro inteiro em cada
+   * aba aberta — com o pool pequeno, a rajada de leads novos vira fila.
+   */
+  agruparEventosMs?: number;
+}
+
+export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {}) {
   const qc = useQueryClient();
-  const queryKey = chaveDoQuadro(pipelineId);
+  const { escopo, agruparEventosMs = 0 } = opcoes;
+  const queryKey = escopo ? chaveDaCarteira(pipelineId) : chaveDoQuadro(pipelineId);
+  const agrupador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Cards que acabaram de mudar POR EVENTO REMOTO — o pulso da Wave 3.
@@ -77,7 +101,7 @@ export function useBoard(pipelineId: string | null) {
 
   const query = useQuery({
     queryKey,
-    queryFn: () => fetchBoard(pipelineId as string),
+    queryFn: () => fetchBoard(pipelineId as string, escopo),
     enabled: !!pipelineId,
   });
 
@@ -86,7 +110,16 @@ export function useBoard(pipelineId: string | null) {
       // Conservative: invalidate the board on any change. Optimistic patches
       // arrive faster via useMoveCard's onMutate; this just reconciles
       // cross-user changes within ~250ms.
-      qc.invalidateQueries({ queryKey });
+      if (agruparEventosMs > 0) {
+        if (!agrupador.current) {
+          agrupador.current = setTimeout(() => {
+            agrupador.current = null;
+            void qc.invalidateQueries({ queryKey });
+          }, agruparEventosMs);
+        }
+      } else {
+        qc.invalidateQueries({ queryKey });
+      }
 
       const leadId = idDoEvento(payload);
       // Janela, não marca gasta por evento: uma ação minha chega aqui em DUAS
@@ -121,7 +154,8 @@ export function useBoard(pipelineId: string | null) {
         }, PULSE_MS),
       );
     },
-    [qc, queryKey],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo
+    [qc, pipelineId, escopo, agruparEventosMs],
   );
 
   // O STATUS DO CANAL NÃO PODE SER DESCARTADO. `useRealtimeChannel` calcula
@@ -134,7 +168,7 @@ export function useBoard(pipelineId: string | null) {
   // checklist do sistema vivo, na versão cara, porque a tela continua parecendo
   // certa enquanto o board já não escuta mais nada.
   const { status: realtimeStatus, ultimaEntrega } = useRealtimeChannel({
-    name: pipelineId ? `kanban-${pipelineId}` : "kanban-disabled",
+    name: pipelineId ? `kanban-${pipelineId}${escopo ? `-${escopo}` : ""}` : "kanban-disabled",
     postgresChanges: pipelineId
       ? {
           event: "*",
@@ -154,6 +188,7 @@ export function useBoard(pipelineId: string | null) {
     return () => {
       for (const t of pendentes.values()) clearTimeout(t);
       pendentes.clear();
+      if (agrupador.current) clearTimeout(agrupador.current);
     };
   }, []);
 
