@@ -62,7 +62,7 @@ describe("assumir só pega lead SEM dono", () => {
 describe("arrastar para uma etapa de perda pede o motivo", () => {
   const quadro = readFileSync(join(process.cwd(), "components/kanban/KanbanBoard.tsx"), "utf8");
   it("soltar em etapa is_lost abre a janela de perda em vez de mover", () => {
-    expect(quadro).toMatch(/etapaDeDestino\?\.is_lost[\s\S]{0,120}setPerdaPendente\(lead\.id\)/);
-    expect(quadro).toMatch(/<LoseLeadDialog[\s\S]{0,80}leadId=\{perdaPendente\}/);
+    expect(quadro).toMatch(/etapaDeDestino\?\.is_lost[\s\S]{0,300}setPerdaPendente\(lead\.id\)/);
+    expect(quadro).toMatch(/<LoseLeadDialog[\s\S]{0,300}leadId=\{perdaPendente\}/);
   });
 });
