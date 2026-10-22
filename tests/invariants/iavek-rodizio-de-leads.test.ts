@@ -31,13 +31,13 @@ function config(ativo: boolean, participantes: string[]) {
   sql(`update public.organizations set settings = jsonb_set(coalesce(settings,'{}'::jsonb), '{iavek}', jsonb_build_object('rodizio', jsonb_build_object('ativo', ${ativo}, 'participantes', '${JSON.stringify(participantes)}'::jsonb))) where id = '${ORG}';`);
 }
 
-/** Cria um lead sem dono e devolve o dono que ele ganhou ('' = nenhum). */
+/** Cria um lead sem dono e devolve o dono que ele ganhou (SEM_DONO = nenhum). */
 function leadNovo(titulo: string, extra: { contato?: string; source?: string } = {}): string {
   const contato = extra.contato ? `'${extra.contato}'` : "null";
   const out = sql(`
     insert into public.crm_leads (organization_id, pipeline_id, stage_id, contact_id, title, source)
       values ('${ORG}', '${FUNIL}', '${ETAPA}', ${contato}, '${titulo}', '${extra.source ?? "whatsapp"}');
-    select coalesce(owner_user_id::text, '') from public.crm_leads where organization_id = '${ORG}' and title = '${titulo}';
+    select coalesce(owner_user_id::text, 'SEM_DONO') from public.crm_leads where organization_id = '${ORG}' and title = '${titulo}';
   `);
   return lastLine(out);
 }
@@ -67,7 +67,7 @@ beforeAll(() => {
 
 describe("rodízio de leads novos", () => {
   it("desligado (padrão): nada muda", () => {
-    expect(leadNovo("r0 desligado")).toBe("");
+    expect(leadNovo("r0 desligado")).toBe("SEM_DONO");
   });
 
   it("ligado: 3 leads novos vão para 3 vendedores diferentes, na ordem marcada", () => {
@@ -83,7 +83,7 @@ describe("rodízio de leads novos", () => {
   });
 
   it("importação de planilha não entra no rodízio", () => {
-    expect(leadNovo("r6 importado", { source: "import" })).toBe("");
+    expect(leadNovo("r6 importado", { source: "import" })).toBe("SEM_DONO");
   });
 
   it("contato que já tem dono continua com o MESMO dono, e a conversa livre vai junto sem calar a IA", () => {
