@@ -46052,7 +46052,7 @@ create trigger trg_iavek_redigir_pedidos_ao_anonimizar
 -- ---- ia.vek: rodízio de leads (migration 0585) ----
 -- Ver o cabeçalho de supabase/migrations/20261022040000_0585_iavek_rodizio_de_leads.sql.
 -- ⚠️ ENTRA ANTES DO BLOCO DA VARREDURA anon (que é o último a mexer em funções).
-POR QUÊ (decisão do dono do produto, 22/10/2026): na produção, todos os
+-- POR QUÊ (decisão do dono do produto, 22/10/2026): na produção, todos os
 -- leads abertos estavam sem dono e nenhuma conversa tinha atendente — a
 -- carteira do vendedor (Pipeline, v1.7.7) ficava vazia. O admin liga o
 -- rodízio e escolhe quem participa; cada lead novo vai, na hora em que chega,
