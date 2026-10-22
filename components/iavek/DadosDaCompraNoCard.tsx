@@ -5,6 +5,7 @@ import { createContext, useContext, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { useEditLead } from "@/hooks/kanban/useUpdateLead";
 import { cn } from "@/lib/utils";
+import { SeloDoPadrao } from "@/components/iavek/PadraoDoLead";
 import type { Lead } from "@/lib/types/leads";
 
 /**
@@ -80,6 +81,7 @@ function Faixa({ lead, pipelineId }: { lead: Lead; pipelineId: string }) {
   const novo = ehNovo(lead);
   return (
     <div className="mt-1.5 flex min-h-6 flex-wrap items-center gap-1 text-[11px]" data-testid="dados-da-compra" onClick={parar}>
+      <SeloDoPadrao leadId={lead.id} />
       {novo && (
         <span className="rounded-full bg-accent px-2 py-0.5 font-semibold text-accent-foreground" data-testid="selo-novo">
           {t("Novo")}

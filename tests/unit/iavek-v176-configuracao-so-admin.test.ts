@@ -82,6 +82,8 @@ const SO_ADMIN = [
   "iavek/rodizio GET",
   "iavek/rodizio PATCH",
   "iavek/rodizio/distribuir POST",
+  // v1.8.0: o padrão da loja é estratégia do admin.
+  "iavek/padrao PATCH",
   "companies POST",
   "company-people POST",
   "contacts/[id]/personal POST",

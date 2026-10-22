@@ -29,6 +29,7 @@ import { ChannelRoutingForm } from "./_channels-form";
 import { AtendimentoForm } from "./_form";
 import { EsteiraForm } from "./_esteira-form";
 import { RodizioDeLeads } from "@/components/iavek/RodizioDeLeads";
+import { PadraoDaLojaConfig } from "@/components/iavek/PadraoDaLojaConfig";
 import { AvisoGrupoForm } from "./_aviso-grupo-form";
 import { configDoAvisoGrupo } from "@/lib/avisos-grupo/regras";
 import { configDaEsteira } from "@/lib/esteira/config";
@@ -51,6 +52,18 @@ export default async function AtendimentoSettingsPage() {
     .select("settings")
     .eq("id", activeOrg.orgId)
     .maybeSingle();
+
+  // ia.vek v1.8.0: as etapas do funil padrão (prazo "até a etapa" do padrão da loja).
+  const { data: funilPadrao } = await supabase
+    .from("crm_pipelines")
+    .select("id, crm_stages(id, name, position, is_archived)")
+    .eq("organization_id", activeOrg.orgId)
+    .eq("is_default", true)
+    .maybeSingle();
+  const etapasDoFunilPadrao = (((funilPadrao as { crm_stages?: Array<{ id: string; name: string; position: number; is_archived: boolean }> } | null)?.crm_stages) ?? [])
+    .filter((e) => !e.is_archived)
+    .sort((a, b) => a.position - b.position)
+    .map((e) => ({ id: e.id, name: e.name }));
 
   const settings = ((data?.settings as Record<string, unknown> | null) ?? {}) as {
     routing?: unknown;
@@ -148,6 +161,8 @@ export default async function AtendimentoSettingsPage() {
 
       {/* ia.vek v1.7.7: o rodízio de LEADS da loja (só admin chega aqui). */}
       <RodizioDeLeads />
+      {/* ia.vek v1.8.0: o padrão da loja (checklist sem IA). */}
+      <PadraoDaLojaConfig etapas={etapasDoFunilPadrao} />
       <AtendimentoForm
         initial={{
           ...routing,

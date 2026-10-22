@@ -1,4 +1,5 @@
 "use client";
+import { ForaDoPadrao } from "@/components/iavek/PadraoDoLead";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -553,6 +554,8 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
         <Numero rotulo={t("Conversas com a IA")} valor={ia} />
         <Numero rotulo={t("Conversas com pessoas")} valor={humano} />
       </div>
+      {/* ia.vek v1.8.0 (A2): fora do padrão da loja, por vendedor — sem texto. */}
+      <ForaDoPadrao />
       {d.propostas_aguardando_aprovacao && (
         <Bloco
           id="gerente-propostas-aguardando"

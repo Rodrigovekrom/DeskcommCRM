@@ -7,6 +7,7 @@ import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
 import { PassarFicha } from "@/components/iavek/PassarFicha";
+import { PadraoDoLead } from "@/components/iavek/PadraoDoLead";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import type { Locale } from "date-fns";
@@ -779,11 +780,15 @@ export function CRMSidePanel({ conversation }: Props) {
         {sectionsLoading ? (
           <Skeleton className="mt-2 h-14 w-full" />
         ) : (
-          <AcompanhamentoDoLead
-            lead={(leads ?? []).find((l) => l.id === leadAtivoId) ?? leads?.[0] ?? null}
-            conversa={conversation}
-            contactId={contactId}
-          />
+          <>
+            <AcompanhamentoDoLead
+              lead={(leads ?? []).find((l) => l.id === leadAtivoId) ?? leads?.[0] ?? null}
+              conversa={conversation}
+              contactId={contactId}
+            />
+            {/* ia.vek v1.8.0: o padrão da loja (checklist sem IA). Some quando desligado. */}
+            {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l ? <div className="mt-3"><PadraoDoLead leadId={l.id} /></div> : null; })()}
+          </>
         )}
       </SecaoRecolhivel>
 

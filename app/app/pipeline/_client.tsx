@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
+import { PadraoNoCardContext, type AvaliacaoDoLead } from "@/components/iavek/PadraoDoLead";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
@@ -42,6 +43,20 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
   });
   // v1.7.9: a vista de cada um (ordem, colunas recolhidas/ocultas) — 0587.
   const { prefs, gravar } = usePreferenciasDoPipeline();
+  // v1.8.0: o padrão da loja da carteira (selo no cartão). Desligado: mapa vazio.
+  const qcPadrao = useQueryClient();
+  const { data: padrao } = useQuery({
+    queryKey: ["iavek", "padrao", "carteira", pipelineId],
+    queryFn: () =>
+      apiClient
+        .get<ApiSuccess<{ ativo: boolean; leads: Record<string, AvaliacaoDoLead> }>>(
+          `/api/v1/iavek/padrao/leads?pipeline_id=${pipelineId}&escopo=carteira`,
+        )
+        .then((r) => r.data),
+  });
+  useEffect(() => {
+    if (dataUpdatedAt) void qcPadrao.invalidateQueries({ queryKey: ["iavek", "padrao", "carteira", pipelineId] });
+  }, [dataUpdatedAt, pipelineId, qcPadrao]);
 
   return (
     <div
@@ -68,6 +83,7 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
       ) : isLoading || !data ? (
         <div className="flex flex-1 animate-pulse items-center justify-center text-muted-foreground">{t("Carregando…")}</div>
       ) : (
+        <PadraoNoCardContext.Provider value={padrao?.ativo ? padrao.leads : null}>
         <DadosDaCompraNoCardContext.Provider value={{ ligado: true }}>
           <KanbanBoard
             pipelineId={pipelineId}
@@ -81,6 +97,7 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
             onAbrirEtapa={(id) => gravar({ ...prefs, recolhidas: prefs.recolhidas.filter((x) => x !== id) })}
           />
         </DadosDaCompraNoCardContext.Provider>
+        </PadraoNoCardContext.Provider>
       )}
     </div>
   );
