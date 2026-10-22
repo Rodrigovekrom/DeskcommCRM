@@ -117,7 +117,7 @@ function FaixaSemDono({ pipelineId, quadroAtualizadoEm }: { pipelineId: string; 
     <section className="rounded-lg border border-accent/40 bg-accent/5 p-3" data-testid="faixa-sem-dono" aria-label={t("Chegaram agora — sem dono")}>
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-sm font-semibold">{t("Chegaram agora — sem dono")}</h2>
-        <span className="rounded-full bg-accent px-2 text-xs font-semibold text-accent-fg" data-testid="contador-sem-dono">
+        <span className="rounded-full bg-accent px-2 text-xs font-semibold text-accent-foreground" data-testid="contador-sem-dono">
           {total}
         </span>
       </div>

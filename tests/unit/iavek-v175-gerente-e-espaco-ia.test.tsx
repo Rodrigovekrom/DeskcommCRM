@@ -204,8 +204,10 @@ describe("3. Os outros menus não mudam (além do Espaço da IA)", () => {
       ...pessoal,
       "/app/templates",
     ]);
+    // v1.7.7: + o Pipeline (a carteira dele no quadro), logo depois do Meu dia.
     expect(DESTINOS_DA_FUNCAO.vendedor).toEqual([
       "/app/meu-dia",
+      "/app/pipeline",
       "/app/inbox",
       "/app/agenda",
       "/app/kanban",

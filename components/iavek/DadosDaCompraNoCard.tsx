@@ -63,7 +63,13 @@ function Faixa({ lead, pipelineId }: { lead: Lead; pipelineId: string }) {
   const [escolhendo, setEscolhendo] = useState(false);
   const campos = (lead.custom_fields ?? {}) as Record<string, unknown>;
   const troca = temTroca(campos);
-  const pagamento = rotuloDaFormaDePagamento(campos.forma_pagamento);
+  // Literais por opção: a chave de t() nunca é montada em runtime (cerca i18n).
+  const ROTULO: Record<string, string> = {
+    a_vista: t("À vista"),
+    financiamento: t("Financiado"),
+    consorcio: t("Consórcio"),
+  };
+  const pagamento = typeof campos.forma_pagamento === "string" ? (ROTULO[campos.forma_pagamento] ?? null) : null;
 
   const gravar = (chave: string, valor: unknown) =>
     editar.mutate({ leadId: lead.id, patch: { custom_fields: { [chave]: valor } } });
@@ -75,7 +81,7 @@ function Faixa({ lead, pipelineId }: { lead: Lead; pipelineId: string }) {
   return (
     <div className="mt-1.5 flex min-h-6 flex-wrap items-center gap-1 text-[11px]" data-testid="dados-da-compra" onClick={parar}>
       {novo && (
-        <span className="rounded-full bg-accent px-2 py-0.5 font-semibold text-accent-fg" data-testid="selo-novo">
+        <span className="rounded-full bg-accent px-2 py-0.5 font-semibold text-accent-foreground" data-testid="selo-novo">
           {t("Novo")}
         </span>
       )}
@@ -106,7 +112,7 @@ function Faixa({ lead, pipelineId }: { lead: Lead; pipelineId: string }) {
             className="rounded-full border px-2 py-0.5 hover:bg-accent/10"
             data-testid={`opcao-pagamento-${f.value}`}
           >
-            {t(f.label)}
+            {ROTULO[f.value]}
           </button>
         ))
       ) : (
@@ -120,7 +126,7 @@ function Faixa({ lead, pipelineId }: { lead: Lead; pipelineId: string }) {
           )}
           data-testid="chip-pagamento"
         >
-          {pagamento ? t(pagamento) : t("Pagamento?")}
+          {pagamento ?? t("Pagamento?")}
         </button>
       )}
     </div>

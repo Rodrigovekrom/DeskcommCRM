@@ -247,11 +247,15 @@ export const NAV_CATALOG = [
     // leads sem dono numa faixa no topo para assumir.
     href: "/app/pipeline",
     label: "Pipeline",
-    description: "Sua carteira no Kanban: arraste os clientes entre as etapas e assuma os que chegaram sem dono.",
+    description: "Sua carteira no quadro: arraste os clientes entre as etapas e assuma os que chegaram sem dono.",
     icon: "Kanban",
     group: "crm",
     section: "O dia a dia da venda",
     sidebar: true,
+    // Na barra só de quem tem função (o vendedor; as outras funções não o
+    // listam). O admin sem função acha no hub do CRM e no ⌘K — a barra dele
+    // segue nos 16 itens medidos em `interface-por-empresa.test.ts`.
+    soComFuncao: true,
   },
   {
     // ⚠️ ERA "Kanban", e a URL continua sendo. O nome saiu da interface porque o

@@ -32,6 +32,14 @@ import { NAV_DESTINATIONS } from "@/lib/navigation/registry";
  */
 const FORA = ["design"];
 
+/**
+ * ia.vek v1.7.7 — EXCEÇÃO pedida pelo cliente (Rodrigo, 22/10/2026): a aba do
+ * vendedor se chama "Pipeline" porque é a palavra que a equipe da loja usa
+ * (vinha do CRM anterior). Só o RÓTULO deste destino; a descrição segue a
+ * regra. A lista só encolhe.
+ */
+const ROTULO_PEDIDO_PELO_CLIENTE = new Set(["/app/pipeline"]);
+
 function telas(raiz: string): string[] {
   const saida: string[] = [];
   const andar = (dir: string) => {
@@ -92,7 +100,7 @@ describe("o vocabulário do funil na interface", () => {
   });
 
   it("nenhum item de menu se chama 'Kanban' ou 'Pipelines'", () => {
-    const ruins = NAV_DESTINATIONS.filter((d) => PROIBIDAS.test(d.label));
+    const ruins = NAV_DESTINATIONS.filter((d) => PROIBIDAS.test(d.label) && !ROTULO_PEDIDO_PELO_CLIENTE.has(d.href));
     expect(ruins.map((d) => d.label)).toEqual([]);
   });
 

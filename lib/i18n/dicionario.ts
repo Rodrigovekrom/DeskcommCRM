@@ -13958,7 +13958,7 @@ export const DICIONARIO: Traducoes = {
   "Só membros ativos da equipe podem participar do rodízio.": { es: "Solo miembros activos del equipo pueden participar de la rotación." },
   "Não consegui ler a configuração.": { es: "No pude leer la configuración." },
   "Não consegui gravar a configuração.": { es: "No pude guardar la configuración." },
-  "Sua carteira no Kanban: arraste os clientes entre as etapas e assuma os que chegaram sem dono.": { es: "Tu cartera en Kanban: arrastra los clientes entre las etapas y asume los que llegaron sin dueño." },
+  "Sua carteira no quadro: arraste os clientes entre as etapas e assuma os que chegaram sem dono.": { es: "Tu cartera en el tablero: arrastra los clientes entre las etapas y asume los que llegaron sin dueño." },
   "Sua carteira no funil": { es: "Tu cartera en el embudo" },
   "Não consegui carregar a sua carteira.": { es: "No pude cargar tu cartera." },
   "Chegaram agora — sem dono": { es: "Recién llegados — sin dueño" },
