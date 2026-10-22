@@ -78,6 +78,10 @@ const SO_ADMIN = [
   "company-people/[id] PATCH",
   "people/[id] PATCH",
   "contacts/[id]/person PATCH",
+  // v1.7.7: o rodízio de leads é configuração e estratégia do admin.
+  "iavek/rodizio GET",
+  "iavek/rodizio PATCH",
+  "iavek/rodizio/distribuir POST",
   "companies POST",
   "company-people POST",
   "contacts/[id]/personal POST",

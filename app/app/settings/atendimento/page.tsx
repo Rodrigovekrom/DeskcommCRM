@@ -28,6 +28,7 @@ import { AssinaturaForm } from "./_assinatura-form";
 import { ChannelRoutingForm } from "./_channels-form";
 import { AtendimentoForm } from "./_form";
 import { EsteiraForm } from "./_esteira-form";
+import { RodizioDeLeads } from "@/components/iavek/RodizioDeLeads";
 import { AvisoGrupoForm } from "./_aviso-grupo-form";
 import { configDoAvisoGrupo } from "@/lib/avisos-grupo/regras";
 import { configDaEsteira } from "@/lib/esteira/config";
@@ -145,6 +146,8 @@ export default async function AtendimentoSettingsPage() {
         </p>
       </header>
 
+      {/* ia.vek v1.7.7: o rodízio de LEADS da loja (só admin chega aqui). */}
+      <RodizioDeLeads />
       <AtendimentoForm
         initial={{
           ...routing,

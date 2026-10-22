@@ -300,6 +300,9 @@ export const AUDIT_ACTIONS = [
   "iavek.meta_agendamentos_changed",
   // ia.vek v1.7.7: o vendedor assumiu um lead sem dono pelo Pipeline.
   "iavek.lead_assumido",
+  // ia.vek v1.7.7: rodízio de leads (configuração e distribuição dos sem dono).
+  "iavek.rodizio_config_changed",
+  "iavek.rodizio_distribuido",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser
   // lido — é mutação relevante, não preferência de exibição.
