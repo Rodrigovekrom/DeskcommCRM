@@ -76,6 +76,11 @@ interface Excecao {
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
   {
+    tabela: "iavek_rodizio_registros",
+    razao:
+      "tests/invariants/iavek-rodizio-de-leads.test.ts — ia.vek 0585: por JWT, o admin lê o registro da própria organização; o vendedor (agent) da MESMA organização lê zero (registro é do admin) e o admin de OUTRA organização lê zero; insert de authenticated recusado (só as funções do rodízio gravam).",
+  },
+  {
     tabela: "notificacoes",
     razao:
       "tests/invariants/iavek-guardiao-e-notificacoes.test.ts — ia.vek 0579: por JWT, cada um lê só as próprias (colega e gerente da MESMA org leem zero das do SDR; usuário de OUTRA organização lê zero), authenticated só muda lida_em e não cria linha (só o servidor/gatilhos gravam).",
