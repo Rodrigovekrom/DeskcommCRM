@@ -13,6 +13,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { conferirDados, quemNaFicha, type CampoDaFicha } from "@/lib/iavek/fichas";
 import { analistasDaOrg, avisar, exigeVerDados, lerFicha, registrarLeitura, semAcesso } from "@/lib/iavek/fichas-servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -60,6 +61,8 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
 const correcaoSchema = z.object({ dados: z.record(z.string(), z.unknown()) }).strict();
 
 export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
   const requestId = randomUUID();
   const quem = await quemNaFicha();
   if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });

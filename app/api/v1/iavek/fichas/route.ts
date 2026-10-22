@@ -17,8 +17,10 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { conferirDados, lerCamposDaFicha, quemNaFicha, STATUS_DA_FICHA } from "@/lib/iavek/fichas";
 import { analistasDaOrg, avisar, semAcesso } from "@/lib/iavek/fichas-servidor";
+import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 
@@ -27,6 +29,8 @@ export const dynamic = "force-dynamic";
 const envioSchema = z.object({ lead_id: z.uuid(), dados: z.record(z.string(), z.unknown()) }).strict();
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
   const requestId = randomUUID();
   const quem = await quemNaFicha();
   if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
@@ -137,7 +141,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       id: l.id,
       lead_id: l.lead_id,
       titulo_do_lead: l.titulo_do_lead,
-      cliente: l.contato?.display_name ?? l.contato?.name ?? null,
+      cliente: nomeDoContato(l.contato),
       status: l.status,
       // O gerente vê o status; o motivo é texto da analista sobre a pessoa.
       motivo: verMotivo(l) ? l.motivo : null,

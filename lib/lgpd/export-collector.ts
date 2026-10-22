@@ -137,6 +137,8 @@ export interface FichaDeCreditoRow {
   motivo: string | null;
   created_at: string;
   decidida_em: string | null;
+  /** Os documentos anexados (o que é, nome e data — o arquivo vai pela fila do storage). */
+  documentos?: Array<{ id: string; tipo: string; nome: string | null; created_at: string }>;
 }
 
 export interface ActivityRow {
@@ -1457,6 +1459,27 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     } else if (data) {
       conferirTeto("fichas_de_credito", data, 100);
       fichasDeCredito = data as FichaDeCreditoRow[];
+    }
+    // iavek_ficha_documentos: o que a anonimização apaga, o titular recebe.
+    if (fichasDeCredito.length > 0) {
+      const { data: docs, error: erroDocs } = await admin
+        .from("iavek_ficha_documentos")
+        .select("id, ficha_id, tipo, nome, created_at")
+        .eq("organization_id", organizationId)
+        .in("ficha_id", fichasDeCredito.map((f) => f.id))
+        .limit(500);
+      if (erroDocs) {
+        logger.warn("[lgpd-export-worker] documentos de ficha load failed", {
+          request_id: requestId,
+          error: erroDocs.message,
+        });
+      } else {
+        for (const f of fichasDeCredito) {
+          f.documentos = ((docs ?? []) as Array<{ id: string; ficha_id: string; tipo: string; nome: string | null; created_at: string }>)
+            .filter((d) => d.ficha_id === f.id)
+            .map(({ id, tipo, nome, created_at }) => ({ id, tipo, nome, created_at }));
+        }
+      }
     }
   }
 

@@ -209,8 +209,8 @@ function CamposDaFicha() {
       <div className="mt-2 space-y-2">
         {campos.map((c, i) => (
           <div key={`${c.key}-${i}`} className="flex flex-wrap items-center gap-2">
-            <input className="w-40 rounded border px-2 py-1" value={c.label} onChange={(e) => mudar(i, { label: e.target.value })} aria-label={t("Nome do campo")} />
-            <select className="rounded border px-1 py-1" value={c.tipo} onChange={(e) => mudar(i, { tipo: e.target.value as CampoDaFichaNaTela["tipo"] })} aria-label={t("Tipo do campo")}>
+            <input className="w-40 rounded-md border px-2 py-1" value={c.label} onChange={(e) => mudar(i, { label: e.target.value })} aria-label={t("Nome do campo")} />
+            <select className="rounded-md border px-1 py-1" value={c.tipo} onChange={(e) => mudar(i, { tipo: e.target.value as CampoDaFichaNaTela["tipo"] })} aria-label={t("Tipo do campo")}>
               <option value="texto">{t("Texto")}</option>
               <option value="cpf">{t("CPF")}</option>
               <option value="data">{t("Data")}</option>

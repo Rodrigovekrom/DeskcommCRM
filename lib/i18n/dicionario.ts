@@ -13941,6 +13941,8 @@ export const DICIONARIO: Traducoes = {
   "Fluxo principal da automação": { es: "Flujo principal de la automatización" },
   "Fluxos principais": { es: "Flujos principales" },
   // ia.vek v1.7.8 — Passar Ficha
+  "Analista de ficha": { es: "Analista de ficha" },
+  "Análise de crédito": { es: "Análisis de crédito" },
   "+ Campo": { es: "+ Campo" },
   "A ficha já foi decidida.": { es: "La ficha ya fue decidida." },
   "A ficha mudou enquanto você editava. Recarregue.": { es: "La ficha cambió mientras editabas. Recarga." },

@@ -9,6 +9,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { camposDaFichaSchema, comCamposDaFicha, lerCamposDaFicha, quemNaFicha } from "@/lib/iavek/fichas";
 import { semAcesso } from "@/lib/iavek/fichas-servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -25,6 +26,8 @@ export async function GET(): Promise<Response> {
 }
 
 export async function PATCH(req: NextRequest): Promise<Response> {
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
   const requestId = randomUUID();
   const quem = await quemNaFicha();
   if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });

@@ -62,7 +62,7 @@ export function PassarFicha({ leadId, donoDoLead }: { leadId: string; donoDoLead
 
   return (
     <div className="space-y-2" data-testid="passar-ficha">
-      {(fichas ?? []).map((f) => (
+      {(Array.isArray(fichas) ? fichas : []).map((f) => (
         <div key={f.id} className="rounded-md border p-2 text-xs" data-testid="ficha-do-lead">
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium" data-testid="status-da-ficha">
