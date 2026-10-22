@@ -24,8 +24,8 @@ beforeAll(() => {
   sql(`
     insert into auth.users (id, email) values ('${ANALISTA}', 'analista@invariant.test'), ('${VIEWER_COMUM}', 'viewer-ficha@invariant.test') on conflict (id) do nothing;
     insert into public.user_organizations (user_id, organization_id, role, accepted_at, interface_settings)
-      values ('${ANALISTA}', '${GOV_ORG}', 'viewer', now(), '{"funcao":"analista_ficha"}'::jsonb),
-             ('${VIEWER_COMUM}', '${GOV_ORG}', 'viewer', now(), '{}'::jsonb)
+      values ('${ANALISTA}', '${GOV_ORG}', 'viewer', now(), '{"preset":"completa","funcao":"analista_ficha"}'::jsonb),
+             ('${VIEWER_COMUM}', '${GOV_ORG}', 'viewer', now(), '{"preset":"completa"}'::jsonb)
       on conflict (user_id, organization_id) do update set interface_settings = excluded.interface_settings, role = excluded.role, revoked_at = null;
     insert into public.contacts (id, organization_id, name) values ('${CONTATO}', '${GOV_ORG}', 'Cliente da Ficha') on conflict (id) do nothing;
     insert into public.iavek_fichas (id, organization_id, lead_id, contact_id, enviada_por, dados)
