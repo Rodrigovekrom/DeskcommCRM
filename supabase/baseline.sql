@@ -46504,11 +46504,21 @@ create table if not exists public.iavek_preferencias_de_tela (
 
 alter table public.iavek_preferencias_de_tela enable row level security;
 
+-- Uma policy por operação (não FOR ALL): a cerca de RBAC da 0150 não aceita
+-- tabela nova com FOR ALL sem papel, e aqui a régua é DONO DA LINHA.
 drop policy if exists iavek_preferencias_de_tela_propria on public.iavek_preferencias_de_tela;
-create policy iavek_preferencias_de_tela_propria on public.iavek_preferencias_de_tela
-  for all to authenticated
-  using (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()))
-  with check (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
+drop policy if exists iavek_preferencias_de_tela_select on public.iavek_preferencias_de_tela;
+drop policy if exists iavek_preferencias_de_tela_insert on public.iavek_preferencias_de_tela;
+drop policy if exists iavek_preferencias_de_tela_update on public.iavek_preferencias_de_tela;
+drop policy if exists iavek_preferencias_de_tela_delete on public.iavek_preferencias_de_tela;
+create policy iavek_preferencias_de_tela_select on public.iavek_preferencias_de_tela
+  for select to authenticated using (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
+create policy iavek_preferencias_de_tela_insert on public.iavek_preferencias_de_tela
+  for insert to authenticated with check (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
+create policy iavek_preferencias_de_tela_update on public.iavek_preferencias_de_tela
+  for update to authenticated using (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids())) with check (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
+create policy iavek_preferencias_de_tela_delete on public.iavek_preferencias_de_tela
+  for delete to authenticated using (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
 
 revoke all on table public.iavek_preferencias_de_tela from anon, authenticated;
 grant select, insert, update, delete on table public.iavek_preferencias_de_tela to authenticated;
