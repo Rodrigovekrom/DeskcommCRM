@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
+import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
@@ -39,6 +40,8 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
     escopo: "carteira",
     agruparEventosMs: AGRUPAR_EVENTOS_MS,
   });
+  // v1.7.9: a vista de cada um (ordem, colunas recolhidas/ocultas) — 0587.
+  const { prefs, gravar } = usePreferenciasDoPipeline();
 
   return (
     <div
@@ -56,6 +59,8 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
 
       <FaixaSemDono pipelineId={pipelineId} quadroAtualizadoEm={dataUpdatedAt} />
 
+      {data && <VistaDoPipeline etapas={data.stages} prefs={prefs} gravar={gravar} />}
+
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm">
           {t("Não consegui carregar a sua carteira.")}
@@ -70,7 +75,10 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
             leads={data.leads}
             pulses={pulses}
             pipeline={data.pipeline}
-            ordem="chegada"
+            ordem={prefs.ordem}
+            etapasOcultas={new Set(prefs.ocultas)}
+            etapasRecolhidas={new Set(prefs.recolhidas)}
+            onAbrirEtapa={(id) => gravar({ ...prefs, recolhidas: prefs.recolhidas.filter((x) => x !== id) })}
           />
         </DadosDaCompraNoCardContext.Provider>
       )}

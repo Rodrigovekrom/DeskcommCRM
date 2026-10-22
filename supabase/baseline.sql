@@ -46489,6 +46489,31 @@ create trigger trg_iavek_redigir_fichas_ao_anonimizar
   execute function public.fn_iavek_redigir_fichas_ao_anonimizar();
 
 
+-- ---- ia.vek: preferências de visualização por pessoa (migration 0587) ----
+-- Ver o cabeçalho de supabase/migrations/20261022060000_0587_iavek_preferencias_de_tela.sql.
+create table if not exists public.iavek_preferencias_de_tela (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  tela text not null check (tela in ('pipeline')),
+  valor jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  constraint iavek_preferencias_de_tela_valor_objeto check (jsonb_typeof(valor) = 'object' and pg_column_size(valor) < 8192),
+  constraint iavek_preferencias_de_tela_unica unique (organization_id, user_id, tela)
+);
+
+alter table public.iavek_preferencias_de_tela enable row level security;
+
+drop policy if exists iavek_preferencias_de_tela_propria on public.iavek_preferencias_de_tela;
+create policy iavek_preferencias_de_tela_propria on public.iavek_preferencias_de_tela
+  for all to authenticated
+  using (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()))
+  with check (user_id = auth.uid() and organization_id in (select public.fn_user_org_ids()));
+
+revoke all on table public.iavek_preferencias_de_tela from anon, authenticated;
+grant select, insert, update, delete on table public.iavek_preferencias_de_tela to authenticated;
+grant all on table public.iavek_preferencias_de_tela to service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

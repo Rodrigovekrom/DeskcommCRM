@@ -51,10 +51,22 @@ interface KanbanBoardProps {
    * ia.vek v1.7.7: `"chegada"` = o mais NOVO no topo de cada coluna (o Pipeline
    * do vendedor). O padrão segue a posição manual (`position_in_stage`).
    */
-  ordem?: "posicao" | "chegada";
+  ordem?: "posicao" | "chegada" | "atividade";
+  /**
+   * ia.vek v1.7.9 — só VISUALIZAÇÃO, por pessoa: etapas que não aparecem e
+   * etapas recolhidas (uma faixa estreita com nome e contagem). Não muda dado.
+   */
+  etapasOcultas?: ReadonlySet<string>;
+  etapasRecolhidas?: ReadonlySet<string>;
+  onAbrirEtapa?: (stageId: string) => void;
 }
 
-function groupLeadsByStage(stages: Stage[], leads: Lead[], ordem: "posicao" | "chegada" = "posicao"): Map<string, Lead[]> {
+/** "Atividade recente": a última atividade do negócio; sem ela, a última mudança. */
+function instanteDeAtividade(l: Lead): string {
+  return l.last_activity_at ?? l.updated_at ?? l.created_at;
+}
+
+function groupLeadsByStage(stages: Stage[], leads: Lead[], ordem: "posicao" | "chegada" | "atividade" = "posicao"): Map<string, Lead[]> {
   const map = new Map<string, Lead[]>();
   for (const stage of stages) map.set(stage.id, []);
   for (const lead of leads) {
@@ -64,6 +76,7 @@ function groupLeadsByStage(stages: Stage[], leads: Lead[], ordem: "posicao" | "c
   // Already ordered by position_in_stage at fetch time, but be defensive.
   for (const list of map.values()) {
     if (ordem === "chegada") list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    else if (ordem === "atividade") list.sort((a, b) => instanteDeAtividade(b).localeCompare(instanteDeAtividade(a)));
     else list.sort((a, b) => a.position_in_stage - b.position_in_stage);
   }
   return map;
@@ -98,6 +111,9 @@ export function KanbanBoard({
   leadInicial,
   podeRenomearEtapa = false,
   ordem = "posicao",
+  etapasOcultas,
+  etapasRecolhidas,
+  onAbrirEtapa,
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -301,7 +317,22 @@ export function KanbanBoard({
         className="flex min-h-0 flex-1 items-start gap-3 overflow-auto px-4 pb-4"
         data-quadro-do-funil
       >
-        {data.stages.map((stage, indice) => (
+        {data.stages.map((stage, indice) =>
+          etapasOcultas?.has(stage.id) ? null : etapasRecolhidas?.has(stage.id) ? (
+            // ia.vek v1.7.9: a etapa RECOLHIDA vira uma faixa estreita — nome,
+            // contagem e o toque para abrir. Só visualização: o dado não muda.
+            <button
+              key={stage.id}
+              type="button"
+              onClick={() => onAbrirEtapa?.(stage.id)}
+              className="coluna-da-etapa flex min-h-full w-12 shrink-0 flex-col items-center gap-2 rounded-lg border border-border py-3 text-xs"
+              aria-label={`${t("Abrir a etapa")} ${stage.name}`}
+              data-etapa-recolhida={stage.id}
+            >
+              <span className="rounded-full bg-surface px-1.5 tabular-nums">{grouped?.get(stage.id)?.length ?? 0}</span>
+              <span className="font-semibold [writing-mode:vertical-rl]">{stage.name}</span>
+            </button>
+          ) : (
           <StageColumn
             key={stage.id}
             stage={stage}
@@ -319,7 +350,8 @@ export function KanbanBoard({
             podeRenomear={podeRenomearEtapa}
             onRenomear={(nome) => renameStage.mutate({ stageId: stage.id, name: nome })}
           />
-        ))}
+          ),
+        )}
       </div>
       {leadDoDossie && (
         <LeadDossier

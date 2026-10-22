@@ -13940,6 +13940,14 @@ export const DICIONARIO: Traducoes = {
   "Perfis de usuário": { es: "Perfiles de usuario" },
   "Fluxo principal da automação": { es: "Flujo principal de la automatización" },
   "Fluxos principais": { es: "Flujos principales" },
+  // ia.vek v1.7.9 — vista do Pipeline
+  "Tela desconhecida.": { es: "Pantalla desconocida." },
+  "Não consegui gravar a preferência.": { es: "No pude guardar la preferencia." },
+  Ordenar: { es: "Ordenar" },
+  "Mais novos primeiro": { es: "Más nuevos primero" },
+  Colunas: { es: "Columnas" },
+  ocultas: { es: "ocultas" },
+  "Abrir a etapa": { es: "Abrir la etapa" },
   // ia.vek v1.7.8 — Passar Ficha
   "Analista de ficha": { es: "Analista de ficha" },
   "Análise de crédito": { es: "Análisis de crédito" },

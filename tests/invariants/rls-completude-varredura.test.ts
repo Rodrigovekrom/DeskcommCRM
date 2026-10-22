@@ -76,6 +76,11 @@ interface Excecao {
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
   {
+    tabela: "iavek_preferencias_de_tela",
+    razao:
+      "tests/invariants/iavek-preferencias-de-tela.test.ts — ia.vek 0587: por JWT, o vendedor grava e lê só a própria linha; o colega da MESMA organização lê zero e não altera; ninguém grava com user_id alheio; quem é de OUTRA organização lê zero e não grava na nossa.",
+  },
+  {
     tabela: "iavek_fichas",
     razao:
       "tests/invariants/iavek-analista-de-ficha.test.ts — ia.vek 0586: RLS ligada e NENHUMA policy nem GRANT para a sessão; por JWT, nem o admin, nem o vendedor que enviou, nem o analista da MESMA organização leem (zero) ou escrevem — só o servidor, que confere quem pede e registra a leitura. Sem leitura nenhuma pela sessão, também não há leitura cruzada entre organizações.",
