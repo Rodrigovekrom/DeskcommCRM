@@ -6,6 +6,7 @@ import { LeadEnrichment } from "./LeadEnrichment";
 import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
+import { PassarFicha } from "@/components/iavek/PassarFicha";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import type { Locale } from "date-fns";
@@ -702,6 +703,8 @@ export function CRMSidePanel({ conversation }: Props) {
             {/* ia.vek v1.7.6: só o admin marca; os demais PEDEM o agendamento. */}
             {contactId&&conversation&&ehAdminDaLoja?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
             {contactId&&conversation&&!ehAdminDaLoja?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
+            {/* ia.vek v1.7.8: Passar Ficha do lead deste atendimento. */}
+            {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l ? <PassarFicha leadId={l.id} donoDoLead={(l as { owner_user_id?: string | null }).owner_user_id ?? null} /> : null; })()}
             <Button
               size="sm"
               variant="outline"

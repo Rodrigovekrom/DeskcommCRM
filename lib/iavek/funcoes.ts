@@ -14,7 +14,10 @@
 // continua no vocabulário GRAVADO (vínculos e convites antigos têm o valor, e
 // nada da produção é reescrito), mas na TELA é apelido de "gerente"
 // (`funcaoDaTela`) e saiu das listas de escolha (`FUNCOES_DE_ESCOLHA`).
-export const FUNCOES = ["sdr", "suporte", "vendedor", "apoio", "gerente"] as const;
+// ia.vek v1.7.8: "analista_ficha" — vê SÓ as fichas (Passar Ficha). Para este
+// vínculo o banco fecha o CRM inteiro (migration 0586: fn_user_org_ids e
+// fn_user_role_in_org não o contam), e o layout o leva para /fichas.
+export const FUNCOES = ["sdr", "suporte", "vendedor", "apoio", "gerente", "analista_ficha"] as const;
 export type Funcao = (typeof FUNCOES)[number];
 
 /** O que se ESCOLHE hoje (convite, Equipe, Ver como): sem o "apoio". */
@@ -23,6 +26,7 @@ export const FUNCOES_DE_ESCOLHA = [
   "suporte",
   "vendedor",
   "gerente",
+  "analista_ficha",
 ] as const satisfies readonly Funcao[];
 
 /**
@@ -40,6 +44,7 @@ export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
   vendedor: "Vendedor",
   apoio: "Gerente de apoio",
   gerente: "Gerente",
+  analista_ficha: "Analista de ficha",
 };
 
 /**
@@ -99,6 +104,8 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   gerente: MENU_GERENTE,
   /** v1.7.5: apelido do gerente (ver `funcaoDaTela`). */
   apoio: MENU_GERENTE,
+  /** v1.7.8: o analista não usa o /app — o layout o leva para /fichas. */
+  analista_ficha: [],
 };
 
 export function ehFuncao(v: unknown): v is Funcao {

@@ -61,6 +61,8 @@ export const ROTULOS_FUNCAO_PADRAO: Record<Funcao, string> = {
   apoio: "Gerente de Negócios",
   // ia.vek v1.7.6: um cargo só de gerente, e ele assina "Gerente de Negócios".
   gerente: "Gerente de Negócios",
+  // ia.vek v1.7.8: o analista de ficha não fala com o cliente.
+  analista_ficha: "Análise de crédito",
 };
 
 /**

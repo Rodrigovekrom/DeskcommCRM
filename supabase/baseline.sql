@@ -18803,13 +18803,17 @@ grant execute on function public.fn_support_write_allowed(uuid) to authenticated
 create or replace function public.fn_user_org_ids()
 returns setof uuid language sql stable security definer set search_path = public as $f$
  select organization_id from public.user_organizations where user_id=auth.uid() and revoked_at is null
+   -- ia.vek v1.7.8 (0586): a função "analista_ficha" fecha o CRM para o vínculo.
+   and coalesce(interface_settings->>'funcao', '') <> 'analista_ficha'
  union select (s->>'organization_id')::uuid from (select public.fn_support_context() s) c where s->>'status'='active';
 $f$;
 create or replace function public.fn_user_role_in_org(p_org uuid)
 returns text language sql stable security definer set search_path = public as $f$
  select case when s->>'status'='active' and (s->>'organization_id')::uuid=p_org
  then case when s->>'access_mode'='full' then 'admin' else 'viewer' end
- else (select role from public.user_organizations where user_id=auth.uid() and organization_id=p_org and revoked_at is null limit 1) end
+ else (select role from public.user_organizations where user_id=auth.uid() and organization_id=p_org and revoked_at is null
+         -- ia.vek v1.7.8 (0586): o analista de ficha não tem papel no CRM.
+         and coalesce(interface_settings->>'funcao', '') <> 'analista_ficha' limit 1) end
  from (select public.fn_support_context() s) c;
 $f$;
 
@@ -45749,7 +45753,9 @@ create table if not exists public.notificacoes (
     'proposta_devolvida',
     'pedido_de_agendamento',
     'pedido_de_agendamento_confirmado',
-    'pedido_de_agendamento_recusado'
+    'pedido_de_agendamento_recusado',
+    'ficha_enviada',
+    'ficha_decidida'
   ))
 );
 
@@ -46355,6 +46361,121 @@ end;
 $$;
 revoke execute on function public.fn_iavek_rodizio_distribuir(uuid, uuid, boolean) from public, anon, authenticated;
 grant execute on function public.fn_iavek_rodizio_distribuir(uuid, uuid, boolean) to service_role;
+
+
+-- ---- ia.vek: Passar Ficha (migration 0586) ----
+-- Ver o cabeçalho de supabase/migrations/20261022050000_0586_iavek_passar_ficha.sql.
+-- As funções de vínculo (item 1) e o CHECK do sino (item 5) mudam NO LUGAR,
+-- mais acima. ⚠️ ENTRA ANTES DO BLOCO DA VARREDURA anon.
+-- 2. As fichas.
+create table if not exists public.iavek_fichas (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  lead_id uuid references public.crm_leads(id) on delete set null,
+  contact_id uuid not null references public.contacts(id) on delete cascade,
+  enviada_por uuid references auth.users(id) on delete set null,
+  status text not null default 'enviada'
+    check (status in ('enviada', 'pendente_documento', 'aprovada', 'recusada')),
+  -- Os valores, chave = campo da lista do admin no momento do envio.
+  dados jsonb not null default '{}'::jsonb,
+  -- A lista de campos como estava no envio (o admin pode mudá-la depois).
+  campos jsonb not null default '[]'::jsonb,
+  motivo text,
+  decidida_por uuid references auth.users(id) on delete set null,
+  decidida_em timestamptz,
+  anonimizada boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint iavek_fichas_motivo_tamanho check (motivo is null or length(motivo) <= 1000)
+);
+create index if not exists iavek_fichas_fila_idx on public.iavek_fichas (organization_id, status, created_at desc);
+create index if not exists iavek_fichas_lead_idx on public.iavek_fichas (organization_id, lead_id);
+create index if not exists iavek_fichas_contato_idx on public.iavek_fichas (contact_id);
+
+create table if not exists public.iavek_ficha_documentos (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  ficha_id uuid not null references public.iavek_fichas(id) on delete cascade,
+  tipo text not null default 'outro' check (tipo in ('rg', 'cnh', 'comprovante_renda', 'comprovante_residencia', 'outro')),
+  nome text,
+  mime text,
+  tamanho int,
+  storage_path text not null,
+  enviado_por uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists iavek_ficha_documentos_ficha_idx on public.iavek_ficha_documentos (ficha_id);
+
+create table if not exists public.iavek_ficha_leituras (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  ficha_id uuid not null references public.iavek_fichas(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  o_que text not null check (o_que in ('dados', 'documento')),
+  documento_id uuid,
+  created_at timestamptz not null default now()
+);
+create index if not exists iavek_ficha_leituras_ficha_idx on public.iavek_ficha_leituras (ficha_id, created_at desc);
+
+alter table public.iavek_fichas enable row level security;
+alter table public.iavek_ficha_documentos enable row level security;
+alter table public.iavek_ficha_leituras enable row level security;
+-- Sem policy para a sessão, de propósito: só o servidor (service role).
+revoke all on table public.iavek_fichas from anon, authenticated;
+revoke all on table public.iavek_ficha_documentos from anon, authenticated;
+revoke all on table public.iavek_ficha_leituras from anon, authenticated;
+grant all on table public.iavek_fichas to service_role;
+grant all on table public.iavek_ficha_documentos to service_role;
+grant all on table public.iavek_ficha_leituras to service_role;
+
+-- 3. O bucket privado dos documentos (sem policy de storage para a sessão).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('iavek-fichas', 'iavek-fichas', false, 10485760,
+        array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'])
+on conflict (id) do update set public = false;
+
+-- 4. LGPD: anonimizar o contato apaga os dados da ficha e manda os documentos
+-- para a fila de remoção do storage.
+create or replace function public.fn_iavek_redigir_fichas_ao_anonimizar()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.storage_redaction_queue (organization_id, bucket, object_path)
+  select d.organization_id, 'iavek-fichas', d.storage_path
+    from public.iavek_ficha_documentos d
+    join public.iavek_fichas f on f.id = d.ficha_id
+   where f.contact_id = new.id
+     and f.organization_id = new.organization_id
+  on conflict (bucket, object_path) do nothing;
+
+  delete from public.iavek_ficha_documentos d
+   using public.iavek_fichas f
+   where f.id = d.ficha_id
+     and f.contact_id = new.id
+     and f.organization_id = new.organization_id;
+
+  update public.iavek_fichas
+     set dados = '{}'::jsonb,
+         motivo = null,
+         anonimizada = true,
+         updated_at = now()
+   where contact_id = new.id
+     and organization_id = new.organization_id
+     and anonimizada = false;
+  return new;
+end;
+$$;
+revoke execute on function public.fn_iavek_redigir_fichas_ao_anonimizar() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_redigir_fichas_ao_anonimizar on public.contacts;
+create trigger trg_iavek_redigir_fichas_ao_anonimizar
+  after update of is_anonymized on public.contacts
+  for each row
+  when (new.is_anonymized = true and old.is_anonymized is distinct from true)
+  execute function public.fn_iavek_redigir_fichas_ao_anonimizar();
 
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
@@ -48528,7 +48649,9 @@ alter table public.notificacoes add constraint notificacoes_tipo_check check (ti
   'proposta_devolvida',
   'pedido_de_agendamento',
   'pedido_de_agendamento_confirmado',
-  'pedido_de_agendamento_recusado'
+  'pedido_de_agendamento_recusado',
+  'ficha_enviada',
+  'ficha_decidida'
 ));
 
 

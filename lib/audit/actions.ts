@@ -303,6 +303,12 @@ export const AUDIT_ACTIONS = [
   // ia.vek v1.7.7: rodízio de leads (configuração e distribuição dos sem dono).
   "iavek.rodizio_config_changed",
   "iavek.rodizio_distribuido",
+  // ia.vek v1.7.8: Passar Ficha (só ids e status — nunca os dados).
+  "iavek.ficha_enviada",
+  "iavek.ficha_reenviada",
+  "iavek.ficha_decidida",
+  "iavek.ficha_documento_anexado",
+  "iavek.ficha_campos_changed",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser
   // lido — é mutação relevante, não preferência de exibição.

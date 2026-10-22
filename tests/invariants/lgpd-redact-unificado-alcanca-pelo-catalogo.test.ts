@@ -276,6 +276,11 @@ const DECISOES: Record<string, Decisao> = {
     razao: "Trilha de estados do roteiro (ponte, nó atual, status, motivo de cancelamento — vocabulário fechado), sem texto livre. A virada de is_anonymizado ENCERRA o roteiro em curso pelo gatilho da 0394; encerrar não é redigir, e não sobra nada legível da pessoa.",
   },
   // ia.vek v1.7.6 (0583): tabela nova com FK para contacts — precisa de decisão escrita.
+  iavek_fichas: {
+    decidida: "redigir",
+    caminho: "gatilho",
+    razao: "ia.vek 0586: a ficha de crédito guarda CPF, RG, renda e endereço em `dados` e o motivo da analista em texto livre — zerados na virada de is_anonymized pelo gatilho fn_iavek_redigir_fichas_ao_anonimizar, que também manda os documentos para storage_redaction_queue e apaga as linhas de iavek_ficha_documentos. Status e datas ficam (operação da loja).",
+  },
   iavek_pedidos_de_agendamento: {
     decidida: "redigir",
     caminho: "gatilho",

@@ -35,6 +35,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   let activeOrg = await resolveActiveOrg(user);
 
+  // ia.vek v1.7.8: o ANALISTA DE FICHA não tem o CRM — o banco já o fecha
+  // (migration 0586) e aqui a casca inteira dá lugar à área das fichas.
+  if ((activeOrg?.interface_settings as { funcao?: string } | undefined)?.funcao === "analista_ficha") {
+    redirect("/fichas");
+  }
+
   // Sem organização ativa existem DOIS estados, e eles pedem telas opostas:
   //
   //  - nunca teve  → provisionamento que falhou no signup. `/get-started`

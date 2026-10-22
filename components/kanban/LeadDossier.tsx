@@ -15,6 +15,7 @@ import { LeadFieldsForm } from "./LeadFieldsForm";
 import { ScoreSlot } from "./ScoreSlot";
 import { LeadTimeline } from "./LeadTimeline";
 import { PropostasDoNegocio } from "./PropostasDoNegocio";
+import { PassarFicha } from "@/components/iavek/PassarFicha";
 import { OwnerBadge } from "./OwnerBadge";
 import { resolveLeadOwner } from "@/lib/kanban/owner";
 import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
@@ -191,6 +192,12 @@ export function LeadDossier({
           pipelineId={pipelineId}
           podeCriar={podeCriarProposta}
         />
+
+        {/* ia.vek v1.7.8 — Passar Ficha: o dono do lead envia; o gerente vê o status. */}
+        <div className="border-t border-border pt-3">
+          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">{t("Ficha de crédito")}</h3>
+          <PassarFicha leadId={lead.id} donoDoLead={lead.owner_user_id ?? null} />
+        </div>
       </SheetContent>
     </Sheet>
   );

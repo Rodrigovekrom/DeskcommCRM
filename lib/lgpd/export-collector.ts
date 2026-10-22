@@ -129,6 +129,16 @@ export interface PedidoDeAgendamentoRow {
   created_at: string;
 }
 
+/** ia.vek v1.7.8 — a ficha de crédito (Passar Ficha): o titular recebe os próprios dados. */
+export interface FichaDeCreditoRow {
+  id: string;
+  status: string;
+  dados: Record<string, unknown>;
+  motivo: string | null;
+  created_at: string;
+  decidida_em: string | null;
+}
+
 export interface ActivityRow {
   id: string;
   lead_id: string | null;
@@ -649,6 +659,8 @@ export interface ExportPayload {
   activities: ActivityRow[];
   /** ia.vek v1.7.6 — opcional: payloads antigos (e os PDFs de teste) não o trazem. */
   pedidos_de_agendamento?: PedidoDeAgendamentoRow[];
+  /** ia.vek v1.7.8 — opcional, como os pedidos: só aparece quando há ficha. */
+  fichas_de_credito?: FichaDeCreditoRow[];
   checkpoints: CheckpointRow[];
   appointments: AppointmentRow[];
   sales: SaleRow[];
@@ -1423,6 +1435,28 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     } else if (data) {
       conferirTeto("pedidos_de_agendamento", data, 500);
       pedidosDeAgendamento = data;
+    }
+  }
+
+  // ia.vek v1.7.8: fichas de crédito — contact_id direto. Os dados que a
+  // anonimização apaga (CPF, RG, renda…) são o que o titular recebe aqui.
+  let fichasDeCredito: FichaDeCreditoRow[] = [];
+  if (contactId) {
+    const { data, error } = await admin
+      .from("iavek_fichas")
+      .select("id, status, dados, motivo, created_at, decidida_em")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) {
+      logger.warn("[lgpd-export-worker] fichas de crédito load failed", {
+        request_id: requestId,
+        error: error.message,
+      });
+    } else if (data) {
+      conferirTeto("fichas_de_credito", data, 100);
+      fichasDeCredito = data as FichaDeCreditoRow[];
     }
   }
 
@@ -2268,6 +2302,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     activities,
     // Só aparece quando há pedido: o data.json de quem não tem fica igual ao de antes.
     ...(pedidosDeAgendamento.length > 0 ? { pedidos_de_agendamento: pedidosDeAgendamento } : {}),
+    ...(fichasDeCredito.length > 0 ? { fichas_de_credito: fichasDeCredito } : {}),
     checkpoints,
     appointments,
     sales,
