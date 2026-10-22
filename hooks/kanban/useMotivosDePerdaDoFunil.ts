@@ -31,6 +31,10 @@ export function useMotivosDePerdaDoFunil(pipelineId: string): string[] {
   const qc = useQueryClient();
   // A MESMA chave de `useBoard`, não uma literal igual: literal igual é igual só
   // até alguém mudar um dos lados, e aí este hook devolve `[]` sem erro nenhum.
-  const settings = qc.getQueryData<BoardData>(chaveDoQuadro(pipelineId))?.pipeline?.settings ?? null;
+  // ia.vek v1.7.7: por PREFIXO — o funil também vive em cache como carteira do
+  // vendedor (`["board", id, "carteira"]`); a primeira entrada com o funil serve.
+  const settings =
+    qc.getQueriesData<BoardData>({ queryKey: chaveDoQuadro(pipelineId) }).find(([, d]) => d?.pipeline)?.[1]?.pipeline
+      ?.settings ?? null;
   return useMemo(() => motivosDoFunil(settings), [settings]);
 }

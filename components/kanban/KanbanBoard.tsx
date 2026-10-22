@@ -18,6 +18,7 @@ import { StageColumn } from "./StageColumn";
 import { nivelDaEtapa } from "@/lib/kanban/tom-da-etapa";
 import { LeadDossier } from "./LeadDossier";
 import { RetomarComoNovoNegocioDialog } from "./RetomarComoNovoNegocioDialog";
+import { LoseLeadDialog } from "./LoseLeadDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 
 interface KanbanBoardProps {
@@ -108,6 +109,9 @@ export function KanbanBoard({
   // esta opção só troca o destino do erro.
   const [recusaDeCampos, setRecusaDeCampos] = useState<RecusaDeCampos | null>(null);
   const [retomada, setRetomada] = useState<RetomadaPendente | null>(null);
+  // ia.vek v1.7.7: soltar o cartão numa etapa de PERDA pede o motivo (a mesma
+  // janela do "Perder" do menu do cartão) em vez de tentar mover e levar recusa.
+  const [perdaPendente, setPerdaPendente] = useState<string | null>(null);
   const moveCard = useMoveCard(pipelineId, {
     onCamposFaltando: setRecusaDeCampos,
     onRetomada: setRetomada,
@@ -219,6 +223,11 @@ export function KanbanBoard({
       if (!lead) return;
 
       const destStageId = destination.droppableId;
+      const etapaDeDestino = data.stages.find((s) => s.id === destStageId);
+      if (etapaDeDestino?.is_lost && source.droppableId !== destStageId && lead.status === "open") {
+        setPerdaPendente(lead.id);
+        return;
+      }
       const destList = (grouped.get(destStageId) ?? []).filter(
         (l) => l.id !== draggableId,
       );
@@ -344,6 +353,14 @@ export function KanbanBoard({
           });
         }}
       />
+      {perdaPendente && (
+        <LoseLeadDialog
+          open
+          onOpenChange={(v: boolean) => !v && setPerdaPendente(null)}
+          leadId={perdaPendente}
+          pipelineId={pipelineId}
+        />
+      )}
       {retomada && (
         <RetomarComoNovoNegocioDialog
           open
