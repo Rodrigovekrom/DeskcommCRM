@@ -68,3 +68,41 @@ describe("LGPD: os dados da ficha nunca vão para log, auditoria nem IA", () => 
     for (const f of fora) expect(readFileSync(f, "utf8"), f).not.toMatch(/iavek_fichas|iavek_ficha_documentos/);
   });
 });
+
+describe("a função do vínculo (e com ela o isolamento do analista) só muda por caminho de admin", () => {
+  /**
+   * `interface_settings.funcao = 'analista_ficha'` é o que fecha o CRM para o
+   * analista (migration 0586). Quem grava `interface_settings` HOJE, e por que é
+   * seguro: a rota de Equipe (requireRole admin), o aceite de convite (o
+   * conteúdo vem do convite que o admin criou) e a criação de tenant (platform
+   * admin). Uma rota nova de "preferência de visualização" que grave aqui
+   * reabriria a porta — ela tem de guardar a preferência em OUTRA chave/tabela,
+   * ou entrar nesta lista com a prova de que não toca `funcao`.
+   */
+  const PERMITIDOS = new Set([
+    "app/api/v1/team/[user_id]/interface/route.ts",
+    "lib/auth/aplicar-convite.ts",
+    "app/api/v1/admin/tenants/route.ts",
+    // Só o TIPO gerado do parâmetro p_interface_settings das RPCs — não escreve nada.
+    "lib/database.types.ts",
+  ]);
+  const varrer = (dir: string): string[] =>
+    readdirSync(dir).flatMap((n) => {
+      const c = join(dir, n);
+      return statSync(c).isDirectory() ? varrer(c) : /\.(ts|tsx)$/.test(n) && !/\.test\./.test(n) ? [c] : [];
+    });
+  it("nenhum outro arquivo escreve interface_settings em user_organizations", () => {
+    const raiz = process.cwd();
+    const escritores = ["app", "lib", "workers"]
+      .flatMap((d) => varrer(join(raiz, d)))
+      .filter((f) => {
+        const src = readFileSync(f, "utf8");
+        return /from\("user_organizations"\)[\s\S]{0,300}\.(update|upsert|insert)\([\s\S]{0,200}interface_settings/.test(src) ||
+          /p_interface_settings/.test(src);
+      })
+      .map((f) => f.slice(raiz.length + 1));
+    expect(escritores.filter((f) => !PERMITIDOS.has(f))).toEqual([]);
+    // a rota de Equipe continua exigindo admin
+    expect(readFileSync(join(raiz, "app/api/v1/team/[user_id]/interface/route.ts"), "utf8")).toMatch(/requireRole\("admin"/);
+  });
+});

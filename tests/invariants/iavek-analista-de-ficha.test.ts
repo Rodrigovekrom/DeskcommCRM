@@ -62,6 +62,31 @@ describe("a função analista_ficha fecha o CRM no banco", () => {
   });
 });
 
+describe("ninguém que não é admin tira a função 'analista_ficha' (nem a própria)", () => {
+  it("a analista não troca nem apaga o próprio vínculo pela sessão", () => {
+    let n = -1;
+    try {
+      n = writeCountAs(ANALISTA, `update public.user_organizations set interface_settings = '{"preset":"completa"}'::jsonb where user_id = '${ANALISTA}'`);
+    } catch { n = 0; }
+    expect(n).toBe(0);
+    try {
+      n = writeCountAs(ANALISTA, `delete from public.user_organizations where user_id = '${ANALISTA}'`);
+    } catch { n = 0; }
+    expect(n).toBe(0);
+  });
+
+  it("um vendedor e um viewer comum também não (nem para si, nem para a analista)", () => {
+    for (const quem of [GOV_AGENT_A, VIEWER_COMUM]) {
+      let n = -1;
+      try {
+        n = writeCountAs(quem, `update public.user_organizations set interface_settings = '{"preset":"completa"}'::jsonb, role = 'admin' where user_id in ('${quem}', '${ANALISTA}')`);
+      } catch { n = 0; }
+      expect(n).toBe(0);
+    }
+    expect(lastLine(sql(`select interface_settings->>'funcao' from public.user_organizations where user_id = '${ANALISTA}';`))).toBe("analista_ficha");
+  });
+});
+
 describe("as tabelas da ficha não abrem para a sessão", () => {
   it("nem o admin, nem o vendedor que enviou, nem o analista leem pela sessão", () => {
     for (const quem of [GOV_ADMIN, GOV_AGENT_A, ANALISTA]) {
