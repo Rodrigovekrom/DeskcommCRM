@@ -83,7 +83,7 @@ describe("as tabelas da ficha não abrem para a sessão", () => {
 
 describe("LGPD: anonimizar o contato apaga a ficha", () => {
   it("dados zerados, documento na fila de remoção e fora da tabela", () => {
-    sql(`update public.contacts set is_anonymized = true where id = '${CONTATO}';`);
+    sql(`update public.contacts set is_anonymized = true, anonymized_at = now() where id = '${CONTATO}';`);
     expect(lastLine(sql(`select dados::text || '|' || anonimizada from public.iavek_fichas where id = '${FICHA}';`))).toBe("{}|t");
     expect(lastLine(sql(`select count(*) from public.storage_redaction_queue where bucket = 'iavek-fichas' and object_path = '${GOV_ORG}/${FICHA}/doc-invariante.jpg';`))).toBe("1");
     expect(lastLine(sql(`select count(*) from public.iavek_ficha_documentos where ficha_id = '${FICHA}';`))).toBe("0");
