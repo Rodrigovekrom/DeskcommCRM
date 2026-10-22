@@ -118,18 +118,30 @@ describe("isolamento entre organizações", () => {
 });
 
 describe("escrita por papel no banco (RLS por operação)", () => {
-  it("viewer e agent não criam empresa; manager cria", () => {
+  // ia.vek v1.7.6 (0584): o cadastro B2B inteiro é só do admin.
+  it("viewer, agent e manager não criam empresa; admin cria", () => {
     const criar = (nome: string) =>
       `insert into public.companies (organization_id, trade_name) values ('${GOV_ORG}', '${nome}')`;
     expect(writeCountAs(GOV_VIEWER, criar("pelo viewer"))).toBe(0);
     expect(writeCountAs(GOV_AGENT_A, criar("pelo agent"))).toBe(0);
-    expect(writeCountAs(GOV_MANAGER, criar("pelo manager"))).toBe(1);
+    expect(writeCountAs(GOV_MANAGER, criar("pelo manager"))).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, criar("pelo admin"))).toBe(1);
   });
 
-  it("viewer não edita a pessoa; agent edita (o PATCH da rota é agent)", () => {
+  it("viewer, agent e manager não editam a pessoa; admin edita", () => {
     const editar = `update public.people set notes = 'editado' where id = '${PESSOA}'`;
     expect(writeCountAs(GOV_VIEWER, editar)).toBe(0);
-    expect(writeCountAs(GOV_AGENT_A, editar)).toBe(1);
+    expect(writeCountAs(GOV_AGENT_A, editar)).toBe(0);
+    expect(writeCountAs(GOV_MANAGER, editar)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, editar)).toBe(1);
+  });
+
+  it("manager não apaga empresa; admin apaga", () => {
+    const criar = `insert into public.companies (organization_id, trade_name) values ('${GOV_ORG}', 'para apagar')`;
+    expect(writeCountAs(GOV_ADMIN, criar)).toBe(1);
+    const apagar = `delete from public.companies where organization_id = '${GOV_ORG}' and trade_name = 'para apagar'`;
+    expect(writeCountAs(GOV_MANAGER, apagar)).toBe(0);
+    expect(writeCountAs(GOV_ADMIN, apagar)).toBe(1);
   });
 
   it("agent e manager não escrevem no importador; admin escreve", () => {
