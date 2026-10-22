@@ -37,6 +37,7 @@ export function PadraoDaLojaConfig({ etapas }: { etapas: Array<{ id: string; nam
     onError: showApiError,
   });
   if (!atual) return null;
+  const noLimite = atual.itens.length >= 20;
   const mudarItem = (i: number, parte: Partial<ItemDoPadrao>) =>
     setRascunho({ ...atual, itens: atual.itens.map((it, j) => (j === i ? { ...it, ...parte } : it)) });
   const rotuloDoCampo: Record<(typeof CAMPOS_EXIGIVEIS)[number], string> = {
@@ -122,7 +123,8 @@ export function PadraoDaLojaConfig({ etapas }: { etapas: Array<{ id: string; nam
         <Button
           size="sm"
           variant="outline"
-          disabled={atual.itens.length >= 20}
+          disabled={noLimite}
+          title={noLimite ? t("O padrão aceita até 20 itens.") : undefined}
           onClick={() =>
             setRascunho({
               ...atual,

@@ -13941,6 +13941,7 @@ export const DICIONARIO: Traducoes = {
   "Fluxo principal da automação": { es: "Flujo principal de la automatización" },
   "Fluxos principais": { es: "Flujos principales" },
   // ia.vek v1.8.0 — padrão da loja
+  "O padrão aceita até 20 itens.": { es: "El estándar acepta hasta 20 ítems." },
   "Tem carro na troca?": { es: "¿Tiene auto en parte de pago?" },
   "Carro de interesse": { es: "Auto de interés" },
   "Prazo para comprar": { es: "Plazo para comprar" },
