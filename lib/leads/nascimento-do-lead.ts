@@ -48,6 +48,7 @@
  * imobiliária e um infoprodutor montam funis diferentes, e nenhum nome de funil
  * aparece neste arquivo.
  */
+import { etapaDeEntrada } from "@/lib/leads/etapa-de-entrada";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { marcaDaOrigem, origemDeCampanhaDaConversa } from "@/lib/campanhas/origem-do-lead";
 
@@ -139,19 +140,8 @@ async function primeiraEtapa(
   organizationId: string,
   pipelineId: string,
 ): Promise<string | null> {
-  const { data: etapa } = await db
-    .from("crm_stages")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("pipeline_id", pipelineId)
-    .eq("is_archived", false)
-    .eq("is_won", false)
-    .eq("is_lost", false)
-    .order("position", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  return (etapa?.id as string | undefined) ?? null;
+  // ia.vek v1.8.2: a etapa de ENTRADA do funil, se ele a declara (lib/leads/etapa-de-entrada.ts).
+  return etapaDeEntrada(db, organizationId, pipelineId);
 }
 
 /**
@@ -231,19 +221,10 @@ async function destinoDaCampanha(
   stageId: string | null,
 ): Promise<{ pipelineId: string; stageId: string } | { erro: MotivoSemLead }> {
   if (stageId) return { pipelineId, stageId };
-  const { data: etapa } = await db
-    .from("crm_stages")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("pipeline_id", pipelineId)
-    .eq("is_archived", false)
-    .eq("is_won", false)
-    .eq("is_lost", false)
-    .order("position", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!etapa) return { erro: "sem_etapa" };
-  return { pipelineId, stageId: (etapa as { id: string }).id };
+  // ia.vek v1.8.2: a etapa de ENTRADA do funil, se ele a declara.
+  const entrada = await etapaDeEntrada(db, organizationId, pipelineId);
+  if (!entrada) return { erro: "sem_etapa" };
+  return { pipelineId, stageId: entrada };
 }
 
 /**

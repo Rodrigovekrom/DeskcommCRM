@@ -23,6 +23,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * um insert em lote com a regra reescrita aqui — criaria a segunda verdade sobre
  * "como um negócio nasce", e é ela que envelhece sozinha.
  */
+import { etapaDeEntrada } from "@/lib/leads/etapa-de-entrada";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
@@ -156,21 +157,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     // sobrescreve o `status: "open"` que o handler grava), e no caso simétrico de
     // perda o segundo trigger aborta cada linha com `lost_reason_required` — 200
     // na tela, zero leads criados.
-    const { data: primeiraEtapa, error: erroEtapa } = await supabase
-      .from("crm_stages")
-      .select("id")
-      .eq("pipeline_id", pipelineId)
-      .eq("organization_id", orgId)
-      .eq("is_archived", false)
-      .eq("is_won", false)
-      .eq("is_lost", false)
-      .order("position", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (erroEtapa) {
-      return fail("internal_error", erroEtapa.message, 500, { requestId });
-    }
+    // ia.vek v1.8.2: a etapa de ENTRADA do funil, se ele a declara.
+    const idDaEntrada = await etapaDeEntrada(supabase, orgId, pipelineId);
+    const primeiraEtapa = idDaEntrada ? { id: idDaEntrada } : null;
     if (!primeiraEtapa) {
       return fail("validation_failed", t("Este funil não tem etapas abertas."), 422, { requestId });
     }

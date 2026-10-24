@@ -102,6 +102,20 @@ describe("etapas novas do funil 72h", () => {
     expect(ids()).toBe(idsDepois);
   });
 
+  it("a ENTRADA do lead fica em Lead novo (settings.etapa_de_entrada = 'novo'), não em IA responsável", () => {
+    expect(lastLine(sql(`select settings->>'etapa_de_entrada' from public.crm_pipelines where id = '${FUNIL}';`))).toBe("novo");
+    expect(
+      lastLine(sql(`select name || ':' || is_archived || ':' || is_won || ':' || is_lost from public.crm_stages where pipeline_id = '${FUNIL}' and slug = 'novo';`)),
+    ).toBe("Lead novo:false:false:false");
+  });
+
+  it("entrada já trocada (IA publicada) não é desfeita por rodar de novo", () => {
+    sql(`update public.crm_pipelines set settings = settings || '{"etapa_de_entrada":"em-atendimento-ia"}' where id = '${FUNIL}';`);
+    sql(MIGRATION);
+    expect(lastLine(sql(`select settings->>'etapa_de_entrada' from public.crm_pipelines where id = '${FUNIL}';`))).toBe("em-atendimento-ia");
+    sql(`update public.crm_pipelines set settings = settings || '{"etapa_de_entrada":"novo"}' where id = '${FUNIL}';`);
+  });
+
   it("só uma etapa de ganho e uma de perda; Muito longe é etapa aberta", () => {
     expect(
       lastLine(sql(`select string_agg(name, ',' order by position) from public.crm_stages where pipeline_id = '${FUNIL}' and not is_archived and (is_won or is_lost);`)),

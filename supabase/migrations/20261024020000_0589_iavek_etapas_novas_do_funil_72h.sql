@@ -1,4 +1,4 @@
--- manifest: ia.vek v1.8.2 — etapas novas do funil "fenomenos-72h" (IA responsável → Lead novo → Em atendimento → Não responde → Agendamento → Ligação de vídeo feita → Lead qualificado → Troca → Muito longe → Vendido → Perdido); renomeia SEM trocar id, arquiva CTA e Passado ao SDR depois de mover os leads delas para Em atendimento; nenhum lead nem etapa é apagado
+-- manifest: ia.vek v1.8.2 — etapas novas do funil "fenomenos-72h" (IA responsável → Lead novo → Em atendimento → Não responde → Agendamento → Ligação de vídeo feita → Lead qualificado → Troca → Muito longe → Vendido → Perdido); renomeia SEM trocar id, arquiva CTA e Passado ao SDR depois de mover os leads delas para Em atendimento; nenhum lead nem etapa é apagado; a entrada do lead fica em Lead novo (settings.etapa_de_entrada)
 --
 -- POR QUÊ (pedido do Rodrigo, 24/10/2026; decisões do Maestro): o funil passa a
 -- seguir a operação real — a IA atende, o vendedor atende, agenda, faz a
@@ -18,8 +18,10 @@
 --     elas são ARQUIVADAS (nunca apagadas — o histórico continua apontando).
 --   * "Muito longe" é etapa PRÓPRIA (aberta): o banco só aceita UMA etapa de
 --     perda por funil (`uniq_crm_stages_pipeline_lost`).
---   * Lead novo nasce na PRIMEIRA etapa aberta pela posição
---     (`lib/leads/nascimento-do-lead.ts`) — com esta ordem, "IA responsável".
+--   * ENTRADA do lead: `settings.etapa_de_entrada = 'novo'` (Lead novo), lida
+--     por `lib/leads/etapa-de-entrada.ts` antes da "primeira por posição" — com
+--     esta ordem a primeira seria "IA responsável", onde ninguém atende enquanto
+--     a IA não estiver publicada.
 --
 -- IDEMPOTENTE: rodar de novo não muda nada (insere só o que falta, renomeia
 -- para o mesmo nome, move zero leads). Só alcança funil com slug
@@ -31,6 +33,14 @@ declare
   v_em_atendimento uuid;
 begin
   for f in select id, organization_id from public.crm_pipelines where slug = 'fenomenos-72h' loop
+    -- 0. a ENTRADA do lead continua em "Lead novo" (slug novo), mesmo com "IA
+    --    responsável" primeiro na ordem: a IA ainda não está publicada, e o
+    --    webhook do Meta já manda para o id de "novo". Só grava se faltar — quem
+    --    trocar a entrada depois (IA publicada) não é desfeito por um update.
+    update public.crm_pipelines
+       set settings = coalesce(settings, '{}'::jsonb) || jsonb_build_object('etapa_de_entrada', 'novo')
+     where id = f.id and not (coalesce(settings, '{}'::jsonb) ? 'etapa_de_entrada');
+
     -- 1. as etapas novas (só se faltarem)
     insert into public.crm_stages (organization_id, pipeline_id, name, slug, position)
     select f.organization_id, f.id, n.nome, n.slug, n.pos
