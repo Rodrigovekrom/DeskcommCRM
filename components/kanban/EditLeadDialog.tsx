@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
@@ -21,12 +21,12 @@ import type { Lead } from "@/lib/types/leads";
 import { updateLeadSchema, type UpdateLeadInput } from "@/lib/schemas/leads";
 import { MOEDA_PADRAO, parseReaisToCents, simboloDaMoeda } from "@/lib/money";
 import { EcoDoValor } from "./EcoDoValor";
+import { SeletorDeEtiquetas } from "@/components/iavek/SeletorDeEtiquetas";
 
 interface FormShape {
   title: string;
   description: string;
   valueReais: string;
-  tagsRaw: string;
   expected_close_date: string;
 }
 
@@ -55,10 +55,11 @@ export function EditLeadDialog({ open, onOpenChange, lead, pipelineId }: Props) 
       title: lead.title,
       description: lead.description ?? "",
       valueReais: centsToReais(lead.value_cents),
-      tagsRaw: (lead.tags ?? []).join(", "),
       expected_close_date: lead.expected_close_date ?? "",
     },
   });
+  // v1.8.3: as etiquetas são escolhidas (SeletorDeEtiquetas), não digitadas.
+  const [tags, setTags] = useState<string[]>(lead.tags ?? []);
 
   useEffect(() => {
     if (open) {
@@ -66,19 +67,14 @@ export function EditLeadDialog({ open, onOpenChange, lead, pipelineId }: Props) 
         title: lead.title,
         description: lead.description ?? "",
         valueReais: centsToReais(lead.value_cents),
-        tagsRaw: (lead.tags ?? []).join(", "),
         expected_close_date: lead.expected_close_date ?? "",
       });
+      setTags(lead.tags ?? []);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, lead.id]);
 
   async function onSubmit(values: FormShape) {
-    const tags = values.tagsRaw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const reais = values.valueReais.trim();
     let valueCents: number | null = null;
     if (reais.length > 0) {
@@ -168,8 +164,8 @@ export function EditLeadDialog({ open, onOpenChange, lead, pipelineId }: Props) 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tagsRaw">{t("Tags (separadas por vírgula)")}</Label>
-            <Input id="tagsRaw" placeholder="vip, recompra" {...form.register("tagsRaw")} />
+            <Label htmlFor="tags-do-lead">{t("Tags")}</Label>
+            <SeletorDeEtiquetas id="tags-do-lead" valor={tags} onChange={setTags} />
           </div>
 
           <DialogFooter>

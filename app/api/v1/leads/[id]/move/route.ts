@@ -242,7 +242,13 @@ export async function POST(
     // qualquer caminho novo que escreva `stage_id` sem passar pela decisão volta a
     // chegar aqui como 500 — que é o defeito, com outro nome.
     const recusa = recusaDeMotivoDaPerdaPeloBanco(updErr, user.idioma);
-    if (recusa) return fail(recusa.codigo, recusa.mensagem, 422, { requestId });
+    // v1.8.3: a trava da loja leva a lista do que falta — a tela abre a janela, não um toast.
+    if (recusa) {
+      return fail(recusa.codigo, recusa.mensagem, 422, {
+        requestId,
+        ...(recusa.faltam ? { details: { faltam: recusa.faltam } } : {}),
+      });
+    }
     return fail("internal_error", updErr.message, 500, { requestId });
   }
 

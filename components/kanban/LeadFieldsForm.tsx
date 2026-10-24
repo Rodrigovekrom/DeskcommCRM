@@ -17,12 +17,12 @@ import { MOEDA_PADRAO, parseReaisToCents, simboloDaMoeda } from "@/lib/money";
 import { soChavesAlteradas } from "@/lib/leads/custom-fields-so-diff";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { EcoDoValor } from "./EcoDoValor";
+import { SeletorDeEtiquetas } from "@/components/iavek/SeletorDeEtiquetas";
 
 interface FormShape {
   title: string;
   description: string;
   valueReais: string;
-  tagsRaw: string;
   expected_close_date: string;
 }
 
@@ -70,30 +70,26 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
       title: lead.title,
       description: lead.description ?? "",
       valueReais: centsToReais(lead.value_cents),
-      tagsRaw: (lead.tags ?? []).join(", "),
       expected_close_date: lead.expected_close_date ?? "",
     },
   });
+  // v1.8.3: as etiquetas são escolhidas (SeletorDeEtiquetas), não digitadas.
+  const [tags, setTags] = useState<string[]>(lead.tags ?? []);
 
   useEffect(() => {
     form.reset({
       title: lead.title,
       description: lead.description ?? "",
       valueReais: centsToReais(lead.value_cents),
-      tagsRaw: (lead.tags ?? []).join(", "),
       expected_close_date: lead.expected_close_date ?? "",
     });
+    setTags(lead.tags ?? []);
     setCustomFields(lead.custom_fields ?? {});
     setCamposCarregados(lead.custom_fields ?? {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id]);
 
   async function onSubmit(values: FormShape) {
-    const tags = values.tagsRaw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const reais = values.valueReais.trim();
     let valueCents: number | null = null;
     if (reais.length > 0) {
@@ -183,8 +179,8 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="tagsRaw">{t("Tags (separadas por vírgula)")}</Label>
-          <Input id="tagsRaw" placeholder="vip, recompra" {...form.register("tagsRaw")} />
+          <Label htmlFor="tags-do-lead">{t("Tags")}</Label>
+          <SeletorDeEtiquetas id="tags-do-lead" valor={tags} onChange={setTags} />
         </div>
 
         {fieldDefs.length > 0 && (

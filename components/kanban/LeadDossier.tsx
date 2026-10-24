@@ -1,7 +1,7 @@
 "use client";
 
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
 import { useActiveOrg, useUser } from "@/hooks/auth/AuthProvider";
@@ -29,6 +29,8 @@ interface Props {
   fieldDefs?: CustomFieldDef[];
   stageName: string;
   ownerNames?: Map<string, string | null>;
+  /** ia.vek v1.8.3: abre já rolado até os campos (vindo da janela da trava). */
+  focarCampos?: boolean;
 }
 
 function formatValor(cents: number | null, currency: string | null): string {
@@ -58,10 +60,17 @@ export function LeadDossier({
   fieldDefs = [],
   stageName,
   ownerNames,
+  focarCampos = false,
 }: Props) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
   const campos = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open || !focarCampos) return;
+    // Depois da animação de abrir: antes dela o painel ainda não tem altura.
+    const id = window.setTimeout(() => campos.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    return () => window.clearTimeout(id);
+  }, [open, focarCampos, lead.id]);
   const timeline = useLeadTimeline(open ? lead.id : null, lead.contact_id);
   const owner = resolveLeadOwner(lead, ownerNames);
   const score = lead.score ?? null;

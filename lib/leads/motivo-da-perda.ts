@@ -164,6 +164,21 @@ export function recusaDeMotivoDaPerda(idioma?: Idioma | null): {
 }
 
 /**
+ * ia.vek v1.8.3: os rótulos da recusa da trava (0590), lidos da mensagem do
+ * banco — "Faltam campos obrigatórios: Guardião responsável, Carro de interesse".
+ * Os rótulos são fixos da 0590 e nenhum tem vírgula.
+ */
+export function faltamDaTrava(mensagem: string): string[] {
+  const i = mensagem.indexOf(":");
+  if (i < 0) return [];
+  return mensagem
+    .slice(i + 1)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
  * A recusa do BANCO traduzida em recusa de negócio — ou `null` quando o erro não é
  * desta classe.
  *
@@ -185,14 +200,19 @@ export function recusaDeMotivoDaPerda(idioma?: Idioma | null): {
 export function recusaDeMotivoDaPerdaPeloBanco(
   erro: { code?: string | null; message?: string | null } | null | undefined,
   idioma?: Idioma | null,
-): { codigo: "lost_reason_required" | "lost_reason_invalid" | "iavek_campos_obrigatorios"; mensagem: string } | null {
+): {
+  codigo: "lost_reason_required" | "lost_reason_invalid" | "iavek_campos_obrigatorios";
+  mensagem: string;
+  /** ia.vek v1.8.3: os rótulos do que falta, para a tela abrir a janela da trava. */
+  faltam?: string[];
+} | null {
   const codigo = erro?.code ?? "";
   const texto = erro?.message ?? "";
 
   // ia.vek v1.8.2 (0590): a trava dos campos obrigatórios ao mover. A mensagem
   // do banco já diz o que falta ("Faltam campos obrigatórios: …").
   if (codigo === "PT422") {
-    return { codigo: "iavek_campos_obrigatorios", mensagem: texto };
+    return { codigo: "iavek_campos_obrigatorios", mensagem: texto, faltam: faltamDaTrava(texto) };
   }
 
   if (codigo === "23514" && texto.includes("crm_leads_lost_reason_required")) {

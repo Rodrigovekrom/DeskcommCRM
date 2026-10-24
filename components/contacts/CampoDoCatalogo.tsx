@@ -37,6 +37,36 @@ export function useCatalogoDoCampo(ligado: boolean) {
   });
 }
 
+const PARECE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * ia.vek v1.8.3 — o que MOSTRAR do `carro_interesse`. O campo grava o id do
+ * produto (v1.5); valor antigo pode ser texto livre, e esse aparece como veio.
+ * Nunca mostra o id cru (o cartão dizia "Carro: 69278c77-…"). `undefined`
+ * enquanto o catálogo ainda não chegou; `""` quando o id não está no catálogo.
+ */
+export function nomeDoCarro(
+  valor: unknown,
+  produtos: Pick<ProdutoDoCampo, "id" | "nome">[] | undefined,
+): string | null | undefined {
+  if (typeof valor !== "string" || !valor.trim()) return null;
+  const v = valor.trim();
+  if (!PARECE_ID.test(v)) return v;
+  if (!produtos) return undefined;
+  return produtos.find((p) => p.id === v)?.nome ?? "";
+}
+
+/** O nome do carro de interesse, lendo o catálogo (a mesma consulta, em cache, do campo). */
+export function useNomeDoCarro(valor: unknown): string | null {
+  const t = useT();
+  const ehId = typeof valor === "string" && PARECE_ID.test(valor.trim());
+  const { data: produtos } = useCatalogoDoCampo(ehId);
+  const nome = nomeDoCarro(valor, produtos);
+  if (nome === undefined) return t("Carregando…");
+  if (nome === "") return t("Carro fora do catálogo");
+  return nome;
+}
+
 function normalizar(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }

@@ -109,6 +109,7 @@ describe("v1.8.2 — campos obrigatórios", () => {
     expect(recusaDeMotivoDaPerdaPeloBanco({ code: "PT422", message: "Faltam campos obrigatórios: Carro de interesse" })).toEqual({
       codigo: "iavek_campos_obrigatorios",
       mensagem: "Faltam campos obrigatórios: Carro de interesse",
+      faltam: ["Carro de interesse"],
     });
   });
 

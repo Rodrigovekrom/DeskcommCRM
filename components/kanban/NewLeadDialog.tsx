@@ -39,13 +39,13 @@ import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import type { Contact } from "@/lib/types/contacts";
 import { EcoDoValor } from "./EcoDoValor";
 import { SeletorDeContato } from "./SeletorDeContato";
+import { SeletorDeEtiquetas } from "@/components/iavek/SeletorDeEtiquetas";
 
 interface FormShape {
   title: string;
   description: string;
   stage_id: string;
   valueReais: string;
-  tagsRaw: string;
   expected_close_date: string;
 }
 
@@ -131,10 +131,11 @@ export function NewLeadDialog({
       description: "",
       stage_id: initialStage,
       valueReais: "",
-      tagsRaw: "",
       expected_close_date: "",
     },
   });
+  // v1.8.3: as etiquetas são escolhidas (SeletorDeEtiquetas), não digitadas.
+  const [tags, setTags] = useState<string[]>([]);
 
   // Reset stage_id default if stages change while dialog mounted.
   useEffect(() => {
@@ -175,11 +176,6 @@ export function NewLeadDialog({
    * duplicidade — é a única forma de não dizer a mesma coisa duas vezes.
    */
   async function gravar(values: FormShape, avisoJaMostrado: boolean) {
-    const tags = values.tagsRaw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const reais = values.valueReais.trim();
     let valueCents: number | null = null;
     if (reais.length > 0) {
@@ -249,9 +245,9 @@ export function NewLeadDialog({
         description: "",
         stage_id: initialStage,
         valueReais: "",
-        tagsRaw: "",
         expected_close_date: "",
       });
+      setTags([]);
       setContato(null);
       setAviso(null);
       onOpenChange(false);
@@ -364,12 +360,8 @@ export function NewLeadDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tagsRaw">{t("Tags (separadas por vírgula)")}</Label>
-            <Input
-              id="tagsRaw"
-              placeholder="vip, recompra"
-              {...form.register("tagsRaw")}
-            />
+            <Label htmlFor="tags-do-lead-novo">{t("Tags")}</Label>
+            <SeletorDeEtiquetas id="tags-do-lead-novo" valor={tags} onChange={setTags} />
           </div>
 
           {/* O AVISO SEM BLOQUEIO (#1751): aparece quando já existe negócio

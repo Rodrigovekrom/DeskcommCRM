@@ -55,6 +55,19 @@ interface OpcoesDeMove {
    * em que o card foi solto. Sem esta opção, cai no toast de sempre.
    */
   onRetomada?: (retomada: RetomadaPendente) => void;
+  /**
+   * ia.vek v1.8.3: a TRAVA DA LOJA (0590, `iavek_campos_obrigatorios`) cobra
+   * guardião, vendedor, etiquetas e contexto — coisas que o diálogo do funil
+   * não preenche. A tela mostra o que falta e leva à ficha do lead. Sem esta
+   * opção, cai no toast de sempre.
+   */
+  onTravaDaLoja?: (trava: TravaDaLoja) => void;
+}
+
+/** O que a recusa da trava da loja devolve: o lead e os rótulos do que falta. */
+export interface TravaDaLoja {
+  leadId: string;
+  faltam: string[];
 }
 
 export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
@@ -131,6 +144,17 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
       // perguntar. O rollback acima já devolveu o card; o reenvio parte do
       // MESMO `expected_updated_at`, porque a recusa veio antes de qualquer
       // escrita — não há segundo carimbo para recolher.
+      const faltam = (err instanceof ApiError ? err.details?.faltam : undefined) as string[] | undefined;
+      if (
+        err instanceof ApiError &&
+        err.code === "iavek_campos_obrigatorios" &&
+        Array.isArray(faltam) &&
+        faltam.length > 0 &&
+        opcoes.onTravaDaLoja
+      ) {
+        opcoes.onTravaDaLoja({ leadId: args.leadId, faltam });
+        return;
+      }
       const faltando = (err instanceof ApiError ? err.details?.faltando : undefined) as
         | RecusaDeCampos["faltando"]
         | undefined;

@@ -5,6 +5,7 @@ import { createContext, useContext } from "react";
 import { DadosDaCompraNoCard, DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { ConversaNoQuadroContext } from "@/components/iavek/conversa-no-quadro-contexto";
 import { SeloIncompleto } from "@/components/iavek/CamposObrigatorios";
+import { useNomeDoCarro } from "@/components/contacts/CampoDoCatalogo";
 import { temAlvoParaAbrir } from "@/components/kanban/AbrirConversaDoLead";
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
@@ -58,7 +59,8 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
   const idioma = useTagDeIdioma();
   const abrirNoQuadro = useContext(ConversaNoQuadroContext);
   const campos = (lead.custom_fields ?? {}) as Record<string, unknown>;
-  const carro = typeof campos.carro_interesse === "string" && campos.carro_interesse.trim() ? campos.carro_interesse.trim() : null;
+  // v1.8.3: o campo guarda o id do produto; o cartão mostra o nome do catálogo.
+  const carro = useNomeDoCarro(campos.carro_interesse);
   const falou = quandoFalou(lead.conversa?.last_message_at ?? null, idioma, t);
   const naoLidas = lead.conversa?.unread ?? 0;
   // Há com quem conversar: conversa já existe, ou contato com quem iniciar.

@@ -1,6 +1,7 @@
 "use client";
 
 import { SeloIncompleto, useCamposQueFaltam } from "@/components/iavek/CamposObrigatorios";
+import { useNomeDoCarro } from "@/components/contacts/CampoDoCatalogo";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { useT } from "@/hooks/i18n/useT";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
@@ -43,6 +44,7 @@ export function ResumoNaBarra({
   const faltam = lead && obrigatorios?.ativo ? (obrigatorios.leads[lead.id] ?? []) : [];
   const campos = lead?.custom_fields ?? {};
   const texto = (k: string) => (typeof campos[k] === "string" && (campos[k] as string).trim() ? (campos[k] as string).trim() : null);
+  const carro = useNomeDoCarro(campos.carro_interesse);
   const parcela = typeof campos.parcela_desejavel === "number" ? campos.parcela_desejavel : Number(campos.parcela_desejavel);
   const tags = [...new Set([...(lead?.tags ?? []), ...tagsDoContato])];
 
@@ -65,7 +67,7 @@ export function ResumoNaBarra({
     switch (k) {
       case "nome": return nome;
       case "telefone": return telefone ? phoneForDisplay(telefone) : null;
-      case "carro_interesse": return texto("carro_interesse");
+      case "carro_interesse": return carro;
       case "etapa": return lead?.etapa_nome ?? null;
       case "vendedor": return lead?.owner_kind === "ai" ? t("IA") : (lead?.owner_name ?? (lead ? t("Sem dono") : null));
       case "guardiao": return lead?.guardiao_name ?? null;

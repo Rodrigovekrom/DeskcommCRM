@@ -28,6 +28,8 @@ import type { Lead } from "@/lib/types/leads";
 import type { Stage } from "@/lib/kanban/types";
 
 const criarLead = vi.hoisted(() => vi.fn());
+// ia.vek v1.8.3: o seletor de etiquetas lê o vocabulário por react-query; aqui ele não é o assunto.
+vi.mock("@/components/iavek/SeletorDeEtiquetas", () => ({ SeletorDeEtiquetas: () => null }));
 vi.mock("@/hooks/kanban/useCreateLead", () => ({
   useCreateLead: () => ({ mutateAsync: criarLead, isPending: false }),
 }));

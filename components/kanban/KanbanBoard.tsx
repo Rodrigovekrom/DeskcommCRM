@@ -5,9 +5,10 @@ import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBoard } from "@/hooks/kanban/useBoard";
-import { useMoveCard, type RecusaDeCampos, type RetomadaPendente } from "@/hooks/kanban/useMoveCard";
+import { useMoveCard, type RecusaDeCampos, type RetomadaPendente, type TravaDaLoja } from "@/hooks/kanban/useMoveCard";
 import { useRenameStage } from "@/hooks/kanban/useRenameStage";
 import { CamposObrigatoriosDialog } from "./CamposObrigatoriosDialog";
+import { TravaDosCamposDialog } from "@/components/iavek/TravaDosCamposDialog";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
 import { useReactivations } from "@/hooks/leads/useReactivations";
@@ -131,9 +132,13 @@ export function KanbanBoard({
   // ia.vek v1.7.7: soltar o cartão numa etapa de PERDA pede o motivo (a mesma
   // janela do "Perder" do menu do cartão) em vez de tentar mover e levar recusa.
   const [perdaPendente, setPerdaPendente] = useState<string | null>(null);
+  // ia.vek v1.8.3: a trava da loja (0590) abre a janela do que falta.
+  const [travaDaLoja, setTravaDaLoja] = useState<TravaDaLoja | null>(null);
+  const [focarCampos, setFocarCampos] = useState(false);
   const moveCard = useMoveCard(pipelineId, {
     onCamposFaltando: setRecusaDeCampos,
     onRetomada: setRetomada,
+    onTravaDaLoja: setTravaDaLoja,
   });
   const { data: members } = useAssignableMembers(true);
   const ownerNames = useMemo(
@@ -384,8 +389,14 @@ export function KanbanBoard({
       {leadDoDossie && (
         <LeadDossier
           open
-          onOpenChange={(v: boolean) => !v && setDossieId(null)}
+          onOpenChange={(v: boolean) => {
+            if (!v) {
+              setDossieId(null);
+              setFocarCampos(false);
+            }
+          }}
           lead={leadDoDossie}
+          focarCampos={focarCampos}
           pipelineId={pipelineId}
           fieldDefs={camposDoFunil(data.pipeline.settings ?? null)}
           stageName={
@@ -395,6 +406,17 @@ export function KanbanBoard({
         />
       )}
 
+      <TravaDosCamposDialog
+        trava={travaDaLoja}
+        onOpenChange={(aberto) => {
+          if (!aberto) setTravaDaLoja(null);
+        }}
+        onPreencher={(leadId) => {
+          setTravaDaLoja(null);
+          setFocarCampos(true);
+          setDossieId(leadId);
+        }}
+      />
       <CamposObrigatoriosDialog
         open={recusaDeCampos !== null}
         onOpenChange={(aberto) => {
