@@ -330,11 +330,17 @@ export function KanbanBoard({
           na borda do conteúdo do contêiner, então um `pt-4` deixava uma faixa
           de 16px acima dele por onde os cards apareciam rolando (medido no e2e
           "o quadro cabe na tela"). O respiro até os filtros vem do `gap-4` da
-          página. */}
+          página.
+          ia.vek v1.8.2: as colunas moram num envelope (`min-h-full` +
+          `items-stretch`) que tem a altura da coluna MAIS ALTA. Sem ele, a
+          coluna curta parava na altura do contêiner: rolando uma etapa cheia
+          para baixo, as outras ficavam só com o cabeçalho e não havia onde
+          soltar o card (medido no canário: o arrasto caía no vazio). */}
       <div
-        className="flex min-h-0 flex-1 items-start gap-3 overflow-auto px-4 pb-4"
+        className="flex min-h-0 flex-1 overflow-auto px-4 pb-4"
         data-quadro-do-funil
       >
+        <div className="flex min-h-full w-max items-stretch gap-3" data-colunas-do-quadro>
         {data.stages.map((stage, indice) =>
           etapasOcultas?.has(stage.id) ? null : etapasRecolhidas?.has(stage.id) ? (
             // ia.vek v1.7.9: a etapa RECOLHIDA vira uma faixa estreita — nome,
@@ -370,6 +376,7 @@ export function KanbanBoard({
           />
           ),
         )}
+        </div>
       </div>
       {leadDoDossie && (
         <LeadDossier
