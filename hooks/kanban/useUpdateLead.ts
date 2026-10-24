@@ -30,8 +30,9 @@ function gravaLeadNoQuadro(
 ): void {
   if (!lead) return;
   // ia.vek v1.7.7: por prefixo — alcança o quadro e a carteira do vendedor.
+  // v1.8.2: e a faixa "sem dono" (`{ total, itens }`), que não é quadro — ver useMoveCard.
   qc.setQueriesData<BoardData>({ queryKey }, (atual) =>
-    atual
+    atual && Array.isArray(atual.leads)
       ? { ...atual, leads: atual.leads.map((l) => (l.id === leadId ? { ...l, ...lead } : l)) }
       : atual,
   );

@@ -76,11 +76,15 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
     // ia.vek v1.7.7: por PREFIXO (`setQueriesData`) — o mesmo funil pode estar
     // em cache como quadro (`["board", id]`) e como carteira do vendedor
     // (`["board", id, "carteira"]`); o card tem de andar nos dois.
+    // v1.8.2: o prefixo também alcança a faixa "sem dono" do Pipeline do
+    // vendedor (`["board", id, "sem-dono"]`), que NÃO é quadro (`{ total, itens }`).
+    // Sem o `Array.isArray`, o `.leads.map` lançava, o POST nunca saía e a tela
+    // dizia "Erro inesperado" — nenhum arrasto andava no Pipeline do vendedor.
     onMutate: async (args) => {
       await qc.cancelQueries({ queryKey });
       const snapshots = qc.getQueriesData<BoardData>({ queryKey });
       qc.setQueriesData<BoardData>({ queryKey }, (atual) =>
-        atual
+        atual && Array.isArray(atual.leads)
           ? {
               ...atual,
               leads: atual.leads.map((l) =>
@@ -99,7 +103,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
       // `onSettled` chegar, e arrastar o mesmo card de novo nesse intervalo
       // mandava `expected_updated_at` velho → 409 (issue #916).
       qc.setQueriesData<BoardData>({ queryKey }, (atual) =>
-        atual
+        atual && Array.isArray(atual.leads)
           ? {
               ...atual,
               leads: atual.leads.map((l) => (l.id === args.leadId ? { ...l, ...res.data } : l)),

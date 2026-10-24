@@ -335,12 +335,15 @@ export function KanbanBoard({
           `items-stretch`) que tem a altura da coluna MAIS ALTA. Sem ele, a
           coluna curta parava na altura do contêiner: rolando uma etapa cheia
           para baixo, as outras ficavam só com o cabeçalho e não havia onde
-          soltar o card (medido no canário: o arrasto caía no vazio). */}
+          soltar o card (medido no canário: o arrasto caía no vazio). O quadro
+          que rola é BLOCO, não flex: filho de flex é esticado até a altura do
+          contêiner e não cresceria com os cards. O `pb-4` mora no envelope
+          (border-box), senão somaria aos 100% e o quadro rolaria 16px à toa. */}
       <div
-        className="flex min-h-0 flex-1 overflow-auto px-4 pb-4"
+        className="min-h-0 flex-1 overflow-auto px-4"
         data-quadro-do-funil
       >
-        <div className="flex min-h-full w-max items-stretch gap-3" data-colunas-do-quadro>
+        <div className="flex min-h-full w-max items-stretch gap-3 pb-4" data-colunas-do-quadro>
         {data.stages.map((stage, indice) =>
           etapasOcultas?.has(stage.id) ? null : etapasRecolhidas?.has(stage.id) ? (
             // ia.vek v1.7.9: a etapa RECOLHIDA vira uma faixa estreita — nome,
