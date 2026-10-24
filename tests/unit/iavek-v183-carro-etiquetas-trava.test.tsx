@@ -113,3 +113,23 @@ describe("v1.8.3 — a recusa da trava abre a janela, não um toast", () => {
     expect(q).toContain("focarCampos={focarCampos}");
   });
 });
+
+describe("v1.8.3 — convites valem 7 dias", () => {
+  it("a validade do token e do convite é de 7 dias", async () => {
+    const { INVITE_TTL_SECONDS } = await import("@/lib/auth/invite-token");
+    expect(INVITE_TTL_SECONDS).toBe(7 * 24 * 60 * 60);
+    expect(ler("app/team/accept-invite/[token]/page.tsx")).not.toContain("janela de 24h");
+  });
+});
+
+describe("v1.8.3 — guardião na chegada (0591 no baseline)", () => {
+  it("o apêndice está antes da varredura anon e o gatilho de inserção existe", () => {
+    const b = ler("supabase/baseline.sql");
+    const i = b.indexOf("-- ---- ia.vek: guardião na chegada (migration 0591) ----");
+    expect(i).toBeGreaterThan(0);
+    expect(i).toBeLessThan(b.indexOf("-- ---- VARREDURA anon:"));
+    const bloco = b.slice(i, b.indexOf("-- ---- VARREDURA anon:"));
+    expect(bloco).toContain("create trigger trg_iavek_guardiao_na_chegada");
+    expect(bloco).toContain("revoke execute on function public.fn_iavek_guardiao_na_chegada() from public, anon, authenticated;");
+  });
+});

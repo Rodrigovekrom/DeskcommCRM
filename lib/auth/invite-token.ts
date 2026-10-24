@@ -81,4 +81,7 @@ export function verifyInviteToken(token: string): InvitePayload | null {
   return payload;
 }
 
-export const INVITE_TTL_SECONDS = 60 * 60 * 24; // 24h
+// ia.vek v1.8.3: 7 dias (eram 24h; os convites do time venceram duas vezes
+// antes de serem aceitos). Vale para o token e para `expires_at` do convite —
+// só para convites enviados ou reenviados daqui em diante.
+export const INVITE_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 dias
