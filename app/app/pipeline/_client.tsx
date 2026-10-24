@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
 import { DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
 import { PadraoNoCardContext, type AvaliacaoDoLead } from "@/components/iavek/PadraoDoLead";
@@ -85,6 +86,7 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
       ) : (
         <PadraoNoCardContext.Provider value={padrao?.ativo ? padrao.leads : null}>
         <DadosDaCompraNoCardContext.Provider value={{ ligado: true }}>
+        <CartaoIavekContext.Provider value={true}>
           <KanbanBoard
             pipelineId={pipelineId}
             stages={data.stages}
@@ -96,6 +98,7 @@ export function CarteiraClient({ pipelineId, nomeDoFunil }: { pipelineId: string
             etapasRecolhidas={new Set(prefs.recolhidas)}
             onAbrirEtapa={(id) => gravar({ ...prefs, recolhidas: prefs.recolhidas.filter((x) => x !== id) })}
           />
+        </CartaoIavekContext.Provider>
         </DadosDaCompraNoCardContext.Provider>
         </PadraoNoCardContext.Provider>
       )}

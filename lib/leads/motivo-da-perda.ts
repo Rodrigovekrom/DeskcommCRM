@@ -185,9 +185,15 @@ export function recusaDeMotivoDaPerda(idioma?: Idioma | null): {
 export function recusaDeMotivoDaPerdaPeloBanco(
   erro: { code?: string | null; message?: string | null } | null | undefined,
   idioma?: Idioma | null,
-): { codigo: "lost_reason_required" | "lost_reason_invalid"; mensagem: string } | null {
+): { codigo: "lost_reason_required" | "lost_reason_invalid" | "iavek_campos_obrigatorios"; mensagem: string } | null {
   const codigo = erro?.code ?? "";
   const texto = erro?.message ?? "";
+
+  // ia.vek v1.8.2 (0590): a trava dos campos obrigatórios ao mover. A mensagem
+  // do banco já diz o que falta ("Faltam campos obrigatórios: …").
+  if (codigo === "PT422") {
+    return { codigo: "iavek_campos_obrigatorios", mensagem: texto };
+  }
 
   if (codigo === "23514" && texto.includes("crm_leads_lost_reason_required")) {
     return recusaDeMotivoDaPerda(idioma);

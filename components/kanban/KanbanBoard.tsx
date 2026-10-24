@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useContext, useMemo, useState } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,8 @@ import { RetomarComoNovoNegocioDialog } from "./RetomarComoNovoNegocioDialog";
 import { LoseLeadDialog } from "./LoseLeadDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { ConversaNoQuadro, ConversaNoQuadroContext } from "@/components/iavek/ConversaNoQuadro";
+import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
+import { ComIncompletos } from "@/components/iavek/CamposObrigatorios";
 
 interface KanbanBoardProps {
   pipelineId: string;
@@ -178,6 +180,7 @@ export function KanbanBoard({
   // ia.vek v1.8.1: a conversa do lead numa gaveta sobre o quadro (sem ir à
   // Entrada). Abrir pelo dossiê fecha o dossiê: um painel por vez.
   const [conversaDoLeadId, setConversaDoLeadId] = useState<string | null>(null);
+  const cartaoIavek = useContext(CartaoIavekContext);
   const abrirConversaNoQuadro = useCallback((leadId: string) => {
     setDossieId(null);
     setConversaDoLeadId(leadId);
@@ -311,6 +314,8 @@ export function KanbanBoard({
 
   return (
     <ConversaNoQuadroContext.Provider value={abrirConversaNoQuadro}>
+    {/* ia.vek v1.8.2: o selo "Incompleto" dos cartões, só no cartão do ia.vek. */}
+    <ComIncompletos leads={cartaoIavek ? data.leads : []}>
     <DragDropContext onDragEnd={handleDragEnd}>
       {/* UM contêiner de rolagem só, nos dois eixos. Rolar cada coluna por
           conta própria seria o desenho "Trello", mas o @hello-pangea/dnd não
@@ -424,6 +429,7 @@ export function KanbanBoard({
         />
       )}
     </DragDropContext>
+    </ComIncompletos>
     </ConversaNoQuadroContext.Provider>
   );
 }

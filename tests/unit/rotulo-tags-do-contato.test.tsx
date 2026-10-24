@@ -55,7 +55,7 @@ describe("painel do inbox — o botão de tags diz de quem é a tag", () => {
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <CRMSidePanel conversation={conversation} />
+        <CRMSidePanel verMaisInicial conversation={conversation} />
       </QueryClientProvider>,
     );
 

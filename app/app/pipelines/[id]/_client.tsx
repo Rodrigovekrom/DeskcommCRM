@@ -21,6 +21,7 @@ function formatError(err: unknown, t: (texto: string) => string): string {
   return String(err);
 }
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
+import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
 import { FilterBar } from "@/components/kanban/FilterBar";
 import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
@@ -168,6 +169,8 @@ export function PipelinePageClient({
           {t("Carregando…")}
         </div>
       ) : (
+        // ia.vek v1.8.2: o mesmo cartão do vendedor no Funil (gerente e admin).
+        <CartaoIavekContext.Provider value={true}>
         <KanbanBoard
           pipelineId={pipelineId}
           stages={data.stages}
@@ -179,6 +182,7 @@ export function PipelinePageClient({
           leadInicial={searchParams.get("lead")}
           podeRenomearEtapa={ROLE_RANK[role] >= ROLE_RANK.admin}
         />
+        </CartaoIavekContext.Provider>
       )}
       <BulkActionBar
         selectedIds={selectedIds}

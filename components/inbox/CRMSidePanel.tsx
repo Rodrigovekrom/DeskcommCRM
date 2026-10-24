@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
 import { PassarFicha } from "@/components/iavek/PassarFicha";
 import { PadraoDoLead } from "@/components/iavek/PadraoDoLead";
+import { ResumoNaBarra } from "@/components/iavek/ResumoNaBarra";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import type { Locale } from "date-fns";
@@ -46,6 +47,11 @@ import { phoneForDisplay } from "@/lib/channels/phone-variants";
 
 interface Props {
   conversation: ConversationWithContact | null;
+  /**
+   * ia.vek v1.8.2: "Ver mais" começa FECHADO na tela. Os testes da ficha que
+   * medem as seções de dentro abrem já aberto, para seguir medindo o mesmo.
+   */
+  verMaisInicial?: boolean;
 }
 
 interface LeadRow {
@@ -70,6 +76,9 @@ interface LeadRow {
   won_reason?: string | null;
   owner_kind?: string | null;
   owner_name?: string | null;
+  // ia.vek v1.8.2: barra enxuta.
+  guardiao_name?: string | null;
+  tags?: string[] | null;
 }
 
 interface OrderRow {
@@ -534,7 +543,7 @@ function CamposDoFunil({
   );
 }
 
-export function CRMSidePanel({ conversation }: Props) {
+export function CRMSidePanel({ conversation, verMaisInicial = false }: Props) {
   const { user, activeOrg } = useAuth();
   const ehAdminDaLoja = (user.is_platform_admin && !user.support) || activeOrg?.role === "admin";
   const readonly = user.support?.access_mode === "support_readonly";
@@ -569,6 +578,8 @@ export function CRMSidePanel({ conversation }: Props) {
   const [tentativa, setTentativa] = useState(0);
 
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
+  // ia.vek v1.8.2: o resto da ficha fica em "Ver mais", FECHADO por padrão.
+  const [verMais, setVerMais] = useState(verMaisInicial);
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [leadAtivoId, setLeadAtivoId] = useState<string | null>(null);
   const defaultPipeline = useDefaultPipeline(leadDialogOpen);
@@ -687,6 +698,37 @@ export function CRMSidePanel({ conversation }: Props) {
 
   return (
     <aside className="flex h-full flex-col gap-4 overflow-y-auto border-l border-border bg-background p-4">
+      {/* ia.vek v1.8.2: o que fica SEMPRE à vista (lib/iavek/barra-lateral.ts). */}
+      {sectionsLoading ? (
+        <Skeleton className="h-48 w-full" />
+      ) : (
+        <ResumoNaBarra
+          nome={displayName}
+          telefone={contact?.phone_number ?? null}
+          tagsDoContato={tags}
+          lead={(leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null}
+          observacoes={fatos}
+        />
+      )}
+      {/* As duas ações do atendimento ficam à vista junto do resumo. */}
+      <div className="flex flex-wrap gap-2 text-xs" data-testid="acoes-na-barra">
+        {/* ia.vek v1.7.6: só o admin marca; os demais PEDEM o agendamento. */}
+        {contactId&&conversation&&ehAdminDaLoja?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
+        {contactId&&conversation&&!ehAdminDaLoja?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
+        {/* ia.vek v1.7.8: Passar Ficha do lead deste atendimento. */}
+        {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l ? <PassarFicha leadId={l.id} donoDoLead={(l as { owner_user_id?: string | null }).owner_user_id ?? null} /> : null; })()}
+      </div>
+      <button
+        type="button"
+        onClick={() => setVerMais((v) => !v)}
+        aria-expanded={verMais}
+        className="flex items-center justify-center rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+        data-testid="ver-mais-da-barra"
+      >
+        {verMais ? t("Ver menos") : t("Ver mais")}
+      </button>
+      {verMais && (
+      <>
       <SecaoRecolhivel id="cliente" titulo={t("Cliente")}>
         <Card className="mt-2 space-y-2 p-3 text-sm">
           <div className="font-medium">{displayName}</div>
@@ -701,11 +743,6 @@ export function CRMSidePanel({ conversation }: Props) {
             </div>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
-            {/* ia.vek v1.7.6: só o admin marca; os demais PEDEM o agendamento. */}
-            {contactId&&conversation&&ehAdminDaLoja?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
-            {contactId&&conversation&&!ehAdminDaLoja?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
-            {/* ia.vek v1.7.8: Passar Ficha do lead deste atendimento. */}
-            {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l ? <PassarFicha leadId={l.id} donoDoLead={(l as { owner_user_id?: string | null }).owner_user_id ?? null} /> : null; })()}
             <Button
               size="sm"
               variant="outline"
@@ -954,6 +991,8 @@ export function CRMSidePanel({ conversation }: Props) {
         </p>
         <AcervoSearch />
       </SecaoRecolhivel>
+      </>
+      )}
     </aside>
   );
 }

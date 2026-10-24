@@ -52,7 +52,7 @@ function renderPainel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <CRMSidePanel conversation={conversation} />
+      <CRMSidePanel verMaisInicial conversation={conversation} />
     </QueryClientProvider>,
   );
 }

@@ -46524,6 +46524,240 @@ revoke all on table public.iavek_preferencias_de_tela from anon, authenticated;
 grant select, insert, update, delete on table public.iavek_preferencias_de_tela to authenticated;
 grant all on table public.iavek_preferencias_de_tela to service_role;
 
+-- ---- ia.vek: vendedor não arquiva conversa (migration 0588) ----
+--
+-- POR QUÊ (decisão do Rodrigo, 24/10/2026): para tirar o lead da fila o
+-- vendedor MOVE o lead para uma etapa (Não responde, Muito longe, Perdido);
+-- arquivar a conversa é de gerente e admin.
+--
+-- A rota PATCH /api/v1/conversations/:id já exige gerente para "archived" e o
+-- botão já some para o vendedor. Faltava o banco: a policy
+-- `conversations_agent_update` deixa qualquer agent gravar a linha, então o
+-- vendedor com o próprio JWT arquivava pela REST sem passar pela rota.
+--
+-- O gatilho só olha SESSÃO de usuário (auth.uid() não nulo): service_role,
+-- crons e workers seguem iguais. Super-admin com acesso pleno passa.
+-- ADITIVA: só função e gatilho novos; nenhum dado muda.
+
+create or replace function public.fn_iavek_so_gerente_arquiva()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.status = 'archived'
+     and old.status is distinct from 'archived'
+     and auth.uid() is not null
+     and not public.fn_is_platform_admin_full()
+     and not public.fn_role_at_least(new.organization_id, 'manager') then
+    raise exception 'Só gerente ou admin arquiva conversa. Para tirar o lead da fila, mova-o para uma etapa.'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.fn_iavek_so_gerente_arquiva() from public, anon;
+grant execute on function public.fn_iavek_so_gerente_arquiva() to authenticated, service_role;
+
+drop trigger if exists trg_iavek_so_gerente_arquiva on public.conversations;
+create trigger trg_iavek_so_gerente_arquiva
+  before update of status on public.conversations
+  for each row execute function public.fn_iavek_so_gerente_arquiva();
+
+-- ---- ia.vek: etapas novas do funil 72h (migration 0589) ----
+--
+-- POR QUÊ (pedido do Rodrigo, 24/10/2026; decisões do Maestro): o funil passa a
+-- seguir a operação real — a IA atende, o vendedor atende, agenda, faz a
+-- ligação de vídeo, qualifica, troca, vende ou perde.
+--
+-- COMO, E POR QUE ASSIM:
+--   * RENOMEAR no lugar (mesmo id): webhooks (`default_stage_id`), a esteira
+--     (`settings.esteira.entrada.etapas_de_compromisso`), o histórico
+--     (`lost_from_stage_id`, atividades) e as preferências de tela apontam para
+--     o ID. Trocar id quebraria tudo isso; trocar o nome não quebra nada.
+--   * Os SLUGS antigos ficam (o slug não aparece na tela; nenhum código os lê).
+--   * Mapa das etapas antigas: Novo → Lead novo; Em atendimento IA → IA
+--     responsável; Carro apresentado → Em atendimento; CTA → Em atendimento;
+--     Agendado/Vídeo → Agendamento; Qualificado → Lead qualificado; Passado ao
+--     SDR → Em atendimento; Vendido e Perdido ficam.
+--   * CTA e Passado ao SDR: os leads delas vão para Em atendimento, e só DEPOIS
+--     elas são ARQUIVADAS (nunca apagadas — o histórico continua apontando).
+--   * "Muito longe" é etapa PRÓPRIA (aberta): o banco só aceita UMA etapa de
+--     perda por funil (`uniq_crm_stages_pipeline_lost`).
+--   * Lead novo nasce na PRIMEIRA etapa aberta pela posição
+--     (`lib/leads/nascimento-do-lead.ts`) — com esta ordem, "IA responsável".
+--
+-- IDEMPOTENTE: rodar de novo não muda nada (insere só o que falta, renomeia
+-- para o mesmo nome, move zero leads). Só alcança funil com slug
+-- `fenomenos-72h`; em qualquer outro banco não faz nada.
+
+do $$
+declare
+  f record;
+  v_em_atendimento uuid;
+begin
+  for f in select id, organization_id from public.crm_pipelines where slug = 'fenomenos-72h' loop
+    -- 1. as etapas novas (só se faltarem)
+    insert into public.crm_stages (organization_id, pipeline_id, name, slug, position)
+    select f.organization_id, f.id, n.nome, n.slug, n.pos
+      from (values ('Não responde', 'nao-responde', 4000),
+                   ('Ligação de vídeo feita', 'ligacao-de-video', 6000),
+                   ('Troca', 'troca', 8000),
+                   ('Muito longe', 'muito-longe', 9000)) n(nome, slug, pos)
+     where not exists (select 1 from public.crm_stages s where s.pipeline_id = f.id and s.slug = n.slug);
+
+    -- 2. os leads de CTA e Passado ao SDR vão para Em atendimento (ex-Carro apresentado)
+    select id into v_em_atendimento from public.crm_stages where pipeline_id = f.id and slug = 'carro-apresentado';
+    if v_em_atendimento is not null then
+      update public.crm_leads l
+         set stage_id = v_em_atendimento
+       where l.pipeline_id = f.id
+         and l.stage_id in (select id from public.crm_stages where pipeline_id = f.id and slug in ('cta', 'passado-ao-sdr'));
+    end if;
+
+    -- 3. nomes e ordem novos (mesmo id)
+    update public.crm_stages s
+       set name = m.nome, position = m.pos, is_archived = false
+      from (values ('em-atendimento-ia', 'IA responsável', 1000),
+                   ('novo', 'Lead novo', 2000),
+                   ('carro-apresentado', 'Em atendimento', 3000),
+                   ('nao-responde', 'Não responde', 4000),
+                   ('agendado-video', 'Agendamento', 5000),
+                   ('ligacao-de-video', 'Ligação de vídeo feita', 6000),
+                   ('qualificado', 'Lead qualificado', 7000),
+                   ('troca', 'Troca', 8000),
+                   ('muito-longe', 'Muito longe', 9000),
+                   ('vendido', 'Vendido', 10000),
+                   ('perdido', 'Perdido', 11000)) m(slug, nome, pos)
+     where s.pipeline_id = f.id and s.slug = m.slug
+       and (s.name, s.position, s.is_archived) is distinct from (m.nome, m.pos::numeric, false);
+
+    -- 4. CTA e Passado ao SDR saem do quadro — só se ficaram vazias
+    update public.crm_stages s
+       set is_archived = true
+     where s.pipeline_id = f.id and s.slug in ('cta', 'passado-ao-sdr') and not s.is_archived
+       and not exists (select 1 from public.crm_leads l where l.stage_id = s.id);
+  end loop;
+end $$;
+
+-- ---- ia.vek: campos obrigatórios do lead (migration 0590) ----
+--
+-- POR QUÊ (pedido do Rodrigo, 24/10/2026; proposta do Maestro): todo lead tem
+-- de chegar à etapa de compromisso com contexto, tags, fase, guardião, vendedor,
+-- carro de interesse e parcela desejável. A ENTRADA do lead não trava (ele chega
+-- sozinho do Meta e da IA): só o MOVER, por uma pessoa, para as etapas de
+-- compromisso.
+--
+-- O QUE FALTA (fn_iavek_campos_que_faltam), na ordem da tela:
+--   Contexto completo      ao menos 1 nota interna numa conversa do contato
+--                          (conversation_notes) ou 1 nota da IA (lead_notes)
+--   Tags de acompanhamento ao menos 1 tag no lead ou no contato
+--   Fase do funil          a etapa (sempre preenchida)
+--   Guardião responsável   crm_leads.sdr_user_id
+--   Vendedor responsável   crm_leads.owner_user_id
+--   Carro de interesse     custom_fields.carro_interesse
+--   Parcela desejável      custom_fields.parcela_desejavel > 0
+--
+-- A TRAVA só olha SESSÃO de pessoa (auth.uid() não nulo) e só com o interruptor
+-- `organizations.settings.iavek.campos_obrigatorios.ativo = true` (admin liga em
+-- Configurações; padrão desligado). IA, automações, crons e workers seguem.
+-- ADITIVA: um campo no funil 72h (só se faltar), funções e um gatilho novos.
+
+-- ---- 1. o campo "Parcela desejável" no funil 72h (e no follow-up), se faltar ----
+update public.crm_pipelines p
+   set settings = jsonb_set(
+         coalesce(p.settings, '{}'::jsonb), '{fields}',
+         coalesce(p.settings->'fields', '[]'::jsonb)
+           || jsonb_build_array(jsonb_build_object('key', 'parcela_desejavel', 'type', 'number', 'label', 'Parcela desejável (R$)')))
+ where p.slug in ('fenomenos-72h', 'fenomenos-follow-up')
+   and not exists (select 1 from jsonb_array_elements(coalesce(p.settings->'fields', '[]'::jsonb)) f where f->>'key' = 'parcela_desejavel');
+
+-- ---- 2. o que falta num lead ----
+create or replace function public.fn_iavek_campos_que_faltam_do_lead(l public.crm_leads)
+returns text[]
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select array_remove(array[
+    case when exists (select 1 from public.conversation_notes n join public.conversations c on c.id = n.conversation_id
+                       where c.contact_id = l.contact_id and c.organization_id = l.organization_id)
+           or exists (select 1 from public.lead_notes ln where ln.contact_id = l.contact_id and ln.organization_id = l.organization_id)
+         then null else 'Contexto completo' end,
+    case when coalesce(array_length(l.tags, 1), 0) > 0
+           or exists (select 1 from public.contacts k where k.id = l.contact_id and coalesce(array_length(k.tags, 1), 0) > 0)
+         then null else 'Tags de acompanhamento' end,
+    case when l.stage_id is not null then null else 'Fase do funil' end,
+    case when l.sdr_user_id is not null then null else 'Guardião responsável' end,
+    case when l.owner_user_id is not null then null else 'Vendedor responsável' end,
+    case when nullif(btrim(coalesce(l.custom_fields->>'carro_interesse', '')), '') is not null then null else 'Carro de interesse' end,
+    case when coalesce(l.custom_fields->>'parcela_desejavel', '') ~ '^\s*[0-9]+([.,][0-9]+)?\s*$'
+              and replace(l.custom_fields->>'parcela_desejavel', ',', '.')::numeric > 0
+         then null else 'Parcela desejável' end
+  ], null)
+  -- Só responde por lead da organização de quem pergunta (sessão); o serviço vê todos.
+  where auth.uid() is null or l.organization_id in (select public.fn_user_org_ids());
+$$;
+revoke execute on function public.fn_iavek_campos_que_faltam_do_lead(public.crm_leads) from public, anon;
+-- `authenticated` porque a TRAVA roda com a sessão de quem move.
+grant execute on function public.fn_iavek_campos_que_faltam_do_lead(public.crm_leads) to authenticated, service_role;
+
+-- Em lote, para o cartão e a barra (só os leads que quem pergunta enxerga).
+create or replace function public.fn_iavek_campos_que_faltam(p_lead_ids uuid[])
+returns table (lead_id uuid, faltam text[])
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select l.id, public.fn_iavek_campos_que_faltam_do_lead(l)
+    from public.crm_leads l
+   where l.id = any(p_lead_ids)
+     and (auth.uid() is null or l.organization_id in (select public.fn_user_org_ids()));
+$$;
+revoke execute on function public.fn_iavek_campos_que_faltam(uuid[]) from public, anon;
+grant execute on function public.fn_iavek_campos_que_faltam(uuid[]) to authenticated, service_role;
+
+-- ---- 3. a trava ao MOVER ----
+create or replace function public.fn_iavek_campos_obrigatorios_ao_mover()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_faltam text[];
+begin
+  if auth.uid() is null or new.stage_id is not distinct from old.stage_id then
+    return new;
+  end if;
+  if not exists (select 1 from public.organizations o
+                  where o.id = new.organization_id
+                    and coalesce((o.settings->'iavek'->'campos_obrigatorios'->>'ativo')::boolean, false)) then
+    return new;
+  end if;
+  if not exists (select 1 from public.crm_stages s
+                  where s.id = new.stage_id
+                    and s.slug in ('agendado-video', 'ligacao-de-video', 'qualificado', 'troca', 'vendido')) then
+    return new;
+  end if;
+  v_faltam := public.fn_iavek_campos_que_faltam_do_lead(new);
+  if coalesce(array_length(v_faltam, 1), 0) > 0 then
+    raise exception 'Faltam campos obrigatórios: %', array_to_string(v_faltam, ', ')
+      using errcode = 'PT422';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.fn_iavek_campos_obrigatorios_ao_mover() from public, anon;
+grant execute on function public.fn_iavek_campos_obrigatorios_ao_mover() to authenticated, service_role;
+
+drop trigger if exists trg_iavek_campos_obrigatorios_ao_mover on public.crm_leads;
+create trigger trg_iavek_campos_obrigatorios_ao_mover
+  before update of stage_id on public.crm_leads
+  for each row execute function public.fn_iavek_campos_obrigatorios_ao_mover();
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

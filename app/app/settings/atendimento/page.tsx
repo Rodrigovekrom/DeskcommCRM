@@ -30,6 +30,7 @@ import { AtendimentoForm } from "./_form";
 import { EsteiraForm } from "./_esteira-form";
 import { RodizioDeLeads } from "@/components/iavek/RodizioDeLeads";
 import { PadraoDaLojaConfig } from "@/components/iavek/PadraoDaLojaConfig";
+import { CamposObrigatoriosConfig } from "@/components/iavek/CamposObrigatorios";
 import { AvisoGrupoForm } from "./_aviso-grupo-form";
 import { configDoAvisoGrupo } from "@/lib/avisos-grupo/regras";
 import { configDaEsteira } from "@/lib/esteira/config";
@@ -163,6 +164,8 @@ export default async function AtendimentoSettingsPage() {
       <RodizioDeLeads />
       {/* ia.vek v1.8.0: o padrão da loja (checklist sem IA). */}
       <PadraoDaLojaConfig etapas={etapasDoFunilPadrao} />
+      {/* ia.vek v1.8.2: exigir os campos obrigatórios ao mover (desligado por padrão). */}
+      <CamposObrigatoriosConfig />
       <AtendimentoForm
         initial={{
           ...routing,

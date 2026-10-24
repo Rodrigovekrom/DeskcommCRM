@@ -1,6 +1,6 @@
 "use client";
 import { Draggable } from "@hello-pangea/dnd";
-import type { MouseEvent } from "react";
+import { useContext, type MouseEvent } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
 import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
@@ -14,6 +14,7 @@ import { ScoreSlot } from "./ScoreSlot";
 import { OwnerBadge } from "./OwnerBadge";
 import { ContatoNoCard } from "./ContatoNoCard";
 import { DadosDaCompraNoCard } from "@/components/iavek/DadosDaCompraNoCard";
+import { CartaoIavekContext, CorpoDoCartaoIavek, rotuloDoResponsavel } from "@/components/iavek/CartaoIavek";
 
 /** Os dois gestos de seleção que o card sabe relatar. */
 export type GestoDeSelecao = "alterna" | "intervalo";
@@ -79,6 +80,8 @@ export function KanbanCard({
   onOpen,
 }: KanbanCardProps) {
   const t = useT();
+  // ia.vek v1.8.2: o cartão do vendedor (Pipeline e Funil) — ver CartaoIavek.
+  const cartaoIavek = useContext(CartaoIavekContext);
   const value = formatValor(card.valueCents, card.currency);
   const state = resolveCardState(card, t);
   const age = stageAgeLabel(card.hoursInStage, t);
@@ -233,11 +236,21 @@ export function KanbanCard({
                 >
                   {card.title}
                 </button>
+                {cartaoIavek && (
+                  <span className="font-normal text-text-muted" data-testid="responsavel-no-cartao">
+                    {" — "}
+                    {rotuloDoResponsavel(card.owner, t)}
+                  </span>
+                )}
               </h3>
             </div>
             <KanbanCardActions lead={lead} pipelineId={pipelineId} />
           </div>
 
+          {cartaoIavek ? (
+            <CorpoDoCartaoIavek lead={lead} pipelineId={pipelineId} />
+          ) : (
+          <>
           {/* ② valor — altura reservada mesmo sem valor, senão o card encolhe. */}
           <p
             className={cn(
@@ -317,6 +330,8 @@ export function KanbanCard({
                 : `${t("em")} ${card.stageName}`}
             </span>
           </div>
+          </>
+          )}
         </div>
       )}
     </Draggable>

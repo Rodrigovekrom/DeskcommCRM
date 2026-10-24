@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { DadosDaCompraNoCard, DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
-import { PadraoDoLead } from "@/components/iavek/PadraoDoLead";
 import { ChatThread } from "@/components/inbox/ChatThread";
+import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
 import { Composer, type ComposerHandle } from "@/components/inbox/Composer";
 import { ConversationHeader } from "@/components/inbox/ConversationHeader";
 import { JanelaFechadaAviso } from "@/components/inbox/JanelaFechadaAviso";
@@ -14,7 +14,7 @@ import { NumeroForaDoAr } from "@/components/inbox/NumeroForaDoAr";
 import { useProximoPassoObrigatorio } from "@/components/inbox/ProximoPassoObrigatorio";
 import { RetentionNotice } from "@/components/inbox/RetentionNotice";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import { isNotFound } from "@/hooks/inbox/useConversation";
@@ -33,7 +33,7 @@ import { CaretLeft, ChatCircle } from "@/lib/ui/icons";
  * ia.vek v1.8.1 — a CONVERSA DENTRO DO QUADRO.
  *
  * Pedido do Rodrigo: no Kanban, abrir a conversa NÃO leva para a Entrada; abre
- * uma gaveta por cima do quadro só com a conversa, e dá para atender ali — o
+ * uma janela central (v1.8.2; na v1.8.1 era gaveta) por cima do quadro só com a conversa, e dá para atender ali — o
  * vendedor fica na tela do funil, focado nos leads.
  *
  * ─── Mesmo atendimento, nenhum caminho novo ─────────────────────────────────
@@ -74,11 +74,12 @@ export function ConversaNoQuadro({
   const telefone = lead.contact_phone ? phoneForDisplay(lead.contact_phone) : null;
 
   return (
-    <Sheet open onOpenChange={(aberto) => !aberto && onFechar()}>
-      <SheetContent
-        side="right"
+    <Dialog open onOpenChange={(aberto) => !aberto && onFechar()}>
+      {/* v1.8.2: janela CENTRAL grande (~80% da tela) no desktop; tela cheia no
+          celular. Era gaveta lateral na v1.8.1. */}
+      <DialogContent
         aria-describedby={undefined}
-        className="flex w-full max-w-none flex-col gap-0 p-0 sm:max-w-none md:w-[min(46rem,92vw)]"
+        className="flex h-[100dvh] max-h-none w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:rounded-none md:h-[80dvh] md:max-h-[80dvh] md:w-[80vw] md:max-w-[80vw] md:rounded-lg"
         data-testid="conversa-no-quadro"
       >
         <div className="flex flex-col gap-1 border-b border-border px-3 py-2 pr-12">
@@ -93,7 +94,7 @@ export function ConversaNoQuadro({
               <CaretLeft size={16} aria-hidden />
               {t("Quadro")}
             </Button>
-            <SheetTitle className="min-w-0 truncate text-base font-semibold">{lead.title}</SheetTitle>
+            <DialogTitle className="min-w-0 truncate text-base font-semibold">{lead.title}</DialogTitle>
           </div>
           <p className="text-xs text-muted-foreground" data-testid="conversa-no-quadro-linha">
             {telefone ? `${telefone} · ` : ""}
@@ -115,15 +116,6 @@ export function ConversaNoQuadro({
           <DadosDaCompraNoCardContext.Provider value={{ ligado: true }}>
             <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
           </DadosDaCompraNoCardContext.Provider>
-          {/* O padrão da loja (v1.8.0): some sozinho quando o admin o desligou.
-              No celular fica de fora: a tela é da conversa (medido em 390×844,
-              o checklist deixava ~150px de histórico). O selo continua no
-              cartão e a marcação, na ficha da Entrada. */}
-          <div className="hidden md:block">
-            <div className="max-h-40 overflow-y-auto rounded-md border px-2 py-1.5 empty:hidden">
-              <PadraoDoLead leadId={lead.id} />
-            </div>
-          </div>
         </div>
 
         {conversaId ? (
@@ -131,8 +123,8 @@ export function ConversaNoQuadro({
         ) : (
           <SemConversa lead={lead} onIniciada={setConversaEscolhida} />
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -158,6 +150,7 @@ function PainelDaConversa({ conversaId, onAbrirConversa }: { conversaId: string;
   const composerRef = useRef<ComposerHandle | null>(null);
   const [respondendo, setRespondendo] = useState<ConversationMensagem | null>(null);
   const { garantir, dialogo } = useProximoPassoObrigatorio();
+  const [fichaNoCelular, setFichaNoCelular] = useState(false);
 
   useMarkAsRead(conversa?.id ?? null, conversa?.unread_count_for_assignee ?? 0);
 
@@ -203,7 +196,19 @@ function PainelDaConversa({ conversaId, onAbrirConversa }: { conversaId: string;
 
   return (
     <OpenConversationProvider conversationId={conversa.id}>
-      <div className="flex min-h-0 flex-1 flex-col" data-testid="painel-da-conversa">
+      {/* v1.8.2: a conversa à esquerda e a barra lateral enxuta à direita (a
+          MESMA da Entrada). No celular a barra abre por "Ficha", no lugar da conversa. */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="mx-3 my-1.5 h-8 shrink-0 lg:hidden"
+        onClick={() => setFichaNoCelular((v) => !v)}
+        data-testid="alternar-ficha-celular"
+      >
+        {fichaNoCelular ? t("Voltar à conversa") : t("Ficha do lead")}
+      </Button>
+      <div className="flex min-h-0 flex-1">
+      <div className={fichaNoCelular ? "hidden min-h-0 flex-1 flex-col lg:flex" : "flex min-h-0 flex-1 flex-col"} data-testid="painel-da-conversa">
         <ConversationHeader
           conversation={conversa}
           onAbrirConversa={onAbrirConversa}
@@ -245,6 +250,13 @@ function PainelDaConversa({ conversaId, onAbrirConversa }: { conversaId: string;
           rascunho={null}
           initialDraft=""
         />
+      </div>
+      <div
+        className={fichaNoCelular ? "flex min-h-0 w-full flex-col lg:w-[22rem] lg:shrink-0" : "hidden min-h-0 w-[22rem] shrink-0 flex-col lg:flex"}
+        data-testid="barra-lateral-da-janela"
+      >
+        <CRMSidePanel conversation={conversa} />
+      </div>
       </div>
       {dialogo}
     </OpenConversationProvider>

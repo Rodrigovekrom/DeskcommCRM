@@ -14,11 +14,11 @@ function renderPainel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <CRMSidePanel conversation={conversation} />
+      <CRMSidePanel verMaisInicial conversation={conversation} />
     </QueryClientProvider>,
   );
   return { ...view, mudarConversa: (next: React.ComponentProps<typeof CRMSidePanel>["conversation"]) => view.rerender(
-    <QueryClientProvider client={client}><CRMSidePanel conversation={next} /></QueryClientProvider>,
+    <QueryClientProvider client={client}><CRMSidePanel verMaisInicial conversation={next} /></QueryClientProvider>,
   ) };
 }
 
