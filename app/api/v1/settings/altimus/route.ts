@@ -14,6 +14,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { ehLojaDeCarros, lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import {
   altimusDaOrg,
   altimusDaOrgSchema,
@@ -83,6 +84,16 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   }
 
   const minha = orgs.find((o) => o.id === orgId);
+  // ia.vek v1.9.0: só a loja de carros recebe estoque. Ligar numa clínica faria
+  // duas organizações marcadas, e o cron pararia a sincronização da loja (409).
+  if (parsed.data.ativa && !ehLojaDeCarros(lerPerfilDaEmpresa(minha?.settings))) {
+    return fail(
+      "state_conflict",
+      "O estoque do Altimus é só para loja de carros. Esta organização tem outro perfil.",
+      409,
+      { requestId },
+    );
+  }
   const proximo = settingsComAltimus(minha?.settings, parsed.data);
   const { error } = await createAdminClient()
     .from("organizations")

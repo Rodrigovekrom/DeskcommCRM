@@ -1,5 +1,6 @@
 "use client";
 
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { createContext, useContext } from "react";
 
 import { DadosDaCompraNoCard, DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
@@ -61,6 +62,7 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
   const campos = (lead.custom_fields ?? {}) as Record<string, unknown>;
   // v1.8.3: o campo guarda o id do produto; o cartão mostra o nome do catálogo.
   const carro = useNomeDoCarro(campos.carro_interesse);
+  const { lojaDeCarros } = usePerfilDaEmpresa();
   const falou = quandoFalou(lead.conversa?.last_message_at ?? null, idioma, t);
   const naoLidas = lead.conversa?.unread ?? 0;
   // Há com quem conversar: conversa já existe, ou contato com quem iniciar.
@@ -82,10 +84,12 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
         <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
       </DadosDaCompraNoCardContext.Provider>
       <SeloIncompleto leadId={lead.id} />
-      <p className="truncate" data-testid="carro-de-interesse" title={carro ?? undefined}>
-        <span className="text-text-muted">{t("Carro")}:</span>{" "}
-        {carro ? <span className="font-medium text-text">{carro}</span> : <span className="text-text-muted">—</span>}
-      </p>
+      {lojaDeCarros && (
+        <p className="truncate" data-testid="carro-de-interesse" title={carro ?? undefined}>
+          <span className="text-text-muted">{t("Carro")}:</span>{" "}
+          {carro ? <span className="font-medium text-text">{carro}</span> : <span className="text-text-muted">—</span>}
+        </p>
+      )}
       <button
         type="button"
         disabled={!podeAbrir || !abrirNoQuadro}

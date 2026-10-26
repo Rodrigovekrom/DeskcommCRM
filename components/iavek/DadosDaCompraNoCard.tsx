@@ -1,5 +1,6 @@
 "use client";
 
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { createContext, useContext, useState } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -54,7 +55,9 @@ export function ehNovo(lead: Lead, agora: number = Date.now()): boolean {
 
 export function DadosDaCompraNoCard({ lead, pipelineId }: { lead: Lead; pipelineId: string }) {
   const { ligado } = useContext(DadosDaCompraNoCardContext);
-  if (!ligado) return null;
+  // v1.9.0: troca e forma de pagamento são da loja de carros.
+  const { lojaDeCarros } = usePerfilDaEmpresa();
+  if (!ligado || !lojaDeCarros) return null;
   return <Faixa lead={lead} pipelineId={pipelineId} />;
 }
 

@@ -1,3 +1,4 @@
+import type { PerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import type { InterfaceSettings } from "@/lib/navigation/interface";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
@@ -233,6 +234,13 @@ export interface ActiveOrg {
    * Só o layout de `/app` preenche; ausente vale como nenhuma no menu.
    */
   capacidades_ligadas?: readonly CapacidadeDaOrganizacao[];
+  /**
+   * ia.vek v1.9.0 — o perfil desta empresa (`settings.iavek.perfil`): loja de
+   * carros ou clínica, e se o modo agendamento está ligado. Só o layout de
+   * `/app` preenche; ausente vale como loja de carros sem modo agendamento (o
+   * que a Fenômenos sempre foi). Esconde tela, não autoriza nada.
+   */
+  iavek_perfil?: PerfilDaEmpresa;
   /**
    * O que ESTA organização definiu para si — CAMPO A CAMPO, e só o que ela
    * mesma definiu.

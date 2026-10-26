@@ -5,6 +5,7 @@
  * A URL (com a chave de acesso) é da instalação, em Admin › Configuração ›
  * Integrações, e nunca aparece aqui; esta tela só diz se ela existe.
  */
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -23,7 +24,13 @@ interface EstadoAltimus {
 
 const CHAVE = ["settings", "altimus"] as const;
 
+/** v1.9.0: o estoque do Altimus é da loja de carros; nos outros perfis, a chave nem aparece. */
 export function AltimusDaOrganizacao() {
+  const { lojaDeCarros } = usePerfilDaEmpresa();
+  return lojaDeCarros ? <AltimusDaLoja /> : null;
+}
+
+function AltimusDaLoja() {
   const t = useT();
   const qc = useQueryClient();
   const [isPending, startTransition] = useTransition();

@@ -64,3 +64,32 @@ export async function orgDonaDoEstoque(admin: SupabaseClient): Promise<OrgDona> 
   if (error || !data) return { tipo: "nenhuma" };
   return escolherOrgDona(data as Array<{ id: string; settings: unknown }>);
 }
+
+/**
+ * ia.vek v1.9.0 — criar MAIS UMA organização pararia o estoque?
+ *
+ * Com o Altimus configurado e uma única organização que nunca marcou a chave
+ * (`unica_sem_marca`), ela recebe o estoque só por ser a única. A segunda
+ * organização tira essa condição e o cron passa a responder `nenhuma`: o
+ * estoque da loja para em silêncio. Por isso a criação é recusada até a loja
+ * ligar "Estoque Altimus" em Configurações › Organização. Pura.
+ */
+export function novaEmpresaPararia(altimusConfigurado: boolean, dona: OrgDona): boolean {
+  return altimusConfigurado && dona.tipo === "unica_sem_marca";
+}
+
+/**
+ * A pergunta acima com o banco e a configuração da instalação. Devolve o id da
+ * loja que precisa ligar a chave, ou `null` quando pode criar. Erro de leitura
+ * da configuração conta como "não configurado" (a criação não fica refém dela);
+ * erro de leitura das organizações vira `nenhuma` em `orgDonaDoEstoque`.
+ */
+export async function lojaQuePrecisaLigarOAltimus(
+  admin: SupabaseClient,
+  urlDoAltimus: string | null | undefined,
+): Promise<string | null> {
+  const configurado = (urlDoAltimus ?? "").trim() !== "";
+  if (!configurado) return null;
+  const dona = await orgDonaDoEstoque(admin);
+  return novaEmpresaPararia(configurado, dona) && dona.tipo === "unica_sem_marca" ? dona.orgId : null;
+}

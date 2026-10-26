@@ -5,6 +5,7 @@ import { TenantOverview } from "@/components/admin/tenants/TenantOverview";
 import { TenantActions } from "@/components/admin/tenants/TenantActions";
 import { SuspendedBanner } from "@/components/admin/tenants/SuspendedBanner";
 import { useT } from "@/hooks/i18n/useT";
+import { PerfilDaEmpresaAdmin } from "@/components/iavek/PerfilDaEmpresaAdmin";
 
 interface TenantOverviewClientProps {
   id: string;
@@ -50,11 +51,14 @@ export function TenantOverviewClient({ id }: TenantOverviewClientProps) {
           counts={counts}
           integrations={integrations}
         />
-        <TenantActions
-          organizationId={organization.id}
-          status={organization.status}
-          displayName={organization.display_name}
-        />
+        <div className="space-y-6">
+          <TenantActions
+            organizationId={organization.id}
+            status={organization.status}
+            displayName={organization.display_name}
+          />
+          <PerfilDaEmpresaAdmin organizationId={organization.id} />
+        </div>
       </div>
     </div>
   );

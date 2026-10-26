@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   rotate: vi.fn(),
   limite: vi.fn(),
   espiar: vi.fn(),
+  lojaSemChave: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({ env: h.env }));
@@ -26,6 +27,10 @@ vi.mock("@/lib/ai/dispatcher/rate-limit", () => ({
   peekRateLimit: h.espiar,
 }));
 vi.mock("@/lib/tenants/api-key", () => ({ rotateIntegrationApiKey: h.rotate }));
+// ia.vek v1.9.0: a guarda do Altimus (a loja sem a chave ligada impede outra organização).
+vi.mock("@/lib/estoque/org-dona", () => ({ lojaQuePrecisaLigarOAltimus: h.lojaSemChave }));
+vi.mock("@/lib/instalacao/config", () => ({ valorDaInstalacao: async () => ({ valor: "https://altimus.test/x" }) }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
 vi.mock("@/lib/auth/provision", async (original) => {
   const real = await original<typeof ProvisionModule>();
   return {
@@ -70,6 +75,7 @@ beforeEach(() => {
   h.espiar.mockResolvedValue(0);
   h.provision.mockResolvedValue({ organizationId: "org-1", ownerId: "user-1", replay: false });
   h.rotate.mockResolvedValue("dsk_abcd1234_segredo");
+  h.lojaSemChave.mockResolvedValue(null);
 });
 
 describe("desligada por padrão", () => {
@@ -175,6 +181,14 @@ describe("ligada: o provisionamento", () => {
         integrationScope: "integration:clinicfx",
       }),
     );
+  });
+
+  it("ia.vek v1.9.0: a loja sem a chave do Altimus ligada impede outra organização → 409, sem provisionar", async () => {
+    h.lojaSemChave.mockResolvedValue("loja-1");
+    const res = await POST(pedido(SEGREDO));
+    expect(res.status).toBe(409);
+    expect(h.provision).not.toHaveBeenCalled();
+    expect(h.rotate).not.toHaveBeenCalled();
   });
 
   it("replay → 200", async () => {

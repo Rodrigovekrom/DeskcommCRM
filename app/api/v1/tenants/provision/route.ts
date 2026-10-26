@@ -31,6 +31,9 @@ import {
   provisionExternalTenant,
 } from "@/lib/auth/provision";
 import { env } from "@/lib/env";
+import { lojaQuePrecisaLigarOAltimus } from "@/lib/estoque/org-dona";
+import { valorDaInstalacao } from "@/lib/instalacao/config";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ipDoCliente } from "@/lib/http/ip-do-cliente";
 import { logger } from "@/lib/logger";
 import { extractBearer } from "@/lib/mcp/auth";
@@ -120,6 +123,21 @@ export async function POST(req: NextRequest): Promise<Response> {
       });
     }
     throw err;
+  }
+
+  // ia.vek v1.9.0: a mesma guarda da criação pela tela — com o Altimus
+  // configurado e a loja sem a chave ligada, outra organização pararia o estoque.
+  const lojaSemChave = await lojaQuePrecisaLigarOAltimus(
+    createAdminClient(),
+    (await valorDaInstalacao("ALTIMUS_ESTOQUE_URL")).valor,
+  );
+  if (lojaSemChave) {
+    return fail(
+      "state_conflict",
+      "A instalação ainda não pode ter outra organização: a loja precisa ligar \"Estoque Altimus\" antes.",
+      409,
+      { requestId },
+    );
   }
 
   try {

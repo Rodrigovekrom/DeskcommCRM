@@ -314,6 +314,8 @@ export const AUDIT_ACTIONS = [
   "iavek.campos_obrigatorios_changed",
   // ia.vek v1.8.4: a chave da nota do atendimento.
   "iavek.nota_do_atendimento_changed",
+  // ia.vek v1.9.0: o perfil da empresa (loja de carros ou clínica, modo agendamento).
+  "iavek.perfil_da_empresa_changed",
   "iavek.padrao_marcado",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser

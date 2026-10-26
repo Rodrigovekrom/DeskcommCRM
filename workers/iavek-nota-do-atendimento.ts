@@ -40,6 +40,7 @@ import {
   type MensagemDoAtendimento,
 } from "@/lib/iavek/nota-do-atendimento";
 import { lerCriteriosDoAcervo } from "@/lib/iavek/nota-do-atendimento-servidor";
+import { lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -65,6 +66,8 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
     if (!lerConfigDaNota((org as { settings?: unknown } | null)?.settings).ativo) {
       return { status: "skipped", reason: "chave_desligada" };
     }
+    // v1.9.0: o texto do avaliador e o critério padrão seguem o perfil da empresa.
+    const { nicho } = lerPerfilDaEmpresa((org as { settings?: unknown } | null)?.settings);
 
     // Reprocessar o mesmo evento não gera nota de novo (e não gasta de novo).
     const { count: jaTem } = await admin
@@ -149,7 +152,7 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
     });
     if (!resolvido) return { status: "skipped", reason: "sem_chave_de_ia" };
 
-    const criterios = await lerCriteriosDoAcervo(admin, orgId);
+    const criterios = await lerCriteriosDoAcervo(admin, orgId, nicho);
     const transcricao = montarTranscricao(mensagens, nomes);
     const prompt = [
       etapaNome ? `Etapa do lead no funil: ${etapaNome}.` : "Lead sem etapa conhecida.",
@@ -171,7 +174,7 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
       const gerado = await generateObject({
         model: resolvido.model,
         schema: respostaDaNotaSchema,
-        system: promptDoAvaliador(criterios.texto),
+        system: promptDoAvaliador(criterios.texto, nicho),
         prompt,
         // Haiku 5.5: raciocínio adaptativo ligado por padrão e cobrado como
         // saída — esforço baixo basta para dar nota. Sem `temperature` (o

@@ -1,5 +1,6 @@
 "use client";
 import type { InterfaceSettings } from "@/lib/navigation/interface";
+import type { NichoDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { useRef } from "react";
 import { createTenantSchema } from "@/lib/schemas/tenant-creation";
 import { randomId } from "@/lib/random-id";
@@ -18,6 +19,8 @@ export interface CreateTenantPayload {
   plan?: "standard" | "pro" | "enterprise";
   owner_email: string;
   owner_interface_settings?: InterfaceSettings;
+  /** ia.vek v1.9.0: perfil da empresa nova. */
+  iavek_nicho?: NichoDaEmpresa;
 }
 
 export interface CreateTenantResponse {

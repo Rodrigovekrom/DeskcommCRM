@@ -5,7 +5,8 @@ import { useNomeDoCarro } from "@/components/contacts/CampoDoCatalogo";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
 import { useT } from "@/hooks/i18n/useT";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
-import { CAMPOS_SEMPRE_VISIVEIS, type CampoDaBarra } from "@/lib/iavek/barra-lateral";
+import { camposSempreVisiveis, type CampoDaBarra } from "@/lib/iavek/barra-lateral";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { formatValorDoNegocio } from "@/lib/money";
 
 /** O lead como a barra o recebe (rota crm-summary). */
@@ -39,6 +40,7 @@ export function ResumoNaBarra({
   observacoes: Array<{ id: string; headline: string; body: string }>;
 }) {
   const t = useT();
+  const { lojaDeCarros } = usePerfilDaEmpresa();
   // v1.8.2 (bloco 6): o selo "Incompleto" do lead desta conversa.
   const { data: obrigatorios } = useCamposQueFaltam(lead ? [lead.id] : [], lead?.updated_at ?? "");
   const faltam = lead && obrigatorios?.ativo ? (obrigatorios.leads[lead.id] ?? []) : [];
@@ -100,7 +102,7 @@ export function ResumoNaBarra({
     <div className="flex flex-col gap-2">
     {lead && faltam.length > 0 && <SeloIncompleto leadId={lead.id} faltam={faltam} />}
     <dl className="grid grid-cols-[minmax(0,7.5rem)_1fr] gap-x-2 gap-y-1.5 rounded-md border p-3 text-xs" data-testid="resumo-na-barra">
-      {CAMPOS_SEMPRE_VISIVEIS.map((k) => {
+      {camposSempreVisiveis(lojaDeCarros).map((k) => {
         const v = valor(k);
         return (
           <div key={k} className="contents" data-campo={k}>

@@ -18,6 +18,7 @@ import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { modulosLigados } from "@/lib/instalacao/modulos";
 import { capacidadesLigadas } from "@/lib/organizacao/capacidades";
+import { lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { ehOperante } from "@/lib/organizacao/operante";
 import {
   ImpersonateBanner,
@@ -145,6 +146,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       modulos_ligados: modulos,
       // Mesma linha de `settings` já lida acima — nenhuma consulta a mais.
       capacidades_ligadas: capacidadesLigadas(orgRow?.settings, modulos),
+      // ia.vek v1.9.0: mesma linha de `settings`; ausente = loja de carros.
+      iavek_perfil: lerPerfilDaEmpresa(orgRow?.settings),
     };
 
     // `marcaDaInstalacao()` é memoizada por TTL no PROCESSO (`lib/branding/

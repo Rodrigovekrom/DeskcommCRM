@@ -24,3 +24,11 @@ export const CAMPOS_SEMPRE_VISIVEIS = [
 ] as const;
 
 export type CampoDaBarra = (typeof CAMPOS_SEMPRE_VISIVEIS)[number];
+
+/** ia.vek v1.9.0: os campos que só existem na loja de carros. */
+export const CAMPOS_SO_DA_LOJA_DE_CARROS: readonly CampoDaBarra[] = ["carro_interesse", "forma_pagamento", "parcela_desejavel"];
+
+/** A lista da barra para o perfil da empresa: fora da loja de carros, sem carro, pagamento e parcela. */
+export function camposSempreVisiveis(lojaDeCarros: boolean): readonly CampoDaBarra[] {
+  return lojaDeCarros ? CAMPOS_SEMPRE_VISIVEIS : CAMPOS_SEMPRE_VISIVEIS.filter((k) => !CAMPOS_SO_DA_LOJA_DE_CARROS.includes(k));
+}

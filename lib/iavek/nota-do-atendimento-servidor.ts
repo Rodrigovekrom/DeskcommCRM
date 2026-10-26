@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { extrairTextoDoArquivo } from "@/lib/ai/rag/ingest/documento";
-import { CRITERIOS_PADRAO, TITULO_DOS_CRITERIOS, lerConfigDaNota } from "@/lib/iavek/nota-do-atendimento";
+import { TITULO_DOS_CRITERIOS, criteriosPadrao, lerConfigDaNota } from "@/lib/iavek/nota-do-atendimento";
+import type { NichoDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { logger } from "@/lib/logger";
 
 /**
@@ -51,12 +52,14 @@ export async function avisarFechamentoHumano(
 
 /**
  * Os critérios em vigor: o material do Acervo com o título fixo, se existir e
- * estiver ativo; senão, o texto padrão. Documento colado (Storage) ou FAQ.
+ * estiver ativo; senão, o texto padrão do perfil da empresa (v1.9.0). Documento colado (Storage) ou FAQ.
  */
 export async function lerCriteriosDoAcervo(
   admin: SupabaseClient,
   organizationId: string,
+  nicho: NichoDaEmpresa = "loja_de_carros",
 ): Promise<{ texto: string; doAcervo: boolean }> {
+  const padrao = criteriosPadrao(nicho);
   try {
     const { data: fontes } = await admin
       .from("ai_knowledge_sources")
@@ -68,7 +71,7 @@ export async function lerCriteriosDoAcervo(
     const fonte = (fontes ?? [])[0] as
       | { id: string; source_type: string | null; source_metadata: Record<string, unknown> | null; status: string | null }
       | undefined;
-    if (!fonte || fonte.status === "archived") return { texto: CRITERIOS_PADRAO, doAcervo: false };
+    if (!fonte || fonte.status === "archived") return { texto: padrao, doAcervo: false };
 
     const blob = typeof fonte.source_metadata?.blob_path === "string" ? fonte.source_metadata.blob_path : null;
     if (blob) {
@@ -92,5 +95,5 @@ export async function lerCriteriosDoAcervo(
       causa: err instanceof Error ? err.message : String(err),
     });
   }
-  return { texto: CRITERIOS_PADRAO, doAcervo: false };
+  return { texto: padrao, doAcervo: false };
 }

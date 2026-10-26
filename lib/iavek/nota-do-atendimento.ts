@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { NichoDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
+
 /**
  * ia.vek v1.8.4 — NOTA DO ATENDIMENTO (pedido do Rodrigo, 24/10/2026).
  *
@@ -29,6 +31,22 @@ export const CRITERIOS_PADRAO = [
   "6. Registrou os campos do lead: o que o cliente disse ficou anotado no CRM.",
   "7. Não prometeu o que não pode: nada de preço, desconto ou condição fora da regra da loja.",
 ].join("\n");
+
+/** v1.9.0: o critério padrão da CLÍNICA (perfil `clinica`). Sem carro, troca nem pagamento. */
+export const CRITERIOS_PADRAO_CLINICA = [
+  "1. Tempo da primeira resposta: respondeu a cliente logo, sem deixá-la esperando.",
+  "2. Cordialidade e português: educada, clara, sem erros que atrapalhem.",
+  "3. Entendeu a necessidade: perguntou qual procedimento a cliente procura, o objetivo e a disponibilidade dela.",
+  "4. Explicou com clareza: disse como é o procedimento e tirou as dúvidas, sem prometer resultado.",
+  "5. Tentou agendar: ofereceu um horário concreto ou o próximo passo com data.",
+  "6. Registrou no CRM: o que a cliente disse ficou anotado.",
+  "7. Não prometeu o que não pode: nada de preço, desconto ou resultado garantido fora da regra da clínica.",
+].join("\n");
+
+/** O critério padrão para o perfil da empresa (sem material no Acervo). */
+export function criteriosPadrao(nicho: NichoDaEmpresa): string {
+  return nicho === "clinica" ? CRITERIOS_PADRAO_CLINICA : CRITERIOS_PADRAO;
+}
 
 // ---------------------------------------------------------------- a chave
 
@@ -151,15 +169,28 @@ export const respostaDaNotaSchema = z.object({
 });
 export type RespostaDaNota = z.infer<typeof respostaDaNotaSchema>;
 
-export function promptDoAvaliador(criterios: string): string {
+/**
+ * v1.9.0: o texto de loja de carros só vai para a loja de carros. Na clínica, as
+ * falas marcadas VENDEDOR são da atendente (a transcrição usa um rótulo só).
+ */
+export function promptDoAvaliador(criterios: string, nicho: NichoDaEmpresa = "loja_de_carros"): string {
+  const quem =
+    nicho === "clinica"
+      ? [
+          "Você avalia o ATENDIMENTO de uma atendente de uma clínica de procedimentos, pela conversa de WhatsApp. As falas marcadas VENDEDOR são da atendente.",
+          "Você NÃO fala com a cliente e NÃO escreve mensagens para ela. Sua saída vai só para a gestão da clínica.",
+        ]
+      : [
+          "Você avalia o ATENDIMENTO de um vendedor de uma loja de carros seminovos, pela conversa de WhatsApp.",
+          "Você NÃO fala com o cliente e NÃO escreve mensagens para ele. Sua saída vai só para o gerente da loja.",
+        ];
   return [
-    "Você avalia o ATENDIMENTO de um vendedor de uma loja de carros seminovos, pela conversa de WhatsApp.",
-    "Você NÃO fala com o cliente e NÃO escreve mensagens para ele. Sua saída vai só para o gerente da loja.",
+    ...quem,
     "Avalie apenas as falas do VENDEDOR, usando os critérios abaixo. Falas da IA e do sistema não contam a favor nem contra o vendedor.",
     "Dados pessoais foram mascarados ([documento], [número], [placa]…): não comente isso.",
     "Seja justo: atendimento curto que resolveu o que o cliente pediu pode ter nota alta.",
     "",
-    "CRITÉRIOS DA LOJA:",
+    nicho === "clinica" ? "CRITÉRIOS DA CLÍNICA:" : "CRITÉRIOS DA LOJA:",
     criterios.trim(),
   ].join("\n");
 }

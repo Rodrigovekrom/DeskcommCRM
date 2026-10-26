@@ -20,6 +20,7 @@ import { OwnerBadge } from "./OwnerBadge";
 import { resolveLeadOwner } from "@/lib/kanban/owner";
 import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
 import type { CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 
 interface Props {
   open: boolean;
@@ -64,6 +65,7 @@ export function LeadDossier({
 }: Props) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
+  const { lojaDeCarros } = usePerfilDaEmpresa();
   const campos = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!open || !focarCampos) return;
@@ -204,10 +206,12 @@ export function LeadDossier({
         />
 
         {/* ia.vek v1.7.8 — Passar Ficha: o dono do lead envia; o gerente vê o status. */}
-        <div className="border-t border-border pt-3">
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">{t("Ficha de crédito")}</h3>
-          <PassarFicha leadId={lead.id} donoDoLead={lead.owner_user_id ?? null} />
-        </div>
+        {lojaDeCarros && (
+          <div className="border-t border-border pt-3">
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">{t("Ficha de crédito")}</h3>
+            <PassarFicha leadId={lead.id} donoDoLead={lead.owner_user_id ?? null} />
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

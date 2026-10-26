@@ -5,6 +5,9 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { falhaDaEscritaDePlatformAdmin, requirePlatformAdmin, requirePlatformAdminEscrita, type PlatformAdminContext } from "@/lib/auth/requirePlatformAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { lojaQuePrecisaLigarOAltimus } from "@/lib/estoque/org-dona";
+import { comPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
+import { valorDaInstalacao } from "@/lib/instalacao/config";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { createHash, randomUUID } from "node:crypto";
@@ -182,7 +185,25 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const request = { ...parsed.data, owner_email: parsed.data.owner_email.trim().toLowerCase() };
+  // ia.vek v1.9.0: o perfil não vai à função do banco (nem ao hash da
+  // idempotência); ele é gravado logo depois, só na criação.
+  const { iavek_nicho: nicho, ...pedido } = parsed.data;
+  const request = { ...pedido, owner_email: pedido.owner_email.trim().toLowerCase() };
+
+  // ia.vek v1.9.0: com o Altimus configurado e a loja sem a chave ligada, uma
+  // segunda organização pararia o estoque dela em silêncio. Recusa antes.
+  const lojaSemChave = await lojaQuePrecisaLigarOAltimus(
+    admin,
+    (await valorDaInstalacao("ALTIMUS_ESTOQUE_URL")).valor,
+  );
+  if (lojaSemChave) {
+    return fail(
+      "state_conflict",
+      "Antes de criar outra organização, ligue \"Estoque Altimus\" em Configurações › Organização da loja que recebe o estoque. Sem isso, o estoque dela pararia.",
+      409,
+      { requestId, details: { organization_id: lojaSemChave } },
+    );
+  }
   const { data: org, error } = await admin.rpc("fn_create_tenant_with_owner", {
     p_actor: adminCtx.user.id,
     p_key: key,
@@ -196,6 +217,21 @@ export async function POST(req: NextRequest) {
       });
     }
     return fail("internal_error", "Não foi possível criar a organização", 500, { requestId });
+  }
+  if (org.created && nicho) {
+    const { data: linha } = await admin.from("organizations").select("settings").eq("id", org.id).maybeSingle();
+    const { error: erroDoPerfil } = await admin
+      .from("organizations")
+      .update({
+        settings: comPerfilDaEmpresa((linha as { settings?: unknown } | null)?.settings, {
+          nicho,
+          modo_agendamento: false,
+        }),
+      })
+      .eq("id", org.id);
+    if (erroDoPerfil) {
+      return fail("internal_error", "A organização foi criada, mas o tipo de empresa não foi gravado. Ajuste na tela da organização.", 500, { requestId });
+    }
   }
   if (org.created) {
     await audit({
@@ -212,6 +248,7 @@ export async function POST(req: NextRequest) {
         display_name: org.display_name,
         plan: request.plan,
         creator_role: "admin",
+        iavek_nicho: nicho ?? null,
       },
     });
   }

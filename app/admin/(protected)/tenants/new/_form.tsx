@@ -1,4 +1,5 @@
 "use client";
+import type { NichoDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
@@ -87,6 +88,7 @@ export function NewTenantForm() {
       cnpj: "",
       plan: "standard",
       owner_email: "",
+      iavek_nicho: "loja_de_carros",
     },
   });
 
@@ -125,6 +127,7 @@ export function NewTenantForm() {
         plan: values.plan,
         owner_email: values.owner_email,
         owner_interface_settings: ownerInterface,
+        iavek_nicho: values.iavek_nicho,
       });
 
       toast.success(t("Tenant criado com sucesso!"));
@@ -143,6 +146,7 @@ export function NewTenantForm() {
   });
 
   const planValue = useWatch({ control: form.control, name: "plan" });
+  const nichoValue = useWatch({ control: form.control, name: "iavek_nicho" });
 
   if (created)
     return (
@@ -297,6 +301,26 @@ export function NewTenantForm() {
               {errors.plan && (
                 <p className="text-xs text-error-fg">{t(errors.plan.message ?? "")}</p>
               )}
+            </div>
+
+            {/* ia.vek v1.9.0: o perfil da empresa */}
+            <div className="space-y-1.5">
+              <Label htmlFor="iavek_nicho">{t("Tipo de empresa")}</Label>
+              <Select
+                value={nichoValue ?? "loja_de_carros"}
+                onValueChange={(v) => setValue("iavek_nicho", v as NichoDaEmpresa)}
+              >
+                <SelectTrigger id="iavek_nicho" aria-label={t("Tipo de empresa")} data-testid="tipo-de-empresa">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="loja_de_carros">{t("Loja de carros")}</SelectItem>
+                  <SelectItem value="clinica">{t("Clínica")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-text-muted">
+                {t("Clínica: sem as telas de carro (carro de interesse, pagamento, ficha de crédito, estoque).")}
+              </p>
             </div>
 
             {/* owner_email */}

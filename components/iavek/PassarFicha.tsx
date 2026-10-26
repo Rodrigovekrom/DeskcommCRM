@@ -1,5 +1,6 @@
 "use client";
 
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -46,7 +47,13 @@ export function useRotuloDoStatusDaFicha() {
  * que o admin definiu e anexa os documentos; a analista decide. Quem só
  * acompanha (o gerente) vê o STATUS, nunca os dados — a rota não os devolve.
  */
-export function PassarFicha({ leadId, donoDoLead }: { leadId: string; donoDoLead: string | null }) {
+/** v1.9.0: a ficha de crédito é da loja de carros; nos outros perfis, nada aparece. */
+export function PassarFicha(props: { leadId: string; donoDoLead: string | null }) {
+  const { lojaDeCarros } = usePerfilDaEmpresa();
+  return lojaDeCarros ? <PassarFichaDaLoja {...props} /> : null;
+}
+
+function PassarFichaDaLoja({ leadId, donoDoLead }: { leadId: string; donoDoLead: string | null }) {
   const t = useT();
   const rotulo = useRotuloDoStatusDaFicha();
   const { user, activeOrg } = useAuth();
