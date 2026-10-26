@@ -96,6 +96,11 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "tests/invariants/iavek-analista-de-ficha.test.ts — ia.vek 0586: RLS ligada e NENHUMA policy nem GRANT para a sessão; por JWT, nem o admin, nem o vendedor que enviou, nem o analista da MESMA organização leem (zero) ou escrevem — só o servidor, que confere quem pede e registra a leitura. Sem leitura nenhuma pela sessão, também não há leitura cruzada entre organizações.",
   },
   {
+    tabela: "iavek_notas_de_atendimento",
+    razao:
+      "tests/invariants/iavek-nota-do-atendimento.test.ts — ia.vek 0593: por JWT, o gerente lê a nota da própria organização; o vendedor (agent) da MESMA organização lê zero; o admin de OUTRA organização lê zero; insert de authenticated recusado (só o worker grava, pela service role).",
+  },
+  {
     tabela: "iavek_rodizio_registros",
     razao:
       "tests/invariants/iavek-rodizio-de-leads.test.ts — ia.vek 0585: por JWT, o admin lê o registro da própria organização; o vendedor (agent) da MESMA organização lê zero (registro é do admin) e o admin de OUTRA organização lê zero; insert de authenticated recusado (só as funções do rodízio gravam).",

@@ -25,6 +25,8 @@ const EVENTO = "ab1e0000-8888-4000-8000-000000000001";
 const CONTATO_LGPD = "ab1e0000-8888-4000-8000-000000000002";
 const CONV_LGPD = "ab1e0000-8888-4000-8000-000000000003";
 const LEAD_DESC = "ab1e0000-8888-4000-8000-000000000004";
+const ORG_B = "ab1e0000-8888-4000-8000-0000000000b0";
+const ADMIN_B = "ab1e0000-8888-4000-8000-0000000000b1";
 
 const nota = (conv: string, evento: string, contato: string | null = null) =>
   sql(`insert into public.iavek_notas_de_atendimento
@@ -37,12 +39,21 @@ beforeAll(() => {
   seedGov();
   sql(`delete from public.iavek_notas_de_atendimento where organization_id = '${GOV_ORG}';`);
   nota(GOV_CONV_UNASSIGNED, EVENTO);
+  sql(`
+    insert into auth.users (id, email) values ('${ADMIN_B}', 'nota-admin-b@invariant.test') on conflict (id) do nothing;
+    insert into public.organizations (id, slug, legal_name, display_name) values ('${ORG_B}', 'nota-inv-b', 'Nota B', 'Nota B') on conflict (id) do nothing;
+    insert into public.user_organizations (user_id, organization_id, role, accepted_at) values ('${ADMIN_B}', '${ORG_B}', 'admin', now()) on conflict do nothing;
+  `);
 });
 
 describe("nota do atendimento", () => {
   it("o gerente lê; o vendedor (agent) não lê", () => {
     expect(countAs(GOV_MANAGER, `select count(*) from public.iavek_notas_de_atendimento where organization_id = '${GOV_ORG}';`)).toBe(1);
     expect(countAs(GOV_AGENT_A, `select count(*) from public.iavek_notas_de_atendimento where organization_id = '${GOV_ORG}';`)).toBe(0);
+  });
+
+  it("o admin de OUTRA organização lê zero", () => {
+    expect(countAs(ADMIN_B, `select count(*) from public.iavek_notas_de_atendimento;`)).toBe(0);
   });
 
   it("ninguém da sessão escreve nota (só o servidor)", () => {
@@ -62,7 +73,7 @@ describe("nota do atendimento", () => {
   it("anonimizar o contato apaga os textos da nota dele, e a nota fica", () => {
     sql(`
       insert into public.contacts (id, organization_id, display_name, phone_number)
-        values ('${CONTATO_LGPD}', '${GOV_ORG}', 'Cliente Nota', '5515900000001') on conflict (id) do nothing;
+        values ('${CONTATO_LGPD}', '${GOV_ORG}', 'Cliente Nota', '+5515900000001') on conflict (id) do nothing;
       insert into public.conversations
         select (jsonb_populate_record(c, jsonb_build_object('id', '${CONV_LGPD}', 'contact_id', '${CONTATO_LGPD}'))).*
           from public.conversations c where c.id = '${GOV_CONV_UNASSIGNED}'
