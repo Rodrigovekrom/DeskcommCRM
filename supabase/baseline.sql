@@ -47032,11 +47032,15 @@ revoke execute on function public.fn_iavek_campos_que_faltam_do_lead(public.crm_
 grant execute on function public.fn_iavek_campos_que_faltam_do_lead(public.crm_leads) to authenticated, service_role;
 
 -- ---- ia.vek: modo agendamento por empresa, agenda sem duplo e funil de clínica (migration 0594) ----
+-- SECURITY INVOKER de propósito: lê com os direitos de quem chama. Na política
+-- da agenda, quem chama já é membro (fn_user_org_ids) e enxerga a própria
+-- organização; no gatilho, quem chama já é definer. Uma definer com org no
+-- argumento teria de conferir o pertencimento (cerca definer-membership-varredura).
 create or replace function public.fn_iavek_modo_agendamento(p_org uuid)
 returns boolean
 language sql
 stable
-security definer
+security invoker
 set search_path = public, pg_temp
 as $$
   select coalesce(
