@@ -11,6 +11,8 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * Piso `agent` nos três verbos: marcar, remarcar e cancelar são mutação, e quem
  * só olha a agenda não muda nada nela.
  */
+import { roleAtLeast } from "@/lib/auth/types";
+import { modoAgendamentoDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { randomUUID } from "node:crypto";
 
 import { type NextRequest } from "next/server";
@@ -356,7 +358,9 @@ async function despachar<T>(
     resource: "agenda",
     // ia.vek v1.7.6: a agenda da loja é mexida só pelo admin (criar, remarcar,
     // cancelar). SDR e vendedor fazem PEDIDO (/api/v1/iavek/pedidos-de-agendamento).
-    role: "admin",
+    // v1.9.1: o piso aqui é gerente; logo abaixo, fora do MODO AGENDAMENTO,
+    // quem não é admin recebe a MESMA recusa de antes.
+    role: "manager",
     scope: "mcp:write",
     // O MESMO papel das tools MCP de escrita na agenda (`lib/mcp/tools/
     // agendamento.ts`, `requiresRole: "ai_operator"`), que chamam estes mesmos
@@ -367,6 +371,16 @@ async function despachar<T>(
     tokenRole: "ai_operator",
   });
   if (!authz.ok) return authz.response;
+  // ia.vek v1.9.1: no modo agendamento (clínica), a recepção (gerente) marca,
+  // remarca e cancela. Fora dele (a loja), continua só o admin — a mesma
+  // resposta que o piso `admin` dava. O banco cobra o mesmo (0594).
+  if (
+    authz.actor.type === "user" &&
+    !roleAtLeast(authz.actor.role, "admin") &&
+    !(await modoAgendamentoDaOrg(authz.organizationId))
+  ) {
+    return fail("forbidden_role", "Permissão insuficiente. Requer role >= admin.", 403, { requestId });
+  }
   // `idioma` só vem no ramo de sessão (`resolveAuthDual`); o ramo de token não
   // tem preferência de idioma de pessoa nenhuma — degrada para o padrão.
   const t = (texto: string) => traduzir(texto, authz.idioma ?? IDIOMA_PADRAO);

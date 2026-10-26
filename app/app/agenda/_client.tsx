@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/hooks/auth/AuthProvider";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { EntradaDaAgenda } from "@/components/agenda/EntradaDaAgenda";
@@ -86,7 +88,7 @@ export function AgendaClient({
   linkDeConfiguracaoDoGoogle,
   tiposIniciais,
   agendamentosIniciais,
-  podeMarcar,
+  podeMarcar: podeMarcarPeloPapel,
 }: {
   /**
    * O fuso RESOLVIDO da organização (`fusoUtilizavel(activeOrg.timezone)`,
@@ -135,6 +137,11 @@ export function AgendaClient({
   const localeDaData = useLocaleDeData();
   const t = useT();
   const router = useRouter();
+  // ia.vek v1.9.1: no modo agendamento quem marca é gerente (recepção) ou admin
+  // — o mesmo piso da rota e do banco (0594). Fora dele, a regra de sempre.
+  const { modo_agendamento } = usePerfilDaEmpresa();
+  const papel = useAuth().activeOrg?.role;
+  const podeMarcar = modo_agendamento ? podeMarcarPeloPapel && (papel === "manager" || papel === "admin") : podeMarcarPeloPapel;
   const [marcando, setMarcando] = React.useState(false);
   // O compromisso criado NESTA abertura do painel. Serve para levar a grade até
   // ele quando o painel fechar por qualquer caminho — ver `ancoraAoFecharPainel`.

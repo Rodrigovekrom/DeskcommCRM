@@ -1,3 +1,5 @@
+import { lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
+
 /**
  * ia.vek v1.7.6 — capacidade por horário da agenda da loja.
  *
@@ -13,9 +15,17 @@
  */
 export const CAPACIDADE_MAXIMA = 1000;
 
-/** `null` = sem limite (o padrão da loja). */
+/**
+ * `null` = sem limite (o padrão da loja).
+ *
+ * v1.9.1: no MODO AGENDAMENTO (clínica) é 1 por pessoa, sempre — uma cliente
+ * por horário com cada profissional. O banco garante o mesmo
+ * (`trg_iavek_agenda_sem_duplo`, migration 0594); aqui é o motor de horários
+ * não oferecer o que o banco recusaria.
+ */
 export function capacidadePorHorario(settings: unknown): number | null {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return null;
+  if (lerPerfilDaEmpresa(settings).modo_agendamento) return 1;
   const iavek = (settings as Record<string, unknown>).iavek;
   if (!iavek || typeof iavek !== "object") return null;
   const v = (iavek as Record<string, unknown>).agenda_capacidade_por_horario;

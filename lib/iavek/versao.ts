@@ -6,7 +6,7 @@
  * melhoria é v1.1, v1.2… Sobe este número no mesmo commit que fecha a versão;
  * o marco git `vX.Y` vai no commit que for para a produção.
  */
-export const VERSAO_IAVEK = "1.9.0";
+export const VERSAO_IAVEK = "1.9.1";
 
 /** O rótulo discreto do rodapé do menu lateral. */
 export const ROTULO_DA_VERSAO = `ia.vek CRM v${VERSAO_IAVEK}`;

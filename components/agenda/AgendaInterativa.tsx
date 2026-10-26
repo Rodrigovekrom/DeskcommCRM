@@ -1,5 +1,8 @@
 "use client";
 
+import { ausenciasDasExcecoes } from "@/components/iavek/CoresDaAgenda";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
+import { apiClient } from "@/lib/api/client";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -109,6 +112,28 @@ export function AgendaInterativa({
 }) {
   const localeDaData = useLocaleDeData();
   const t = useT();
+  // ia.vek v1.9.1: no modo agendamento a grade pinta as AUSÊNCIAS (cinza).
+  const { modo_agendamento } = usePerfilDaEmpresa();
+  // Busca simples (sem react-query): a grade é montada também onde não há
+  // QueryClient, e fora do modo agendamento nada é pedido.
+  const [excecoes, setExcecoes] = React.useState<Parameters<typeof ausenciasDasExcecoes>[0] | null>(null);
+  const deDia = recorte.de.slice(0, 10);
+  const ateDia = recorte.ate.slice(0, 10);
+  React.useEffect(() => {
+    if (!modo_agendamento) return;
+    let vivo = true;
+    apiClient
+      .get<{ data: Parameters<typeof ausenciasDasExcecoes>[0] }>(`/api/v1/agenda/excecoes?de=${deDia}&ate=${ateDia}`)
+      .then((r) => vivo && setExcecoes(r.data))
+      .catch(() => vivo && setExcecoes(null));
+    return () => {
+      vivo = false;
+    };
+  }, [modo_agendamento, deDia, ateDia]);
+  const ausencias = React.useMemo(
+    () => (modo_agendamento && excecoes ? ausenciasDasExcecoes(excecoes, new Set(pessoas.map((p) => p.id))) : undefined),
+    [modo_agendamento, excecoes, pessoas],
+  );
   const { data: horarios, isError: horariosFalharam } = useHorariosLivres(
     tipo ? { event_type_id: tipo.id, de: recorte.de, ate: recorte.ate } : null,
   );
@@ -346,6 +371,7 @@ export function AgendaInterativa({
         pessoas={pessoas}
         agendamentos={desenhados}
         onAbrirAgendamento={onAbrirAgendamento}
+        ausencias={ausencias}
         className="min-h-0 flex-1"
         interacao={
           tipo && onMarcarEm

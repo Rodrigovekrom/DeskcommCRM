@@ -433,6 +433,10 @@ async function executarCriacaoDeAgendamento(
     .select("id, starts_at, ends_at, status, time_zone, revision, meeting_state, meeting_url")
     .single();
   if (erroInsert) {
+    // ia.vek v1.9.1: no modo agendamento o banco recusa dois compromissos vivos
+    // sobrepostos da mesma pessoa (0594) — inclusive a marcação simultânea que
+    // passou pela conferência acima ao mesmo tempo que outra.
+    if (ehHorarioOcupado(erroInsert)) throw horarioOcupado(ctx.requestId);
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, erroInsert.message);
   }
 
@@ -930,6 +934,26 @@ async function fusoDaLojaOuPadrao(supabase: SB, organizationId: string): Promise
  * `tests/invariants/agenda-ocupacao-google-do-dono.test.ts` e aqui por "o
  * ENCAIXE do atendente em cima do Google do dono é RECUSADO".
  */
+/**
+ * v1.9.1: a recusa do gatilho anti-duplo (0594). PT409 sozinho não basta: a
+ * `fn_appointment_change` usa o mesmo código para outras recusas permanentes
+ * (0363), por isso a mensagem também é conferida.
+ */
+export function ehHorarioOcupado(erro: { code?: string; message?: string } | null | undefined): boolean {
+  return erro?.code === "PT409" && erro.message === "agenda_horario_ocupado";
+}
+
+/** v1.9.1: a recusa do banco com a mesma cara da conferência da rota. */
+function horarioOcupado(requestId: string): ApiError {
+  return new ApiError(
+    409,
+    "agenda_horario_indisponivel",
+    undefined,
+    requestId,
+    "Este horário acabou de ser ocupado na agenda de quem atende. Escolha outro.",
+  );
+}
+
 async function exigeSemSobreposicao(
   supabase: SB,
   ctx: HandlerCtx,
@@ -1258,6 +1282,7 @@ async function leadAtivoDoContato(
 
 async function alteraComRevisao(supabase:SB,ctx:HandlerCtx,id:string,revision:number,patch:Record<string,unknown>):Promise<Record<string,unknown>> {
   const {data,error}=await supabase.rpc("fn_appointment_change",{p_org:ctx.organization_id,p_id:id,p_revision:revision,p_patch:patch});
+  if(ehHorarioOcupado(error)) throw horarioOcupado(ctx.requestId);
   if(error) throw new ApiError(error.code === "40001" ? 409 : error.code === "42501" ? 403 : error.code === "P0002" ? 404 : 422,
     error.code === "40001" ? "conflict" : error.code === "42501" ? "forbidden" : error.code === "P0002" ? "not_found" : "validation_failed",undefined,ctx.requestId,
     error.code === "40001" ? "Este compromisso mudou. Atualize os dados antes de confirmar novamente." : "Não foi possível alterar este compromisso. Confira a presença, o horário e a mensagem vinculada.");

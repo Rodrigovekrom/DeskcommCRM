@@ -26,6 +26,7 @@ import {
   lerPerfilDaEmpresa,
   perfilDaEmpresaSchema,
 } from "@/lib/iavek/perfil-da-empresa";
+import { semearFunilDaClinica } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
@@ -89,6 +90,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .update({ settings: comPerfilDaEmpresa(org.settings, parsed.data) })
     .eq("id", tenantId);
   if (error) return fail("internal_error", "Não deu para salvar.", 500, { requestId });
+  // v1.9.1: a clínica ganha o funil padrão de clínica (idempotente; o admin
+  // da empresa edita pela tela de Funis). A loja não é tocada.
+  const funilDaClinica =
+    parsed.data.nicho === "clinica" ? await semearFunilDaClinica(createAdminClient(), tenantId) : null;
 
   await audit({
     action: "iavek.perfil_da_empresa_changed",
@@ -99,7 +104,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     resourceType: "organization",
     resourceId: tenantId,
     requestId,
-    metadata: { antes, depois: parsed.data },
+    metadata: { antes, depois: parsed.data, funil_da_clinica: funilDaClinica },
   });
 
   return ok({ perfil: parsed.data, recebe_estoque: altimusDaOrg(org.settings)?.ativa === true }, { requestId });

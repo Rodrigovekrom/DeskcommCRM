@@ -1,5 +1,6 @@
 "use client";
 
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { RoteirosDoContato } from "@/components/contacts/RoteirosDoContato";
 import { AcervoSearch } from "./AcervoSearch";
 import { LeadEnrichment } from "./LeadEnrichment";
@@ -546,6 +547,9 @@ function CamposDoFunil({
 export function CRMSidePanel({ conversation, verMaisInicial = false }: Props) {
   const { user, activeOrg } = useAuth();
   const ehAdminDaLoja = (user.is_platform_admin && !user.support) || activeOrg?.role === "admin";
+  // ia.vek v1.9.1: no modo agendamento (clínica) a recepção (gerente) marca direto.
+  const { modo_agendamento } = usePerfilDaEmpresa();
+  const marcaDireto = ehAdminDaLoja || (modo_agendamento && (activeOrg?.role === "manager"));
   const readonly = user.support?.access_mode === "support_readonly";
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -713,8 +717,8 @@ export function CRMSidePanel({ conversation, verMaisInicial = false }: Props) {
       {/* As duas ações do atendimento ficam à vista junto do resumo. */}
       <div className="flex flex-wrap gap-2 text-xs" data-testid="acoes-na-barra">
         {/* ia.vek v1.7.6: só o admin marca; os demais PEDEM o agendamento. */}
-        {contactId&&conversation&&ehAdminDaLoja?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
-        {contactId&&conversation&&!ehAdminDaLoja?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
+        {contactId&&conversation&&marcaDireto?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
+        {contactId&&conversation&&!marcaDireto?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
         {/* ia.vek v1.7.8: Passar Ficha do lead deste atendimento. */}
         {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l ? <PassarFicha leadId={l.id} donoDoLead={(l as { owner_user_id?: string | null }).owner_user_id ?? null} /> : null; })()}
       </div>

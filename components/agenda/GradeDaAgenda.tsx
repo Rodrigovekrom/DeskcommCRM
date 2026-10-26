@@ -34,6 +34,16 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/hooks/i18n/useT";
 
 import { corDaTrilha, fundoDaTrilha } from "./paleta";
+import {
+  CamadaDeAusencias,
+  CoresDaAgendaContext,
+  LegendaDaAgenda,
+  corDoCompromisso,
+  useCoresDaAgenda,
+  COR_DO_ESTADO,
+  type AusenciaDaGrade,
+} from "@/components/iavek/CoresDaAgenda";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import type { Agendamento, Pessoa, VisaoDaAgenda } from "./tipos";
 
 /**
@@ -280,6 +290,8 @@ function CamadaDeMarcacao({
   const localeDaData = useLocaleDeData();
   const chave = chaveDoDia(dia);
   const publicados = interacao.horariosPorDia[chave] ?? [];
+  // ia.vek v1.9.1: no modo agendamento o horário livre aparece em azul.
+  const { ativo: coresAtivas } = useCoresDaAgenda();
 
   return (
     <>
@@ -327,7 +339,12 @@ function CamadaDeMarcacao({
                   // mouse, no cursor e no motivo escrito.
                   "cursor-default",
             )}
-            style={{ top: pixelsDe(minuto - PRIMEIRA_HORA * 60), height: pixelsDe(PASSO_DA_CELULA_MIN) }}
+            style={{
+              top: pixelsDe(minuto - PRIMEIRA_HORA * 60),
+              height: pixelsDe(PASSO_DA_CELULA_MIN),
+              ...(coresAtivas && livre ? { backgroundColor: COR_DO_ESTADO.livre.fundo } : {}),
+            }}
+            data-estado={coresAtivas && livre ? "livre" : undefined}
           />
         );
       })}
@@ -383,6 +400,10 @@ function BlocoDeAgendamento({
   const trilha = pessoa?.trilha ?? 1;
   const doGoogle = agendamento.origem === "google_sync";
   const cancelado = agendamento.situacao === "cancelled";
+  // ia.vek v1.9.1: no modo agendamento o FUNDO diz o estado (verde/amarelo); a
+  // faixa lateral continua dizendo de quem é.
+  const { ativo: coresAtivas } = useCoresDaAgenda();
+  const corDoEstado = coresAtivas && !doGoogle ? corDoCompromisso(agendamento.situacao) : null;
 
   return (
     <button
@@ -466,9 +487,11 @@ function BlocoDeAgendamento({
             // é neutra de propósito — a agenda de fora não pertence a ninguém da
             // equipe, então não recebe trilha.
             "repeating-linear-gradient(135deg, var(--color-surface-elevated) 0 6px, var(--color-surface) 6px 12px)"
-          : fundoDaTrilha(trilha),
+          : (corDoEstado?.fundo ?? fundoDaTrilha(trilha)),
+        ...(corDoEstado ? { borderColor: corDoEstado.borda } : {}),
         opacity: doGoogle ? 0.75 : undefined,
       }}
+      data-estado={corDoEstado ? (agendamento.situacao === "pending" ? "pre_agendado" : "agendado") : undefined}
     >
       <span
         aria-hidden
@@ -666,6 +689,13 @@ function ColunaDeDia({
             style={{ height: ALTURA_DA_HORA }}
           />
         ))}
+        <CamadaDeAusencias
+          dia={chaveDoDia(dia)}
+          primeiraHora={PRIMEIRA_HORA}
+          ultimaHora={ULTIMA_HORA}
+          pixelsDe={pixelsDe}
+          nomeDaPessoa={(id) => pessoas.find((p) => p.id === id)?.nome}
+        />
         {interacao && (
           <CamadaDeMarcacao
             dia={dia}
@@ -828,6 +858,7 @@ export function GradeDaAgenda({
   agendamentos,
   onAbrirAgendamento,
   interacao,
+  ausencias,
   className,
 }: {
   visao: VisaoDaAgenda;
@@ -855,9 +886,13 @@ export function GradeDaAgenda({
   onAbrirAgendamento?: (id: string) => void;
   /** Ausente = grade só de leitura, como a vitrine a monta. Ver `InteracaoDaGrade`. */
   interacao?: InteracaoDaGrade;
+  /** ia.vek v1.9.1: as ausências (cinza) — só desenhadas no modo agendamento. */
+  ausencias?: readonly AusenciaDaGrade[];
   className?: string;
 }) {
   const dias = visao === "dia" ? [ancora] : diasDaSemanaDe(ancora);
+  const { modo_agendamento: coresAtivas } = usePerfilDaEmpresa();
+  const cores = React.useMemo(() => ({ ativo: coresAtivas, ausencias: ausencias ?? [] }), [coresAtivas, ausencias]);
 
   const gradeRef = React.useRef<HTMLDivElement>(null);
   const [proposta, setProposta] = React.useState<PropostaDeRemarcacao | null>(null);
@@ -1057,14 +1092,17 @@ export function GradeDaAgenda({
     : undefined;
 
   return (
+    <CoresDaAgendaContext.Provider value={cores}>
     <div
       data-testid="grade-da-agenda"
       data-visao={visao}
+      data-cores-por-estado={coresAtivas || undefined}
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface",
         className,
       )}
     >
+      {coresAtivas && <LegendaDaAgenda />}
       {visao === "mes" ? (
         <VisaoDeMes
           ancora={ancora}
@@ -1100,6 +1138,7 @@ export function GradeDaAgenda({
         </div>
       )}
     </div>
+    </CoresDaAgendaContext.Provider>
   );
 }
 

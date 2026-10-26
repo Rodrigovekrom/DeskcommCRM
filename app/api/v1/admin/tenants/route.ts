@@ -7,6 +7,7 @@ import { falhaDaEscritaDePlatformAdmin, requirePlatformAdmin, requirePlatformAdm
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lojaQuePrecisaLigarOAltimus } from "@/lib/estoque/org-dona";
 import { comPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
+import { semearFunilDaClinica } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { valorDaInstalacao } from "@/lib/instalacao/config";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
@@ -232,6 +233,8 @@ export async function POST(req: NextRequest) {
     if (erroDoPerfil) {
       return fail("internal_error", "A organização foi criada, mas o tipo de empresa não foi gravado. Ajuste na tela da organização.", 500, { requestId });
     }
+    // v1.9.1: a clínica nasce com o funil padrão de clínica.
+    if (nicho === "clinica") await semearFunilDaClinica(admin, org.id);
   }
   if (org.created) {
     await audit({

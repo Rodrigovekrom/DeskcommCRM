@@ -26,6 +26,11 @@ vi.mock("@/lib/ai/dispatcher/rate-limit", () => ({ checkRateLimit: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async () => null) }));
+// ia.vek v1.9.1: fora do modo agendamento, só o admin escreve na agenda. Os casos
+// de sessão daqui medem a fiação da rota (client de cookie, actor de usuário),
+// então rodam no modo; o caso "fora do modo" está logo abaixo.
+const modo = vi.hoisted(() => ({ ligado: true }));
+vi.mock("@/lib/iavek/perfil-da-empresa-servidor", () => ({ modoAgendamentoDaOrg: vi.fn(async () => modo.ligado) }));
 vi.mock("./_handler", () => ({
   marcarAgendamentoHandler: vi.fn(async () => ({ id: "ag-1", status: "pending" })),
   alterarAgendamentoHandler: vi.fn(),
@@ -94,6 +99,20 @@ describe("POST /api/v1/agenda/agendamentos — sessão de navegador", () => {
       organization_id: ORG_ID,
       actor: { type: "user", id: USER_ID },
     });
+  });
+
+  it("ia.vek v1.9.1: fora do modo agendamento, quem não é admin leva a MESMA recusa de antes", async () => {
+    sessaoOk();
+    modo.ligado = false;
+    try {
+      const { POST } = await import("./route");
+      const res = await POST(postReq());
+      expect(res.status).toBe(403);
+      expect((await res.json()).error.code).toBe("forbidden_role");
+      expect(marcarAgendamentoHandler).not.toHaveBeenCalled();
+    } finally {
+      modo.ligado = true;
+    }
   });
 
   it("sem sessão e sem Bearer → 401, repassa a resposta de requireRole", async () => {
