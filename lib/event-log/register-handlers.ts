@@ -31,6 +31,7 @@ import { avisoDeEtapaHandler } from "@/lib/leads/aviso-de-etapa.handler";
 import { avisoDeCasoAoSuporteHandler } from "@/lib/escalacao/aviso-ao-suporte.handler";
 import { avisoDePropostaNoWhatsAppHandler } from "@/lib/propostas/aviso-no-whatsapp.handler";
 import { registerHandler } from "@/lib/event-log/dispatcher";
+import { iavekNotaDoAtendimentoHandler } from "@/workers/iavek-nota-do-atendimento.handler";
 
 let _registered = false;
 
@@ -85,5 +86,8 @@ export function ensureHandlersRegistered(): void {
   registerHandler(conversaoDeVendaHandler);
   registerHandler(conversaoDeQualificacaoHandler);
   registerHandler(conversaoDeEtapaMetaHandler);
+  // ia.vek v1.8.4: a nota do atendimento chama a IA (rede de terceiro) e é a
+  // coisa menos urgente do fechamento — fica depois de todo mundo.
+  registerHandler(iavekNotaDoAtendimentoHandler);
   _registered = true;
 }

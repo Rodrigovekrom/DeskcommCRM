@@ -95,6 +95,11 @@ const FORA_DO_SEAM: Record<string, { arquivo: string; marcador: string }> = {
     arquivo: "workers/ai-sentiment-worker.ts",
     marcador: "resolverModeloDoPonto",
   },
+  // ia.vek v1.8.4: a nota do atendimento do vendedor.
+  iavek_nota_atendimento: {
+    arquivo: "workers/iavek-nota-do-atendimento.ts",
+    marcador: "resolverModeloDoPonto",
+  },
   bot_respond: {
     arquivo: "workers/ai-response-worker.ts",
     marcador: "resolverModeloDoPonto",

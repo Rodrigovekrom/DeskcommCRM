@@ -348,6 +348,19 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
     registraEm: "llm_calls",
   },
   {
+    // ia.vek v1.8.4 — avaliador separado: sem ferramentas, nunca fala com o lead.
+    id: "iavek_nota_atendimento",
+    rotulo: "Dar nota ao atendimento do vendedor",
+    oQueFaz:
+      "Quando o vendedor fecha uma conversa, lê o atendimento e dá uma nota de 0 a 10 com pontos fortes e a melhorar. Só o gerente vê.",
+    papel: "melhorar",
+    exige: {},
+    emissor: "workers/iavek-nota-do-atendimento.ts",
+    sintomaDeFalha:
+      "O gerente deixa de ver a nota dos atendimentos fechados; o atendimento ao cliente segue normal.",
+    registraEm: "llm_calls",
+  },
+  {
     id: "sentiment_classify",
     rotulo: "Medir o clima da conversa",
     oQueFaz:

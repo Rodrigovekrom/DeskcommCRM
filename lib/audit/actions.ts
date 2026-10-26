@@ -312,6 +312,8 @@ export const AUDIT_ACTIONS = [
   // ia.vek v1.8.0: padrão da loja (configuração do admin e marcação do vendedor).
   "iavek.padrao_da_loja_changed",
   "iavek.campos_obrigatorios_changed",
+  // ia.vek v1.8.4: a chave da nota do atendimento.
+  "iavek.nota_do_atendimento_changed",
   "iavek.padrao_marcado",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser

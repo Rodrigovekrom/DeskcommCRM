@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { avisarFechamentoHumano } from "@/lib/iavek/nota-do-atendimento-servidor";
 /**
  * Core handlers para /api/v1/conversations.
  *
@@ -570,6 +571,14 @@ export async function patchConversationHandler(
     if (statusError) throw new ApiError(conflito ? 409 : statusError.code === "P0002" ? 404 : 500,
       conflito ? "conflict" : statusError.code === "P0002" ? "not_found" : "internal_error", undefined, ctx.requestId,
       conflito ? traduzir("O atendimento mudou. Atualize e tente novamente.", ctx.idioma ?? "pt-BR") : statusError.message);
+    // ia.vek v1.8.4: fechar por uma PESSOA (não token de integração) põe a nota do atendimento na fila.
+    if (input.status === "closed" && ctx.actor.type === "user") {
+      await avisarFechamentoHumano(createAdminClient(), {
+        organizationId: ctx.organization_id,
+        conversationId,
+        fechadoPor: ctx.actor.id,
+      });
+    }
   }
   if (input.tags !== undefined) {
     update.tags = input.tags;

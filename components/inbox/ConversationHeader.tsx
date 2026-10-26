@@ -26,6 +26,7 @@ import {
   useUnmarkPersonalContact,
 } from "@/hooks/contacts/usePersonalContact";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { SeloDaNota } from "@/components/iavek/NotaDoAtendimento";
 import {
   useArchiveConversation,
   useCloseConversation,
@@ -224,6 +225,8 @@ export function ConversationHeader({
           {/* Ao lado do estado, não escondido num painel: a pergunta "dá para
               escrever agora?" se faz ANTES de digitar, não depois de receber um
               `failed` com um código de cinco dígitos. */}
+          {/* ia.vek v1.8.4: a nota do atendimento — só gerente e admin. */}
+          {podeArquivar && <SeloDaNota conversationId={conversation.id} />}
           <JanelaSelo
             provider={conversation.channel_sessions?.provider ?? null}
             lastInboundAt={conversation.last_inbound_at}

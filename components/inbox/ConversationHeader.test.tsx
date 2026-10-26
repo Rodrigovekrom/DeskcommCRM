@@ -18,6 +18,8 @@ const arquivarMutate = vi.hoisted(() => vi.fn());
 const startCall = vi.hoisted(() => vi.fn());
 
 // ia.vek v1.5: o selo das 72h lê a rota do painel (react-query); aqui não interessa.
+// ia.vek v1.8.4: o selo da nota lê por react-query; aqui ele não é o assunto.
+vi.mock("@/components/iavek/NotaDoAtendimento", () => ({ SeloDaNota: () => null }));
 vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () => null }));
 // ia.vek v1.7.6: arquivar é de gerente e admin; o papel é trocável por caso.
 const papel = vi.hoisted(() => ({ role: "manager" as string }));

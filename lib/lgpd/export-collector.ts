@@ -119,6 +119,13 @@ export interface OrderRow {
   ordered_at: string | null;
 }
 
+/** ia.vek v1.8.4: o texto da nota do atendimento que cita o titular (o que a anonimização apaga). */
+export interface NotaDoAtendimentoRow {
+  id: string;
+  trecho: string | null;
+  created_at: string;
+}
+
 /** ia.vek v1.7.6: o pedido de agendamento do titular (migration 0583). */
 export interface PedidoDeAgendamentoRow {
   id: string;
@@ -661,6 +668,7 @@ export interface ExportPayload {
   activities: ActivityRow[];
   /** ia.vek v1.7.6 — opcional: payloads antigos (e os PDFs de teste) não o trazem. */
   pedidos_de_agendamento?: PedidoDeAgendamentoRow[];
+  notas_de_atendimento?: NotaDoAtendimentoRow[];
   /** ia.vek v1.7.8 — opcional, como os pedidos: só aparece quando há ficha. */
   fichas_de_credito?: FichaDeCreditoRow[];
   checkpoints: CheckpointRow[];
@@ -1415,6 +1423,28 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     } else if (data) {
       conferirTeto("activities", data, 500);
       activities = data;
+    }
+  }
+
+  // ia.vek v1.8.4: notas do atendimento — contact_id direto. O trecho que a
+  // anonimização apaga é o que o titular recebe aqui (a nota é do vendedor).
+  let notasDeAtendimento: NotaDoAtendimentoRow[] = [];
+  if (contactId) {
+    const { data, error } = await admin
+      .from("iavek_notas_de_atendimento")
+      .select("id, trecho, created_at")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) {
+      logger.warn("[lgpd-export-worker] notas de atendimento load failed", {
+        request_id: requestId,
+        error: error.message,
+      });
+    } else if (data) {
+      conferirTeto("notas_de_atendimento", data, 500);
+      notasDeAtendimento = data;
     }
   }
 
@@ -2325,6 +2355,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     activities,
     // Só aparece quando há pedido: o data.json de quem não tem fica igual ao de antes.
     ...(pedidosDeAgendamento.length > 0 ? { pedidos_de_agendamento: pedidosDeAgendamento } : {}),
+    ...(notasDeAtendimento.length > 0 ? { notas_de_atendimento: notasDeAtendimento } : {}),
     ...(fichasDeCredito.length > 0 ? { fichas_de_credito: fichasDeCredito } : {}),
     checkpoints,
     appointments,

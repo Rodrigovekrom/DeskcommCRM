@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Conversation } from "@/lib/types/messaging";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { avisarFechamentoHumano } from "@/lib/iavek/nota-do-atendimento-servidor";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,14 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     resourceType: "conversation",
     resourceId: conv.id,
     requestId,
+  });
+
+  // ia.vek v1.8.4: o Fechar de uma PESSOA põe a nota do atendimento na fila
+  // (só com a chave da loja ligada; nunca derruba o fechamento).
+  await avisarFechamentoHumano(createAdminClient(), {
+    organizationId: conv.organization_id,
+    conversationId: conv.id,
+    fechadoPor: user.id,
   });
 
   return ok(conv, { requestId });

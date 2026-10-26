@@ -1,6 +1,7 @@
 "use client";
 import { ForaDoPadrao } from "@/components/iavek/PadraoDoLead";
 import { LeadsIncompletos } from "@/components/iavek/CamposObrigatorios";
+import { NotasDaSemana } from "@/components/iavek/NotaDoAtendimento";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -559,6 +560,8 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
       <ForaDoPadrao />
       {/* ia.vek v1.8.2: leads sem os campos obrigatórios, por vendedor — sem texto. */}
       <LeadsIncompletos />
+      {/* ia.vek v1.8.4: nota dos atendimentos, por vendedor, e as piores. */}
+      <NotasDaSemana />
       {d.propostas_aguardando_aprovacao && (
         <Bloco
           id="gerente-propostas-aguardando"

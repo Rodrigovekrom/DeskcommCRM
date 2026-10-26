@@ -16,7 +16,9 @@ export type InvocationKind =
   | "bot_respond"
   | "sentiment_classify"
   | "triage_classify"
-  | "embedding_generate";
+  | "embedding_generate"
+  // ia.vek v1.8.4 (0593): a nota do atendimento do vendedor.
+  | "iavek_nota_atendimento";
 
 export interface LogInvocationInput {
   organization_id: string;
