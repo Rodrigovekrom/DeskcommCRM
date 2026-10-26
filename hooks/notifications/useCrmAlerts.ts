@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import { useActiveOrg, useUser } from "@/hooks/auth/AuthProvider";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
@@ -28,9 +28,36 @@ function sides(payload: unknown): {
   };
 }
 
+/**
+ * ia.vek v1.8.4 — os avisos do lead só quando algo MUDOU de fato.
+ *
+ * O realtime manda o registro antigo só com a chave primária (nenhuma tabela
+ * tem `replica identity full`), então `old.owner_user_id` e `old.status` chegam
+ * SEMPRE vazios e qualquer UPDATE de um lead do usuário — salvar a ficha, um
+ * gatilho que mexe no `updated_at` — repetia "Lead atribuído a você" (medido
+ * no canário: 3 avisos iguais a cada Salvar), e um lead ganho repetia "Lead
+ * ganho". A régua é o último valor que ESTA tela viu; lead nunca visto só avisa
+ * se o carimbo da mudança é recente (`assigned_at` / `closed_at` até 2 minutos).
+ */
+const JANELA_DA_NOVIDADE_MS = 2 * 60_000;
+
+export function ehNovidade(
+  vistoAntes: string | null | undefined,
+  valor: string | null,
+  esperado: string,
+  carimbo: string | null,
+  agora: number = Date.now(),
+): boolean {
+  if (valor !== esperado) return false;
+  if (vistoAntes !== undefined) return vistoAntes !== valor;
+  const quando = carimbo ? Date.parse(carimbo) : NaN;
+  return Number.isFinite(quando) && agora - quando <= JANELA_DA_NOVIDADE_MS;
+}
+
 export function useCrmAlerts(): void {
   const orgId = useActiveOrg()?.orgId ?? null;
   const user = useUser();
+  const visto = useRef(new Map<string, { dono: string | null; status: string | null }>());
 
   const onLead = useCallback(
     (payload: unknown) => {
@@ -40,11 +67,16 @@ export function useCrmAlerts(): void {
       const pipelineId = str(novo.pipeline_id);
       const href = pipelineId ? `/app/pipelines/${pipelineId}` : "/app/kanban";
       const owner = str(novo.owner_user_id);
-      const ownerAntes = str(antigo?.owner_user_id);
       const status = str(novo.status);
-      const statusAntes = str(antigo?.status);
+      const leadId = str(novo.id);
+      // `antigo` só traz os campos quando a tabela tiver replica identity full; senão vale o último visto.
+      const anterior = leadId ? visto.current.get(leadId) : undefined;
+      const ownerAntes = antigo && "owner_user_id" in antigo ? str(antigo.owner_user_id) : anterior?.dono;
+      const statusAntes = antigo && "status" in antigo ? str(antigo.status) : anterior?.status;
+      if (leadId) visto.current.set(leadId, { dono: owner, status });
+      const fechadoEm = str(novo.closed_at);
 
-      if (owner && owner === user.id && owner !== ownerAntes) {
+      if (ehNovidade(ownerAntes, owner, user.id, str(novo.assigned_at))) {
         entregarAviso({
           category: "lead_assigned",
           kind: "lead_assigned",
@@ -54,7 +86,7 @@ export function useCrmAlerts(): void {
           href,
         });
       }
-      if (owner === user.id && status === "won" && statusAntes !== "won") {
+      if (owner === user.id && ehNovidade(statusAntes, status, "won", fechadoEm)) {
         entregarAviso({
           category: "lead_won",
           kind: "lead_won",
@@ -64,7 +96,7 @@ export function useCrmAlerts(): void {
           href,
         });
       }
-      if (owner === user.id && status === "lost" && statusAntes !== "lost") {
+      if (owner === user.id && ehNovidade(statusAntes, status, "lost", fechadoEm)) {
         entregarAviso({
           category: "lead_lost",
           kind: "lead_lost",
