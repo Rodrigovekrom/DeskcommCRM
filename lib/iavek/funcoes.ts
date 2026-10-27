@@ -57,6 +57,9 @@ const MENU_GERENTE = ["/app/meu-dia", "/app/agenda", "/app/kanban", "/app/inbox"
 export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   sdr: [
     "/app/meu-dia",
+    // v1.9.3: o Pipeline do SDR (só as etapas do lado dele) e os números dele.
+    "/app/pipeline",
+    "/app/meus-numeros",
     "/app/inbox",
     "/app/agenda",
     "/app/tasks",
@@ -68,6 +71,8 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
     "/app/meu-dia",
     // v1.7.7: a carteira dele no Kanban (antes de tudo o que é lista).
     "/app/pipeline",
+    // v1.9.3: só os números dele.
+    "/app/meus-numeros",
     "/app/inbox",
     "/app/agenda",
     "/app/kanban",
@@ -84,6 +89,8 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
    */
   suporte: [
     "/app/meu-dia",
+    "/app/pipeline",
+    "/app/meus-numeros",
     "/app/espaco-ia",
     "/app/inbox",
     "/app/agenda",

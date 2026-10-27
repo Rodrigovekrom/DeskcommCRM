@@ -72,6 +72,8 @@ export async function gravarPedidoDeAgendamento(
     origem: "pessoa" | "ia";
     pedidoPor: string | null;
     pedidoPorAgente?: string | null;
+    /** v1.9.3: o SDR que marca direto não manda pedido para os admins. */
+    avisarAdmins?: boolean;
   },
 ): Promise<{ ok: true; pedido: PedidoGravado } | { ok: false; status: number; motivo: string }> {
   const { orgId, input } = args;
@@ -140,6 +142,7 @@ export async function gravarPedidoDeAgendamento(
   if (error || !pedido)
     return { ok: false, status: 500, motivo: error?.message ?? "Falha ao gravar o pedido." };
 
+  if (args.avisarAdmins === false) return { ok: true, pedido: pedido as PedidoGravado };
   const admins = await membrosComPapel(admin, orgId, ["admin"]);
   await avisarSobrePedidoDeAgendamento(admin, {
     orgId,

@@ -197,9 +197,12 @@ describe("2. Menu do gerente", () => {
 describe("3. Os outros menus não mudam (além do Espaço da IA)", () => {
   it("SDR, vendedor e suporte: as mesmas listas da v1.7.4 (o SDR perde só o Espaço)", () => {
     const pessoal = ["/app/inbox", "/app/agenda", "/app/tasks", "/app/contacts", "/app/calls"];
-    expect(DESTINOS_DA_FUNCAO.sdr).toEqual(["/app/meu-dia", ...pessoal, "/app/templates"]);
+    // v1.9.3: + o Pipeline (só as etapas do SDR) e os Meus números.
+    const v193 = ["/app/pipeline", "/app/meus-numeros"];
+    expect(DESTINOS_DA_FUNCAO.sdr).toEqual(["/app/meu-dia", ...v193, ...pessoal, "/app/templates"]);
     expect(DESTINOS_DA_FUNCAO.suporte).toEqual([
       "/app/meu-dia",
+      ...v193,
       ESPACO,
       ...pessoal,
       "/app/templates",
@@ -208,6 +211,7 @@ describe("3. Os outros menus não mudam (além do Espaço da IA)", () => {
     expect(DESTINOS_DA_FUNCAO.vendedor).toEqual([
       "/app/meu-dia",
       "/app/pipeline",
+      "/app/meus-numeros",
       "/app/inbox",
       "/app/agenda",
       "/app/kanban",

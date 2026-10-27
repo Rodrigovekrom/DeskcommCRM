@@ -30,6 +30,7 @@ import { createClient } from "@/lib/supabase/server";
 import { idsDeContatosPessoais } from "@/app/api/v1/conversations/_handler";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
 import type { Lead } from "@/lib/types/leads";
+import { etapaDoLado, ladoDaFuncao, lerLados } from "@/lib/iavek/lados-do-funil";
 
 export const dynamic = "force-dynamic";
 
@@ -457,12 +458,21 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   // pool pequeno, cada carga do quadro (e cada evento do tempo real) deixa de
   // ler o funil inteiro para ler só a carteira de quem pede.
   const soMinhaCarteira = req.nextUrl.searchParams.get("escopo") === "carteira";
+  // ia.vek v1.9.3: na carteira, o LADO de quem pede (SDR ou vendedor) recorta
+  // as etapas e, para o SDR, a carteira são os leads de que ele é dono OU
+  // guardião. A função vem do vínculo desta organização.
+  const lado = soMinhaCarteira ? await ladoDeQuemPede(supabase, pipelineId, user.id) : null;
   let consultaDeLeads = supabase
     .from("crm_leads")
     .select("*")
     .eq("pipeline_id", pipelineId)
     .neq("status", "archived");
-  if (soMinhaCarteira) consultaDeLeads = consultaDeLeads.eq("owner_user_id", user.id);
+  if (soMinhaCarteira) {
+    consultaDeLeads =
+      lado === "sdr"
+        ? consultaDeLeads.or(`owner_user_id.eq.${user.id},sdr_user_id.eq.${user.id}`)
+        : consultaDeLeads.eq("owner_user_id", user.id);
+  }
 
   const [
     { data: pipeline, error: pipelineErr },
@@ -492,12 +502,15 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     supabase,
     (pipeline as Pipeline).organization_id,
   );
-  const leadsVisiveis =
-    pessoais.length > 0
-      ? ((leads ?? []) as Lead[]).filter(
-          (l) => l.contact_id === null || !pessoais.includes(l.contact_id),
-        )
-      : ((leads ?? []) as Lead[]);
+  // ia.vek v1.9.3: só as etapas do lado de quem pede (funil sem lados: todas).
+  const lados = lerLados((pipeline as Pipeline).settings);
+  const etapasVisiveis = ((stages ?? []) as Stage[]).filter((st) => etapaDoLado(lados, st.id, lado));
+  const idsVisiveis = new Set(etapasVisiveis.map((st) => st.id));
+  const leadsVisiveis = ((leads ?? []) as Lead[]).filter(
+    (l) =>
+      (pessoais.length === 0 || l.contact_id === null || !pessoais.includes(l.contact_id)) &&
+      (lado === null || idsVisiveis.has(l.stage_id)),
+  );
 
   const leadsWithOwner = await withOwnerAgents(
     supabase,
@@ -554,9 +567,35 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   const board: BoardData = {
     pipeline: pipeline as Pipeline,
-    stages: (stages ?? []) as Stage[],
+    stages: etapasVisiveis,
     leads: leadsComMarcadores.leads,
   };
 
   return ok(board, { requestId });
+}
+
+/**
+ * ia.vek v1.9.3 — o lado (SDR/vendedor) de quem abre a carteira, lido do
+ * VÍNCULO desta organização (que só o admin grava).
+ */
+async function ladoDeQuemPede(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  pipelineId: string,
+  userId: string,
+): Promise<"sdr" | "vendedor" | null> {
+  const { data: funil } = await supabase
+    .from("crm_pipelines")
+    .select("organization_id")
+    .eq("id", pipelineId)
+    .maybeSingle();
+  if (!funil) return null;
+  const { data: vinculo } = await supabase
+    .from("user_organizations")
+    .select("interface_settings")
+    .eq("organization_id", (funil as { organization_id: string }).organization_id)
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    .maybeSingle();
+  if (!vinculo) return null;
+  return ladoDaFuncao((vinculo.interface_settings as { funcao?: unknown } | null)?.funcao);
 }

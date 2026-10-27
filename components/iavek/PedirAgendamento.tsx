@@ -3,8 +3,12 @@
  * ia.vek v1.7.6 — "Pedir agendamento": o SDR (ou o vendedor) repassa cliente,
  * dia e hora desejados e uma observação; o ADMIN confirma no Meu dia. Não
  * reserva horário. Quem é admin continua marcando direto pela Agenda.
+ *
+ * ia.vek v1.9.3: o SDR DA LOJA MARCA direto (decisão do Rodrigo, 27/10): a
+ * janela vira "Marcar agendamento", ele escolhe o VENDEDOR, e o compromisso
+ * nasce confirmado — o vendedor é avisado no sino. Para os demais, igual.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -21,6 +25,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
+
+interface Vendedor {
+  id: string;
+  nome: string;
+}
 
 interface TipoDeAtendimento {
   id: string;
@@ -50,15 +59,39 @@ export function PedirAgendamento({
   const [observacao, setObservacao] = useState("");
   const [tipos, setTipos] = useState<TipoDeAtendimento[]>([]);
   const [enviando, setEnviando] = useState(false);
+  const [marcaDireto, setMarcaDireto] = useState(false);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [vendedorId, setVendedorId] = useState("");
+
+  // v1.9.3: quem marca direto (SDR da loja) já sabe ao montar, para o botão
+  // dizer "Marcar agendamento". Falhou a leitura: segue o pedido de sempre.
+  useEffect(() => {
+    let vivo = true;
+    apiClient
+      .get<{ data: { marca_direto: boolean; vendedores: Vendedor[] } }>("/api/v1/iavek/agenda-do-sdr")
+      .then((r) => {
+        if (!vivo) return;
+        setMarcaDireto(Boolean(r.data?.marca_direto));
+        setVendedores(r.data?.vendedores ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   const alvo = quando ? new Date(quando).getTime() : NaN;
-  const valido = Number.isFinite(alvo) && alvo > abertoEm;
+  const valido =
+    Number.isFinite(alvo) &&
+    alvo > abertoEm &&
+    (!marcaDireto || (Boolean(vendedorId) && (Boolean(tipoId) || tipos.length <= 1)));
 
   async function abrir() {
     const agora = Date.now();
     setAbertoEm(agora);
     setQuando(paraCampoLocal(new Date(agora + 24 * 3600_000)));
     setObservacao("");
+    setVendedorId("");
     setAberto(true);
     try {
       const r = await apiClient.get<{ data: TipoDeAtendimento[] }>("/api/v1/agenda/tipos");
@@ -79,8 +112,13 @@ export function PedirAgendamento({
         quando: new Date(quando).toISOString(),
         ...(tipoId ? { event_type_id: tipoId } : {}),
         ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
+        ...(marcaDireto ? { vendedor_id: vendedorId } : {}),
       });
-      toast.success(t("Pedido enviado. O administrador confirma o agendamento."));
+      toast.success(
+        marcaDireto
+          ? t("Agendamento marcado. O vendedor foi avisado.")
+          : t("Pedido enviado. O administrador confirma o agendamento."),
+      );
       setAberto(false);
     } catch (e) {
       showApiError(e);
@@ -98,16 +136,18 @@ export function PedirAgendamento({
         onClick={() => void abrir()}
         data-testid="pedir-agendamento"
       >
-        {t("Pedir agendamento")}
+        {marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento")}
       </Button>
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("Pedir agendamento")}</DialogTitle>
+            <DialogTitle>{marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento")}</DialogTitle>
             <DialogDescription>
-              {t(
-                "O administrador recebe o pedido e confirma o agendamento. Nada fica reservado até lá.",
-              )}
+              {marcaDireto
+                ? t("Escolha o vendedor. O agendamento já fica confirmado e ele é avisado na hora.")
+                : t(
+                    "O administrador recebe o pedido e confirma o agendamento. Nada fica reservado até lá.",
+                  )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -121,6 +161,25 @@ export function PedirAgendamento({
                 onChange={(e) => setQuando(e.target.value)}
               />
             </div>
+            {marcaDireto && (
+              <div className="space-y-1">
+                <Label htmlFor="pedido-vendedor">{t("Vendedor")}</Label>
+                <select
+                  id="pedido-vendedor"
+                  value={vendedorId}
+                  onChange={(e) => setVendedorId(e.target.value)}
+                  className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                  data-testid="pedido-vendedor"
+                >
+                  <option value="">{t("Escolha o vendedor")}</option>
+                  {vendedores.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {tipos.length > 0 && (
               <div className="space-y-1">
                 <Label htmlFor="pedido-tipo">{t("Tipo de atendimento")}</Label>
@@ -130,7 +189,9 @@ export function PedirAgendamento({
                   onChange={(e) => setTipoId(e.target.value)}
                   className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
                 >
-                  <option value="">{t("O administrador escolhe")}</option>
+                  <option value="">
+                    {marcaDireto ? t("Escolha o tipo") : t("O administrador escolhe")}
+                  </option>
                   {tipos.map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}
@@ -160,7 +221,7 @@ export function PedirAgendamento({
               disabled={!valido || enviando}
               data-testid="enviar-pedido"
             >
-              {t("Enviar pedido")}
+              {marcaDireto ? t("Marcar") : t("Enviar pedido")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -831,6 +831,18 @@ export const NAV_CATALOG = [
     modulo: "honorarios",
   },
   {
+    // ia.vek v1.9.3: os números SÓ de quem está conectado (SDR e vendedor),
+    // calculados no servidor. Na barra só de quem tem função.
+    href: "/app/meus-numeros",
+    label: "Meus números",
+    description: "Os seus resultados no período: agendamentos, visitas, vendas e o que ficou pelo caminho.",
+    icon: "ChartBar",
+    group: "analise",
+    section: "Os números do período",
+    sidebar: true,
+    soComFuncao: true,
+  },
+  {
     href: "/app/metrics",
     label: "Desempenho",
     description: "Funil e performance por atendente nos últimos 30 dias.",

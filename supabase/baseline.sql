@@ -49326,7 +49326,9 @@ alter table public.notificacoes add constraint notificacoes_tipo_check check (ti
   'pedido_de_agendamento_confirmado',
   'pedido_de_agendamento_recusado',
   'ficha_enviada',
-  'ficha_decidida'
+  'ficha_decidida',
+  -- ia.vek v1.9.3 (migration 0595): o SDR marcou direto para o vendedor.
+  'agendamento_para_voce'
 ));
 
 

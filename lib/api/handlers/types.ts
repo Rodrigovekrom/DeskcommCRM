@@ -90,6 +90,13 @@ export interface HandlerCtx {
   organization_id: string;
   actor: Actor;
   /**
+   * ia.vek v1.9.3 (decisão do Rodrigo, 27/10): na loja, o SDR MARCA direto para
+   * o vendedor que escolheu — o compromisso nasce confirmado, sem o admin.
+   * Só a rota de pedidos de agendamento preenche, depois de conferir no banco
+   * que quem chama é SDR da loja e que o vendedor é da empresa. Nunca vem do corpo.
+   */
+  iavekSdrMarcaParaVendedor?: true;
+  /**
    * Autoria "em nome de" (#1613): a PESSOA por cuja decisão o token envia.
    *
    * Vive no CTX, e não no input, de propósito: o mesmo input atravessa as tools

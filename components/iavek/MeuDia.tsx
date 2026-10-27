@@ -7,6 +7,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/auth/AuthProvider";
+import { fraseDoDia } from "@/lib/iavek/frase-do-dia";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { ROLE_RANK } from "@/lib/auth/types";
@@ -151,11 +153,26 @@ export function MeuDia() {
         .then((r) => r.data),
     refetchInterval: 60_000,
   });
+  // ia.vek v1.9.3: a frase do dia — só na loja, e só para quem TEM a função
+  // SDR ou vendedor (o "vendedor" de quem não tem função é só o dia padrão).
+  const { lojaDeCarros } = usePerfilDaEmpresa();
+  const funcaoGravada = funcaoDaTela(activeOrg?.interface_settings?.funcao);
+  const frase =
+    lojaDeCarros && funcaoGravada
+      ? fraseDoDia(funcaoGravada, new Date(), activeOrg?.timezone ?? "America/Sao_Paulo")
+      : null;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5" data-testid="meu-dia" data-funcao={funcao}>
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">{t("Meu dia")}</h1>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold">{t("Meu dia")}</h1>
+          {frase && (
+            <p className="mt-0.5 text-sm italic text-muted-foreground" data-testid="frase-do-dia">
+              {frase}
+            </p>
+          )}
+        </div>
         <span className="text-sm text-muted-foreground">{t(ROTULO_DA_FUNCAO[funcao])}</span>
       </header>
       {/* ia.vek v1.7.6: pedidos de agendamento (o admin decide; os demais acompanham os seus). */}

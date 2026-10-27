@@ -318,6 +318,7 @@ export const AUDIT_ACTIONS = [
   "iavek.perfil_da_empresa_changed",
   // ia.vek v1.9.2: como a IA marca na agenda (pré-agendado ou agendado).
   "iavek.agenda_ia_changed",
+  "iavek.lados_do_funil_changed",
   "iavek.padrao_marcado",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser
@@ -748,6 +749,7 @@ export const AUDIT_ACTIONS = [
   "agenda.request_cancelled",
   "agenda.request_refused",
   "agenda.request_confirmed",
+  "agenda.sdr_booked_for_seller",
   "proposal.edited",
   "proposal.assistant_applied",
   "proposal.sent",

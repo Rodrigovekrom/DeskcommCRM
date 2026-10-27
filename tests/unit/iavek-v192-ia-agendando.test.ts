@@ -44,7 +44,8 @@ describe("v1.9.2 — como a IA marca", () => {
   it("o handler de marcar: IA no modo usa a configuração; pessoa e fora do modo seguem o tipo", () => {
     const h = ler("app/api/v1/agenda/agendamentos/_handler.ts");
     expect(h).toContain('const agendaDaIa = ctx.actor.type !== "user" ? await agendaDaIaDaOrg(ctx.organization_id) : null;');
-    expect(h).toMatch(/agendaDaIa\?\.modo\s*\?\s*statusDaMarcacaoDaIa\(agendaDaIa\.config\)\s*:\s*tipo\.requires_confirmation/);
+    // v1.9.3: entre os dois, o SDR da loja que marca para o vendedor (nasce confirmado).
+    expect(h).toMatch(/agendaDaIa\?\.modo\s*\?\s*statusDaMarcacaoDaIa\(agendaDaIa\.config\)\s*:\s*ctx\.iavekSdrMarcaParaVendedor\s*\?\s*"confirmed"\s*:\s*tipo\.requires_confirmation/);
   });
 });
 

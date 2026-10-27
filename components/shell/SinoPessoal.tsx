@@ -33,6 +33,19 @@ export interface NotificacaoDoSino {
 
 const CHAVE = ["iavek", "notificacoes"] as const;
 
+/** Dia e hora do aviso, no idioma do navegador (nunca um idioma fixo). */
+function quandoDoAviso(v: unknown): string {
+  const d = typeof v === "string" ? new Date(v) : null;
+  if (!d || Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
 /** A frase de cada aviso (o `t` traduz o molde; os nomes entram depois). */
 export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => string): string {
   const quem = n.contato_nome ?? n.lead_titulo ?? t("um lead");
@@ -70,6 +83,12 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
       return troca("{who} confirmou o agendamento de {lead}");
     case "pedido_de_agendamento_recusado":
       return troca("{who} recusou o pedido de agendamento de {lead}: {reason}");
+    // ia.vek v1.9.3: o SDR marcou direto para este vendedor.
+    case "agendamento_para_voce":
+      return troca("{who} marcou um agendamento de {lead} para você: {when}").replace(
+        "{when}",
+        quandoDoAviso(n.dados.quando),
+      );
     default:
       return quem;
   }

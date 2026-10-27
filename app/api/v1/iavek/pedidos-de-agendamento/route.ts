@@ -4,6 +4,10 @@
  * POST  agent+ (SDR, vendedor, suporte, gerente): pede um agendamento —
  *       `{ contact_id, lead_id?, conversation_id?, quando, event_type_id?, observacao? }`.
  *       Não reserva horário. Os admins são avisados no sino.
+ *       ia.vek v1.9.3: com `vendedor_id`, o SDR DA LOJA marca direto — o
+ *       compromisso nasce confirmado para o vendedor escolhido, sem o admin, e o
+ *       vendedor é avisado no sino (`sdrMarcaDireto`). Quem não é SDR da loja e
+ *       manda `vendedor_id` recebe 403: segue pedindo, como sempre.
  * GET   o admin vê os PENDENTES da organização (e os decididos nos últimos 30
  *       dias); os demais veem os PRÓPRIOS pedidos.
  *
@@ -11,6 +15,10 @@
  */
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
+import { z } from "zod";
+
+import { marcarAgendamentoHandler } from "@/app/api/v1/agenda/agendamentos/_handler";
+import { ApiError } from "@/lib/api/types";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
@@ -18,10 +26,13 @@ import { requireRole } from "@/lib/auth/require-role";
 import { roleAtLeast } from "@/lib/auth/types";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { avisarVendedorDoAgendamento } from "@/lib/iavek/avisos-da-proposta";
 import {
   gravarPedidoDeAgendamento,
   pedidoDeAgendamentoSchema,
+  type PedidoGravado,
 } from "@/lib/iavek/pedidos-de-agendamento";
+import { sdrMarcaDireto, vendedoresDaLoja } from "@/lib/iavek/sdr-marca-direto";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -30,6 +41,8 @@ import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 export const dynamic = "force-dynamic";
 
 const DIA = 86_400_000;
+
+const corpoSchema = pedidoDeAgendamentoSchema.extend({ vendedor_id: z.string().uuid().optional() });
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
@@ -86,17 +99,19 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!authz.ok) return authz.response;
   const t = (s: string) => traduzir(s, authz.user.idioma);
 
-  const parsed = pedidoDeAgendamentoSchema.safeParse(await req.json().catch(() => null));
+  const parsed = corpoSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return fail("validation_failed", t("Campos inválidos."), 422, {
       requestId,
       details: parsed.error.flatten().fieldErrors as Record<string, unknown>,
     });
   }
+  const { vendedor_id: vendedorId, ...input } = parsed.data;
+  if (vendedorId) return sdrMarca(authz, input, vendedorId, requestId);
 
   const r = await gravarPedidoDeAgendamento(createAdminClient(), {
     orgId: authz.org.orgId,
-    input: parsed.data,
+    input,
     origem: "pessoa",
     pedidoPor: authz.user.id,
   });
@@ -114,4 +129,132 @@ export async function POST(req: NextRequest): Promise<Response> {
     requestId,
   });
   return ok(r.pedido, { requestId, status: 201 });
+}
+
+type Autorizado = Extract<Awaited<ReturnType<typeof requireRole>>, { ok: true }>;
+
+/**
+ * ia.vek v1.9.3 — o SDR da loja MARCA para o vendedor escolhido. Grava o pedido
+ * (o histórico do SDR e a meta seguem contando por ele) já como confirmado por
+ * ele mesmo, cria o compromisso confirmado com o vendedor como responsável e
+ * avisa o vendedor. Os admins não recebem pedido para confirmar.
+ */
+async function sdrMarca(
+  authz: Autorizado,
+  input: z.infer<typeof pedidoDeAgendamentoSchema>,
+  vendedorId: string,
+  requestId: string,
+): Promise<Response> {
+  const t = (s: string) => traduzir(s, authz.user.idioma);
+  const orgId = authz.org.orgId;
+  const admin = createAdminClient();
+  if (!(await sdrMarcaDireto(admin, orgId, authz.user.id))) {
+    return fail("forbidden_role", t("Só o SDR da loja marca direto. Envie um pedido de agendamento."), 403, {
+      requestId,
+    });
+  }
+  if (!(await vendedoresDaLoja(admin, orgId)).some((v) => v.id === vendedorId)) {
+    return fail("validation_failed", t("Escolha um vendedor da loja."), 422, { requestId });
+  }
+  const eventTypeId = input.event_type_id ?? (await tipoUnicoAtivo(admin, orgId));
+  if (!eventTypeId) {
+    return fail("validation_failed", t("Escolha o tipo de agendamento."), 422, { requestId });
+  }
+
+  const r = await gravarPedidoDeAgendamento(admin, {
+    orgId,
+    input: { ...input, event_type_id: eventTypeId },
+    origem: "pessoa",
+    pedidoPor: authz.user.id,
+    avisarAdmins: false,
+  });
+  if (!r.ok) {
+    const code = r.status === 404 ? "not_found" : r.status === 422 ? "validation_failed" : "internal_error";
+    return fail(code, t(r.motivo), r.status, { requestId });
+  }
+  const pedido = r.pedido;
+  // Se o compromisso não nascer, o pedido NÃO fica pendurado para o admin: o
+  // SDR vê o erro na hora e marca de novo.
+  const cancelarOPedido = () =>
+    admin
+      .from("iavek_pedidos_de_agendamento")
+      .update({ status: "cancelado", updated_at: new Date().toISOString() })
+      .eq("organization_id", orgId)
+      .eq("id", pedido.id);
+  await admin
+    .from("iavek_pedidos_de_agendamento")
+    .update({ status: "confirmado", decidido_por: authz.user.id, decidido_em: new Date().toISOString() })
+    .eq("organization_id", orgId)
+    .eq("id", pedido.id)
+    .eq("status", "pendente");
+
+  let compromisso: Record<string, unknown>;
+  try {
+    // Service role: a política da agenda só deixa o admin escrever na loja; a
+    // autoridade do SDR foi conferida acima, no banco.
+    compromisso = await marcarAgendamentoHandler(
+      admin,
+      {
+        organization_id: orgId,
+        actor: { type: "user", id: authz.user.id, role: authz.org.role },
+        requestId,
+        iavekSdrMarcaParaVendedor: true,
+      },
+      {
+        event_type_id: eventTypeId,
+        starts_at: new Date(pedido.quando).toISOString(),
+        contact_id: pedido.contact_id,
+        ...(pedido.conversation_id ? { conversation_id: pedido.conversation_id } : {}),
+        owner_user_id: vendedorId,
+        ...(pedido.observacao ? { description: pedido.observacao } : {}),
+      },
+    );
+  } catch (erro) {
+    await cancelarOPedido();
+    if (erro instanceof ApiError) {
+      return fail(erro.code, erro.message, erro.status, { requestId, details: erro.details as never });
+    }
+    throw erro;
+  }
+  const appointmentId = typeof compromisso.id === "string" ? compromisso.id : null;
+  const { data: confirmado } = await admin
+    .from("iavek_pedidos_de_agendamento")
+    .update({ appointment_id: appointmentId, updated_at: new Date().toISOString() })
+    .eq("organization_id", orgId)
+    .eq("id", pedido.id)
+    .select("*")
+    .maybeSingle();
+  void audit({
+    action: "agenda.sdr_booked_for_seller",
+    actorUserId: authz.user.id,
+    organizationId: orgId,
+    resourceType: "calendar_appointment",
+    resourceId: appointmentId ?? pedido.id,
+    requestId,
+    metadata: { pedido_id: pedido.id, vendedor_id: vendedorId },
+  });
+  await avisarVendedorDoAgendamento(admin, {
+    orgId,
+    vendedorId,
+    atorId: authz.user.id,
+    leadId: pedido.lead_id,
+    appointmentId,
+    quando: new Date(pedido.quando).toISOString(),
+  });
+  return ok({ pedido: (confirmado ?? pedido) as PedidoGravado, compromisso }, { requestId, status: 201 });
+}
+
+/** Sem tipo escolhido: o único tipo ativo da empresa, se houver um só. */
+async function tipoUnicoAtivo(
+  admin: ReturnType<typeof createAdminClient>,
+  orgId: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("calendar_event_types")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("is_active", true)
+    .limit(2);
+  const [unico, outro] = data ?? [];
+  return unico && !outro ? (unico.id as string) : null;
 }

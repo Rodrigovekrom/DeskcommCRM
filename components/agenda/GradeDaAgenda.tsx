@@ -31,6 +31,7 @@ import {
 } from "@/lib/agenda/recorte-da-grade";
 import { diaLocalISO, instanteDe, partesNoFuso } from "@/lib/agenda/fuso";
 import { cn } from "@/lib/utils";
+import { useDestaqueDaAgenda } from "@/hooks/iavek/useDestaqueDaAgenda";
 import { useT } from "@/hooks/i18n/useT";
 
 import { corDaTrilha, fundoDaTrilha } from "./paleta";
@@ -409,9 +410,13 @@ function BlocoDeAgendamento({
   // faixa lateral continua dizendo de quem é.
   const { ativo: coresAtivas } = useCoresDaAgenda();
   const corDoEstado = coresAtivas && !doGoogle ? corDoCompromisso(agendamento.situacao) : null;
+  // ia.vek v1.9.3: o vendedor vê a agenda inteira, com os DELE em destaque.
+  const destacar = useDestaqueDaAgenda();
+  const meu = destacar !== null && agendamento.responsavelId === destacar;
 
   return (
     <button
+      data-meu={destacar !== null ? String(meu) : undefined}
       type="button"
       data-testid={`agendamento-${agendamento.id}`}
       data-origem={agendamento.origem}
@@ -479,6 +484,7 @@ function BlocoDeAgendamento({
         // mostra onde ele cairia. Sumir com o original faria perder a
         // referência de onde ele estava — que é o que se desfaz ao cancelar.
         arraste?.ativo && "opacity-40",
+        destacar !== null && (meu ? "z-10 ring-2 ring-primary" : !cancelado && "opacity-60"),
       )}
       style={{
         top: pixelsDe(minutosDesdeOTopo(comeca, fuso)),

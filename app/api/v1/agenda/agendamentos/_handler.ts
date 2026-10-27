@@ -347,7 +347,8 @@ async function executarCriacaoDeAgendamento(
   // service role), então não passa por `fn_appointment_change_core`, que é onde
   // o banco cobra a mesma regra na alteração e no cancelamento.
   const ehDonoDoQueVaiNascer = ctx.actor.type === "user" && donoId === ctx.actor.id;
-  if (aOpcaoPodeRecortar(ctx.actor, ehDonoDoQueVaiNascer)) {
+  // ia.vek v1.9.3: o SDR da loja marca para o vendedor escolhido (conferido na rota).
+  if (!ctx.iavekSdrMarcaParaVendedor && aOpcaoPodeRecortar(ctx.actor, ehDonoDoQueVaiNascer)) {
     const agendaDosColegasLigada = await colegasPodemMexerNaAgenda(supabase, ctx);
     if (recusaMudancaNaAgendaAlheia(ctx.actor, agendaDosColegasLigada, ehDonoDoQueVaiNascer)) {
       throw new ApiError(403, "appointment_do_colega", undefined, ctx.requestId, RECUSA_DO_COLEGA);
@@ -407,7 +408,9 @@ async function executarCriacaoDeAgendamento(
   const agendaDaIa = ctx.actor.type !== "user" ? await agendaDaIaDaOrg(ctx.organization_id) : null;
   const statusDaMarcacao: "pending" | "confirmed" = agendaDaIa?.modo
     ? statusDaMarcacaoDaIa(agendaDaIa.config)
-    : tipo.requires_confirmation
+    : ctx.iavekSdrMarcaParaVendedor
+      ? "confirmed"
+      : tipo.requires_confirmation
       ? "pending"
       : "confirmed";
   const { data: criado, error: erroInsert } = await supabase

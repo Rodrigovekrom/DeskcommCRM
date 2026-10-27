@@ -14,7 +14,8 @@ type Tipo =
   | "proposta_devolvida"
   | "pedido_de_agendamento"
   | "pedido_de_agendamento_confirmado"
-  | "pedido_de_agendamento_recusado";
+  | "pedido_de_agendamento_recusado"
+  | "agendamento_para_voce";
 
 /** Os membros ativos da organização com um destes papéis. */
 export async function membrosComPapel(
@@ -139,4 +140,32 @@ export async function avisarSobrePedidoDeAgendamento(
         },
       })),
   );
+}
+
+/**
+ * ia.vek v1.9.3: o SDR marcou um agendamento para o vendedor — o vendedor é
+ * avisado no sino na hora (o "{who}" é o SDR; o dia e a hora vão nos dados).
+ */
+export async function avisarVendedorDoAgendamento(
+  db: SupabaseClient,
+  args: {
+    orgId: string;
+    vendedorId: string;
+    atorId: string;
+    leadId: string | null;
+    appointmentId: string | null;
+    quando: string;
+  },
+): Promise<void> {
+  if (args.vendedorId === args.atorId) return;
+  await gravar(db, [
+    {
+      organization_id: args.orgId,
+      user_id: args.vendedorId,
+      tipo: "agendamento_para_voce",
+      lead_id: args.leadId,
+      ator_user_id: args.atorId,
+      dados: { appointment_id: args.appointmentId, quando: args.quando },
+    },
+  ]);
 }

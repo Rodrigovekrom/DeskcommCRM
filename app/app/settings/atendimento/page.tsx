@@ -33,6 +33,7 @@ import { PadraoDaLojaConfig } from "@/components/iavek/PadraoDaLojaConfig";
 import { CamposObrigatoriosConfig } from "@/components/iavek/CamposObrigatorios";
 import { NotaDoAtendimentoConfig } from "@/components/iavek/NotaDoAtendimento";
 import { AgendaDaIaConfig } from "@/components/iavek/AgendaDaIaConfig";
+import { LadosDoFunilConfig } from "@/components/iavek/LadosDoFunilConfig";
 import { AvisoGrupoForm } from "./_aviso-grupo-form";
 import { configDoAvisoGrupo } from "@/lib/avisos-grupo/regras";
 import { configDaEsteira } from "@/lib/esteira/config";
@@ -172,6 +173,7 @@ export default async function AtendimentoSettingsPage() {
       <NotaDoAtendimentoConfig />
       {/* ia.vek v1.9.2: como a IA marca na agenda (só no modo agendamento). */}
       <AgendaDaIaConfig />
+      <LadosDoFunilConfig />
       <AtendimentoForm
         initial={{
           ...routing,
