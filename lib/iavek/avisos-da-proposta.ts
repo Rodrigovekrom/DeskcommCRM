@@ -155,6 +155,12 @@ export async function avisarVendedorDoAgendamento(
     leadId: string | null;
     appointmentId: string | null;
     quando: string;
+    /**
+     * O nome do cliente vai no aviso: o lead segue sendo do SDR, e a RLS não
+     * deixa o vendedor ler o lead para montar a frase. É o mesmo nome que ele
+     * já vê no compromisso, na agenda.
+     */
+    contatoNome: string | null;
   },
 ): Promise<void> {
   if (args.vendedorId === args.atorId) return;
@@ -165,7 +171,7 @@ export async function avisarVendedorDoAgendamento(
       tipo: "agendamento_para_voce",
       lead_id: args.leadId,
       ator_user_id: args.atorId,
-      dados: { appointment_id: args.appointmentId, quando: args.quando },
+      dados: { appointment_id: args.appointmentId, quando: args.quando, contato_nome: args.contatoNome },
     },
   ]);
 }

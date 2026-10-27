@@ -105,6 +105,9 @@ describe("v1.9.3 — agenda: o SDR da loja marca direto (decisão B)", () => {
     const ultima = b.slice(b.lastIndexOf("add constraint notificacoes_tipo_check"));
     expect(ultima.slice(0, ultima.indexOf("));"))).toContain("'agendamento_para_voce'");
     expect(ler("components/shell/SinoPessoal.tsx")).toContain('case "agendamento_para_voce":');
+    // O lead segue do SDR: o nome do cliente vai no aviso, senão o vendedor lê "um lead".
+    expect(ler("lib/iavek/avisos-da-proposta.ts")).toContain("contato_nome: args.contatoNome");
+    expect(ler("components/shell/SinoPessoal.tsx")).toContain("n.contato_nome ?? n.lead_titulo ?? doAviso");
   });
 
   it("o vendedor vê a agenda inteira com os dele em destaque", () => {

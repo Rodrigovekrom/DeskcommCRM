@@ -233,9 +233,16 @@ async function sdrMarca(
     requestId,
     metadata: { pedido_id: pedido.id, vendedor_id: vendedorId },
   });
+  const { data: contato } = await admin
+    .from("contacts")
+    .select("name, display_name, phone_number")
+    .eq("organization_id", orgId)
+    .eq("id", pedido.contact_id)
+    .maybeSingle();
   await avisarVendedorDoAgendamento(admin, {
     orgId,
     vendedorId,
+    contatoNome: contato ? rotuloDoContato(contato as never, t) : null,
     atorId: authz.user.id,
     leadId: pedido.lead_id,
     appointmentId,

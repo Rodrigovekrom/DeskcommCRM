@@ -48,7 +48,10 @@ function quandoDoAviso(v: unknown): string {
 
 /** A frase de cada aviso (o `t` traduz o molde; os nomes entram depois). */
 export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => string): string {
-  const quem = n.contato_nome ?? n.lead_titulo ?? t("um lead");
+  // v1.9.3: o aviso do SDR para o vendedor traz o nome do cliente nos dados
+  // (o lead segue do SDR e o vendedor não o lê).
+  const doAviso = typeof n.dados.contato_nome === "string" ? n.dados.contato_nome : null;
+  const quem = n.contato_nome ?? n.lead_titulo ?? doAviso ?? t("um lead");
   const ator = n.ator_nome ?? t("Alguém");
   const troca = (molde: string) =>
     t(molde)
