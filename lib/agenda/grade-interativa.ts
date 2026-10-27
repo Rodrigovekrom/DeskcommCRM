@@ -70,7 +70,7 @@ export type MotivoDaGradeTravada = "sem-jornada" | "erro" | "sem-vaga";
  * aqui era a das 09:00 — e no arraste a tolerância de 30 min não alcançava o
  * publicado, devolvia `null` e o fantasma nem aparecia.
  */
-function minutoDoDia(iso: string, fuso: string): number {
+export function minutoDoDia(iso: string, fuso: string): number {
   const p = partesNoFuso(new Date(iso), fuso);
   return p.hora * 60 + p.minuto;
 }

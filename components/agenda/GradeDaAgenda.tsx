@@ -39,6 +39,7 @@ import {
   CoresDaAgendaContext,
   LegendaDaAgenda,
   corDoCompromisso,
+  horarioQueCobre,
   useCoresDaAgenda,
   COR_DO_ESTADO,
   type AusenciaDaGrade,
@@ -296,7 +297,11 @@ function CamadaDeMarcacao({
   return (
     <>
       {CELULAS.map((minuto) => {
-        const livre = horarioNaCelula(publicados, minuto, fuso);
+        // ia.vek v1.9.1: no modo agendamento, a célula DENTRO de um horário
+        // oferecido também é dele (azul, e o clique marca aquele horário).
+        const livre =
+          horarioNaCelula(publicados, minuto, fuso) ??
+          (coresAtivas ? horarioQueCobre(publicados, minuto, interacao.duracaoMin, fuso) : null);
         const inicio = instanteDoMinuto(dia, minuto, fuso);
         const fim = instanteDoMinuto(dia, minuto + PASSO_DA_CELULA_MIN, fuso);
         const ocupado = agendamentosDoDia.some(

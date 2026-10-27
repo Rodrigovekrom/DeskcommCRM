@@ -116,6 +116,26 @@ describe("v1.9.1 — as 4 cores", () => {
     expect(container.querySelectorAll('[data-estado="livre"]').length).toBeGreaterThan(0);
   });
 
+  it("ajuste: o horário oferecido fica azul INTEIRO (60 min = as duas células) e qualquer parte marca o mesmo horário", () => {
+    modo = true;
+    const onMarcarEm = vi.fn();
+    const { container } = render(
+      <GradeDaAgenda
+        visao="dia"
+        ancora={new Date(`${DIA}T12:00:00`)}
+        agora={new Date(`${DIA}T07:30:00`)}
+        fuso={Intl.DateTimeFormat().resolvedOptions().timeZone}
+        pessoas={PESSOAS}
+        agendamentos={[]}
+        interacao={{ horariosPorDia: { [DIA]: [{ instante: `${DIA}T11:00:00.000`, rotulo: "11:00" }] }, motivo: null, duracaoMin: 60, onMarcarEm }}
+      />,
+    );
+    const azuis = [...container.querySelectorAll('button[data-estado="livre"]')].map((b) => b.getAttribute("data-testid"));
+    expect(azuis).toEqual([`bloco-${DIA}-11:00`, `bloco-${DIA}-11:30`]);
+    (container.querySelector(`[data-testid="bloco-${DIA}-11:30"]`) as HTMLButtonElement).click();
+    expect(onMarcarEm).toHaveBeenCalledWith(`${DIA}T11:00:00.000`);
+  });
+
   it("fora do modo (a loja): nada disso aparece — a grade de sempre", () => {
     const { container } = montar();
     expect(screen.queryByTestId("legenda-da-agenda")).toBeNull();

@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { useT } from "@/hooks/i18n/useT";
+import { minutoDoDia } from "@/lib/agenda/grade-interativa";
 
 /**
  * ia.vek v1.9.1 — as 4 CORES DA AGENDA no modo agendamento (clínica).
@@ -47,6 +48,30 @@ export function corDoCompromisso(situacao: string): { fundo: string; borda: stri
   if (situacao === "confirmed" || situacao === "completed") return COR_DO_ESTADO.agendado;
   if (situacao === "pending") return COR_DO_ESTADO.pre_agendado;
   return null;
+}
+
+/**
+ * v1.9.1 (ajuste): o horário oferecido que COBRE a célula — para o azul pintar o
+ * horário inteiro (60 min = duas células), e não só a célula de início. Clicar
+ * em qualquer parte do azul marca aquele horário (o instante PUBLICADO, nunca um
+ * calculado). Escolhe o que começa mais tarde entre os que cobrem.
+ */
+export function horarioQueCobre<H extends { instante: string }>(
+  publicados: readonly H[],
+  celulaMinuto: number,
+  duracaoMin: number,
+  fuso: string,
+): H | null {
+  let escolhido: H | null = null;
+  let melhor = Number.NEGATIVE_INFINITY;
+  for (const h of publicados) {
+    const m = minutoDoDia(h.instante, fuso);
+    if (m <= celulaMinuto && celulaMinuto < m + duracaoMin && m > melhor) {
+      melhor = m;
+      escolhido = h;
+    }
+  }
+  return escolhido;
 }
 
 /** Converte as exceções da agenda (`calendar_availability_exceptions`) nas faixas cinzas da grade. */
