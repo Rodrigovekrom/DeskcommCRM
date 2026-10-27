@@ -217,6 +217,15 @@ async function sdrMarca(
     throw erro;
   }
   const appointmentId = typeof compromisso.id === "string" ? compromisso.id : null;
+  // Decisão do Rodrigo (27/10): ao marcar, o LEAD passa para o vendedor e o SDR
+  // fica de GUARDIÃO — o cliente aparece no Pipeline do vendedor.
+  const leadPassado = await passarOLeadAoVendedor(admin, {
+    orgId,
+    sdrId: authz.user.id,
+    vendedorId,
+    leadId: pedido.lead_id,
+    contactId: pedido.contact_id,
+  });
   const { data: confirmado } = await admin
     .from("iavek_pedidos_de_agendamento")
     .update({ appointment_id: appointmentId, updated_at: new Date().toISOString() })
@@ -231,7 +240,7 @@ async function sdrMarca(
     resourceType: "calendar_appointment",
     resourceId: appointmentId ?? pedido.id,
     requestId,
-    metadata: { pedido_id: pedido.id, vendedor_id: vendedorId },
+    metadata: { pedido_id: pedido.id, vendedor_id: vendedorId, lead_passado: leadPassado },
   });
   const { data: contato } = await admin
     .from("contacts")
@@ -249,6 +258,56 @@ async function sdrMarca(
     quando: new Date(pedido.quando).toISOString(),
   });
   return ok({ pedido: (confirmado ?? pedido) as PedidoGravado, compromisso }, { requestId, status: 201 });
+}
+
+/**
+ * Passa o lead do cliente para o vendedor, com o SDR como guardião. Primeiro
+ * com a SESSÃO do SDR (o aviso "passou o lead" sai no nome dele, e o gatilho
+ * 0579 grava o guardião); se a RLS não deixar (lead sem dono, da IA ou de
+ * outra pessoa), pelo servidor, gravando o guardião aqui. Guardião que já
+ * existia fica. Sem lead aberto do cliente: não passa nada (`null`).
+ */
+async function passarOLeadAoVendedor(
+  admin: ReturnType<typeof createAdminClient>,
+  args: { orgId: string; sdrId: string; vendedorId: string; leadId: string | null; contactId: string },
+): Promise<string | null> {
+  let consulta = admin
+    .from("crm_leads")
+    .select("id, owner_user_id, sdr_user_id")
+    .eq("organization_id", args.orgId)
+    .eq("contact_id", args.contactId)
+    .eq("status", "open")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (args.leadId) consulta = consulta.eq("id", args.leadId);
+  const { data: lead } = await consulta.maybeSingle();
+  if (!lead) return null;
+  if (lead.owner_user_id === args.vendedorId) return lead.id as string;
+  const guardiao = (lead.sdr_user_id as string | null) ?? args.sdrId;
+  const mudanca = {
+    owner_user_id: args.vendedorId,
+    owner_kind: "user",
+    owner_agent_id: null,
+    sdr_user_id: guardiao,
+    assigned_at: new Date().toISOString(),
+  };
+  const sessao = await createClient();
+  const { data: peloSdr } = await sessao
+    .from("crm_leads")
+    .update(mudanca)
+    .eq("organization_id", args.orgId)
+    .eq("id", lead.id)
+    .select("id")
+    .maybeSingle();
+  if (peloSdr) return lead.id as string;
+  const { data: peloServidor } = await admin
+    .from("crm_leads")
+    .update(mudanca)
+    .eq("organization_id", args.orgId)
+    .eq("id", lead.id)
+    .select("id")
+    .maybeSingle();
+  return peloServidor ? (lead.id as string) : null;
 }
 
 /** Sem tipo escolhido: o único tipo ativo da empresa, se houver um só. */
