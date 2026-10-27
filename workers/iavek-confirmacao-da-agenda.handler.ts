@@ -16,6 +16,7 @@ export const iavekConfirmacaoDaAgendaHandler: EventHandler = {
     const r = await confirmarPeloWhatsApp(row as never);
     if (r.status === "ok") return { consumer_key: IAVEK_CONFIRMACAO_HANDLER_KEY, status: "ok", detail: r.detail };
     if (r.status === "skipped") return { consumer_key: IAVEK_CONFIRMACAO_HANDLER_KEY, status: "skipped", detail: r.reason };
+    if (r.status === "retry") return { consumer_key: IAVEK_CONFIRMACAO_HANDLER_KEY, status: "retry", retry_at: r.retryAt, detail: r.reason };
     return { consumer_key: IAVEK_CONFIRMACAO_HANDLER_KEY, status: "error", detail: r.reason };
   },
 };

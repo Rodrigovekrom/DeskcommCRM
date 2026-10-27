@@ -20,12 +20,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * O mesmo caminho e as mesmas regras do lembrete (`app/api/v1/cron/agenda-
  * reminder`): transacional (não é campanha), contato bloqueado ou sem telefone
  * não recebe, canal WORKING da empresa, espaçamento anti-banimento e a janela de
- * envio do canal. Fora da janela, NÃO reenvia depois: a confirmação é de agora,
- * e o lembrete do tipo (se ligado) cobre a véspera.
+ * envio do canal. Fora da janela, o evento é REAGENDADO para quando ela abrir
+ * (o dispatcher reagenda sem contar tentativa); na nova tentativa tudo é
+ * conferido de novo (ainda confirmado, ainda no futuro).
  */
 export type ResultadoDaConfirmacao =
   | { status: "ok"; detail: string }
   | { status: "skipped"; reason: string }
+  | { status: "retry"; retryAt: string; reason: string }
   | { status: "error"; reason: string };
 
 export async function confirmarPeloWhatsApp(row: {
@@ -71,7 +73,10 @@ export async function confirmarPeloWhatsApp(row: {
       .limit(1)
       .maybeSingle();
     if (!canal) return { status: "skipped", reason: "sem_canal" };
-    if (await adiarAteAJanelaAbrir(admin, org, canal.id)) return { status: "skipped", reason: "fora_da_janela" };
+    // Fora da janela de envio (ex.: a recepção confirmou às 23h): tenta de novo
+    // quando a janela abrir — a clínica confirmou, a cliente tem de saber.
+    const abre = await adiarAteAJanelaAbrir(admin, org, canal.id);
+    if (abre) return { status: "retry", retryAt: abre, reason: "fora_da_janela" };
 
     const { data: organizacao } = await admin.from("organizations").select("locale").eq("id", org).maybeSingle();
     const corpo = textoDaConfirmacao({

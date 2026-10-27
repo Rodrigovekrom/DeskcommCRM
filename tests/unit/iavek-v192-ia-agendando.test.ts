@@ -98,6 +98,12 @@ describe("v1.9.2 — prompt-base e confirmação", () => {
     expect(r).toEqual({ status: "skipped", reason: "fora_do_modo_agendamento" });
   });
 
+  it("fora da janela de envio, a confirmação é REAGENDADA para quando a janela abrir (não se perde)", () => {
+    const w = ler("workers/iavek-confirmacao-da-agenda.ts");
+    expect(w).toContain('if (abre) return { status: "retry", retryAt: abre, reason: "fora_da_janela" };');
+    expect(ler("workers/iavek-confirmacao-da-agenda.handler.ts")).toContain('status: "retry", retry_at: r.retryAt');
+  });
+
   it("o consumidor está registrado, ouve só appointment.confirmed e pula org parada", () => {
     expect(ler("lib/event-log/register-handlers.ts")).toContain("registerHandler(iavekConfirmacaoDaAgendaHandler);");
     const h = ler("workers/iavek-confirmacao-da-agenda.handler.ts");
