@@ -50,6 +50,7 @@ import { mediaDeriveHandler } from "@/workers/media-derive-worker.handler";
 import { mediaPersistHandler } from "@/workers/media-persist-worker.handler";
 import { ragIndexerHandler } from "@/workers/rag-indexer.handler";
 import { iavekNotaDoAtendimentoHandler } from "@/workers/iavek-nota-do-atendimento.handler";
+import { iavekConfirmacaoDaAgendaHandler } from "@/workers/iavek-confirmacao-da-agenda.handler";
 
 const RODA: EventHandler[] = [
   followupReactivityHandler,
@@ -64,6 +65,7 @@ const RODA: EventHandler[] = [
 const PULA: EventHandler[] = [
   // ia.vek v1.8.4: chama a IA — custa dinheiro.
   iavekNotaDoAtendimentoHandler,
+  iavekConfirmacaoDaAgendaHandler,
   aiResponseHandler,
   aiSentimentHandler,
   aiHandoffFromSentimentHandler,

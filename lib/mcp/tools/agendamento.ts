@@ -18,6 +18,7 @@
  * dentro, e é o que separa esta chamada de um vazamento entre organizações.
  */
 import { gravarPedidoDeAgendamento } from "@/lib/iavek/pedidos-de-agendamento";
+import { agendaDaIaDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { z } from "zod";
 
 import {
@@ -104,14 +105,18 @@ function espalhaPorDia(
 const tiposShape = {};
 
 /**
- * ia.vek v1.7.6: a IA ainda NÃO agenda sozinha — ela registra pedido de
+ * ia.vek v1.7.6: a IA NÃO agenda sozinha na loja — ela registra pedido de
  * agendamento, e o admin confirma. O caminho para a IA marcar direto no futuro
  * está preparado: `IAVEK_IA_AGENDA_SOZINHA=1` no ambiente religa o motor de
  * sempre (marcar, remarcar, cancelar). Desligado por padrão; é o que a suíte
  * do motor liga para continuar medindo o produto.
  */
-export function iaAgendaSozinha(): boolean {
-  return process.env.IAVEK_IA_AGENDA_SOZINHA === "1";
+export async function iaAgendaSozinha(organizationId: string): Promise<boolean> {
+  // ia.vek v1.9.2: a chave é POR EMPRESA — o modo agendamento (clínica). A do
+  // ambiente só vale na suíte de testes (NODE_ENV=test), que mede o motor de
+  // sempre; em produção ela não liga nada, e a Fenômenos segue no pedido.
+  if (process.env.NODE_ENV === "test" && process.env.IAVEK_IA_AGENDA_SOZINHA === "1") return true;
+  return (await agendaDaIaDaOrg(organizationId)).modo;
 }
 
 export const crmListEventTypes: McpToolDefinition<typeof tiposShape> = {
@@ -709,7 +714,7 @@ export const crmBookAppointment: McpToolDefinition<typeof marcarShape> = {
       }
       // ia.vek v1.7.6: a IA (e qualquer integração) NÃO marca direto — ela
       // registra um PEDIDO, que o admin confirma. Não reserva horário.
-      if (!iaAgendaSozinha() && ctx.actor.type !== "user") {
+      if (ctx.actor.type !== "user" && !(await iaAgendaSozinha(ctx.organizationId))) {
         const r = await gravarPedidoDeAgendamento(ctx.supabase, {
           orgId: ctx.organizationId,
           input: {
@@ -1073,7 +1078,7 @@ export const crmRescheduleAppointment: McpToolDefinition<typeof remarcarShape> =
   handler: async (input, ctx) =>
     semDerrubarOTurno("remarcado", async () => {
       // ia.vek v1.7.6: só o admin mexe na agenda; a IA não remarcar compromisso.
-      if (!iaAgendaSozinha() && ctx.actor.type !== "user") {
+      if (ctx.actor.type !== "user" && !(await iaAgendaSozinha(ctx.organizationId))) {
         return {
           remarcado: false,
           motivo: "so_a_equipe_mexe_na_agenda",
@@ -1122,7 +1127,7 @@ export const crmCancelAppointment: McpToolDefinition<typeof cancelarShape> = {
   handler: async (input, ctx) =>
     semDerrubarOTurno("cancelado", async () => {
       // ia.vek v1.7.6: só o admin mexe na agenda; a IA não cancelar compromisso.
-      if (!iaAgendaSozinha() && ctx.actor.type !== "user") {
+      if (ctx.actor.type !== "user" && !(await iaAgendaSozinha(ctx.organizationId))) {
         return {
           cancelado: false,
           motivo: "so_a_equipe_mexe_na_agenda",

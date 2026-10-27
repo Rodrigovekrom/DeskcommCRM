@@ -316,6 +316,8 @@ export const AUDIT_ACTIONS = [
   "iavek.nota_do_atendimento_changed",
   // ia.vek v1.9.0: o perfil da empresa (loja de carros ou clínica, modo agendamento).
   "iavek.perfil_da_empresa_changed",
+  // ia.vek v1.9.2: como a IA marca na agenda (pré-agendado ou agendado).
+  "iavek.agenda_ia_changed",
   "iavek.padrao_marcado",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser

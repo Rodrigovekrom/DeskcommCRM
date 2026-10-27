@@ -78,10 +78,12 @@ describe("pedido de agendamento", () => {
     expect(podeDecidir("confirmado")).toBe(false);
     expect(podeDecidir("recusado")).toBe(false);
   });
-  it("a IA ainda não agenda sozinha (registra pedido)", () => {
+  it("na loja (fora do modo agendamento) a IA não agenda sozinha (registra pedido)", async () => {
+    // v1.9.2: a chave é por empresa; sem ler a empresa (erro de leitura) vale
+    // o mais fechado — o pedido.
     const antes = process.env.IAVEK_IA_AGENDA_SOZINHA;
     delete process.env.IAVEK_IA_AGENDA_SOZINHA;
-    expect(iaAgendaSozinha()).toBe(false);
+    expect(await iaAgendaSozinha("00000000-0000-4000-8000-000000000000")).toBe(false);
     if (antes !== undefined) process.env.IAVEK_IA_AGENDA_SOZINHA = antes;
   });
 });

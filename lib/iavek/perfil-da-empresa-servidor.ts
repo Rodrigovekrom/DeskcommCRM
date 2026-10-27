@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { AGENDA_DA_IA_PADRAO, lerAgendaDaIa, type AgendaDaIa } from "@/lib/iavek/agenda-da-ia";
 import { lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -41,4 +42,26 @@ export async function semearFunilDaClinica(admin: SupabaseClient, organizationId
     return null;
   }
   return (data as string | null) ?? null;
+}
+
+/**
+ * ia.vek v1.9.2 — o que a agenda da IA precisa saber da empresa: se está no
+ * modo agendamento (a IA marca) e como marca. NUNCA LANÇA: erro de leitura vale
+ * "fora do modo" — a IA faz pedido, como na loja (o mais fechado).
+ */
+export async function agendaDaIaDaOrg(
+  organizationId: string,
+): Promise<{ modo: boolean; config: AgendaDaIa }> {
+  try {
+    const { data, error } = await createAdminClient()
+      .from("organizations")
+      .select("settings")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (error) return { modo: false, config: { ...AGENDA_DA_IA_PADRAO } };
+    const settings = (data as { settings?: unknown } | null)?.settings;
+    return { modo: lerPerfilDaEmpresa(settings).modo_agendamento, config: lerAgendaDaIa(settings) };
+  } catch {
+    return { modo: false, config: { ...AGENDA_DA_IA_PADRAO } };
+  }
 }

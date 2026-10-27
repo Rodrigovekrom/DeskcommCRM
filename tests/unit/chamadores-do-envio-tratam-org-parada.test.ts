@@ -18,6 +18,7 @@ const TRATA = "trata";
 
 const CHAMADORES: Record<string, string> = {
   "app/api/v1/cron/agenda-reminder/route.ts": TRATA, // tests/unit/lembrete-pula-org-parada.test.ts
+  "workers/iavek-confirmacao-da-agenda.ts": TRATA, // ia.vek v1.9.2: devolve skipped org_nao_operante (tests/unit/iavek-v192-ia-agendando.test.ts)
   "lib/campanhas/rodada.ts": TRATA, // registrarExcecaoDoEnvio, tests/unit/suspensao-nao-dispara-campanha.test.ts
   "lib/prospecting/worker.ts": TRATA, // tests/unit/prospecting-worker.test.ts
   "lib/followup/enviar-texto-fixo.ts": TRATA, // lib/followup/enviar-texto-fixo.test.ts

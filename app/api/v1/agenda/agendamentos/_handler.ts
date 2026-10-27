@@ -1,4 +1,6 @@
 import { cabeMaisUm } from "@/lib/iavek/capacidade-da-agenda";
+import { statusDaMarcacaoDaIa } from "@/lib/iavek/agenda-da-ia";
+import { agendaDaIaDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { randomUUID } from "node:crypto";
 import type { Json } from "@/lib/database.types";
 /**
@@ -399,6 +401,15 @@ async function executarCriacaoDeAgendamento(
   }
   const delivery = booking ? { state:"waiting_for_link",generation:randomUUID(),service_boundary:booking.boundary,source_operation_id:booking.sourceJobId,
     booking_claim:booking.claim,authorized_by:{kind:ctx.actor.type,id:ctx.actor.id} } : {state:"none"};
+  // ia.vek v1.9.2: no MODO AGENDAMENTO a IA (e a integração) marca como a
+  // empresa escolheu — pré-agendado (padrão) ou agendado. Pessoa da equipe e
+  // empresa fora do modo seguem a regra do tipo, como sempre.
+  const agendaDaIa = ctx.actor.type !== "user" ? await agendaDaIaDaOrg(ctx.organization_id) : null;
+  const statusDaMarcacao: "pending" | "confirmed" = agendaDaIa?.modo
+    ? statusDaMarcacaoDaIa(agendaDaIa.config)
+    : tipo.requires_confirmation
+      ? "pending"
+      : "confirmed";
   const { data: criado, error: erroInsert } = await supabase
     .from("calendar_appointments")
     .insert({
@@ -410,7 +421,7 @@ async function executarCriacaoDeAgendamento(
       // O fuso do compromisso é campo de primeira classe: é o da JORNADA, onde
       // o horário foi decidido, e ele viaja até o lembrete (ACHADO 09).
       time_zone: consulta.fusoDaRegra,
-      status: tipo.requires_confirmation ? "pending" : "confirmed",
+      status: statusDaMarcacao,
       owner_user_id: donoId,
       contact_id: input.contact_id ?? null,
       conversation_id: booking?.boundary.conversation_id ?? input.conversation_id ?? null,
