@@ -60,8 +60,12 @@ export function ResponsavelNoCartao({
         <span className="font-medium text-text" data-testid="responsavel-nome">
           {dono ?? (donoId ? "…" : t("Sem dono"))}
         </span>
-        {guardiao && <span className="text-text-muted"> · {t("Guardião")}: {guardiao}</span>}
       </p>
+      {guardiao && (
+        <p className="truncate" title={guardiao} data-testid="guardiao-do-lead">
+          <span className="text-text-muted">{t("Guardião")}:</span> {guardiao}
+        </p>
+      )}
       <p className="truncate" title={objetivo?.titulo} data-testid="objetivo-do-lead">
         <span className="text-text-muted">{t("Objetivo")}:</span>{" "}
         {objetivo ? (
