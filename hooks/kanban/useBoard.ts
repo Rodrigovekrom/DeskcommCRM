@@ -181,6 +181,48 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
     enabled: !!pipelineId,
   });
 
+  // ia.vek v1.9.5 (CRM-179): a PRÉVIA DA ÚLTIMA MENSAGEM no cartão muda sem
+  // recarregar. A prévia mora na CONVERSA (`last_message_preview`), não no
+  // lead — então o canal acima, que escuta `crm_leads`, nunca a via. Este
+  // escuta as conversas da empresa (a RLS entrega só as que a pessoa vê) e
+  // recarrega o quadro quando a conversa de um cliente DESTE quadro muda,
+  // juntando a rajada de mensagens numa leitura só.
+  const orgDoQuadro = (query.data as BoardData | undefined)?.pipeline?.organization_id ?? null;
+  const contatosDoQuadro = useRef<Set<string>>(new Set());
+  contatosDoQuadro.current = new Set(
+    ((query.data as BoardData | undefined)?.leads ?? [])
+      .map((l) => (l as { contact_id?: string | null }).contact_id)
+      .filter((c): c is string => Boolean(c)),
+  );
+  const agrupadorDaConversa = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aoMudarAConversa = useCallback(
+    (payload: unknown) => {
+      const nova = (payload as { new?: { contact_id?: string | null } } | null)?.new;
+      if (!nova?.contact_id || !contatosDoQuadro.current.has(nova.contact_id)) return;
+      if (agrupadorDaConversa.current) return;
+      agrupadorDaConversa.current = setTimeout(() => {
+        agrupadorDaConversa.current = null;
+        void qc.invalidateQueries({ queryKey });
+      }, Math.max(agruparEventosMs, 1_500));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo
+    [qc, pipelineId, escopo, agruparEventosMs],
+  );
+  useRealtimeChannel({
+    name: pipelineId && orgDoQuadro ? `kanban-conversas-${pipelineId}${escopo ? `-${escopo}` : ""}` : "kanban-conversas-disabled",
+    postgresChanges: orgDoQuadro
+      ? { event: "UPDATE", schema: "public", table: "conversations", filter: `organization_id=eq.${orgDoQuadro}` }
+      : undefined,
+    onChange: aoMudarAConversa,
+    enabled: !!pipelineId && !!orgDoQuadro,
+  });
+  useEffect(
+    () => () => {
+      if (agrupadorDaConversa.current) clearTimeout(agrupadorDaConversa.current);
+    },
+    [],
+  );
+
   // Timers pendentes morrem com o componente — senão um setState chega depois
   // do unmount e o React reclama (e o Map de timers vaza).
   useEffect(() => {

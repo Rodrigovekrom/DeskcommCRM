@@ -45,6 +45,7 @@ import {
 } from "@/lib/iavek/passagem-servidor";
 import { ehLojaDeCarros, lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { vendedoresDaLoja } from "@/lib/iavek/sdr-marca-direto";
+import { objetivosDosLeads, pessoasDosLeads } from "@/lib/iavek/responsavel-do-lead";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
@@ -131,11 +132,25 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (c.lead.sdr_user_id) pessoas.add(c.lead.sdr_user_id);
   const nomes = await nomesDosAtendentes([...pessoas]);
   const nome = (id: unknown) => (typeof id === "string" ? (nomes.get(id) ?? null) : null);
+  // v1.9.5 (CRM-196): a função de quem cuida e o objetivo atual do lead.
+  const [funcoes, objetivos] = await Promise.all([
+    pessoasDosLeads(admin, authz.org.orgId, [c.lead.owner_user_id, c.lead.sdr_user_id].filter((x): x is string => Boolean(x))),
+    objetivosDosLeads(admin, authz.org.orgId, [leadId]),
+  ]);
   return ok(
     {
       loja: c.loja,
-      dono: { id: c.lead.owner_user_id, nome: nome(c.lead.owner_user_id) },
-      guardiao: { id: c.lead.sdr_user_id, nome: nome(c.lead.sdr_user_id) },
+      dono: {
+        id: c.lead.owner_user_id,
+        nome: nome(c.lead.owner_user_id),
+        funcao: c.lead.owner_user_id ? (funcoes[c.lead.owner_user_id]?.funcao ?? null) : null,
+      },
+      guardiao: {
+        id: c.lead.sdr_user_id,
+        nome: nome(c.lead.sdr_user_id),
+        funcao: c.lead.sdr_user_id ? (funcoes[c.lead.sdr_user_id]?.funcao ?? null) : null,
+      },
+      objetivo: objetivos[leadId] ?? null,
       dentro_das_72h: c.dentroDas72h,
       fim_das_72h: new Date(Date.parse(nascimentoDoLead(c.lead)) + c.horas * 3_600_000).toISOString(),
       no_followup: c.noFollowup,

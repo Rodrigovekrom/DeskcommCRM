@@ -6,6 +6,7 @@ import { createContext, useContext } from "react";
 import { DadosDaCompraNoCard, DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { ConversaNoQuadroContext } from "@/components/iavek/conversa-no-quadro-contexto";
 import { SeloIncompleto } from "@/components/iavek/CamposObrigatorios";
+import { ResponsavelNoCartao } from "@/components/iavek/ResponsavelDoLead";
 import { useNomeDoCarro } from "@/components/contacts/CampoDoCatalogo";
 import { temAlvoParaAbrir } from "@/components/kanban/AbrirConversaDoLead";
 import { useT } from "@/hooks/i18n/useT";
@@ -80,6 +81,15 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
           t("Ainda sem conversa")
         )}
       </p>
+      {/* ia.vek v1.9.5 (CRM-196): responsável com a função, guardião e objetivo atual. */}
+      {lojaDeCarros && (
+        <ResponsavelNoCartao
+          pipelineId={pipelineId}
+          leadId={lead.id}
+          donoId={lead.owner_user_id ?? null}
+          guardiaoId={(lead as { sdr_user_id?: string | null }).sdr_user_id ?? null}
+        />
+      )}
       <DadosDaCompraNoCardContext.Provider value={{ ligado: true }}>
         <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
       </DadosDaCompraNoCardContext.Provider>

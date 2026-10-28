@@ -34,8 +34,9 @@ interface Historico {
 }
 interface DadosDaPassagem {
   loja: boolean;
-  dono: { id: string | null; nome: string | null };
-  guardiao: { id: string | null; nome: string | null };
+  dono: { id: string | null; nome: string | null; funcao: string | null };
+  guardiao: { id: string | null; nome: string | null; funcao: string | null };
+  objetivo: { titulo: string; vence_em: string | null } | null;
   dentro_das_72h: boolean;
   fim_das_72h: string;
   no_followup: boolean;
@@ -171,9 +172,16 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
               : t("72h encerradas")}
         </span>
       </div>
-      <p className="text-xs">
-        {t("Com")}: <strong>{data.dono.nome ?? t("sem dono")}</strong>
-        {data.guardiao.nome ? ` · ${t("Guardião")}: ${data.guardiao.nome}` : ""}
+      <p className="text-xs" data-testid="passagem-responsavel">
+        {t("Responsável")}: <strong>{data.dono.nome ?? t("sem dono")}</strong>
+        {data.dono.funcao ? ` (${data.dono.funcao})` : ""}
+        {data.guardiao.nome && data.guardiao.id !== data.dono.id
+          ? ` · ${t("Guardião")}: ${data.guardiao.nome}${data.guardiao.funcao ? ` (${data.guardiao.funcao})` : ""}`
+          : ""}
+      </p>
+      <p className="text-xs" data-testid="passagem-objetivo">
+        {t("Objetivo")}:{" "}
+        {data.objetivo ? `${data.objetivo.titulo}${data.objetivo.vence_em ? ` · ${dataHora(data.objetivo.vence_em)}` : ""}` : t("sem próximo passo")}
       </p>
       {data.faltam.length > 0 && (
         <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="passagem-faltam">

@@ -1529,6 +1529,9 @@ export const DICIONARIO: Traducoes = {
   "Prompt-base da clínica (para colar no agente de IA)": { es: "Prompt base de la clínica (para pegar en el agente de IA)" },
   "A IA só marca na agenda com o modo agendamento ligado.": { es: "La IA solo agenda con el modo agenda activado." },
   "Agendado 100%": { es: "Agendado 100%" },
+  // ia.vek v1.9.5: responsável e objetivo no cartão.
+  "Objetivo": { es: "Objetivo" },
+  "sem próximo passo": { es: "sin próximo paso" },
   // ia.vek v1.9.4: o trajeto do lead em 72h (passagens, motivos, follow-up).
   "0 a 7 dias": { es: "0 a 7 días" },
   "15 a 30 dias": { es: "15 a 30 días" },
