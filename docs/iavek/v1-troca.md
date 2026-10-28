@@ -38,9 +38,18 @@ O logo da rede de nós aparece quando a instalação se chama **`ia.vek`**
 (`DEFAULT_APP_NAME`) não foi editado: o repositório tem testes que travam essa
 constante.
 
-**O fork não leva migration.** Configuração nova mora em `organizations.settings`
-(JSON), para não colidir com a numeração do upstream. Por isso o canário, que usa
-o banco da produção, prova a versão inteira.
+**O fork leva migration desde a v1.7 (0579 em diante).** Cada migration nova é
+um arquivo em `supabase/migrations/` (com a linha `-- manifest:`) **e** um
+bloco no apêndice do `supabase/baseline.sql`. Ela é provada em três lugares antes
+da produção:
+
+1. no CI **`iavek-banco`** (dispara sozinho no push quando há migration): Postgres
+   15 e 17, baseline instalado do zero e atualizado, mais os invariantes;
+2. no **banco de teste**, onde é aplicada para o canário e para a prova pela tela;
+3. no próprio **`trocar-vX.sh`**, que faz um **ensaio** na produção (aplica dentro
+   de uma transação e desfaz) antes do backup e da aplicação de verdade.
+
+Configuração que não precisa de schema continua em `organizations.settings` (JSON).
 
 ## 1. Publicar as imagens
 
@@ -72,8 +81,13 @@ acesse `http://localhost:3901/login`:
 ssh -i ~/.ssh/iavek_vps -p 22022 -L 3901:127.0.0.1:3901 root@143.95.173.212
 ```
 
-O canário lê **o mesmo banco da produção**: só olhar e navegar, sem salvar
-configuração por ali. O worker e o scheduler da tag não sobem no canário.
+Desde 20/10/2026 o canário usa **sempre o banco de TESTE** (projeto
+`jsuahfckxyorwetbpqvl`), nunca o da produção: o `canario.sh` recusa outro banco, e
+WhatsApp e e-mail ficam desligados nele. Pode navegar, salvar e provar à vontade;
+as contas de teste ficam em `/root/iavek-teste-usuarios.txt` no servidor (as
+senhas nunca saem de lá). O worker e o scheduler da tag não sobem no canário:
+quando a prova precisa de um cron, ele é chamado de dentro do contêiner do canário.
+Toda troca bem-sucedida remove o canário; depois dela, suba-o de novo.
 
 ## 3. Trocar (só com OK explícito do Rodrigo para aquela troca)
 
@@ -122,9 +136,10 @@ chaves vivas).
   `POST /api/v1/system/update` é recusado (410), mesmo que o `agent.sh` do kit
   seja religado no servidor. Nunca rodar o `update.sh` do upstream: ele troca as
   imagens do ia.vek pelas do DeskcommCRM.
-- Se algum dia uma mudança precisar de migration, o canário **não** basta (ele
-  usa o banco da produção): o schema precisa ser aplicado e provado antes, num
-  banco à parte.
+- Mudança com migration: o caminho é o de "O que o fork muda" (CI `iavek-banco`, banco de
+  teste, ensaio no `trocar-vX.sh`). Mudança só de dados da produção (ex.: o funil
+  da v1.9.3, o trajeto da v1.9.4) vai num SQL à parte, com **foto de antes** e
+  **script de volta**, provado antes no banco de teste.
 
 ## Prova da sincronização do Altimus (v1.3)
 
