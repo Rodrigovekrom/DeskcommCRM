@@ -13,6 +13,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
+  ehPerdaDeVerdade,
   ehPeriodo,
   limitesDoPeriodo,
   topMotivos,
@@ -147,7 +148,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     if (ganhos.error) throw new Error(ganhos.error.message);
     if (perdidos.error) throw new Error(perdidos.error.message);
     const vendas = (ganhos.data ?? []) as Array<{ value_cents: number | null }>;
-    const perdas = (perdidos.data ?? []) as Array<{ lost_reason: string | null }>;
+    // "Levado para outro funil" é passagem, não perda (ver `ehPerdaDeVerdade`).
+    const perdas = ((perdidos.data ?? []) as Array<{ lost_reason: string | null }>).filter((p) => ehPerdaDeVerdade(p.lost_reason));
     const numeros: NumerosDoVendedor = {
       visao: "vendedor",
       carteira_aberta: carteira,
