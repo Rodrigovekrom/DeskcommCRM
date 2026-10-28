@@ -71,7 +71,7 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
   const parar = (e: React.SyntheticEvent) => e.stopPropagation();
 
   return (
-    <div className="mt-1 flex flex-col gap-1.5 text-xs" data-testid="cartao-iavek">
+    <div className="mt-1 flex flex-col gap-1.5 text-xs" data-testid="cartao-iavek" data-lead-id={lead.id}>
       <p className="text-text-muted" data-testid="ultimo-horario">
         {falou ? (
           <>

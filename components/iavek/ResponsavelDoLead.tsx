@@ -54,7 +54,7 @@ export function ResponsavelNoCartao({
     ? new Intl.DateTimeFormat(idioma, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(objetivo.vence_em))
     : null;
   return (
-    <div className="space-y-0.5" data-testid="responsavel-no-cartao">
+    <div className="space-y-0.5" data-testid="responsavel-e-objetivo">
       <p className="truncate" title={dono ?? undefined}>
         <span className="text-text-muted">{t("Responsável")}:</span>{" "}
         <span className="font-medium text-text" data-testid="responsavel-nome">
