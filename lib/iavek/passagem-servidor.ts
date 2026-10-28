@@ -7,6 +7,7 @@ import { ETAPA_DA_PASSAGEM, type CamposDaPassagem, type TipoDePassagem } from "@
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
+import { registrarTrocaDeComando } from "@/lib/inbox/atividade-de-comando";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 
@@ -285,6 +286,7 @@ export async function reativarLead(
     });
   }
   if (guardiao) {
+    await passarAConversa(admin, { orgId: lead.organization_id, contactId: lead.contact_id, para: guardiao, actor: ctx.actor, motivo: "O lead reativou e voltou ao SDR" });
     await avisoDaPassagem(admin, {
       orgId: lead.organization_id,
       leadId: novo.id,
@@ -313,4 +315,54 @@ export async function nomeDoCliente(
     .eq("id", contactId)
     .maybeSingle();
   return data ? rotuloDoContato(data as never, t) : null;
+}
+
+/**
+ * A CONVERSA vai junto com o lead: sem isto o novo dono abria "Conversa não
+ * encontrada ou fora do seu acesso" (a conversa seguia atribuída ao SDR). O
+ * guardião continua vendo — a RLS deixa o SDR ler as conversas dos contatos
+ * que guarda (`fn_iavek_contatos_que_guardo`). O MESMO caminho da transferência
+ * da tela (`fn_conversation_assign`, motivo `transfer`).
+ */
+export async function passarAConversa(
+  admin: SupabaseClient,
+  args: { orgId: string; contactId: string | null; para: string | null; actor: Actor; motivo: string },
+): Promise<void> {
+  if (!args.contactId || !args.para) return;
+  const { data: conversa } = await admin
+    .from("conversations")
+    .select("id, assigned_to_user_id")
+    .eq("organization_id", args.orgId)
+    .eq("contact_id", args.contactId)
+    .eq("is_group", false)
+    .neq("status", "archived")
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  const c = conversa as { id: string; assigned_to_user_id: string | null } | null;
+  if (!c || c.assigned_to_user_id === args.para) return;
+  const { error } = await admin.rpc("fn_conversation_assign", {
+    p_organization_id: args.orgId,
+    p_conversation_id: c.id,
+    p_to_user_id: args.para,
+    p_reason: "transfer",
+    p_enforce_expected: false,
+  });
+  if (error) {
+    logger.warn("[iavek-passagem] a conversa não foi junto com o lead", {
+      organization_id: args.orgId,
+      conversation_id: c.id,
+      causa: error.message.slice(0, 200),
+    });
+    return;
+  }
+  await registrarTrocaDeComando({
+    supabase: admin,
+    organizationId: args.orgId,
+    conversationId: c.id,
+    contactId: args.contactId,
+    tipo: "conversation_transferred",
+    actor: args.actor,
+    motivo: args.motivo,
+  });
 }

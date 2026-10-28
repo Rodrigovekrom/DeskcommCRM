@@ -41,7 +41,13 @@ import {
   camposQueFaltam,
   type CamposDaPassagem,
 } from "@/lib/iavek/passagem";
-import { anotarCampos, lerLeadDaPassagem, moverParaAEtapaDaPassagem, registrarPassagem } from "@/lib/iavek/passagem-servidor";
+import {
+  anotarCampos,
+  lerLeadDaPassagem,
+  moverParaAEtapaDaPassagem,
+  passarAConversa,
+  registrarPassagem,
+} from "@/lib/iavek/passagem-servidor";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -263,6 +269,7 @@ async function sdrMarca(
   if (lido) {
     const ctxDoSdr = { organization_id: orgId, actor: { type: "user" as const, id: authz.user.id, role: authz.org.role }, requestId };
     await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");
+    await passarAConversa(admin, { orgId, contactId: lido.contact_id, para: vendedorId, actor: ctxDoSdr.actor, motivo: "Agendou e passou o lead ao vendedor" });
     await registrarPassagem(admin, {
       lead: lido,
       actor: ctxDoSdr.actor,

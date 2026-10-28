@@ -85,6 +85,15 @@ describe("v1.9.4 — a marcação do SDR passa pela trava", () => {
   });
 });
 
+describe("v1.9.4 — a conversa vai junto com o lead", () => {
+  it("em toda passagem o novo dono recebe a conversa (o guardião segue vendo pelos contatos que guarda)", () => {
+    const r = ler("app/api/v1/iavek/passagem/route.ts");
+    expect(r.match(/await passarAConversa\(admin,/g)).toHaveLength(3);
+    expect(ler("app/api/v1/iavek/pedidos-de-agendamento/route.ts")).toContain("await passarAConversa(admin, {");
+    expect(ler("lib/iavek/passagem-servidor.ts")).toContain('p_reason: "transfer",');
+  });
+});
+
 describe("v1.9.4 — a trava ao mover olha o funil novo (0596)", () => {
   it("as etapas de compromisso do funil novo, sem a Troca arquivada", () => {
     expect(ETAPAS_QUE_TRAVAM).toEqual(["agendado-video", "qualificado", "ligacao-de-video", "ficha-feita", "ficha-aprovada", "venda-100-web", "vendido"]);

@@ -37,6 +37,7 @@ import {
   moverParaAEtapaDaPassagem,
   mudarDono,
   nomeDoCliente,
+  passarAConversa,
   nascimentoDoLead,
   reativarLead,
   registrarPassagem,
@@ -202,6 +203,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       return fail("internal_error", t("Não consegui passar o lead."), 500, { requestId });
     }
     await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: p.vendedor_id, sdr_user_id: guardiao }, "negociar");
+    await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead para negociar" });
     await criarTarefaInterna(admin, {
       organizationId: orgId,
       titulo: p.proximo_passo.o_que,
@@ -232,6 +234,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       return fail("internal_error", t("Não consegui devolver o lead."), 500, { requestId });
     }
     await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: guardiao }, "devolver");
+    await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: guardiao, actor: ctx.actor, motivo: "Devolveu o lead ao guardião" });
     await avisoDaPassagem(admin, {
       orgId,
       leadId: lead.id,
@@ -268,6 +271,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao: lead.sdr_user_id, atorId: eu }))) {
       return fail("internal_error", t("Não consegui trocar o vendedor."), 500, { requestId });
     }
+    await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead a outro vendedor" });
     // Quem perdeu o lead fica sabendo, com o motivo.
     await avisoDaPassagem(admin, {
       orgId,
