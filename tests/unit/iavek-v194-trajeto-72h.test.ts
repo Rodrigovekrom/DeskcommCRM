@@ -92,6 +92,11 @@ describe("v1.9.4 — a conversa vai junto com o lead", () => {
     expect(ler("app/api/v1/iavek/pedidos-de-agendamento/route.ts")).toContain("await passarAConversa(admin, {");
     expect(ler("lib/iavek/passagem-servidor.ts")).toContain('p_reason: "transfer",');
   });
+
+  it("o aviso de quem recebe converte só o aviso MAIS RECENTE do gatilho (sem aviso em dobro)", () => {
+    const s = ler("lib/iavek/passagem-servidor.ts");
+    expect(s).toContain('.order("created_at", { ascending: false })\n      .limit(1)\n      .maybeSingle();\n    if (doGatilho) {');
+  });
 });
 
 describe("v1.9.4 — a trava ao mover olha o funil novo (0596)", () => {

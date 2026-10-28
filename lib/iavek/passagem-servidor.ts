@@ -142,16 +142,27 @@ export async function avisoDaPassagem(
   },
 ): Promise<void> {
   if (args.converterOAvisoDoGatilho) {
-    const { data } = await admin
+    // Só o aviso MAIS RECENTE (o que esta passagem gerou) — um "passou o lead"
+    // anterior, do mesmo lead, fica como estava.
+    const { data: doGatilho } = await admin
       .from("notificacoes")
-      .update({ tipo: args.tipo, dados: args.dados, ator_user_id: args.atorId })
+      .select("id")
       .eq("organization_id", args.orgId)
       .eq("lead_id", args.leadId)
       .eq("user_id", args.para)
       .eq("tipo", "lead_passado")
       .gte("created_at", new Date(Date.now() - 120_000).toISOString())
-      .select("id");
-    if ((data ?? []).length > 0) return;
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (doGatilho) {
+      await admin
+        .from("notificacoes")
+        .update({ tipo: args.tipo, dados: args.dados, ator_user_id: args.atorId })
+        .eq("organization_id", args.orgId)
+        .eq("id", (doGatilho as { id: string }).id);
+      return;
+    }
   }
   if (args.para === args.atorId) return;
   await admin
