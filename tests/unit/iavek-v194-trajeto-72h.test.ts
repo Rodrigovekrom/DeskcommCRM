@@ -70,7 +70,7 @@ describe("v1.9.4 — quem troca o vendedor", () => {
   it("quem perde o lead é avisado, com o nome do cliente (ele não lê mais o lead)", () => {
     const r = ler("app/api/v1/iavek/passagem/route.ts");
     expect(r).toContain('tipo: "lead_retirado",');
-    expect(r).toContain("contato_nome: await nomeDoCliente(admin, orgId, lead.contact_id)");
+    expect(r).toContain("contato_nome: await nomeDoCliente(admin, orgId, lead.contact_id, t)");
     expect(r).toContain('"Depois das 72h, só o administrador troca o vendedor."');
   });
 });

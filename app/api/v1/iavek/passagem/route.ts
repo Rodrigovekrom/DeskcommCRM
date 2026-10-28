@@ -275,7 +275,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       para: anterior,
       atorId: eu,
       tipo: "lead_retirado",
-      dados: { motivo: p.motivo, contato_nome: await nomeDoCliente(admin, orgId, lead.contact_id) },
+      dados: { motivo: p.motivo, contato_nome: await nomeDoCliente(admin, orgId, lead.contact_id, t) },
       converterOAvisoDoGatilho: false,
     });
     await registrarPassagem(admin, {

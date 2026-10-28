@@ -6,6 +6,7 @@ import { entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
 import { ETAPA_DA_PASSAGEM, type CamposDaPassagem, type TipoDePassagem } from "@/lib/iavek/passagem";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
+import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 
@@ -298,14 +299,18 @@ export async function reativarLead(
 }
 
 /** O nome do cliente para o aviso de quem PERDE o lead (ele não lê mais o lead). */
-export async function nomeDoCliente(admin: SupabaseClient, orgId: string, contactId: string | null): Promise<string | null> {
+export async function nomeDoCliente(
+  admin: SupabaseClient,
+  orgId: string,
+  contactId: string | null,
+  t: (s: string) => string,
+): Promise<string | null> {
   if (!contactId) return null;
   const { data } = await admin
     .from("contacts")
-    .select("display_name, name")
+    .select("name, display_name, phone_number")
     .eq("organization_id", orgId)
     .eq("id", contactId)
     .maybeSingle();
-  const c = data as { display_name?: string | null; name?: string | null } | null;
-  return c?.display_name ?? c?.name ?? null;
+  return data ? rotuloDoContato(data as never, t) : null;
 }
