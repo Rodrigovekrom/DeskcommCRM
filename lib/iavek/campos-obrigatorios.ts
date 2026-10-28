@@ -21,7 +21,16 @@ export const CAMPOS_OBRIGATORIOS = [
   "Parcela desejável",
 ] as const;
 
-export const ETAPAS_QUE_TRAVAM = ["agendado-video", "ligacao-de-video", "qualificado", "troca", "vendido"] as const;
+// v1.9.4 (0596): as etapas de compromisso do funil novo (a "Troca" foi arquivada na v1.9.3).
+export const ETAPAS_QUE_TRAVAM = [
+  "agendado-video",
+  "qualificado",
+  "ligacao-de-video",
+  "ficha-feita",
+  "ficha-aprovada",
+  "venda-100-web",
+  "vendido",
+] as const;
 
 export const configDosObrigatoriosSchema = z.object({ ativo: z.boolean() }).strict();
 export type ConfigDosObrigatorios = z.infer<typeof configDosObrigatoriosSchema>;

@@ -31,6 +31,12 @@ export const funilDeEntradaSchema = z.strictObject({
   horas: z.number().int().min(1).max(24 * 30).default(72),
   /** Colunas que contam como COMPROMISSO (agendado, vídeo): lead nelas não passa. */
   etapas_de_compromisso: z.array(uuid).default([]),
+  /**
+   * ia.vek v1.9.4: a esteira só cuida de lead que NASCEU a partir deste
+   * instante. Ligar a esteira numa loja com centenas de leads antigos não pode
+   * mandar todos de uma vez para o follow-up (com aviso e ligação para cada um).
+   */
+  desde: z.string().datetime({ offset: true }).optional(),
 });
 
 /** O funil de follow-up: fases por dia de vida do lead, e a coluna de quem voltou. */

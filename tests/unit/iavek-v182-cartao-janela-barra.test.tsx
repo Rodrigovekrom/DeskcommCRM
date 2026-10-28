@@ -113,14 +113,16 @@ describe("v1.8.2 — campos obrigatórios", () => {
     });
   });
 
-  it("a trava só olha sessão de pessoa, o interruptor e as 5 etapas de compromisso (0590 no baseline)", () => {
+  it("a trava só olha sessão de pessoa, o interruptor e as etapas de compromisso (0590; etapas do funil novo desde a 0596)", () => {
     const b = ler("supabase/baseline.sql");
     const i = b.indexOf("-- ---- ia.vek: campos obrigatórios do lead (migration 0590) ----");
     expect(i).toBeGreaterThan(0);
     expect(i).toBeLessThan(b.indexOf("-- ---- VARREDURA anon:"));
     const bloco = b.slice(i, b.indexOf("-- ---- VARREDURA anon:"));
     expect(bloco).toContain("if auth.uid() is null or new.stage_id is not distinct from old.stage_id then");
-    expect(bloco).toContain("s.slug in ('agendado-video', 'ligacao-de-video', 'qualificado', 'troca', 'vendido')");
+    expect(bloco).toContain(
+      "and s.slug in ('agendado-video', 'qualificado', 'ligacao-de-video', 'ficha-feita',\n                                   'ficha-aprovada', 'venda-100-web', 'vendido')) then",
+    );
     expect(bloco).toContain("'campos_obrigatorios'->>'ativo')::boolean, false)");
   });
 });

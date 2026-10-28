@@ -19,6 +19,7 @@ import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
 import { logger } from "@/lib/logger";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
+import { lerLeadDaPassagem, reativarLead } from "@/lib/iavek/passagem-servidor";
 
 import { usuariosDoDestinatario, type Destinatario } from "./config";
 import {
@@ -94,13 +95,26 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         logger.warn("esteira_passagem_recusada", { organization_id: orgId, lead_id: lead.id, code: r.code });
         return { ok: false, erro: r.code };
       }
-      const clone = r.clone as LinhaDeLead;
+      const clone = r.clone as LinhaDeLead & { sdr_user_id?: string | null };
       const metadata = { ...(clone.source_metadata ?? {}), esteira_inicio: lead.inicio };
+      // v1.9.4 (Rodrigo, 27/10): no follow-up o dono é o GUARDIÃO (o SDR), não o
+      // vendedor que estava com o lead. O clone herda o guardião (gatilho 0579).
+      const { data: comGuardiao } = await admin
+        .from("crm_leads")
+        .select("sdr_user_id")
+        .eq("organization_id", orgId)
+        .eq("id", clone.id)
+        .maybeSingle();
+      const guardiao = (comGuardiao as { sdr_user_id: string | null } | null)?.sdr_user_id ?? null;
       await admin
         .from("crm_leads")
-        .update({ source_metadata: metadata })
+        .update({
+          source_metadata: metadata,
+          ...(guardiao ? { owner_user_id: guardiao, owner_kind: "user", owner_agent_id: null } : {}),
+        })
         .eq("organization_id", orgId)
         .eq("id", clone.id);
+      if (guardiao) clone.owner_user_id = guardiao;
 
       // A conversa passa para a equipe (SDR): o MESMO handoff da IA — silencia,
       // cancela os follow-ups automáticos e abre o aviso crítico na Central.
@@ -199,6 +213,21 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         .limit(1)
         .maybeSingle();
       return data ? new Date((data as { created_at: string }).created_at) : null;
+    },
+
+    async reativar(lead) {
+      const completo = await lerLeadDaPassagem(admin, orgId, lead.id);
+      if (!completo) return null;
+      const r = await reativarLead(admin, ctx, completo, {
+        atorId: null,
+        motivo: "O cliente voltou a falar no WhatsApp durante o follow-up",
+      });
+      if (!r.ok) {
+        logger.warn("esteira_reativar_falhou", { organization_id: orgId, lead_id: lead.id, code: r.erro });
+        return null;
+      }
+      const novo = await lerLeadDaPassagem(admin, orgId, r.novoLeadId);
+      return novo ? paraLeadDaEsteira(novo as unknown as LinhaDeLead) : null;
     },
 
     async marcarReengajou(lead) {

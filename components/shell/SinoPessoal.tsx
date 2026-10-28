@@ -86,6 +86,13 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
       return troca("{who} confirmou o agendamento de {lead}");
     case "pedido_de_agendamento_recusado":
       return troca("{who} recusou o pedido de agendamento de {lead}: {reason}");
+    // ia.vek v1.9.4: o trajeto das 72h.
+    case "lead_devolvido":
+      return troca("{who} devolveu {lead} para você: {reason}");
+    case "lead_retirado":
+      return troca("{who} passou {lead} para outro vendedor: {reason}");
+    case "lead_reativado":
+      return troca("{lead} voltou a falar e voltou para você (novo ciclo de 72h)");
     // ia.vek v1.9.3: o SDR marcou direto para este vendedor.
     case "agendamento_para_voce":
       return troca("{who} marcou um agendamento de {lead} para você: {when}").replace(

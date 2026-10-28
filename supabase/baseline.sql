@@ -46738,7 +46738,9 @@ begin
   end if;
   if not exists (select 1 from public.crm_stages s
                   where s.id = new.stage_id
-                    and s.slug in ('agendado-video', 'ligacao-de-video', 'qualificado', 'troca', 'vendido')) then
+                    -- ia.vek v1.9.4 (migration 0596): as etapas de compromisso do funil novo.
+                    and s.slug in ('agendado-video', 'qualificado', 'ligacao-de-video', 'ficha-feita',
+                                   'ficha-aprovada', 'venda-100-web', 'vendido')) then
     return new;
   end if;
   v_faltam := public.fn_iavek_campos_que_faltam_do_lead(new);
@@ -49328,7 +49330,11 @@ alter table public.notificacoes add constraint notificacoes_tipo_check check (ti
   'ficha_enviada',
   'ficha_decidida',
   -- ia.vek v1.9.3 (migration 0595): o SDR marcou direto para o vendedor.
-  'agendamento_para_voce'
+  'agendamento_para_voce',
+  -- ia.vek v1.9.4 (migration 0596): as trocas de mão do trajeto das 72h.
+  'lead_devolvido',
+  'lead_retirado',
+  'lead_reativado'
 ));
 
 

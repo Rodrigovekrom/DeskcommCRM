@@ -7,6 +7,7 @@ import { LeadEnrichment } from "./LeadEnrichment";
 import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
+import { PassagemDoLead } from "@/components/iavek/PassagemDoLead";
 import { PassarFicha } from "@/components/iavek/PassarFicha";
 import { PadraoDoLead } from "@/components/iavek/PadraoDoLead";
 import { ResumoNaBarra } from "@/components/iavek/ResumoNaBarra";
@@ -714,6 +715,8 @@ export function CRMSidePanel({ conversation, verMaisInicial = false }: Props) {
           observacoes={fatos}
         />
       )}
+      {/* ia.vek v1.9.4: a passagem do lead (resumo para quem recebe + as trocas de mão). */}
+      <PassagemDoLead leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />
       {/* As duas ações do atendimento ficam à vista junto do resumo. */}
       <div className="flex flex-wrap gap-2 text-xs" data-testid="acoes-na-barra">
         {/* ia.vek v1.7.6: só o admin marca; os demais PEDEM o agendamento. */}

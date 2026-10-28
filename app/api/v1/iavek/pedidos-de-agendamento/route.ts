@@ -33,6 +33,15 @@ import {
   type PedidoGravado,
 } from "@/lib/iavek/pedidos-de-agendamento";
 import { sdrMarcaDireto, vendedoresDaLoja } from "@/lib/iavek/sdr-marca-direto";
+import {
+  CAMPOS_DA_PASSAGEM,
+  CONTEXTO_MINIMO,
+  ROTULO_DO_CONTEXTO,
+  camposDaPassagemSchema,
+  camposQueFaltam,
+  type CamposDaPassagem,
+} from "@/lib/iavek/passagem";
+import { anotarCampos, lerLeadDaPassagem, moverParaAEtapaDaPassagem, registrarPassagem } from "@/lib/iavek/passagem-servidor";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -42,7 +51,12 @@ export const dynamic = "force-dynamic";
 
 const DIA = 86_400_000;
 
-const corpoSchema = pedidoDeAgendamentoSchema.extend({ vendedor_id: z.string().uuid().optional() });
+const corpoSchema = pedidoDeAgendamentoSchema.extend({
+  vendedor_id: z.string().uuid().optional(),
+  // v1.9.4 (CRM-209): a passagem por agendamento leva os 7 campos e o contexto.
+  campos: camposDaPassagemSchema.optional(),
+  contexto: z.string().trim().max(2000).optional(),
+});
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
@@ -106,8 +120,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       details: parsed.error.flatten().fieldErrors as Record<string, unknown>,
     });
   }
-  const { vendedor_id: vendedorId, ...input } = parsed.data;
-  if (vendedorId) return sdrMarca(authz, input, vendedorId, requestId);
+  const { vendedor_id: vendedorId, campos, contexto, ...input } = parsed.data;
+  if (vendedorId) return sdrMarca(authz, input, { vendedorId, campos, contexto }, requestId);
 
   const r = await gravarPedidoDeAgendamento(createAdminClient(), {
     orgId: authz.org.orgId,
@@ -142,9 +156,10 @@ type Autorizado = Extract<Awaited<ReturnType<typeof requireRole>>, { ok: true }>
 async function sdrMarca(
   authz: Autorizado,
   input: z.infer<typeof pedidoDeAgendamentoSchema>,
-  vendedorId: string,
+  passagem: { vendedorId: string; campos?: CamposDaPassagem; contexto?: string },
   requestId: string,
 ): Promise<Response> {
+  const { vendedorId } = passagem;
   const t = (s: string) => traduzir(s, authz.user.idioma);
   const orgId = authz.org.orgId;
   const admin = createAdminClient();
@@ -159,6 +174,23 @@ async function sdrMarca(
   const eventTypeId = input.event_type_id ?? (await tipoUnicoAtivo(admin, orgId));
   if (!eventTypeId) {
     return fail("validation_failed", t("Escolha o tipo de agendamento."), 422, { requestId });
+  }
+
+  // v1.9.4 — a TRAVA da passagem (CRM-209): o SDR só marca para o vendedor com
+  // os 7 campos do negócio e o contexto do atendimento. Os campos que vierem
+  // são gravados no negócio antes da conferência (o mesmo merge da tela).
+  const negocio = await leadDoCliente(admin, orgId, input.lead_id ?? null, input.contact_id);
+  if (!negocio) {
+    return fail("validation_failed", t("O cliente não tem negócio aberto para passar ao vendedor."), 422, { requestId });
+  }
+  const campos = (await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields;
+  const faltam = camposQueFaltam(campos);
+  if ((passagem.contexto ?? "").length < CONTEXTO_MINIMO) faltam.push(ROTULO_DO_CONTEXTO);
+  if (faltam.length > 0) {
+    return fail("validation_failed", `${t("Faltam campos para passar o lead")}: ${faltam.map(t).join(", ")}`, 422, {
+      requestId,
+      details: { faltam },
+    });
   }
 
   const r = await gravarPedidoDeAgendamento(admin, {
@@ -223,9 +255,32 @@ async function sdrMarca(
     orgId,
     sdrId: authz.user.id,
     vendedorId,
-    leadId: pedido.lead_id,
+    leadId: negocio.id,
     contactId: pedido.contact_id,
   });
+  // v1.9.4: o lead vai para "Agendado" e o RESUMO fica para o vendedor ler.
+  const lido = leadPassado ? await lerLeadDaPassagem(admin, orgId, leadPassado) : null;
+  if (lido) {
+    const ctxDoSdr = { organization_id: orgId, actor: { type: "user" as const, id: authz.user.id, role: authz.org.role }, requestId };
+    await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");
+    await registrarPassagem(admin, {
+      lead: lido,
+      actor: ctxDoSdr.actor,
+      tipo: "agendamento",
+      de: authz.user.id,
+      para: vendedorId,
+      detalhes: {
+        campos: Object.fromEntries(
+          Object.entries(campos ?? {}).filter(([k]) =>
+            [...CAMPOS_DA_PASSAGEM.map((x) => x.chave as string), "troca_modelo", "troca_ano"].includes(k),
+          ),
+        ),
+        contexto: passagem.contexto,
+        quando: new Date(pedido.quando).toISOString(),
+        appointment_id: appointmentId,
+      },
+    });
+  }
   const { data: confirmado } = await admin
     .from("iavek_pedidos_de_agendamento")
     .update({ appointment_id: appointmentId, updated_at: new Date().toISOString() })
@@ -267,6 +322,26 @@ async function sdrMarca(
  * outra pessoa), pelo servidor, gravando o guardião aqui. Guardião que já
  * existia fica. Sem lead aberto do cliente: não passa nada (`null`).
  */
+/** O negócio aberto do cliente (o do pedido, ou o mais recente). */
+async function leadDoCliente(
+  admin: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  leadId: string | null,
+  contactId: string,
+): Promise<{ id: string; custom_fields: Record<string, unknown> | null } | null> {
+  let consulta = admin
+    .from("crm_leads")
+    .select("id, custom_fields")
+    .eq("organization_id", orgId)
+    .eq("contact_id", contactId)
+    .eq("status", "open")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (leadId) consulta = consulta.eq("id", leadId);
+  const { data } = await consulta.maybeSingle();
+  return (data as { id: string; custom_fields: Record<string, unknown> | null } | null) ?? null;
+}
+
 async function passarOLeadAoVendedor(
   admin: ReturnType<typeof createAdminClient>,
   args: { orgId: string; sdrId: string; vendedorId: string; leadId: string | null; contactId: string },

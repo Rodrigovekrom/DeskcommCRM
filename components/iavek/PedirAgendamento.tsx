@@ -25,6 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
+import { CONTEXTO_MINIMO, type CamposDaPassagem } from "@/lib/iavek/passagem";
+import { CamposDaPassagemForm, camposIniciais, camposParaEnviar } from "@/components/iavek/CamposDaPassagemForm";
 
 interface Vendedor {
   id: string;
@@ -62,6 +64,9 @@ export function PedirAgendamento({
   const [marcaDireto, setMarcaDireto] = useState(false);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [vendedorId, setVendedorId] = useState("");
+  // v1.9.4 (CRM-209): a passagem por agendamento leva os 7 campos e o contexto.
+  const [campos, setCampos] = useState<CamposDaPassagem>({});
+  const [contexto, setContexto] = useState("");
 
   // v1.9.3: quem marca direto (SDR da loja) já sabe ao montar, para o botão
   // dizer "Marcar agendamento". Falhou a leitura: segue o pedido de sempre.
@@ -84,7 +89,8 @@ export function PedirAgendamento({
   const valido =
     Number.isFinite(alvo) &&
     alvo > abertoEm &&
-    (!marcaDireto || (Boolean(vendedorId) && (Boolean(tipoId) || tipos.length <= 1)));
+    (!marcaDireto ||
+      (Boolean(vendedorId) && (Boolean(tipoId) || tipos.length <= 1) && contexto.trim().length >= CONTEXTO_MINIMO));
 
   async function abrir() {
     const agora = Date.now();
@@ -92,7 +98,14 @@ export function PedirAgendamento({
     setQuando(paraCampoLocal(new Date(agora + 24 * 3600_000)));
     setObservacao("");
     setVendedorId("");
+    setContexto("");
     setAberto(true);
+    if (marcaDireto && leadId) {
+      apiClient
+        .get<{ data: { campos: Record<string, unknown> } }>(`/api/v1/iavek/passagem?lead_id=${leadId}`)
+        .then((r) => setCampos(camposIniciais(r.data?.campos)))
+        .catch(() => setCampos({}));
+    }
     try {
       const r = await apiClient.get<{ data: TipoDeAtendimento[] }>("/api/v1/agenda/tipos");
       setTipos((r.data ?? []).filter((x) => x.is_active !== false));
@@ -112,7 +125,7 @@ export function PedirAgendamento({
         quando: new Date(quando).toISOString(),
         ...(tipoId ? { event_type_id: tipoId } : {}),
         ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
-        ...(marcaDireto ? { vendedor_id: vendedorId } : {}),
+        ...(marcaDireto ? { vendedor_id: vendedorId, campos: camposParaEnviar(campos), contexto: contexto.trim() } : {}),
       });
       toast.success(
         marcaDireto
@@ -139,7 +152,7 @@ export function PedirAgendamento({
         {marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento")}
       </Button>
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className={marcaDireto ? "max-h-[90vh] overflow-y-auto sm:max-w-xl" : "sm:max-w-md"}>
           <DialogHeader>
             <DialogTitle>{marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento")}</DialogTitle>
             <DialogDescription>
@@ -198,6 +211,12 @@ export function PedirAgendamento({
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+            {marcaDireto && (
+              <div className="space-y-1 rounded-md border border-border p-2">
+                <p className="text-xs font-medium">{t("Para o vendedor (obrigatório)")}</p>
+                <CamposDaPassagemForm valor={campos} aoMudar={setCampos} contexto={contexto} aoMudarContexto={setContexto} />
               </div>
             )}
             <div className="space-y-1">

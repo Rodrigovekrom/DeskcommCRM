@@ -122,6 +122,12 @@ export interface DepsDaEsteira {
   /** Quando foi a última marca de reengajamento deste negócio (null = nunca). */
   ultimoReengajo(leadId: string): Promise<Date | null>;
   marcarReengajou(lead: LeadDaEsteira): Promise<void>;
+  /**
+   * ia.vek v1.9.4 (Rodrigo, 27/10): o follow-up só REATIVA — quem voltou a falar
+   * volta para o SDR (o guardião) num novo ciclo de 72h. Devolve o lead novo
+   * (no funil de entrada), ou null se não deu (fica em "Reengajou", como antes).
+   */
+  reativar?(lead: LeadDaEsteira): Promise<LeadDaEsteira | null>;
   /** `source_kind` das ligações que cada negócio já teve (qualquer status). */
   ligacoesJaCriadas(leadIds: string[]): Promise<Map<string, Set<string>>>;
   criarLigacao(lead: LeadDaEsteira, codigo: CodigoDeLigacao, venceEm: Date): Promise<boolean>;
@@ -168,7 +174,11 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   };
 
   // ── 1 e 4 (L1, L2, L3): funil de entrada ────────────────────────────────────
-  const naEntrada = (await deps.leadsAbertos(entrada.pipeline_id)).filter((l) => !compromisso.has(l.stage_id));
+  // v1.9.4: lead nascido antes de `desde` (o dia em que a esteira foi ligada) não é tocado.
+  const desde = entrada.desde ? Date.parse(entrada.desde) : null;
+  const naEntrada = (await deps.leadsAbertos(entrada.pipeline_id)).filter(
+    (l) => !compromisso.has(l.stage_id) && (desde === null || Date.parse(l.created_at) >= desde),
+  );
   const criadasEntrada = await deps.ligacoesJaCriadas(naEntrada.map((l) => l.id));
   const handoffs = await deps.comHandoff(naEntrada.map((l) => l.id));
   for (const lead of naEntrada) {
@@ -202,8 +212,10 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
         if (await deps.mover(lead, followup.etapa_reengajou)) {
           await deps.marcarReengajou(lead);
           resumo.reengajados += 1;
+          // v1.9.4: volta ao SDR num novo ciclo; o sinal quente vai para o lead novo.
+          const novo = deps.reativar ? await deps.reativar(lead) : null;
           // Sinal quente: uma por reengajamento (a pendente anterior, se houver, basta).
-          await criar(lead, "quente", undefined);
+          await criar(novo ?? lead, "quente", undefined);
         }
         continue;
       }

@@ -152,6 +152,14 @@ export type ActivityType =
   | "esteira_reengajou"
   | "esteira_ligacao_cobrada"
   /**
+   * ia.vek v1.9.4 — o TRAJETO DAS 72h (CRM-209): cada troca de mão do lead
+   * (SDR → vendedor para negociar, vendedor → guardião, guardião → outro
+   * vendedor) com os campos, o motivo e o próximo passo no `payload` — é o
+   * RESUMO que quem recebe lê. E o lead do follow-up que REATIVOU e voltou ao SDR.
+   */
+  | "iavek_passagem"
+  | "iavek_reativado"
+  /**
    * DOIS CADASTROS DA MESMA PESSOA VIRARAM UM. Emitido por
    * `fn_mesclar_contatos` (migration 0215) em cada negócio que o contato
    * vencedor passou a ter — inclusive nos que ELE não tinha e herdou do
@@ -296,6 +304,8 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   call_logged: "Ligação registrada",
   esteira_reengajou: "Cliente voltou a falar",
   esteira_ligacao_cobrada: "Ligação atrasada cobrada",
+  iavek_passagem: "Passagem do lead",
+  iavek_reativado: "Lead reativado (voltou ao SDR)",
   // Rótulo com OBJETO e sem jargão de banco: "Mesclado" sozinho é palavra de
   // engenheiro. O que aconteceu, para quem lê a timeline do negócio, é que dois
   // cadastros da mesma pessoa viraram um — e é por isso que este negócio pode

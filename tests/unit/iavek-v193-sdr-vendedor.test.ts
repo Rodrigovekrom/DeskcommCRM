@@ -83,7 +83,7 @@ describe("v1.9.3 — Pipeline por função (lados do funil)", () => {
 describe("v1.9.3 — agenda: o SDR da loja marca direto (decisão B)", () => {
   it("só com a autorização conferida no banco; o compromisso nasce confirmado para o vendedor", () => {
     const r = ler("app/api/v1/iavek/pedidos-de-agendamento/route.ts");
-    expect(r).toContain("if (vendedorId) return sdrMarca(authz, input, vendedorId, requestId);");
+    expect(r).toContain("if (vendedorId) return sdrMarca(authz, input, { vendedorId, campos, contexto }, requestId);");
     expect(r).toMatch(/if \(!\(await sdrMarcaDireto\(admin, orgId, authz\.user\.id\)\)\)/);
     expect(r).toContain("iavekSdrMarcaParaVendedor: true,");
     expect(r).toContain("avisarAdmins: false,");
