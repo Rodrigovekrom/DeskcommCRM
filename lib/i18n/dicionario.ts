@@ -10231,6 +10231,7 @@ export const DICIONARIO: Traducoes = {
   // com ponto final (painel da grade) e outro sem (painel de marcação), e o
   // "Sem eles..." da tela de quem atende sem poder de gerente.
   "A jornada de atendimento ainda não foi publicada.": { es: "La jornada de atención aún no se ha publicado." },
+  "A sincronização com o Google Agenda ainda não está ligada.": { es: "La sincronización con Google Calendar aún no está activada." },
   "A jornada de atendimento ainda não foi publicada": { es: "La jornada de atención aún no se ha publicado" },
   // #1107 (item 5): a frase da folga chega à tela por LITERAL
   // (PainelDeMarcacao.tsx) — `t(variável)` escapava do guarda que varre

@@ -189,11 +189,13 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
   // juntando a rajada de mensagens numa leitura só.
   const orgDoQuadro = (query.data as BoardData | undefined)?.pipeline?.organization_id ?? null;
   const contatosDoQuadro = useRef<Set<string>>(new Set());
-  contatosDoQuadro.current = new Set(
-    ((query.data as BoardData | undefined)?.leads ?? [])
-      .map((l) => (l as { contact_id?: string | null }).contact_id)
-      .filter((c): c is string => Boolean(c)),
-  );
+  useEffect(() => {
+    contatosDoQuadro.current = new Set(
+      ((query.data as BoardData | undefined)?.leads ?? [])
+        .map((l) => (l as { contact_id?: string | null }).contact_id)
+        .filter((c): c is string => Boolean(c)),
+    );
+  }, [query.data]);
   const agrupadorDaConversa = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aoMudarAConversa = useCallback(
     (payload: unknown) => {

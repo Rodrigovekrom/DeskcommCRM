@@ -82,6 +82,7 @@ describe("cartão da conexão do Google", () => {
         configurado={false}
         falta={["GOOGLE_CALENDAR_CLIENT_ID"]}
         enderecoDeRetorno="https://crm.exemplo/api/v1/agenda/google/callback"
+        linkDeConfiguracao="/admin/google"
       />,
     );
     const alvo = screen.getByTestId("endereco-de-retorno");
@@ -121,7 +122,33 @@ describe("cartão da conexão do Google", () => {
     // A ordem dos ramos importa: quem não configurou a instalação não pode ver
     // "desconectar" só porque há linha no banco.
     expect(screen.getByTestId("google-nao-configurado")).toBeTruthy();
-    expect(screen.getByTestId("o-que-falta").textContent).toContain("GOOGLE_CALENDAR_CLIENT_ID");
     expect(screen.queryByTestId("desconectar-google")).toBeNull();
+  });
+
+  it("ia.vek v1.9.5: quem não administra a instalação vê só a frase curta — sem nome de variável nem endereço", () => {
+    render(
+      <CartaoDaConexaoGoogle
+        configurado={false}
+        falta={["GOOGLE_CALENDAR_CLIENT_ID", "GOOGLE_CALENDAR_CLIENT_SECRET"]}
+        enderecoDeRetorno="https://crm.exemplo/api/v1/agenda/google/callback"
+      />,
+    );
+    const cartao = screen.getByTestId("google-nao-configurado");
+    expect(cartao.textContent).toBe("A sincronização com o Google Agenda ainda não está ligada.");
+    expect(screen.queryByTestId("o-que-falta")).toBeNull();
+    expect(screen.queryByTestId("endereco-de-retorno")).toBeNull();
+  });
+
+  it("...e o admin da plataforma segue vendo o caminho para cadastrar", () => {
+    render(
+      <CartaoDaConexaoGoogle
+        configurado={false}
+        falta={["GOOGLE_CALENDAR_CLIENT_ID"]}
+        enderecoDeRetorno="https://crm.exemplo/api/v1/agenda/google/callback"
+        linkDeConfiguracao="/admin/google"
+      />,
+    );
+    expect(screen.getByTestId("ir-configurar-google")).toBeTruthy();
+    expect(screen.getByTestId("endereco-de-retorno")).toBeTruthy();
   });
 });

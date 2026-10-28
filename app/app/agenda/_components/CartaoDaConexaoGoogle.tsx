@@ -49,6 +49,21 @@ export function CartaoDaConexaoGoogle({
   const router = useRouter();
   const [desconectando, setDesconectando] = React.useState(false);
 
+  if (!configurado && !linkDeConfiguracao) {
+    // ia.vek v1.9.5: quem NÃO administra a instalação (SDR, vendedor, gerente,
+    // admin da empresa) não pode resolver isto — nomes de variável e endereço de
+    // retorno só confundiam. Uma frase curta basta; o detalhe fica para o admin
+    // da plataforma, que recebe o link de cadastro.
+    return (
+      <div
+        data-testid="google-nao-configurado"
+        className="rounded-lg border border-border bg-surface-elevated/50 p-3"
+      >
+        <p className="text-sm text-text-muted">{t("A sincronização com o Google Agenda ainda não está ligada.")}</p>
+      </div>
+    );
+  }
+
   if (!configurado) {
     return (
       <div
