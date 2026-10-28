@@ -60,12 +60,11 @@ describe("guardião na chegada", () => {
     expect(guardiao(L(4))).toBe(GOV_AGENT_B);
   });
 
-  it("a trava aceita o dono SDR como guardião, mesmo sem sdr_user_id gravado", () => {
-    // simula lead antigo: dono SDR, guardião vazio (update só da coluna sdr não dispara o gatilho de dono)
+  it("v1.9.4b (0597): o guardião saiu da lista da trava — nem o lead do SDR nem o do vendedor o pedem", () => {
     sql(`update public.crm_leads set sdr_user_id = null where id = '${L(1)}';`);
-    const faltam = lastLine(sql(`select array_to_string(faltam, '|') from public.fn_iavek_campos_que_faltam(array['${L(1)}'::uuid]);`));
-    expect(faltam).not.toContain("Guardião responsável");
-    const doVendedor = lastLine(sql(`select array_to_string(faltam, '|') from public.fn_iavek_campos_que_faltam(array['${L(2)}'::uuid]);`));
-    expect(doVendedor).toContain("Guardião responsável");
+    for (const lead of [L(1), L(2)]) {
+      const faltam = lastLine(sql(`select array_to_string(faltam, '|') from public.fn_iavek_campos_que_faltam(array['${lead}'::uuid]);`));
+      expect(faltam).not.toContain("Guardião responsável");
+    }
   });
 });
