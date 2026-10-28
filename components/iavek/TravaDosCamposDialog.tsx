@@ -13,20 +13,22 @@ import { useT } from "@/hooks/i18n/useT";
 import type { TravaDaLoja } from "@/hooks/kanban/useMoveCard";
 
 /**
- * v1.8.4: ONDE preencher cada item. Os rótulos são os da 0590 (fixos); item
+ * v1.8.4: ONDE preencher cada item. Os rótulos são os da 0597 (fixos); item
  * desconhecido aparece sem dica. Literais por item: a chave de t() nunca é
  * montada em runtime (cerca i18n).
  */
 function useOndePreencher(): (item: string) => string | null {
   const t = useT();
+  // v1.9.4b (0597): os rótulos da passagem do lead.
   const DICAS: Record<string, string> = {
-    "Contexto completo": t("Escreva na Descrição do lead (20 letras ou mais) ou deixe uma nota interna na conversa."),
-    "Tags de acompanhamento": t("Escolha uma etiqueta em Tags, na ficha do lead."),
-    "Fase do funil": t("A etapa do lead no quadro."),
-    "Guardião responsável": t("Vem sozinho quando o lead passa por um SDR. Peça ao gerente se faltar."),
-    "Vendedor responsável": t("O dono do lead. Peça ao gerente para atribuir."),
+    "Contexto do atendimento": t("Escreva na Descrição do lead (20 letras ou mais), deixe uma nota interna na conversa ou passe o lead com o contexto."),
     "Carro de interesse": t("Escolha o carro do catálogo em Carro de interesse, na ficha do lead."),
-    "Parcela desejável": t("Preencha Parcela desejável (R$), na ficha do lead."),
+    "Cidade / região": t("Preencha Cidade / região, na ficha do lead."),
+    "Forma de pagamento": t("Escolha a Forma de pagamento, na ficha do lead."),
+    "Entrada (R$; 0 = sem entrada)": t("Preencha Entrada (R$) na ficha do lead; sem entrada, escreva 0."),
+    "Tem carro na troca?": t("Marque se tem carro na troca, na ficha do lead."),
+    "Troca: modelo e ano": t("Com troca, preencha o modelo e o ano do carro da troca, na ficha do lead."),
+    "Prazo para comprar": t("Escolha o Prazo para comprar, na ficha do lead."),
   };
   return (item) => DICAS[item] ?? null;
 }

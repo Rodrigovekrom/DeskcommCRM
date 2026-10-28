@@ -93,6 +93,12 @@ describe("contas do Meu dia", () => {
     ]);
   });
 
+  it("28/10: 'levado para outro funil' não é perda, e o canônico aparece com o rótulo da tela", () => {
+    expect(
+      perdasPorMotivo([{ lost_reason: "moved_to_another_pipeline" }, { lost_reason: "price" }]),
+    ).toEqual([{ motivo: "Preço", total: 1 }]);
+  });
+
   it("perdas agrupadas por motivo, sem motivo vira 'Sem motivo'", () => {
     expect(
       perdasPorMotivo([

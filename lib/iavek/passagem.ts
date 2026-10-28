@@ -142,13 +142,15 @@ export function dentroDoPrazo(nascimento: string, agora: Date, horas = 72): bool
 }
 
 /**
- * Quem pode trocar o vendedor: o GUARDIÃO do lead dentro das 72h; o
- * administrador a qualquer momento. Depois das 72h, só o administrador.
+ * Quem pode trocar o vendedor: o GUARDIÃO do lead dentro das 72h; a GERÊNCIA
+ * (gerente e administrador) a qualquer momento — decisão do Rodrigo de 28/10:
+ * o gerente fica livre para ajudar os vendedores. Depois das 72h, a restrição
+ * vale para o guardião e o vendedor; nunca para a gerência.
  */
 export function podeTrocarVendedor(args: {
   souGuardiao: boolean;
-  souAdmin: boolean;
+  souGestor: boolean;
   dentroDas72h: boolean;
 }): boolean {
-  return args.souAdmin || (args.souGuardiao && args.dentroDas72h);
+  return args.souGestor || (args.souGuardiao && args.dentroDas72h);
 }

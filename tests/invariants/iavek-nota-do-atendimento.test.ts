@@ -19,7 +19,7 @@ import {
  *  · o mesmo evento não gera duas notas;
  *  · anonimizar o contato apaga os TEXTOS da nota (a nota fica);
  *  · o claude-haiku-5-5 tem preço (senão o custo seria zero e o teto não veria);
- *  · "Contexto completo" aceita a Descrição do lead com 20+ letras.
+ *  · "Contexto do atendimento" (0597; era "Contexto completo") aceita a Descrição do lead com 20+ letras.
  */
 const EVENTO = "ab1e0000-8888-4000-8000-000000000001";
 const CONTATO_LGPD = "ab1e0000-8888-4000-8000-000000000002";
@@ -95,13 +95,13 @@ describe("nota do atendimento", () => {
     expect(lastLine(sql(`select pg_get_constraintdef(oid) like '%iavek_nota_atendimento%' from pg_constraint where conname = 'ai_invocations_invocation_kind_check';`))).toBe("t");
   });
 
-  it("'Contexto completo' aceita a Descrição com 20+ letras (lead sem conversa)", () => {
+  it("'Contexto do atendimento' (0597; era 'Contexto completo') aceita a Descrição com 20+ letras (lead sem conversa)", () => {
     sql(`insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, description)
            values ('${LEAD_DESC}', '${GOV_ORG}', '${GOV_PIPELINE}', '${GOV_STAGE}', 'Sem conversa', 'curto')
            on conflict (id) do update set description = 'curto';`);
     const faltam = () => lastLine(sql(`select array_to_string(faltam, '|') from public.fn_iavek_campos_que_faltam(array['${LEAD_DESC}'::uuid]);`));
-    expect(faltam()).toContain("Contexto completo");
+    expect(faltam()).toContain("Contexto do atendimento");
     sql(`update public.crm_leads set description = 'Quer Onix 2022, financiar em 48x' where id = '${LEAD_DESC}';`);
-    expect(faltam()).not.toContain("Contexto completo");
+    expect(faltam()).not.toContain("Contexto do atendimento");
   });
 });

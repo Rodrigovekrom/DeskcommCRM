@@ -3,6 +3,8 @@ import { format, type Locale } from "date-fns";
 import { useT } from "@/hooks/i18n/useT";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { usePainelIavek } from "@/hooks/iavek/usePainelIavek";
+import { MOTIVO_DA_TRANSFERENCIA } from "@/lib/leads/motivo-da-perda";
+import { rotuloDoMotivoDePerda } from "@/lib/schemas/leads";
 import { cn } from "@/lib/utils";
 
 /**
@@ -83,12 +85,18 @@ export function AcompanhamentoDoLead({
           t("Comprou em {data}").replace("{data}", dataCurta(lead.closed_at, locale) ?? "—") +
           (lead.won_reason ? ` · ${lead.won_reason}` : ""),
       });
+    } else if (lead.status === "lost" && lead.lost_reason === MOTIVO_DA_TRANSFERENCIA) {
+      // ia.vek 28/10: ir para outro funil (o Follow-up) não é perda em lugar nenhum.
+      linhas.push({
+        marca: "agora",
+        texto: t("Foi para outro funil em {data}").replace("{data}", dataCurta(lead.closed_at, locale) ?? "—"),
+      });
     } else if (lead.status === "lost") {
       linhas.push({
         marca: "perdeu",
         texto:
           t("Não comprou em {data}").replace("{data}", dataCurta(lead.closed_at, locale) ?? "—") +
-          ` · ${lead.lost_reason ? lead.lost_reason : t("motivo não informado")}`,
+          ` · ${lead.lost_reason ? rotuloDoMotivoDePerda(lead.lost_reason) : t("motivo não informado")}`,
       });
     } else {
       linhas.push({

@@ -55,10 +55,12 @@ describe("v1.9.4 — os campos da passagem (a trava)", () => {
 
 describe("v1.9.4 — quem troca o vendedor", () => {
   it("o guardião troca a qualquer momento DENTRO das 72h; depois, só o administrador", () => {
-    expect(podeTrocarVendedor({ souGuardiao: true, souAdmin: false, dentroDas72h: true })).toBe(true);
-    expect(podeTrocarVendedor({ souGuardiao: true, souAdmin: false, dentroDas72h: false })).toBe(false);
-    expect(podeTrocarVendedor({ souGuardiao: false, souAdmin: true, dentroDas72h: false })).toBe(true);
-    expect(podeTrocarVendedor({ souGuardiao: false, souAdmin: false, dentroDas72h: true })).toBe(false);
+    expect(podeTrocarVendedor({ souGuardiao: true, souGestor: false, dentroDas72h: true })).toBe(true);
+    expect(podeTrocarVendedor({ souGuardiao: true, souGestor: false, dentroDas72h: false })).toBe(false);
+    expect(podeTrocarVendedor({ souGuardiao: false, souGestor: true, dentroDas72h: false })).toBe(true);
+    expect(podeTrocarVendedor({ souGuardiao: false, souGestor: false, dentroDas72h: true })).toBe(false);
+    // 28/10: o gerente (gestor) fica livre, antes e depois das 72h.
+    expect(podeTrocarVendedor({ souGuardiao: false, souGestor: true, dentroDas72h: true })).toBe(true);
   });
 
   it("as 72h são corridas desde o nascimento do lead", () => {
@@ -71,7 +73,7 @@ describe("v1.9.4 — quem troca o vendedor", () => {
     const r = ler("app/api/v1/iavek/passagem/route.ts");
     expect(r).toContain('tipo: "lead_retirado",');
     expect(r).toContain("contato_nome: await nomeDoCliente(admin, orgId, lead.contact_id, t)");
-    expect(r).toContain('"Depois das 72h, só o administrador troca o vendedor."');
+    expect(r).toContain('"Depois das 72h, só o gerente ou o administrador troca o vendedor."');
   });
 });
 

@@ -60,7 +60,6 @@ type Admin = ReturnType<typeof createAdminClient>;
 interface Contexto {
   lead: LeadDaPassagem;
   loja: boolean;
-  souAdmin: boolean;
   souGestor: boolean;
   funcao: string | null;
   dentroDas72h: boolean;
@@ -79,7 +78,6 @@ async function contexto(admin: Admin, authz: Autorizado, leadId: string): Promis
   return {
     lead,
     loja: ehLojaDeCarros(perfil) && !perfil.modo_agendamento,
-    souAdmin: roleAtLeast(authz.org.role, "admin"),
     souGestor: roleAtLeast(authz.org.role, "manager"),
     funcao: funcaoDaTela(authz.org.interface_settings?.funcao),
     dentroDas72h: dentroDoPrazo(nascimentoDoLead(lead), new Date(), horas),
@@ -94,11 +92,12 @@ function permissoes(c: Contexto, eu: string) {
   const souGuardiao = c.lead.sdr_user_id === eu;
   const sdr = c.funcao === "sdr" || c.funcao === "suporte";
   return {
-    negociar: c.loja && aberto && !c.noFollowup && (c.souAdmin || (sdr && (souDono || souGuardiao))),
+    // v1.9.4 (28/10): o gerente também passa o lead para o vendedor, a qualquer momento.
+    negociar: c.loja && aberto && !c.noFollowup && (c.souGestor || (sdr && (souDono || souGuardiao))),
     devolver: c.loja && aberto && souDono && Boolean(c.lead.sdr_user_id) && !souGuardiao,
     trocar_vendedor:
       c.loja && aberto && Boolean(c.lead.owner_user_id) && !c.noFollowup &&
-      podeTrocarVendedor({ souGuardiao, souAdmin: c.souAdmin, dentroDas72h: c.dentroDas72h }),
+      podeTrocarVendedor({ souGuardiao, souGestor: c.souGestor, dentroDas72h: c.dentroDas72h }),
     reativar: c.loja && aberto && c.noFollowup && (souGuardiao || souDono || c.souGestor),
   };
 }
@@ -201,7 +200,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const lead = c.lead;
 
   if (p.tipo === "negociar") {
-    if (!pode.negociar) return proibido("Só o SDR do lead (ou o administrador) passa o lead para negociar.");
+    if (!pode.negociar) return proibido("Só o SDR do lead (ou a gerência) passa o lead para negociar.");
     if (!(await vendedoresDaLoja(admin, orgId)).some((v) => v.id === p.vendedor_id)) {
       return fail("validation_failed", t("Escolha um vendedor da loja."), 422, { requestId });
     }
@@ -274,8 +273,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!pode.trocar_vendedor) {
       return proibido(
         c.dentroDas72h
-          ? "Só o guardião do lead (ou o administrador) troca o vendedor."
-          : "Depois das 72h, só o administrador troca o vendedor.",
+          ? "Só o guardião do lead (ou a gerência) troca o vendedor."
+          : "Depois das 72h, só o gerente ou o administrador troca o vendedor.",
       );
     }
     if (p.vendedor_id === lead.owner_user_id) return fail("validation_failed", t("O lead já está com este vendedor."), 422, { requestId });
