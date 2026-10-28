@@ -134,6 +134,10 @@ describe("v1.9.3 — Meus números", () => {
     expect(limitesDoPeriodo("7d", agora, FUSO).inicio.toISOString()).toBe("2026-10-21T15:00:00.000Z");
   });
 
+  it("v1.9.5: o motivo canônico aparece com o rótulo da tela, e 'levado para outro funil' não é perda", () => {
+    expect(topMotivos(["price", "moved_to_another_pipeline", "moved_to_another_pipeline"])).toEqual([{ motivo: "Preço", total: 1 }]);
+  });
+
   it("motivos de perda: do mais comum ao menos, no máximo 5", () => {
     expect(topMotivos(["Preço", "Muito longe", "Preço", null, " "])).toEqual([
       { motivo: "Preço", total: 2 },

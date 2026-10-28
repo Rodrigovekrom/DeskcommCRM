@@ -1,4 +1,6 @@
 import { limitesDoDia } from "@/lib/iavek/meu-dia";
+import { MOTIVO_DA_TRANSFERENCIA } from "@/lib/leads/motivo-da-perda";
+import { rotuloDoMotivoDePerda } from "@/lib/schemas/leads";
 
 /**
  * ia.vek v1.9.3 — "MEUS NÚMEROS" (CRM-207/208): os resultados SÓ de quem está
@@ -49,11 +51,21 @@ export interface NumerosDoVendedor {
   motivos_de_perda: Array<{ motivo: string; total: number }>;
 }
 
-/** Os motivos de perda, do mais comum para o menos, no máximo 5. */
+/**
+ * "Levado para outro funil" NÃO é perda de quem vende: é como o sistema fecha o
+ * negócio que mudou de funil (a esteira das 72h para o follow-up, a reativação
+ * de volta ao SDR). Contá-lo inflaria as perdas do vendedor a cada passagem.
+ */
+export function ehPerdaDeVerdade(motivo: string | null): boolean {
+  return (motivo ?? "").trim() !== MOTIVO_DA_TRANSFERENCIA;
+}
+
+/** Os motivos de perda, do mais comum para o menos, no máximo 5 — com o rótulo da tela (nunca a chave crua). */
 export function topMotivos(motivos: Array<string | null>): Array<{ motivo: string; total: number }> {
   const conta = new Map<string, number>();
   for (const m of motivos) {
-    const k = (m ?? "").trim();
+    if (!ehPerdaDeVerdade(m)) continue;
+    const k = rotuloDoMotivoDePerda((m ?? "").trim());
     if (k) conta.set(k, (conta.get(k) ?? 0) + 1);
   }
   return [...conta.entries()]
