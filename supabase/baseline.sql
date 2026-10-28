@@ -47007,25 +47007,29 @@ stable
 security definer
 set search_path = public
 as $$
+  -- ia.vek v1.9.4b (migration 0597, decisão do Rodrigo): a MESMA lista da
+  -- passagem do lead (lib/iavek/passagem.ts) — o contexto e os 7 campos do
+  -- handoff SDR → loja. Saem as tags, a fase, o guardião, o vendedor e a parcela.
   select array_remove(array[
     case when char_length(btrim(coalesce(l.description, ''))) >= 20
            or exists (select 1 from public.conversation_notes n join public.conversations c on c.id = n.conversation_id
                        where c.contact_id = l.contact_id and c.organization_id = l.organization_id)
            or exists (select 1 from public.lead_notes ln where ln.contact_id = l.contact_id and ln.organization_id = l.organization_id)
-         then null else 'Contexto completo' end,
-    case when coalesce(array_length(l.tags, 1), 0) > 0
-           or exists (select 1 from public.contacts k where k.id = l.contact_id and coalesce(array_length(k.tags, 1), 0) > 0)
-         then null else 'Tags de acompanhamento' end,
-    case when l.stage_id is not null then null else 'Fase do funil' end,
-    case when l.sdr_user_id is not null
-           or (l.owner_user_id is not null
-               and coalesce(public.fn_iavek_funcao_do_membro(l.organization_id, l.owner_user_id), '') = 'sdr')
-         then null else 'Guardião responsável' end,
-    case when l.owner_user_id is not null then null else 'Vendedor responsável' end,
+           or exists (select 1 from public.crm_lead_activities a
+                       where a.lead_id = l.id and a.organization_id = l.organization_id
+                         and a.type = 'iavek_passagem' and char_length(btrim(coalesce(a.payload->>'contexto', ''))) >= 20)
+         then null else 'Contexto do atendimento' end,
     case when nullif(btrim(coalesce(l.custom_fields->>'carro_interesse', '')), '') is not null then null else 'Carro de interesse' end,
-    case when coalesce(l.custom_fields->>'parcela_desejavel', '') ~ '^\s*[0-9]+([.,][0-9]+)?\s*$'
-              and replace(l.custom_fields->>'parcela_desejavel', ',', '.')::numeric > 0
-         then null else 'Parcela desejável' end
+    case when nullif(btrim(coalesce(l.custom_fields->>'cidade', '')), '') is not null then null else 'Cidade / região' end,
+    case when nullif(btrim(coalesce(l.custom_fields->>'forma_pagamento', '')), '') is not null then null else 'Forma de pagamento' end,
+    case when coalesce(l.custom_fields->>'entrada_reais', '') ~ '^\s*[0-9]+([.,][0-9]+)?\s*$'
+         then null else 'Entrada (R$; 0 = sem entrada)' end,
+    case when coalesce(l.custom_fields->>'tem_troca', '') in ('true', 'false') then null else 'Tem carro na troca?' end,
+    case when coalesce(l.custom_fields->>'tem_troca', '') = 'true'
+              and (nullif(btrim(coalesce(l.custom_fields->>'troca_modelo', '')), '') is null
+                   or nullif(btrim(coalesce(l.custom_fields->>'troca_ano', '')), '') is null)
+         then 'Troca: modelo e ano' else null end,
+    case when nullif(btrim(coalesce(l.custom_fields->>'prazo_compra', '')), '') is not null then null else 'Prazo para comprar' end
   ], null)
   -- Só responde por lead da organização de quem pergunta (sessão); o serviço vê todos.
   where auth.uid() is null or l.organization_id in (select public.fn_user_org_ids());

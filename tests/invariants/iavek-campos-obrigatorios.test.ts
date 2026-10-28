@@ -48,14 +48,16 @@ beforeAll(() => {
 });
 
 describe("campos obrigatórios ao mover", () => {
-  it("o banco diz o que falta, na ordem da tela (fase e vendedor já preenchidos)", () => {
-    expect(faltam()).toBe("Contexto completo|Tags de acompanhamento|Guardião responsável|Carro de interesse|Parcela desejável");
+  it("o banco diz o que falta, na ordem da tela (0597: a lista da passagem)", () => {
+    expect(faltam()).toBe(
+      "Contexto do atendimento|Carro de interesse|Cidade / região|Forma de pagamento|Entrada (R$; 0 = sem entrada)|Tem carro na troca?|Prazo para comprar",
+    );
   });
 
   it("ligado: a pessoa NÃO move para Agendamento sem os campos — e a recusa diz o que falta", () => {
     expect(() =>
       writeCountAs(GOV_AGENT_A, `update public.crm_leads set stage_id = '${AGENDAMENTO}' where id = '${LEAD}'`),
-    ).toThrow(/Faltam campos obrigatórios: Contexto completo, Tags de acompanhamento/);
+    ).toThrow(/Faltam campos obrigatórios: Contexto do atendimento, Carro de interesse/);
     expect(etapa()).toBe(GOV_STAGE);
   });
 
@@ -70,10 +72,15 @@ describe("campos obrigatórios ao mover", () => {
     voltar();
   });
 
-  it("com os 7 campos, a pessoa move", () => {
+  it("com a troca marcada, pede modelo e ano", () => {
+    sql(`update public.crm_leads set custom_fields = '{"carro_interesse":"Onix 2022","cidade":"Sorocaba","forma_pagamento":"financiamento","entrada_reais":0,"tem_troca":true,"prazo_compra":"0_7"}'::jsonb where id = '${LEAD}';`);
+    expect(faltam()).toBe("Contexto do atendimento|Troca: modelo e ano");
+  });
+
+  it("com o contexto e os campos da passagem, a pessoa move", () => {
     sql(`
-      update public.crm_leads set sdr_user_id = '${GOV_AGENT_A}', tags = array['quente'],
-        custom_fields = '{"carro_interesse":"Onix 2022","parcela_desejavel":1500}'::jsonb where id = '${LEAD}';
+      update public.crm_leads set
+        custom_fields = '{"carro_interesse":"Onix 2022","cidade":"Sorocaba","forma_pagamento":"financiamento","entrada_reais":0,"tem_troca":false,"prazo_compra":"0_7"}'::jsonb where id = '${LEAD}';
       insert into public.conversation_notes (organization_id, conversation_id, body)
         select '${GOV_ORG}', id, 'cliente quer financiar' from public.conversations where id = '${GOV_CONV_UNASSIGNED}' and contact_id = '${GOV_CONTACT_1}';
       insert into public.lead_notes (organization_id, contact_id, headline, body) values ('${GOV_ORG}', '${GOV_CONTACT_1}', 'Resumo', 'Quer Onix, parcela até 1500');

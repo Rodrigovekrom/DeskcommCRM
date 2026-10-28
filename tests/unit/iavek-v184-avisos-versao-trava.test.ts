@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { ehNovidade } from "@/hooks/notifications/useCrmAlerts";
+import { CAMPOS_OBRIGATORIOS } from "@/lib/iavek/campos-obrigatorios";
 import { ROTULO_DA_VERSAO } from "@/lib/iavek/versao";
 
 const ler = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
@@ -41,17 +42,9 @@ describe("v1.8.4 — rodapé com o número certo", () => {
 });
 
 describe("v1.8.4 — a janela da trava diz onde preencher", () => {
-  it("cada um dos 7 rótulos da 0590 tem dica", () => {
+  it("cada rótulo da trava (0597, a lista da passagem) tem dica", () => {
     const f = ler("components/iavek/TravaDosCamposDialog.tsx");
-    for (const rotulo of [
-      "Contexto completo",
-      "Tags de acompanhamento",
-      "Fase do funil",
-      "Guardião responsável",
-      "Vendedor responsável",
-      "Carro de interesse",
-      "Parcela desejável",
-    ]) {
+    for (const rotulo of CAMPOS_OBRIGATORIOS) {
       expect(f, rotulo).toContain(`"${rotulo}": t(`);
     }
     expect(f).toContain("Descrição do lead (20 letras ou mais)");

@@ -1530,6 +1530,13 @@ export const DICIONARIO: Traducoes = {
   "A IA só marca na agenda com o modo agendamento ligado.": { es: "La IA solo agenda con el modo agenda activado." },
   "Agendado 100%": { es: "Agendado 100%" },
   // ia.vek v1.9.4: o trajeto do lead em 72h (passagens, motivos, follow-up).
+  "Escreva na Descrição do lead (20 letras ou mais), deixe uma nota interna na conversa ou passe o lead com o contexto.": { es: "Escriba en la Descripción del lead (20 letras o más), deje una nota interna en la conversación o pase el lead con el contexto." },
+  "Preencha Cidade / região, na ficha do lead.": { es: "Complete Ciudad / región, en la ficha del lead." },
+  "Escolha a Forma de pagamento, na ficha do lead.": { es: "Elija la Forma de pago, en la ficha del lead." },
+  "Preencha Entrada (R$) na ficha do lead; sem entrada, escreva 0.": { es: "Complete Entrada (R$) en la ficha del lead; sin entrada, escriba 0." },
+  "Marque se tem carro na troca, na ficha do lead.": { es: "Marque si tiene auto para canje, en la ficha del lead." },
+  "Com troca, preencha o modelo e o ano do carro da troca, na ficha do lead.": { es: "Con canje, complete el modelo y el año del auto del canje, en la ficha del lead." },
+  "Escolha o Prazo para comprar, na ficha do lead.": { es: "Elija el Plazo para comprar, en la ficha del lead." },
   "0 a 7 dias": { es: "0 a 7 días" },
   "15 a 30 dias": { es: "15 a 30 días" },
   "7 a 15 dias": { es: "7 a 15 días" },

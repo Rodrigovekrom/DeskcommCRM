@@ -11,14 +11,16 @@ import { z } from "zod";
  * A trava vale ao MOVER, por uma pessoa, para as etapas de compromisso abaixo
  * (slugs do funil 72h). A entrada do lead nunca trava.
  */
+// v1.9.4b (0597): a MESMA lista da passagem do lead (lib/iavek/passagem.ts).
 export const CAMPOS_OBRIGATORIOS = [
-  "Contexto completo",
-  "Tags de acompanhamento",
-  "Fase do funil",
-  "Guardião responsável",
-  "Vendedor responsável",
+  "Contexto do atendimento",
   "Carro de interesse",
-  "Parcela desejável",
+  "Cidade / região",
+  "Forma de pagamento",
+  "Entrada (R$; 0 = sem entrada)",
+  "Tem carro na troca?",
+  "Troca: modelo e ano",
+  "Prazo para comprar",
 ] as const;
 
 // v1.9.4 (0596): as etapas de compromisso do funil novo (a "Troca" foi arquivada na v1.9.3).
