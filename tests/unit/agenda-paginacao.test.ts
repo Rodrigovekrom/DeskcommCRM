@@ -80,3 +80,30 @@ it("falha de página posterior não transforma leitura parcial em ausência", as
   expect(warn).toHaveBeenCalledOnce();
   warn.mockRestore();
 });
+it("ia.vek v1.9.5: centenas de contatos vão em lotes (a lista inteira estourava a URL e o radar de risco falhava)", async () => {
+  const lotes: number[] = [];
+  const db = {
+    from: (table: string) => {
+      const q = {
+        select: () => q,
+        eq: () => q,
+        in: (key: string, valores: string[]) => {
+          if (key === "contact_id") lotes.push(valores.length);
+          return q;
+        },
+        order: () => q,
+        limit: () => q,
+        gt: () => q,
+        single: async () => ({ data: { settings: {} }, error: null }),
+        then: (resolve: (value: unknown) => unknown) =>
+          Promise.resolve({ data: table === "calendar_appointments" ? [] : { settings: {} }, error: null }).then(resolve),
+      };
+      return q;
+    },
+  };
+  const contatos = Array.from({ length: 450 }, (_, n) => `c${n}`);
+  const r = await protecaoAgendaSupabase(db as never, "org", contatos, now);
+  expect(r.size).toBe(450);
+  expect([...r.values()].some((p) => p.motivo === "leitura_indisponivel")).toBe(false);
+  expect(lotes).toEqual([100, 100, 100, 100, 50]);
+});
