@@ -1026,6 +1026,7 @@
   "Limpar o carro de interesse": "Clear the car of interest",
   "motivo não informado": "no reason given",
   "Não comprou em {data}": "Did not buy ({data})",
+  "Foi para outro funil em {data}": "Moved to another pipeline ({data})",
   "Não consegui ler o catálogo.": "Couldn't read the catalog.",
   "Negócio e dados da compra": "Deal and purchase details",
   "Nenhum carro encontrado.": "No car found.",

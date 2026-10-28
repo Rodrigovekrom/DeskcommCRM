@@ -5,6 +5,8 @@
  * prazo das 72h, e os agrupamentos do gerente.
  */
 import { instanteLocal } from "@/lib/esteira/horas-uteis";
+import { ehPerdaDeVerdade } from "@/lib/iavek/meus-numeros";
+import { rotuloDoMotivoDePerda } from "@/lib/schemas/leads";
 
 /** Início e fim de HOJE no fuso da organização (o fim é o início de amanhã). */
 export function limitesDoDia(agora: Date, fuso: string): { inicio: Date; fim: Date } {
@@ -75,7 +77,9 @@ export function perdasPorMotivo(
 ): Array<{ motivo: string; total: number }> {
   const mapa = new Map<string, number>();
   for (const l of leads) {
-    const motivo = l.lost_reason?.trim() || "Sem motivo";
+    // 28/10 (Rodrigo): ir para o Follow-up (ou outro funil) não é perda em lugar nenhum.
+    if (!ehPerdaDeVerdade(l.lost_reason)) continue;
+    const motivo = l.lost_reason?.trim() ? rotuloDoMotivoDePerda(l.lost_reason.trim()) : "Sem motivo";
     mapa.set(motivo, (mapa.get(motivo) ?? 0) + 1);
   }
   return [...mapa.entries()]

@@ -29,6 +29,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { MOTIVO_DA_TRANSFERENCIA } from "@/lib/leads/motivo-da-perda";
 import {
   type AtividadeDeEtapa,
   type EtapaReferencia,
@@ -60,6 +61,7 @@ interface LeadCru {
   pipeline_id: string;
   stage_id: string;
   status: string;
+  lost_reason?: string | null;
   source: string;
   value_cents: number | null;
   currency: string | null;
@@ -155,7 +157,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       supabase
         .from("crm_leads")
         .select(
-          "id, pipeline_id, stage_id, status, source, value_cents, currency, created_at, closed_at",
+          "id, pipeline_id, stage_id, status, lost_reason, source, value_cents, currency, created_at, closed_at",
         )
         .eq("organization_id", orgId)
         .gte("created_at", de)
@@ -164,7 +166,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       supabase
         .from("crm_leads")
         .select(
-          "id, pipeline_id, stage_id, status, source, value_cents, currency, created_at, closed_at",
+          "id, pipeline_id, stage_id, status, lost_reason, source, value_cents, currency, created_at, closed_at",
         )
         .eq("organization_id", orgId)
         .gte("closed_at", de)
@@ -220,7 +222,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     id: l.id,
     pipeline_id: l.pipeline_id,
     stage_id: l.stage_id,
-    status: (l.status === "won" || l.status === "lost" ? l.status : "open"),
+    // ia.vek 28/10: o negócio levado para outro funil (o Follow-up) segue vivo lá —
+    // não é perda em lugar nenhum. Na matriz origem × status ele conta como aberto.
+    status: (l.status === "won" || (l.status === "lost" && l.lost_reason !== MOTIVO_DA_TRANSFERENCIA) ? l.status : "open"),
     source: l.source ?? "",
     value_cents: l.value_cents,
     currency: l.currency,
