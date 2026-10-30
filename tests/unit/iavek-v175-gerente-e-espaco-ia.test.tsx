@@ -202,7 +202,6 @@ describe("3. Os outros menus não mudam (além do Espaço da IA)", () => {
     expect(DESTINOS_DA_FUNCAO.suporte).toEqual([
       "/app/meu-dia",
       "/app/inbox",
-      "/app/pipeline",
       "/app/agenda",
       "/app/meus-numeros",
     ]);

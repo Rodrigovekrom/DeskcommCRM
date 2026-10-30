@@ -77,11 +77,13 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
     "/app/templates",
   ],
   /**
-   * Igual ao guardião, mas sem virar guardião do lead. v1.9.6: o Espaço da IA
-   * saiu do menu (a rota segue aberta para ela, ver `veEspacoDaIa`) e a
-   * Entrada de leads volta como "Atendimento da IA".
+   * Não vira guardião do lead. v1.9.6: o Espaço da IA saiu do menu (a rota
+   * segue aberta para ela, ver `veEspacoDaIa`), a Entrada de leads é o
+   * "Atendimento da IA" e não há "Meus leads" (ela não tem carteira).
    */
-  suporte: ["/app/meu-dia", "/app/inbox", "/app/pipeline", "/app/agenda", "/app/meus-numeros"],
+  // v1.9.6b (30/10): sem "Meus leads" — a Daiane humana não tem carteira; trabalha
+  // onde a IA atende e passa o lead na mão (Transferir na conversa).
+  suporte: ["/app/meu-dia", "/app/inbox", "/app/agenda", "/app/meus-numeros"],
   /**
    * ia.vek v1.7.5 (pedido do Rodrigo): o gerente CONTROLA e ACOMPANHA a equipe,
    * e o menu dele é só isto, em dois grupos com nome próprio
@@ -161,7 +163,6 @@ export const MENU_DA_FUNCAO: Partial<
       itens: [
         { href: "/app/meu-dia", label: "Meu dia" },
         { href: "/app/inbox", label: "Atendimento da IA" },
-        { href: "/app/pipeline", label: "Meus leads" },
         { href: "/app/agenda", label: "Agenda" },
         { href: "/app/meus-numeros", label: "Meus dados" },
       ],

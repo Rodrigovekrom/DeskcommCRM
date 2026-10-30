@@ -142,11 +142,12 @@ describe("funções novas da v1.7.1", () => {
     );
   });
 
-  it("v1.9.6: o Suporte IA tem o menu do guardião mais o Atendimento da IA (sem o Espaço da IA)", () => {
+  it("v1.9.6: o Suporte IA tem o Atendimento da IA e não tem Meus leads nem o Espaço da IA", () => {
     const suporte = hrefs({ preset: "completa", funcao: "suporte" });
     expect(suporte.filter((h) => h !== "/app/inbox")).toEqual(
-      hrefs({ preset: "completa", funcao: "sdr" }),
+      hrefs({ preset: "completa", funcao: "sdr" }).filter((h) => h !== "/app/pipeline"),
     );
+    expect(suporte).not.toContain("/app/pipeline");
     expect(suporte).toContain("/app/inbox");
     expect(suporte).not.toContain("/app/espaco-ia");
   });

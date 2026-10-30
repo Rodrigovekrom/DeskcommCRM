@@ -22,6 +22,7 @@ const FENOMENOS = {
       funcoes: {
         sdr: { emoji: "🚗⏳", frase: "Estou aqui para firmar seu compromisso com a gente" },
         vendedor: { emoji: "🚗🎁", frase: "Faço um negocio junto e com as melhores condições da região" },
+        suporte: { emoji: "🚗💛", frase: "Entende o que você busca e apresenta a melhor solução:" },
       },
     },
   },
@@ -42,9 +43,14 @@ describe("v1.9.6 — assinatura: cabeçalho fixo por papel", () => {
     );
   });
 
-  it("sem cabeçalho (gerente, Suporte IA, sem função): fica como era", () => {
+  it("Suporte IA: o mesmo cabeçalho da IA, com o PRIMEIRO nome da pessoa", () => {
+    expect(linhaDeAssinatura(c, "user", "daiane souza", "suporte")).toBe(
+      "*Daiane 🚗💛*\n> Entende o que você busca e apresenta a melhor solução:\n\n",
+    );
+  });
+
+  it("sem cabeçalho (gerente, sem função): fica como era", () => {
     expect(linhaDeAssinatura(c, "user", "lucas lima", "gerente")).toBe("*Lucas Lima | Gerente de Negócios*\n");
-    expect(linhaDeAssinatura(c, "user", "ana", "suporte")).toBe("*Ana | Atendimento*\n");
     expect(linhaDeAssinatura(c, "user", "rodrigo", null)).toBe("*Rodrigo*\n");
   });
 
@@ -89,15 +95,15 @@ describe("v1.9.6 — nomes e menus do guardião e do Suporte IA", () => {
     ]);
   });
 
-  it("Suporte IA: Meu dia · Atendimento da IA · Meus leads · Agenda · Meus dados (sem Espaço da IA)", () => {
+  it("Suporte IA: Meu dia · Atendimento da IA · Agenda · Meus dados (sem Meus leads nem Espaço da IA)", () => {
     expect(menu("suporte")).toEqual([
       "Meu dia /app/meu-dia",
       "Atendimento da IA /app/inbox",
-      "Meus leads /app/pipeline",
       "Agenda /app/agenda",
       "Meus dados /app/meus-numeros",
     ]);
     expect(DESTINOS_DA_FUNCAO.suporte).not.toContain("/app/espaco-ia");
+    expect(DESTINOS_DA_FUNCAO.suporte).not.toContain("/app/pipeline");
   });
 
   it("saem Tarefas, Contatos, Chamadas, Respostas rápidas (e a Entrada de leads do guardião)", () => {

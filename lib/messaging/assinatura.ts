@@ -56,7 +56,7 @@ export interface ConfigAssinatura {
    * `*Nome | Rótulo*` — `*Nome emoji*`, uma linha em citação (`> frase`) e uma
    * linha em branco antes do texto. Mora em
    * `assinatura_mensagens.cabecalhos` e não se escolhe pela tela: quem não tem
-   * cabeçalho (gerente, admin, sem função, Suporte IA) assina como antes.
+   * cabeçalho (gerente, admin, sem função) assina como antes.
    */
   cabecalhos?: Cabecalhos;
 }
