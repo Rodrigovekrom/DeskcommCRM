@@ -1,7 +1,7 @@
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 import { type Role } from "@/lib/auth/types";
-import { ESPACO_DA_IA, MENU_DO_GERENTE, funcaoDaTela } from "@/lib/iavek/funcoes";
+import { ESPACO_DA_IA, MENU_DA_FUNCAO, funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
   Bell,
   BookOpen,
@@ -145,19 +145,22 @@ export function sidebarGroups(
       (g.group.hub && NAV_DESTINATIONS.some((d) => d.group === g.group.id && visible.has(d.href))),
   );
   // "apoio" é apelido de gerente (v1.7.5): mesmo desenho.
-  if (funcaoDaTela(settings?.funcao) !== "gerente") return grupos;
+  const funcao = funcaoDaTela(settings?.funcao);
+  const desenho = funcao ? MENU_DA_FUNCAO[funcao] : undefined;
+  if (!desenho) return grupos;
 
   // ia.vek v1.7.5: o gerente tem um desenho próprio — dois grupos com nome e
   // rótulos dele, sem hubs. O rodapé (Configurações: perfil e segurança) fica.
+  // v1.9.6: o guardião e o Suporte IA também (`MENU_DA_FUNCAO`).
   const porHref = new Map(NAV_DESTINATIONS.map((d) => [d.href, d]));
-  const doGerente = MENU_DO_GERENTE.map((g) => ({
+  const daFuncao = desenho.map((g) => ({
     group: { id: g.id, label: g.label } as NavGroup,
     items: g.itens.flatMap((i) => {
       const d = porHref.get(i.href);
       return d && visible.has(i.href) ? [{ ...d, label: i.label }] : [];
     }),
   })).filter((g) => g.items.length > 0);
-  return [...doGerente, ...grupos.filter((g) => g.group.id === GRUPO_NO_RODAPE)];
+  return [...daFuncao, ...grupos.filter((g) => g.group.id === GRUPO_NO_RODAPE)];
 }
 
 /**

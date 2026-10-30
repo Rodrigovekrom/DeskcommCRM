@@ -170,7 +170,7 @@ async function sdrMarca(
   const orgId = authz.org.orgId;
   const admin = createAdminClient();
   if (!(await sdrMarcaDireto(admin, orgId, authz.user.id))) {
-    return fail("forbidden_role", t("Só o SDR da loja marca direto. Envie um pedido de agendamento."), 403, {
+    return fail("forbidden_role", t("Só o guardião da loja marca direto. Envie um pedido de agendamento."), 403, {
       requestId,
     });
   }

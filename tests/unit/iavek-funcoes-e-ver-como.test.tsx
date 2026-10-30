@@ -55,7 +55,9 @@ describe("função na interface do vínculo", () => {
 describe("menu por função", () => {
   it("SDR vê só a lista dela (e as portas essenciais), nunca além do papel", () => {
     const sdr = hrefs({ preset: "completa", funcao: "sdr" });
-    expect(sdr).toContain("/app/inbox");
+    // v1.9.6: o guardião responde pela conversa aberta do card (Meus leads); a
+    // Entrada de leads saiu do menu dele.
+    expect(sdr).not.toContain("/app/inbox");
     // v1.7.5: o Espaço da IA é só do admin e da função suporte.
     expect(sdr).not.toContain("/app/espaco-ia");
     expect(sdr).not.toContain("/app/kanban");
@@ -140,12 +142,13 @@ describe("funções novas da v1.7.1", () => {
     );
   });
 
-  it("SDR de suporte tem o menu do SDR, mais o Espaço da IA", () => {
+  it("v1.9.6: o Suporte IA tem o menu do guardião mais o Atendimento da IA (sem o Espaço da IA)", () => {
     const suporte = hrefs({ preset: "completa", funcao: "suporte" });
-    expect(suporte.filter((h) => h !== "/app/espaco-ia")).toEqual(
+    expect(suporte.filter((h) => h !== "/app/inbox")).toEqual(
       hrefs({ preset: "completa", funcao: "sdr" }),
     );
-    expect(suporte).toContain("/app/espaco-ia");
+    expect(suporte).toContain("/app/inbox");
+    expect(suporte).not.toContain("/app/espaco-ia");
   });
 
   it("o schema aceita as duas, e os rótulos são os combinados", () => {
@@ -155,7 +158,7 @@ describe("funções novas da v1.7.1", () => {
       );
     }
     expect(ROTULO_DA_FUNCAO.apoio).toBe("Gerente de apoio");
-    expect(ROTULO_DA_FUNCAO.suporte).toBe("SDR de suporte");
+    expect(ROTULO_DA_FUNCAO.suporte).toBe("Suporte IA");
   });
 });
 
@@ -174,7 +177,7 @@ describe("selo 'Vendo como'", () => {
     expect(screen.queryByTestId("selo-ver-como")).toBeNull();
     auth.verComo = "sdr";
     rerender(<SeloVerComo />);
-    expect(screen.getByTestId("selo-ver-como").textContent).toContain("Vendo como: SDR");
+    expect(screen.getByTestId("selo-ver-como").textContent).toContain("Vendo como: Guardião");
     fireEvent.click(screen.getByRole("button", { name: "Voltar para a minha visão" }));
     expect(auth.definirVerComo).toHaveBeenCalledWith(null);
   });

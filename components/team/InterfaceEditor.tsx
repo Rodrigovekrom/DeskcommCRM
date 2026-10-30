@@ -68,7 +68,7 @@ export function InterfaceEditor({
           </select>
           <p className="text-xs text-muted-foreground">
             {t(
-              "SDR e Vendedor veem só o que é do dia deles; Gerente vê tudo. A permissão continua sendo a do papel.",
+              "Guardião e Vendedor veem só o que é do dia deles; Gerente vê tudo. A permissão continua sendo a do papel.",
             )}
           </p>
         </>

@@ -218,11 +218,11 @@ export async function registrarPassagem(
   },
 ): Promise<void> {
   const porque: Record<TipoDePassagem, string> = {
-    agendamento: "O SDR marcou o agendamento e passou o lead ao vendedor",
-    negociar: "O SDR passou o lead ao vendedor para negociar",
+    agendamento: "O guardião marcou o agendamento e passou o lead ao vendedor",
+    negociar: "O guardião passou o lead ao vendedor para negociar",
     devolver: "O vendedor devolveu o lead ao guardião",
     trocar_vendedor: "O lead foi passado a outro vendedor",
-    reativar: "O lead reativou e voltou ao SDR",
+    reativar: "O lead reativou e voltou ao guardião",
   };
   const r = await emitLeadActivity(admin, {
     organizationId: args.lead.organization_id,
@@ -297,7 +297,7 @@ export async function reativarLead(
     });
   }
   if (guardiao) {
-    await passarAConversa(admin, { orgId: lead.organization_id, contactId: lead.contact_id, para: guardiao, actor: ctx.actor, motivo: "O lead reativou e voltou ao SDR" });
+    await passarAConversa(admin, { orgId: lead.organization_id, contactId: lead.contact_id, para: guardiao, actor: ctx.actor, motivo: "O lead reativou e voltou ao guardião" });
     await avisoDaPassagem(admin, {
       orgId: lead.organization_id,
       leadId: novo.id,

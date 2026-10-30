@@ -703,7 +703,7 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
         />
       ) : (
         <p className="text-sm text-muted-foreground" data-testid="meta-agendamentos-leitura">
-          {t("Meta de agendamentos por dia (para o SDR)")}: {d.meta_agendamentos_dia ?? t("sem meta")}
+          {t("Meta de agendamentos por dia (para o guardião)")}: {d.meta_agendamentos_dia ?? t("sem meta")}
         </p>
       )}
     </div>
@@ -903,7 +903,7 @@ function MetaDeAgendamentos({ meta, capacidade }: { meta: number | null; capacid
     <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3 text-sm">
       <label className="space-y-1">
         <span className="block text-xs text-muted-foreground">
-          {t("Meta de agendamentos por dia (para o SDR)")}
+          {t("Meta de agendamentos por dia (para o guardião)")}
         </span>
         <input
           type="number"

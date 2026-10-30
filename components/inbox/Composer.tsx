@@ -166,6 +166,28 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   useEffect(() => {
     onDraftChange?.(text, mode);
   }, [text, mode, onDraftChange]);
+  // ia.vek v1.9.6: o modelo da PRIMEIRA mensagem do guardião/vendedor naquele
+  // lead aparece pronto no campo — nunca é enviado sozinho. Só entra com o
+  // campo vazio, e nunca por cima do que a pessoa já começou a escrever.
+  const semRascunhoInicial = initialDraft.length === 0;
+  useEffect(() => {
+    if (!semRascunhoInicial || disabled) return;
+    let vivo = true;
+    apiClient
+      .get<{ data: { texto: string | null } }>(
+        `/api/v1/iavek/primeira-mensagem?conversation_id=${encodeURIComponent(conversationId)}`,
+      )
+      .then((r) => {
+        const modelo = r.data?.texto;
+        if (vivo && modelo) setText((atual) => (atual.length > 0 ? atual : modelo));
+      })
+      .catch(() => {
+        /* sem modelo, o campo segue vazio como sempre */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [conversationId, semRascunhoInicial, disabled]);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const send = useSendMessage();
   const upload = useUploadMedia();

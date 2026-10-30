@@ -21,7 +21,11 @@ vi.mock("@/hooks/inbox/useDraftReply", () => ({
   useDraftReply: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("@/lib/api/client", () => ({
-  apiClient: { post: (...args: unknown[]) => postMock(...args) as Promise<unknown> },
+  apiClient: {
+    post: (...args: unknown[]) => postMock(...args) as Promise<unknown>,
+    // v1.9.6: o modelo da primeira mensagem — aqui, nenhum.
+    get: () => Promise.resolve({ data: { texto: null } }),
+  },
 }));
 
 import { Composer } from "@/components/inbox/Composer";

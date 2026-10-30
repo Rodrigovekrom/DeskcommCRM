@@ -200,7 +200,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const lead = c.lead;
 
   if (p.tipo === "negociar") {
-    if (!pode.negociar) return proibido("Só o SDR do lead (ou a gerência) passa o lead para negociar.");
+    if (!pode.negociar) return proibido("Só o guardião do lead (ou a gerência) passa o lead para negociar.");
     if (!(await vendedoresDaLoja(admin, orgId)).some((v) => v.id === p.vendedor_id)) {
       return fail("validation_failed", t("Escolha um vendedor da loja."), 422, { requestId });
     }

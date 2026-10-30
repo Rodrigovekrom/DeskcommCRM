@@ -51,6 +51,20 @@ export interface ConfigAssinatura {
    * precisa saber se fala com o consultor, o relacionamento ou o gerente.
    */
   rotulosFuncao?: Record<Funcao, string>;
+  /**
+   * ia.vek v1.9.6 (Rodrigo, 30/10): o CABEÇALHO fixo por papel, que substitui o
+   * `*Nome | Rótulo*` — `*Nome emoji*`, uma linha em citação (`> frase`) e uma
+   * linha em branco antes do texto. Mora em
+   * `assinatura_mensagens.cabecalhos` e não se escolhe pela tela: quem não tem
+   * cabeçalho (gerente, admin, sem função, Suporte IA) assina como antes.
+   */
+  cabecalhos?: Cabecalhos;
+}
+
+/** O cabeçalho da IA (`titulo` = o nome com os emojis) e o de cada função. */
+export interface Cabecalhos {
+  ia?: { titulo: string; frase: string };
+  funcoes?: Partial<Record<Funcao, { emoji: string; frase: string }>>;
 }
 
 /** Os rótulos padrão de cada função para o cliente (configuráveis por organização). */
@@ -90,6 +104,27 @@ function rotulosLidos(bruto: unknown): Record<Funcao, string> {
   return r;
 }
 
+/** Uma linha só, sem `*` (desmontaria o negrito) — vale para título, emoji e frase. */
+const umaLinha = (max: number) => z.string().trim().min(1).max(max).regex(/^[^*\r\n]+$/);
+
+const cabecalhosSchema = z
+  .object({
+    ia: z.object({ titulo: umaLinha(120), frase: umaLinha(200) }).optional().catch(undefined),
+    funcoes: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .transform((bruto) => {
+        const r: Partial<Record<Funcao, { emoji: string; frase: string }>> = {};
+        for (const f of FUNCOES) {
+          const v = z.object({ emoji: umaLinha(20), frase: umaLinha(200) }).safeParse(bruto?.[f]);
+          if (v.success) r[f] = v.data;
+        }
+        return r;
+      })
+      .catch({}),
+  })
+  .catch({ ia: undefined, funcoes: {} });
+
 const assinaturaSchema = z
   .object({
     humanos: z.boolean().catch(false),
@@ -114,6 +149,7 @@ export function configAssinatura(settings: unknown): ConfigAssinatura {
     ia: parsed.ia,
     nomeIa: parsed.nome_ia,
     rotulosFuncao: rotulosLidos((bruto as { rotulos_funcao?: unknown } | null)?.rotulos_funcao),
+    cabecalhos: cabecalhosSchema.parse((bruto as { cabecalhos?: unknown } | null)?.cabecalhos ?? {}),
   };
 }
 
@@ -147,6 +183,8 @@ export function linhaDeAssinatura(
 ): string | null {
   if (origem === "ai") {
     if (!config.ia) return null;
+    const cab = config.cabecalhos?.ia;
+    if (cab) return cabecalho(cab.titulo, cab.frase);
     // Para a IA o relato não pede capitalização — o nome é o que a organização
     // configurou ("Assistente Virtual", o nome do agente, uma marca).
     return `*${config.nomeIa}*\n`;
@@ -156,10 +194,18 @@ export function linhaDeAssinatura(
   if (!nome) return null;
   // Apoio é apelido de gerente: os dois assinam com o rótulo do gerente.
   const funcao = funcaoDaTela(funcaoHumano);
+  const cab = funcao ? config.cabecalhos?.funcoes?.[funcao] : undefined;
+  // v1.9.6: com cabeçalho, só o PRIMEIRO nome (como nos prints do Rodrigo).
+  if (cab) return cabecalho(`${capitalizarIniciais(nome.split(/\s+/)[0] ?? nome)} ${cab.emoji}`, cab.frase);
   const rotulo = funcao ? config.rotulosFuncao?.[funcao] : undefined;
   return rotulo
     ? `*${capitalizarIniciais(nome)} | ${rotulo}*\n`
     : `*${capitalizarIniciais(nome)}*\n`;
+}
+
+/** `*Título*`, a frase em citação e a linha em branco antes do texto. */
+function cabecalho(titulo: string, frase: string): string {
+  return `*${titulo}*\n> ${frase}\n\n`;
 }
 
 /**
@@ -212,7 +258,8 @@ export const assinaturaEntradaSchema = z
   })
   .strict();
 
-const LINHA_DE_ASSINATURA = /^\*[^*\n]+\*\n/;
+// v1.9.6: o cabeçalho pode trazer a citação e a linha em branco depois do nome.
+const LINHA_DE_ASSINATURA = /^\*[^*\n]+\*\n(?:> [^\n]*\n\n)?/;
 
 /**
  * O texto sem a linha de assinatura do começo, se houver. Quem precisa é a

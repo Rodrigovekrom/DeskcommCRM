@@ -63,7 +63,7 @@ function LadosDoFunilDaLoja() {
         <h2 className="text-sm font-semibold">{t("Etapas de cada função")}</h2>
         <p className="text-xs text-muted-foreground">
           {t(
-            "No Pipeline, o SDR vê só as etapas do SDR e o vendedor só as do vendedor, cada um com os próprios leads. \"Os dois\" aparece para ambos. Sem nenhuma marcada, todos veem o funil inteiro.",
+            "No Pipeline, o guardião vê só as etapas do guardião e o vendedor só as do vendedor, cada um com os próprios leads. \"Os dois\" aparece para ambos. Sem nenhuma marcada, todos veem o funil inteiro.",
           )}
         </p>
       </div>
@@ -82,7 +82,7 @@ function LadosDoFunilDaLoja() {
               data-testid={`lado-${e.id}`}
             >
               <option value="">{t("Nenhum")}</option>
-              <option value="sdr">{t("SDR")}</option>
+              <option value="sdr">{t("Guardião")}</option>
               <option value="vendedor">{t("Vendedor")}</option>
               <option value="ambos">{t("Os dois")}</option>
             </select>

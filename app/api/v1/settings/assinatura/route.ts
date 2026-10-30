@@ -80,6 +80,8 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     ...(nova.rotulos_funcao === undefined && anterior.rotulos_funcao !== undefined
       ? { rotulos_funcao: anterior.rotulos_funcao }
       : {}),
+    // ia.vek v1.9.6: o cabeçalho por papel não se edita por esta tela — fica.
+    ...(anterior.cabecalhos !== undefined ? { cabecalhos: anterior.cabecalhos } : {}),
   };
   const { error } = await createAdminClient()
     .from("organizations")

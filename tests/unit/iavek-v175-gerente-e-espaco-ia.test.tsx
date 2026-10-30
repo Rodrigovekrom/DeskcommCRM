@@ -65,8 +65,9 @@ describe("1. Espaço da IA: só admin e função suporte", () => {
         expect(veEspacoDaIa(funcaoDaTela(f), role), `${f ?? "sem função"}/${role}`).toBe(espera);
         // e o menu (incluindo a busca ⌘K, que lê a mesma lista) obedece
         const papelQueAbre = role !== "viewer"; // minRole do item é agent
+        // v1.9.6: o Espaço da IA saiu do MENU do Suporte IA (a rota segue aberta).
         expect(hrefs(f, role).includes(ESPACO), `${f ?? "sem função"}/${role}`).toBe(
-          espera && papelQueAbre,
+          espera && papelQueAbre && f !== "suporte",
         );
       }
     }
@@ -78,12 +79,12 @@ describe("1. Espaço da IA: só admin e função suporte", () => {
     expect(itens).toContain(ESPACO);
   });
 
-  it("a função suporte vê na barra; SDR, vendedor, gerente e apoio, não", () => {
+  it("v1.9.6: nenhuma função vê o Espaço da IA na barra (o Suporte IA também saiu)", () => {
     const naBarra = (f: string, role: Papel) =>
       barra(f, role)
         .flatMap((g) => g.items.map((d) => d.href))
         .includes(ESPACO);
-    expect(naBarra("suporte", "agent")).toBe(true);
+    expect(naBarra("suporte", "agent")).toBe(false);
     expect(naBarra("sdr", "agent")).toBe(false);
     expect(naBarra("vendedor", "agent")).toBe(false);
     expect(naBarra("gerente", "manager")).toBe(false);
@@ -196,16 +197,14 @@ describe("2. Menu do gerente", () => {
 
 describe("3. Os outros menus não mudam (além do Espaço da IA)", () => {
   it("SDR, vendedor e suporte: as mesmas listas da v1.7.4 (o SDR perde só o Espaço)", () => {
-    const pessoal = ["/app/inbox", "/app/agenda", "/app/tasks", "/app/contacts", "/app/calls"];
-    // v1.9.3: + o Pipeline (só as etapas do SDR) e os Meus números.
-    const v193 = ["/app/pipeline", "/app/meus-numeros"];
-    expect(DESTINOS_DA_FUNCAO.sdr).toEqual(["/app/meu-dia", ...v193, ...pessoal, "/app/templates"]);
+    // v1.9.6 (Rodrigo, 30/10): guardião e Suporte IA com "literalmente apenas esses".
+    expect(DESTINOS_DA_FUNCAO.sdr).toEqual(["/app/meu-dia", "/app/pipeline", "/app/agenda", "/app/meus-numeros"]);
     expect(DESTINOS_DA_FUNCAO.suporte).toEqual([
       "/app/meu-dia",
-      ...v193,
-      ESPACO,
-      ...pessoal,
-      "/app/templates",
+      "/app/inbox",
+      "/app/pipeline",
+      "/app/agenda",
+      "/app/meus-numeros",
     ]);
     // v1.7.7: + o Pipeline (a carteira dele no quadro), logo depois do Meu dia.
     expect(DESTINOS_DA_FUNCAO.vendedor).toEqual([

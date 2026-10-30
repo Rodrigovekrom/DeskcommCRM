@@ -54,7 +54,7 @@ const ROTULO_DO_TIPO: Record<string, string> = {
   negociar: "Passou para negociar",
   devolver: "Vendedor devolveu ao guardião",
   trocar_vendedor: "Passou a outro vendedor",
-  reativar: "Reativou e voltou ao SDR",
+  reativar: "Reativou e voltou ao guardião",
 };
 const SELECT = "h-9 w-full rounded-md border border-border bg-background px-2 text-sm";
 
@@ -149,7 +149,7 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
     negociar: "Passar para negociar",
     devolver: "Devolver ao guardião",
     trocar_vendedor: "Passar a outro vendedor",
-    reativar: "Reativar (volta ao SDR)",
+    reativar: "Reativar (volta ao guardião)",
   };
   const detalhe = (k: string) => {
     const v = ultima?.detalhes?.[k];
@@ -240,7 +240,7 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
                   ? t("O lead volta para o guardião com o motivo e o que você já fez.")
                   : acao === "trocar_vendedor"
                     ? t("O vendedor atual é avisado de que perdeu o lead. O histórico vai junto para o novo.")
-                    : t("O lead volta para o SDR (o guardião) e começa um novo ciclo de 72h.")}
+                    : t("O lead volta para o guardião e começa um novo ciclo de 72h.")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

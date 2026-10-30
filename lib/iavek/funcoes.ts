@@ -39,8 +39,9 @@ export function funcaoDaTela(v: unknown): Funcao | null {
 }
 
 export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
-  sdr: "SDR",
-  suporte: "SDR de suporte",
+  // v1.9.6 (Rodrigo, 30/10): só o TEXTO muda — a chave segue "sdr" (a 0579 compara 'sdr' exato).
+  sdr: "Guardião",
+  suporte: "Suporte IA",
   vendedor: "Vendedor",
   apoio: "Gerente de apoio",
   gerente: "Gerente",
@@ -55,18 +56,10 @@ export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
 const MENU_GERENTE = ["/app/meu-dia", "/app/agenda", "/app/kanban", "/app/inbox"] as const;
 
 export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
-  sdr: [
-    "/app/meu-dia",
-    // v1.9.3: o Pipeline do SDR (só as etapas do lado dele) e os números dele.
-    "/app/pipeline",
-    "/app/meus-numeros",
-    "/app/inbox",
-    "/app/agenda",
-    "/app/tasks",
-    "/app/contacts",
-    "/app/calls",
-    "/app/templates",
-  ],
+  // v1.9.6 (Rodrigo, 30/10): "literalmente apenas esses", nesta ordem (`MENU_DA_FUNCAO`).
+  // Saem Entrada de leads, Tarefas, Contatos, Chamadas e Respostas rápidas. É
+  // apresentação: o sino e os links diretos para a conversa continuam abrindo.
+  sdr: ["/app/meu-dia", "/app/pipeline", "/app/agenda", "/app/meus-numeros"],
   vendedor: [
     "/app/meu-dia",
     // v1.7.7: a carteira dele no Kanban (antes de tudo o que é lista).
@@ -84,21 +77,11 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
     "/app/templates",
   ],
   /**
-   * Igual ao SDR, mas sem virar guardião do lead — e é a ÚNICA função que vê o
-   * Espaço da IA (v1.7.5: "só admin tem a visão + SDR de suporte").
+   * Igual ao guardião, mas sem virar guardião do lead. v1.9.6: o Espaço da IA
+   * saiu do menu (a rota segue aberta para ela, ver `veEspacoDaIa`) e a
+   * Entrada de leads volta como "Atendimento da IA".
    */
-  suporte: [
-    "/app/meu-dia",
-    "/app/pipeline",
-    "/app/meus-numeros",
-    "/app/espaco-ia",
-    "/app/inbox",
-    "/app/agenda",
-    "/app/tasks",
-    "/app/contacts",
-    "/app/calls",
-    "/app/templates",
-  ],
+  suporte: ["/app/meu-dia", "/app/inbox", "/app/pipeline", "/app/agenda", "/app/meus-numeros"],
   /**
    * ia.vek v1.7.5 (pedido do Rodrigo): o gerente CONTROLA e ACOMPANHA a equipe,
    * e o menu dele é só isto, em dois grupos com nome próprio
@@ -148,6 +131,43 @@ export const MENU_DO_GERENTE = [
     ],
   },
 ] as const;
+
+/**
+ * ia.vek v1.9.6: o menu do guardião e do Suporte IA, com os rótulos que o
+ * Rodrigo pediu, na ordem da barra. Mesmo princípio do `MENU_DO_GERENTE`.
+ * O "Space do guardião" entra na v1.9.7.
+ */
+export const MENU_DA_FUNCAO: Partial<
+  Record<Funcao, ReadonlyArray<{ id: string; label: string; itens: ReadonlyArray<{ href: string; label: string }> }>>
+> = {
+  gerente: MENU_DO_GERENTE,
+  apoio: MENU_DO_GERENTE,
+  sdr: [
+    {
+      id: "iavek-guardiao",
+      label: "Meu trabalho",
+      itens: [
+        { href: "/app/meu-dia", label: "Meu dia" },
+        { href: "/app/pipeline", label: "Meus leads" },
+        { href: "/app/agenda", label: "Agenda" },
+        { href: "/app/meus-numeros", label: "Meus dados" },
+      ],
+    },
+  ],
+  suporte: [
+    {
+      id: "iavek-suporte-ia",
+      label: "Meu trabalho",
+      itens: [
+        { href: "/app/meu-dia", label: "Meu dia" },
+        { href: "/app/inbox", label: "Atendimento da IA" },
+        { href: "/app/pipeline", label: "Meus leads" },
+        { href: "/app/agenda", label: "Agenda" },
+        { href: "/app/meus-numeros", label: "Meus dados" },
+      ],
+    },
+  ],
+};
 
 export const ESPACO_DA_IA = "/app/espaco-ia";
 

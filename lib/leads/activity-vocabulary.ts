@@ -305,7 +305,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   esteira_reengajou: "Cliente voltou a falar",
   esteira_ligacao_cobrada: "Ligação atrasada cobrada",
   iavek_passagem: "Passagem do lead",
-  iavek_reativado: "Lead reativado (voltou ao SDR)",
+  iavek_reativado: "Lead reativado (voltou ao guardião)",
   // Rótulo com OBJETO e sem jargão de banco: "Mesclado" sozinho é palavra de
   // engenheiro. O que aconteceu, para quem lê a timeline do negócio, é que dois
   // cadastros da mesma pessoa viraram um — e é por isso que este negócio pode
