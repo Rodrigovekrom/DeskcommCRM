@@ -179,7 +179,10 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
       )
       .then((r) => {
         const modelo = r.data?.texto;
-        if (vivo && modelo) setText((atual) => (atual.length > 0 ? atual : modelo));
+        if (!vivo || !modelo) return;
+        setText((atual) => (atual.length > 0 ? atual : modelo));
+        // O campo cresce como quando se digita: o modelo inteiro fica à vista.
+        requestAnimationFrame(() => autoresize());
       })
       .catch(() => {
         /* sem modelo, o campo segue vazio como sempre */
