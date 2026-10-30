@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
   diaDoCompromisso,
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const fuso = compromisso?.time_zone || authz.org.timezone || "America/Sao_Paulo";
     const inicio = compromisso?.starts_at ? new Date(compromisso.starts_at) : null;
     const texto = preencherModelo(modelo, {
-      primeiro_nome: primeiroNome(contato?.display_name ?? contato?.name),
+      primeiro_nome: primeiroNome(nomeDoContato(contato)),
       dia: inicio ? diaDoCompromisso(inicio, new Date(), fuso) : null,
       hora: inicio ? horaDoCompromisso(inicio, fuso) : null,
     });
