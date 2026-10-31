@@ -38,6 +38,17 @@ export async function lerLeadDaPassagem(admin: SupabaseClient, orgId: string, le
   return (data as LeadDaPassagem | null) ?? null;
 }
 
+/**
+ * Pacote de segurança (31/10): quem pede ENXERGA este lead? A rota da passagem
+ * lê o lead pela chave de serviço (precisa dos campos de todo o trajeto); antes
+ * dela, a SESSÃO tem de vê-lo — senão é 404, como se não existisse.
+ */
+export async function leadVisivelPelaSessao(orgId: string, leadId: string): Promise<boolean> {
+  const sessao = await createClient();
+  const { data } = await sessao.from("crm_leads").select("id").eq("organization_id", orgId).eq("id", leadId).maybeSingle();
+  return data !== null;
+}
+
 /** O nascimento do lead para a conta das 72h (no clone da esteira, o do ciclo). */
 export function nascimentoDoLead(lead: Pick<LeadDaPassagem, "created_at" | "source_metadata">): string {
   const inicio = lead.source_metadata?.esteira_inicio;
@@ -86,7 +97,15 @@ export async function anotarCampos(
  */
 export async function mudarDono(
   admin: SupabaseClient,
-  args: { orgId: string; leadId: string; dono: string; guardiao: string | null; atorId: string },
+  args: {
+    orgId: string;
+    leadId: string;
+    dono: string;
+    guardiao: string | null;
+    atorId: string;
+    /** O dono que a rota leu e conferiu. Pelo servidor, só troca se ainda for ele. */
+    donoAnterior: string | null;
+  },
 ): Promise<boolean> {
   const mudanca = {
     owner_user_id: args.dono,
@@ -104,13 +123,12 @@ export async function mudarDono(
     .select("id")
     .maybeSingle();
   if (peloAtor) return true;
-  const { data: peloServidor } = await admin
-    .from("crm_leads")
-    .update(mudanca)
-    .eq("organization_id", args.orgId)
-    .eq("id", args.leadId)
-    .select("id")
-    .maybeSingle();
+  // Pacote de segurança (31/10): pelo servidor, só com o dono que a rota
+  // conferiu — se outra pessoa mudou o dono no meio do caminho, não passa por
+  // cima dela (a rota responde que não conseguiu).
+  let consulta = admin.from("crm_leads").update(mudanca).eq("organization_id", args.orgId).eq("id", args.leadId);
+  consulta = args.donoAnterior ? consulta.eq("owner_user_id", args.donoAnterior) : consulta.is("owner_user_id", null);
+  const { data: peloServidor } = await consulta.select("id").maybeSingle();
   if (!peloServidor) return false;
   await admin
     .from("notificacoes")
@@ -275,7 +293,7 @@ export async function reativarLead(
   const guardiao = lead.sdr_user_id;
   const agora = new Date().toISOString();
   // Ciclo novo: o nascimento das 72h é AGORA (o clone pode herdar a marca do ciclo antigo).
-  await admin
+  const { error: erroDoClone } = await admin
     .from("crm_leads")
     .update({
       source_metadata: { ...((r.clone as { source_metadata?: Record<string, unknown> }).source_metadata ?? {}), esteira_inicio: agora },
@@ -285,6 +303,13 @@ export async function reativarLead(
     })
     .eq("organization_id", lead.organization_id)
     .eq("id", novo.id);
+  // Pacote de segurança e defeitos (31/10): o erro era ignorado. Não interrompe
+  // (o clone já existe; parar aqui deixaria o trabalho pela metade e um novo
+  // clique criaria OUTRO clone), mas fica no log: o clone ficou sem o dono e sem
+  // o ciclo novo, e alguém precisa olhar.
+  if (erroDoClone) {
+    logger.error("[iavek-reativar] clone sem dono/ciclo novo", { leadId: lead.id, clone: novo.id, erro: erroDoClone.message });
+  }
   const novoLead = await lerLeadDaPassagem(admin, lead.organization_id, novo.id);
   if (novoLead) {
     await registrarPassagem(admin, {

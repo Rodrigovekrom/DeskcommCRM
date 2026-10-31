@@ -30,6 +30,16 @@ export type ResultadoDaConfirmacao =
   | { status: "retry"; retryAt: string; reason: string }
   | { status: "error"; reason: string };
 
+/**
+ * Pacote de segurança e defeitos (31/10): erro TEMPORÁRIO de leitura (banco
+ * fora, tempo esgotado) não é "o compromisso sumiu". Antes, a leitura ignorava o
+ * `error`, o `null` virava `compromisso_sumiu` e a confirmação ao cliente se
+ * perdia. Agora tenta de novo em 5 minutos.
+ */
+function tentarDeNovo(motivo: string): ResultadoDaConfirmacao {
+  return { status: "retry", retryAt: new Date(Date.now() + 5 * 60_000).toISOString(), reason: motivo };
+}
+
 export async function confirmarPeloWhatsApp(row: {
   organization_id: string | null;
   entity_id: string | null;
@@ -41,7 +51,7 @@ export async function confirmarPeloWhatsApp(row: {
   try {
     if (!(await agendaDaIaDaOrg(org)).modo) return { status: "skipped", reason: "fora_do_modo_agendamento" };
     const admin = createAdminClient();
-    const { data: compromisso } = await admin
+    const { data: compromisso, error: erroDoCompromisso } = await admin
       .from("calendar_appointments")
       .select("id, status, starts_at, title, time_zone, contact_id, calendar_event_types(name)")
       .eq("id", id)
@@ -50,28 +60,31 @@ export async function confirmarPeloWhatsApp(row: {
     const c = compromisso as
       | { status: string; starts_at: string; title: string; time_zone: string | null; contact_id: string | null; calendar_event_types: { name: string } | null }
       | null;
+    if (erroDoCompromisso) return tentarDeNovo("leitura_do_compromisso_falhou");
     if (!c) return { status: "skipped", reason: "compromisso_sumiu" };
     if (c.status !== "confirmed") return { status: "skipped", reason: "nao_esta_mais_confirmado" };
     if (new Date(c.starts_at).getTime() <= Date.now()) return { status: "skipped", reason: "ja_passou" };
     if (!c.contact_id) return { status: "skipped", reason: "sem_contato" };
 
-    const { data: contato } = await admin
+    const { data: contato, error: erroDoContato } = await admin
       .from("contacts")
       .select("id, display_name, phone_number, is_blocked")
       .eq("id", c.contact_id)
       .eq("organization_id", org)
       .maybeSingle();
+    if (erroDoContato) return tentarDeNovo("leitura_do_contato_falhou");
     if (!contato) return { status: "skipped", reason: "contato_fora_da_org" };
     if (contato.is_blocked) return { status: "skipped", reason: "contato_bloqueado" };
     if (!contato.phone_number) return { status: "skipped", reason: "sem_telefone" };
 
-    const { data: canal } = await admin
+    const { data: canal, error: erroDoCanal } = await admin
       .from("channel_sessions")
       .select("id")
       .eq("organization_id", org)
       .eq("status", "WORKING")
       .limit(1)
       .maybeSingle();
+    if (erroDoCanal) return tentarDeNovo("leitura_do_canal_falhou");
     if (!canal) return { status: "skipped", reason: "sem_canal" };
     // Fora da janela de envio (ex.: a recepção confirmou às 23h): tenta de novo
     // quando a janela abrir — a clínica confirmou, a cliente tem de saber.

@@ -17,8 +17,9 @@ type Ctx = { params: Promise<{ id: string; docId: string }> };
 
 export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
   const requestId = randomUUID();
-  const quem = await quemNaFicha();
-  if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
+  const portao = await quemNaFicha(requestId);
+  if (!portao.ok) return portao.response;
+  const quem = portao.quem;
   const { id, docId } = await ctx.params;
   if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(docId).success) return semAcesso(quem, requestId);
   const ficha = await lerFicha(quem.orgId, id);

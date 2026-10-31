@@ -78,7 +78,7 @@ toca o contêiner de produção, o `.env` nem o compose. Para olhar, abra o tún
 acesse `http://localhost:3901/login`:
 
 ```bash
-ssh -i ~/.ssh/iavek_vps -p 22022 -L 3901:127.0.0.1:3901 root@143.95.173.212
+ssh -i <sua-chave> -p <porta-ssh> -L 3901:127.0.0.1:3901 <usuario>@<ip-do-servidor>
 ```
 
 Desde 20/10/2026 o canário usa **sempre o banco de TESTE** (projeto
@@ -148,7 +148,7 @@ resposta do cron: organização, veículos, `alterados` e, quando não sincroniz
 motivo (`pulado`). Sem segredo nem URL. Para ler:
 
 ```bash
-ssh -i ~/.ssh/iavek_vps -p 22022 root@143.95.173.212 \
+ssh -i <sua-chave> -p <porta-ssh> <usuario>@<ip-do-servidor> \
   'docker logs --since 2h deskcommcrm-scheduler-1 2>&1 | grep estoque-altimus'
 ```
 

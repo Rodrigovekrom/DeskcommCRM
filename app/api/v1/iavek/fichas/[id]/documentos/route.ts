@@ -11,7 +11,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { requireSupportWrite } from "@/lib/impersonate/support";
-import { quemNaFicha, TIPOS_DE_DOCUMENTO } from "@/lib/iavek/fichas";
+import { bytesBatemComOTipo, quemNaFicha, TIPOS_DE_DOCUMENTO } from "@/lib/iavek/fichas";
 import { exigeVerDados, lerFicha, semAcesso } from "@/lib/iavek/fichas-servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -31,8 +31,9 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const quem = await quemNaFicha();
-  if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
+  const portao = await quemNaFicha(requestId);
+  if (!portao.ok) return portao.response;
+  const quem = portao.quem;
   const t = (s: string) => traduzir(s, quem.idioma);
   const { id } = await ctx.params;
   if (quem.analista || quem.suporteSoLeitura || !z.uuid().safeParse(id).success) return semAcesso(quem, requestId);
@@ -52,11 +53,15 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   if (!ext) return fail("validation_failed", t("Formato não aceito: use foto (JPG, PNG, WEBP, HEIC) ou PDF."), 422, { requestId });
   if (arquivo.size > MAXIMO) return fail("validation_failed", t("Arquivo maior que 10 MB."), 422, { requestId });
 
+  const bytes = Buffer.from(await arquivo.arrayBuffer());
+  if (!bytesBatemComOTipo(arquivo.type, bytes)) {
+    return fail("validation_failed", t("O arquivo não é do formato que diz ser."), 422, { requestId });
+  }
   const caminho = `${quem.orgId}/${id}/${randomUUID()}.${ext}`;
   const admin = createAdminClient();
   const { error: erroUp } = await admin.storage
     .from("iavek-fichas")
-    .upload(caminho, Buffer.from(await arquivo.arrayBuffer()), { contentType: arquivo.type, upsert: false });
+    .upload(caminho, bytes, { contentType: arquivo.type, upsert: false });
   if (erroUp) return fail("internal_error", t("Não consegui guardar o documento."), 500, { requestId });
 
   const { data: doc, error } = await admin

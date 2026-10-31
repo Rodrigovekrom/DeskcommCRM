@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
+import { portaoSemPapel } from "@/lib/auth/require-role";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
+import { createClient } from "@/lib/supabase/server";
 import type { Idioma } from "@/lib/i18n/idiomas";
 
 /**
@@ -128,27 +129,37 @@ export interface QuemNaFicha {
 }
 
 /**
- * Resolve quem chama SEM `requireRole`: para o analista de ficha o
- * `fn_user_role_in_org` devolve nulo (0586), e o `requireRole` negaria tudo —
- * de propósito. Aqui a função vem do próprio vínculo, que só o admin grava.
+ * Resolve quem chama. Não usa `requireRole`: para o analista de ficha o
+ * `fn_user_role_in_org` devolve nulo (0586), e o `requireRole` negaria tudo — de
+ * propósito. Pacote de segurança (31/10): passa pelo MESMO portão, sem a etapa do
+ * papel (`portaoSemPapel`: MFA da sessão, org suspensa, aba divergente,
+ * auditoria), e o papel de quem não é analista vem do BANCO, não da memória.
  */
-export async function quemNaFicha(): Promise<QuemNaFicha | null> {
-  const user = await loadAuthUser();
-  if (!user) return null;
-  const org = await resolveActiveOrg(user);
-  if (!org) return null;
+export async function quemNaFicha(
+  requestId?: string,
+): Promise<{ ok: true; quem: QuemNaFicha } | { ok: false; response: Response }> {
+  const portao = await portaoSemPapel({ requestId, resource: "iavek_fichas" });
+  if (!portao.ok) return portao;
+  const { user, org } = portao;
   const funcao = (org.interface_settings as { funcao?: string } | null | undefined)?.funcao ?? null;
   const analista = funcao === FUNCAO_ANALISTA_DE_FICHA;
-  const role = analista ? null : (org.role as Role);
+  let role: Role | null = null;
+  if (!analista) {
+    const { data } = await (await createClient()).rpc("fn_user_role_in_org", { p_org: org.orgId });
+    role = (data as Role | null) ?? null;
+  }
   return {
-    userId: user.id,
-    orgId: org.orgId,
-    role,
-    analista,
-    admin: !analista && role !== null && ROLE_RANK[role] >= ROLE_RANK.admin,
-    gerente: !analista && role === "manager",
-    idioma: user.idioma,
-    suporteSoLeitura: Boolean(user.support && user.support.access_mode !== "full"),
+    ok: true,
+    quem: {
+      userId: user.id,
+      orgId: org.orgId,
+      role,
+      analista,
+      admin: !analista && role !== null && ROLE_RANK[role] >= ROLE_RANK.admin,
+      gerente: !analista && role === "manager",
+      idioma: user.idioma,
+      suporteSoLeitura: Boolean(user.support && user.support.access_mode !== "full"),
+    },
   };
 }
 
@@ -160,4 +171,28 @@ export function podeVerDados(
 ): boolean {
   if (quem.analista || quem.admin) return true;
   return quem.userId === ficha.enviada_por || (donoDoLead !== null && quem.userId === donoDoLead);
+}
+
+/**
+ * Pacote de segurança (31/10): o tipo DECLARADO pelo navegador (`arquivo.type`)
+ * é o que quem envia quiser. O documento da ficha só entra se os PRIMEIROS BYTES
+ * forem do formato declarado (JPG, PNG, WEBP, HEIC ou PDF).
+ */
+export function bytesBatemComOTipo(mime: string, b: Uint8Array): boolean {
+  const comeca = (...xs: number[]) => xs.every((x, i) => b[i] === x);
+  const ascii = (de: number, texto: string) => [...texto].every((c, i) => b[de + i] === c.charCodeAt(0));
+  switch (mime) {
+    case "image/jpeg":
+      return comeca(0xff, 0xd8, 0xff);
+    case "image/png":
+      return comeca(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    case "image/webp":
+      return ascii(0, "RIFF") && ascii(8, "WEBP");
+    case "image/heic":
+      return ascii(4, "ftyp") && ["heic", "heix", "mif1", "msf1", "heim", "heis", "hevc", "hevx"].some((m) => ascii(8, m));
+    case "application/pdf":
+      return ascii(0, "%PDF-");
+    default:
+      return false;
+  }
 }

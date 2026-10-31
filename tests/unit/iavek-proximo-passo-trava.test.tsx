@@ -45,16 +45,26 @@ const conversa = {
 } as unknown as ConversationWithContact;
 
 let api: ReturnType<typeof useProximoPassoObrigatorio>;
-function Sonda() {
-  api = useProximoPassoObrigatorio();
-  return <>{api.dialogo}</>;
+// O hook sai pela prop (e não por atribuição a uma variável de fora dentro do
+// componente, que a regra react-hooks/globals recusa).
+function Sonda({ expor }: { expor: (a: ReturnType<typeof useProximoPassoObrigatorio>) => void }) {
+  const a = useProximoPassoObrigatorio();
+  expor(a);
+  return <>{a.dialogo}</>;
 }
 function montar() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );
-  render(<Sonda />, { wrapper });
+  render(
+    <Sonda
+      expor={(a) => {
+        api = a;
+      }}
+    />,
+    { wrapper },
+  );
 }
 
 beforeEach(() => {

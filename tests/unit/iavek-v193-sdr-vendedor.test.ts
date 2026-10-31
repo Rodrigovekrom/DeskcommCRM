@@ -90,7 +90,7 @@ describe("v1.9.3 — agenda: o SDR da loja marca direto (decisão B)", () => {
     expect(r).toContain("avisarVendedorDoAgendamento(admin,");
     // Decisão do Rodrigo (27/10): o lead passa para o vendedor, e o SDR fica de guardião.
     expect(r).toContain("const leadPassado = await passarOLeadAoVendedor(admin, {");
-    expect(r).toContain("const guardiao = (lead.sdr_user_id as string | null) ?? args.sdrId;");
+    expect(r).toContain("const guardiao = lead.sdr_user_id ?? args.sdrId;"); // v1.9.9-seg: o lead vem tipado da sessão
     expect(r).toContain("owner_user_id: args.vendedorId,");
     const h = ler("app/api/v1/agenda/agendamentos/_handler.ts");
     expect(h).toContain("if (!ctx.iavekSdrMarcaParaVendedor && aOpcaoPodeRecortar(");

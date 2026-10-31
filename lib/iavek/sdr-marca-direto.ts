@@ -62,3 +62,14 @@ export async function vendedoresDaLoja(
     .map((id) => ({ id, nome: nomes.get(id) ?? "—" }))
     .sort((a, b) => a.nome.localeCompare(b.nome));
 }
+
+/**
+ * Pacote de segurança (31/10): ao marcar para o vendedor, o SDR passa o lead SEM
+ * dono, o DELE e o que ele GUARDA. O de outra pessoa da loja, só a gerência.
+ */
+export function podePassarOLead(
+  lead: { owner_user_id: string | null; sdr_user_id: string | null },
+  eu: string,
+): boolean {
+  return lead.owner_user_id === null || lead.owner_user_id === eu || lead.sdr_user_id === eu;
+}

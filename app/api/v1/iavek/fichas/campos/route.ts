@@ -18,8 +18,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
-  const quem = await quemNaFicha();
-  if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
+  const portao = await quemNaFicha(requestId);
+  if (!portao.ok) return portao.response;
+  const quem = portao.quem;
   if (!quem.analista && (quem.role === null || quem.role === "viewer")) return semAcesso(quem, requestId);
   const { data } = await createAdminClient().from("organizations").select("settings").eq("id", quem.orgId).maybeSingle();
   return ok({ campos: lerCamposDaFicha(data?.settings) }, { requestId });
@@ -29,8 +30,9 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const quem = await quemNaFicha();
-  if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
+  const portao = await quemNaFicha(requestId);
+  if (!portao.ok) return portao.response;
+  const quem = portao.quem;
   if (!quem.admin || quem.suporteSoLeitura) return semAcesso(quem, requestId);
   const t = (s: string) => traduzir(s, quem.idioma);
   const corpo = await req.json().catch(() => null);

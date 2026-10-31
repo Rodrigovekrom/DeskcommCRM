@@ -30,8 +30,9 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const quem = await quemNaFicha();
-  if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
+  const portao = await quemNaFicha(requestId);
+  if (!portao.ok) return portao.response;
+  const quem = portao.quem;
   const t = (s: string) => traduzir(s, quem.idioma);
   const { id } = await ctx.params;
   if (!(quem.analista || quem.admin) || quem.suporteSoLeitura || !z.uuid().safeParse(id).success) {

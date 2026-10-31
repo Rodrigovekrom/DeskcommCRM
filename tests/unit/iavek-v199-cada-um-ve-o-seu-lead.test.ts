@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { bytesBatemComOTipo } from "@/lib/iavek/fichas";
+import { podePassarOLead } from "@/lib/iavek/sdr-marca-direto";
+
 /**
  * ia.vek v1.9.9-seg (0598) — "cada um vê o seu lead". A prova de comportamento é
  * por JWT real no banco de teste (provas/prova-seg, fora do repo); aqui a cerca
@@ -73,5 +76,64 @@ describe("v1.9.9-seg — as travas", () => {
     expect(policy("tenant_read_lgpd_exports")).toContain("'admin')");
     expect(policy("tenant_write_ai_policy")).toContain("'manager')");
     expect(policy("tenant_delete_ai_policy")).toContain("'manager')");
+  });
+});
+
+
+describe("v1.9.9-seg (parte 2) — as rotas que usam a chave de serviço", () => {
+  it("B2: o SDR passa o lead sem dono, o dele e o que guarda; o de um colega, não", () => {
+    expect(podePassarOLead({ owner_user_id: null, sdr_user_id: null }, "eu")).toBe(true);
+    expect(podePassarOLead({ owner_user_id: "eu", sdr_user_id: null }, "eu")).toBe(true);
+    expect(podePassarOLead({ owner_user_id: "vendedor", sdr_user_id: "eu" }, "eu")).toBe(true);
+    expect(podePassarOLead({ owner_user_id: "colega", sdr_user_id: null }, "eu")).toBe(false);
+    expect(podePassarOLead({ owner_user_id: "colega", sdr_user_id: "outro" }, "eu")).toBe(false);
+    const rota = readFileSync("app/api/v1/iavek/pedidos-de-agendamento/route.ts", "utf8");
+    expect(rota).toMatch(/!gerencia && !podePassarOLead\(negocio, authz\.user\.id\)/);
+    // O negócio é lido pela SESSÃO, e a escrita pelo servidor só com o dono conferido.
+    expect(rota).toMatch(/async function leadDoCliente\([^)]*\)[\s\S]{0,200}const sessao = await createClient\(\)/);
+    expect(rota).toMatch(/peloServidor\.eq\("owner_user_id", lead\.owner_user_id\) : peloServidor\.is\("owner_user_id", null\)/);
+  });
+
+  it("B3: a passagem (GET e POST) responde 404 a quem não enxerga o lead", () => {
+    const rota = readFileSync("app/api/v1/iavek/passagem/route.ts", "utf8");
+    expect(rota.match(/leadVisivelPelaSessao\(authz\.org\.orgId, /g)?.length).toBe(2);
+  });
+
+  it("D5: trocar o dono pelo servidor só com o dono que a rota conferiu", () => {
+    const f = readFileSync("lib/iavek/passagem-servidor.ts", "utf8");
+    expect(f).toMatch(/args\.donoAnterior \? consulta\.eq\("owner_user_id", args\.donoAnterior\) : consulta\.is\("owner_user_id", null\)/);
+    const rota = readFileSync("app/api/v1/iavek/passagem/route.ts", "utf8");
+    expect(rota.match(/donoAnterior: lead\.owner_user_id/g)?.length).toBe(3);
+  });
+
+  it("B4: as fichas passam pelo portão (MFA, org suspensa, aba, auditoria) e o papel vem do banco", () => {
+    const f = readFileSync("lib/iavek/fichas.ts", "utf8");
+    expect(f).toContain("await portaoSemPapel(");
+    expect(f).toContain('rpc("fn_user_role_in_org"');
+    expect(f).not.toContain("resolveActiveOrg");
+    const portao = readFileSync("lib/auth/require-role.ts", "utf8");
+    const corpo = portao.slice(portao.indexOf("export async function portaoSemPapel("));
+    for (const etapa of ["orgAtivaSemPortao(user)", "orgDaAbaNoHeader()", "ehOperante(org.org_status)", "mfaEmDivida()", '"authz.denied"']) {
+      expect(corpo).toContain(etapa);
+    }
+  });
+
+  it("B8: o documento da ficha só entra se os bytes forem do formato declarado", () => {
+    const bytes = (...xs: number[]) => new Uint8Array([...xs, ...new Array(16).fill(0)]);
+    const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
+    expect(bytesBatemComOTipo("image/jpeg", bytes(0xff, 0xd8, 0xff, 0xe0))).toBe(true);
+    expect(bytesBatemComOTipo("image/png", bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))).toBe(true);
+    expect(bytesBatemComOTipo("application/pdf", bytes(...ascii("%PDF-1.7")))).toBe(true);
+    expect(bytesBatemComOTipo("image/webp", bytes(...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WEBP")))).toBe(true);
+    expect(bytesBatemComOTipo("image/heic", bytes(0, 0, 0, 24, ...ascii("ftypheic")))).toBe(true);
+    // Um HTML (ou um executável) que se diz PDF ou JPG.
+    expect(bytesBatemComOTipo("application/pdf", bytes(...ascii("<html>")))).toBe(false);
+    expect(bytesBatemComOTipo("image/jpeg", bytes(0x4d, 0x5a))).toBe(false);
+    expect(bytesBatemComOTipo("text/html", bytes(...ascii("%PDF-")))).toBe(false);
+  });
+
+  it("D1: o Meu dia busca só a janela do relógio, não os mais velhos com corte", () => {
+    const rota = readFileSync("app/api/v1/iavek/meu-dia/route.ts", "utf8");
+    expect(rota).toMatch(/\.gte\("created_at", new Date\(agora\.getTime\(\) - \(entrada\.horas \+ 24\) \* 3_600_000\)/);
   });
 });

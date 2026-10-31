@@ -41,6 +41,7 @@ import {
   nascimentoDoLead,
   reativarLead,
   registrarPassagem,
+  leadVisivelPelaSessao,
   type LeadDaPassagem,
 } from "@/lib/iavek/passagem-servidor";
 import { ehLojaDeCarros, lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
@@ -109,6 +110,9 @@ export async function GET(req: NextRequest): Promise<Response> {
   const t = (s: string) => traduzir(s, authz.user.idioma);
   const leadId = req.nextUrl.searchParams.get("lead_id") ?? "";
   if (!z.string().uuid().safeParse(leadId).success) return fail("validation_failed", t("Lead inválido."), 422, { requestId });
+  if (!(await leadVisivelPelaSessao(authz.org.orgId, leadId))) {
+    return fail("not_found", t("Lead não encontrado."), 404, { requestId });
+  }
   const admin = createAdminClient();
   const c = await contexto(admin, authz, leadId);
   if (!c) return fail("not_found", t("Lead não encontrado."), 404, { requestId });
@@ -189,6 +193,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
   const p = parsed.data;
+  if (!(await leadVisivelPelaSessao(authz.org.orgId, p.lead_id))) {
+    return fail("not_found", t("Lead não encontrado."), 404, { requestId });
+  }
   const admin = createAdminClient();
   const c = await contexto(admin, authz, p.lead_id);
   if (!c) return fail("not_found", t("Lead não encontrado."), 404, { requestId });
@@ -213,7 +220,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       });
     }
     const guardiao = lead.sdr_user_id ?? (c.funcao === "sdr" || c.funcao === "suporte" ? eu : null);
-    if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao, atorId: eu }))) {
+    if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao, atorId: eu, donoAnterior: lead.owner_user_id }))) {
       return fail("internal_error", t("Não consegui passar o lead."), 500, { requestId });
     }
     await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: p.vendedor_id, sdr_user_id: guardiao }, "negociar");
@@ -244,7 +251,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (p.tipo === "devolver") {
     if (!pode.devolver) return proibido("Só o vendedor dono do lead devolve ao guardião.");
     const guardiao = lead.sdr_user_id as string;
-    if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: guardiao, guardiao, atorId: eu }))) {
+    if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: guardiao, guardiao, atorId: eu, donoAnterior: lead.owner_user_id }))) {
       return fail("internal_error", t("Não consegui devolver o lead."), 500, { requestId });
     }
     await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: guardiao }, "devolver");
@@ -282,7 +289,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       return fail("validation_failed", t("Escolha um vendedor da loja."), 422, { requestId });
     }
     const anterior = lead.owner_user_id as string;
-    if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao: lead.sdr_user_id, atorId: eu }))) {
+    if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao: lead.sdr_user_id, atorId: eu, donoAnterior: lead.owner_user_id }))) {
       return fail("internal_error", t("Não consegui trocar o vendedor."), 500, { requestId });
     }
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead a outro vendedor" });

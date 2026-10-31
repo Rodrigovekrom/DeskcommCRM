@@ -23,8 +23,9 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
   const requestId = randomUUID();
-  const quem = await quemNaFicha();
-  if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
+  const portao = await quemNaFicha(requestId);
+  if (!portao.ok) return portao.response;
+  const quem = portao.quem;
   const { id } = await ctx.params;
   if (!z.uuid().safeParse(id).success) return semAcesso(quem, requestId);
   const ficha = await lerFicha(quem.orgId, id);
@@ -64,8 +65,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const quem = await quemNaFicha();
-  if (!quem) return fail("unauthenticated", "Auth required.", 401, { requestId });
+  const portao = await quemNaFicha(requestId);
+  if (!portao.ok) return portao.response;
+  const quem = portao.quem;
   const t = (s: string) => traduzir(s, quem.idioma);
   const { id } = await ctx.params;
   if (quem.analista || quem.suporteSoLeitura || !z.uuid().safeParse(id).success) return semAcesso(quem, requestId);

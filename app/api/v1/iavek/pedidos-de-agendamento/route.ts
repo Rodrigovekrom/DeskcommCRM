@@ -23,6 +23,8 @@ import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { ROLE_RANK } from "@/lib/auth/types";
+import { podePassarOLead } from "@/lib/iavek/sdr-marca-direto";
 import { roleAtLeast } from "@/lib/auth/types";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -185,9 +187,19 @@ async function sdrMarca(
   // v1.9.4 — a TRAVA da passagem (CRM-209): o SDR só marca para o vendedor com
   // os 7 campos do negócio e o contexto do atendimento. Os campos que vierem
   // são gravados no negócio antes da conferência (o mesmo merge da tela).
-  const negocio = await leadDoCliente(admin, orgId, input.lead_id ?? null, input.contact_id);
+  // Pacote de segurança (31/10): o negócio é lido pela SESSÃO — o SDR só passa o
+  // lead que enxerga — e o de outra pessoa da loja (nem dono, nem guardião) só a
+  // gerência passa. Antes, a leitura era pela chave de serviço e o SDR tomava o
+  // lead de um colega.
+  const negocio = await leadDoCliente(orgId, input.lead_id ?? null, input.contact_id);
   if (!negocio) {
     return fail("validation_failed", t("O cliente não tem negócio aberto para passar ao vendedor."), 422, { requestId });
+  }
+  const gerencia = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager;
+  if (!gerencia && !podePassarOLead(negocio, authz.user.id)) {
+    return fail("forbidden_role", t("Este cliente está com outra pessoa da loja. Peça à gerência para passar."), 403, {
+      requestId,
+    });
   }
   const campos = (await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields;
   const faltam = camposQueFaltam(campos);
@@ -261,8 +273,7 @@ async function sdrMarca(
     orgId,
     sdrId: authz.user.id,
     vendedorId,
-    leadId: negocio.id,
-    contactId: pedido.contact_id,
+    lead: negocio,
   });
   // v1.9.4: o lead vai para "Agendado" e o RESUMO fica para o vendedor ler.
   const lido = leadPassado ? await lerLeadDaPassagem(admin, orgId, leadPassado) : null;
@@ -322,23 +333,19 @@ async function sdrMarca(
   return ok({ pedido: (confirmado ?? pedido) as PedidoGravado, compromisso }, { requestId, status: 201 });
 }
 
-/**
- * Passa o lead do cliente para o vendedor, com o SDR como guardião. Primeiro
- * com a SESSÃO do SDR (o aviso "passou o lead" sai no nome dele, e o gatilho
- * 0579 grava o guardião); se a RLS não deixar (lead sem dono, da IA ou de
- * outra pessoa), pelo servidor, gravando o guardião aqui. Guardião que já
- * existia fica. Sem lead aberto do cliente: não passa nada (`null`).
- */
-/** O negócio aberto do cliente (o do pedido, ou o mais recente). */
-async function leadDoCliente(
-  admin: ReturnType<typeof createAdminClient>,
-  orgId: string,
-  leadId: string | null,
-  contactId: string,
-): Promise<{ id: string; custom_fields: Record<string, unknown> | null } | null> {
-  let consulta = admin
+interface NegocioDoCliente {
+  id: string;
+  custom_fields: Record<string, unknown> | null;
+  owner_user_id: string | null;
+  sdr_user_id: string | null;
+}
+
+/** O negócio aberto do cliente (o do pedido, ou o mais recente) — o que a SESSÃO enxerga. */
+async function leadDoCliente(orgId: string, leadId: string | null, contactId: string): Promise<NegocioDoCliente | null> {
+  const sessao = await createClient();
+  let consulta = sessao
     .from("crm_leads")
-    .select("id, custom_fields")
+    .select("id, custom_fields, owner_user_id, sdr_user_id")
     .eq("organization_id", orgId)
     .eq("contact_id", contactId)
     .eq("status", "open")
@@ -346,26 +353,23 @@ async function leadDoCliente(
     .limit(1);
   if (leadId) consulta = consulta.eq("id", leadId);
   const { data } = await consulta.maybeSingle();
-  return (data as { id: string; custom_fields: Record<string, unknown> | null } | null) ?? null;
+  return (data as NegocioDoCliente | null) ?? null;
 }
 
+/**
+ * Passa o lead do cliente para o vendedor, com o SDR como guardião. Primeiro
+ * com a SESSÃO do SDR (o aviso "passou o lead" sai no nome dele, e o gatilho
+ * 0579 grava o guardião); se a RLS não deixar (lead sem dono, da IA ou de
+ * outra pessoa), pelo servidor, gravando o guardião aqui. Guardião que já
+ * existia fica. Sem lead aberto do cliente: não passa nada (`null`).
+ */
 async function passarOLeadAoVendedor(
   admin: ReturnType<typeof createAdminClient>,
-  args: { orgId: string; sdrId: string; vendedorId: string; leadId: string | null; contactId: string },
+  args: { orgId: string; sdrId: string; vendedorId: string; lead: NegocioDoCliente },
 ): Promise<string | null> {
-  let consulta = admin
-    .from("crm_leads")
-    .select("id, owner_user_id, sdr_user_id")
-    .eq("organization_id", args.orgId)
-    .eq("contact_id", args.contactId)
-    .eq("status", "open")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  if (args.leadId) consulta = consulta.eq("id", args.leadId);
-  const { data: lead } = await consulta.maybeSingle();
-  if (!lead) return null;
-  if (lead.owner_user_id === args.vendedorId) return lead.id as string;
-  const guardiao = (lead.sdr_user_id as string | null) ?? args.sdrId;
+  const { lead } = args;
+  if (lead.owner_user_id === args.vendedorId) return lead.id;
+  const guardiao = lead.sdr_user_id ?? args.sdrId;
   const mudanca = {
     owner_user_id: args.vendedorId,
     owner_kind: "user",
@@ -381,15 +385,17 @@ async function passarOLeadAoVendedor(
     .eq("id", lead.id)
     .select("id")
     .maybeSingle();
-  if (peloSdr) return lead.id as string;
-  const { data: peloServidor } = await admin
+  if (peloSdr) return lead.id;
+  // Pelo servidor só com o dono que a SESSÃO viu (e conferiu acima): se outra
+  // pessoa assumiu o lead no meio do caminho, não passa por cima dela.
+  let peloServidor = admin
     .from("crm_leads")
     .update(mudanca)
     .eq("organization_id", args.orgId)
-    .eq("id", lead.id)
-    .select("id")
-    .maybeSingle();
-  return peloServidor ? (lead.id as string) : null;
+    .eq("id", lead.id);
+  peloServidor = lead.owner_user_id ? peloServidor.eq("owner_user_id", lead.owner_user_id) : peloServidor.is("owner_user_id", null);
+  const { data } = await peloServidor.select("id").maybeSingle();
+  return data ? lead.id : null;
 }
 
 /** Sem tipo escolhido: o único tipo ativo da empresa, se houver um só. */

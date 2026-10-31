@@ -62,7 +62,9 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
     const admin = createAdminClient();
 
     // A chave pode ter sido desligada entre o Fechar e agora.
-    const { data: org } = await admin.from("organizations").select("settings").eq("id", orgId).maybeSingle();
+    const { data: org, error: erroDaOrg } = await admin.from("organizations").select("settings").eq("id", orgId).maybeSingle();
+    // Pacote de segurança e defeitos (31/10): erro de leitura não é "chave desligada".
+    if (erroDaOrg) return { status: "error", reason: `leitura_da_organizacao: ${erroDaOrg.message}` };
     if (!lerConfigDaNota((org as { settings?: unknown } | null)?.settings).ativo) {
       return { status: "skipped", reason: "chave_desligada" };
     }
@@ -70,20 +72,23 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
     const { nicho } = lerPerfilDaEmpresa((org as { settings?: unknown } | null)?.settings);
 
     // Reprocessar o mesmo evento não gera nota de novo (e não gasta de novo).
-    const { count: jaTem } = await admin
+    const { count: jaTem, error: erroDoJaTem } = await admin
       .from("iavek_notas_de_atendimento")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("event_id", event.id);
+    // Sem saber se já foi avaliada, não avalia: chamaria a IA (e pagaria) de novo.
+    if (erroDoJaTem) return { status: "error", reason: `leitura_da_nota_anterior: ${erroDoJaTem.message}` };
     if ((jaTem ?? 0) > 0) return { status: "skipped", reason: "ja_avaliada" };
 
-    const { data: conversa } = await admin
+    const { data: conversa, error: erroDaConversa } = await admin
       .from("conversations")
       .select("id, contact_id, assigned_to_user_id, is_group")
       .eq("id", conversationId)
       .eq("organization_id", orgId)
       .maybeSingle();
     const conv = conversa as { id: string; contact_id: string | null; assigned_to_user_id: string | null; is_group: boolean | null } | null;
+    if (erroDaConversa) return { status: "error", reason: `leitura_da_conversa: ${erroDaConversa.message}` };
     if (!conv) return { status: "skipped", reason: "conversa_nao_encontrada" };
     if (conv.is_group) return { status: "skipped", reason: "grupo" };
 

@@ -117,6 +117,11 @@ export async function GET(req: NextRequest): Promise<Response> {
       .eq("organization_id", orgId)
       .eq("pipeline_id", entrada.pipeline_id)
       .eq("status", "open")
+      // Pacote de segurança e defeitos (31/10): só a JANELA do relógio — o ciclo
+      // e mais um dia de vencidos recentes. Antes vinha do mais VELHO com corte
+      // em 200/500: na loja com centenas de abertos antigos, a lista enchia de
+      // vencidos de semanas e o lead NOVO nunca aparecia.
+      .gte("created_at", new Date(agora.getTime() - (entrada.horas + 24) * 3_600_000).toISOString())
       .order("created_at", { ascending: true })
       .limit(limite);
     if (error) throw new Error(error.message);

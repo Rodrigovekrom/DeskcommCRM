@@ -303,3 +303,56 @@ export async function requireRole(min: Role, opts: RequireRoleOpts = {}): Promis
 
   return { ok: true, user, org: { ...org, role: effectiveRole as Role } };
 }
+
+export type PortaoSemPapel =
+  | { ok: true; user: AuthUser; org: ActiveOrg }
+  | { ok: false; response: NextResponse<ApiError> };
+
+/**
+ * ia.vek (pacote de segurança, 31/10) — o MESMO portão do `requireRole`, sem a
+ * etapa do papel: sessão, acompanhamento encerrado, org ativa (sem redirecionar),
+ * aba divergente (`X-Org-Da-Aba`), org suspensa e MFA da sessão, com o
+ * `authz.denied` na auditoria. Para a rota cujo papel é decidido por outra regra
+ * — as fichas de crédito, onde o analista não tem papel no banco (0586) e o
+ * `requireRole` o negaria de propósito. Quem chama decide o papel por cima.
+ */
+export async function portaoSemPapel(opts: { requestId?: string; resource?: string } = {}): Promise<PortaoSemPapel> {
+  const { requestId, resource } = opts;
+  const user = await loadAuthUser();
+  if (!user) {
+    return { ok: false, response: fail("unauthenticated", "Auth required.", 401, { requestId }) };
+  }
+  const t = (texto: string) => traduzir(texto, user.idioma);
+  if (user.support && user.support.status !== "active") {
+    return { ok: false, response: fail("forbidden", "O acompanhamento terminou. Saia para continuar.", 403, { requestId }) };
+  }
+  const org = await orgAtivaSemPortao(user);
+  if (!org) {
+    return { ok: false, response: fail("forbidden_tenant", t("Sem organização ativa."), 403, { requestId }) };
+  }
+  const aba = await orgDaAbaNoHeader();
+  if (aba && aba !== org.orgId) {
+    return {
+      ok: false,
+      response: fail(CODIGO_ORG_DIVERGENTE, t("Esta aba está numa organização diferente da sessão. Recarregar?"), 409, {
+        requestId,
+        details: { organization_id: org.orgId, organization_name: org.name },
+      }),
+    };
+  }
+  if (!ehOperante(org.org_status)) {
+    return { ok: false, response: orgSuspensa(user, requestId) };
+  }
+  if (await mfaEmDivida()) {
+    void audit({
+      action: "authz.denied",
+      actorUserId: user.id,
+      organizationId: org.orgId,
+      resourceType: resource ?? null,
+      requestId,
+      metadata: { reason: "mfa_required", via: "portao_sem_papel" },
+    });
+    return { ok: false, response: fail("mfa_required", t(MENSAGEM_DE_MFA), 403, { requestId }) };
+  }
+  return { ok: true, user, org };
+}
