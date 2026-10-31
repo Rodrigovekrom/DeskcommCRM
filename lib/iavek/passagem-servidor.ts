@@ -49,11 +49,8 @@ export async function leadVisivelPelaSessao(orgId: string, leadId: string): Prom
   return data !== null;
 }
 
-/** O nascimento do lead para a conta das 72h (no clone da esteira, o do ciclo). */
-export function nascimentoDoLead(lead: Pick<LeadDaPassagem, "created_at" | "source_metadata">): string {
-  const inicio = lead.source_metadata?.esteira_inicio;
-  return typeof inicio === "string" && !Number.isNaN(Date.parse(inicio)) ? inicio : lead.created_at;
-}
+/** O nascimento do lead para a conta das 72h: o mesmo relógio de todo o sistema (D6). */
+export { nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
 
 /** As horas do ciclo (a esteira da empresa; sem esteira, 72). */
 export function horasDoCiclo(settingsDaOrg: unknown): number {

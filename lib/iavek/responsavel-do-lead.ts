@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ROTULO_DA_FUNCAO, funcaoDaTela } from "@/lib/iavek/funcoes";
+import { logger } from "@/lib/logger";
+import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 
 /**
@@ -57,16 +59,22 @@ export async function objetivosDosLeads(
   leadIds: string[],
 ): Promise<Record<string, ObjetivoDoLead>> {
   if (leadIds.length === 0) return {};
-  const { data } = await admin
-    .from("crm_tasks")
-    .select("lead_id, title, due_date")
-    .eq("organization_id", orgId)
-    .in("lead_id", leadIds.slice(0, 1000))
-    .in("status", ["pending", "in_progress"])
-    .order("due_date", { ascending: true, nullsFirst: false })
-    .limit(5000);
+  // Pacote de defeitos (D3): em LOTES. Mil ids numa URL estouravam o cabeçalho
+  // (ver `buscaEmLotes`), o erro era ignorado e o objetivo de todo lead sumia
+  // em silêncio. Cada lead cai num lote só, então a ordem por prazo dentro do
+  // lote basta para "a tarefa que vence primeiro".
+  const { data, error } = await buscaEmLotes(leadIds, (lote) =>
+    admin
+      .from("crm_tasks")
+      .select("lead_id, title, due_date")
+      .eq("organization_id", orgId)
+      .in("lead_id", lote)
+      .in("status", ["pending", "in_progress"])
+      .order("due_date", { ascending: true, nullsFirst: false }),
+  );
+  if (error) logger.warn("[iavek-objetivos] leitura das tarefas falhou", { erro: error.message, leads: leadIds.length });
   const objetivos: Record<string, ObjetivoDoLead> = {};
-  for (const t of (data ?? []) as Array<{ lead_id: string | null; title: string; due_date: string | null }>) {
+  for (const t of data as Array<{ lead_id: string | null; title: string; due_date: string | null }>) {
     if (t.lead_id && !objetivos[t.lead_id]) objetivos[t.lead_id] = { titulo: t.title, vence_em: t.due_date };
   }
   return objetivos;

@@ -489,6 +489,12 @@ const schema = z.object({
    */
   DRAFT_RETENTION_DAYS: z.string().optional().default(""),
   /**
+   * ia.vek (D7): notificações JÁ LIDAS do sino pessoal. Padrão 90, piso 30,
+   * contados do `lida_em` (aviso não lido nunca sai). Quem interpreta é
+   * `lib/retencao/politica.ts`.
+   */
+  NOTIFICACOES_RETENTION_DAYS: z.string().optional().default(""),
+  /**
    * Candidatos ao golden set (migration 0428, issue #1695): rótulo de near-miss
    * e de divergência, sem texto de cliente. `z.string()` pela MESMA razão das
    * irmãs acima — quem interpreta é `lib/retencao/politica.ts`. Padrão 90, piso

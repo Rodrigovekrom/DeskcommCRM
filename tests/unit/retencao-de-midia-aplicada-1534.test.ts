@@ -179,6 +179,9 @@ describe("o dreno em lotes do cron data-retention (#1534)", () => {
       async apagarRascunhos() {
         return { data: 0, error: null };
       },
+      async apagarNotificacoesLidas() {
+        return { data: 0, error: null };
+      },
       async enfileirarMidia(lote) {
         lotes.push(lote);
         return { data: restante.shift() ?? { vencidas: 0, orfas: 0 }, error: null };

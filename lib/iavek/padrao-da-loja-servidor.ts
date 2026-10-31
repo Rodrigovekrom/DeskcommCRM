@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { buscaEmLotes, IDS_POR_LOTE } from "@/lib/supabase/em-lotes";
+import { todasAsPaginas } from "@/lib/supabase/paginas";
+
 import { avaliarLead, lerPadraoDaLoja, resumo, type ItemAvaliado, type PadraoDaLoja } from "./padrao-da-loja";
 
 /** O que o VENDEDOR mandou: humano pela tela ou pelo próprio celular. IA e automação não contam. */
@@ -48,23 +51,35 @@ export async function avaliarLeads(
   const contatos = [...new Set(leads.map((l) => l.contact_id).filter((c): c is string => Boolean(c)))];
   const porContato = new Map<string, { fotos: number; videos: number }>();
   if (contatos.length > 0) {
-    const { data: conversas } = await admin
-      .from("conversations")
-      .select("id, contact_id")
-      .eq("organization_id", orgId)
-      .in("contact_id", contatos);
-    const contatoDa = new Map(((conversas ?? []) as Array<{ id: string; contact_id: string }>).map((c) => [c.id, c.contact_id]));
+    // Pacote de defeitos (D3): em LOTES (centenas de ids numa URL estouram o
+    // cabeçalho) e as mídias PAGINADAS (um `.limit(20000)` para no teto do
+    // PostgREST, o `max_rows`, e a contagem de fotos e vídeos mentia).
+    const { data: conversas, error: erroConversas } = await buscaEmLotes(contatos, (lote) =>
+      admin.from("conversations").select("id, contact_id").eq("organization_id", orgId).in("contact_id", lote),
+    );
+    if (erroConversas) throw new Error(`padrão da loja: conversas: ${erroConversas.message}`);
+    const contatoDa = new Map((conversas as Array<{ id: string; contact_id: string }>).map((c) => [c.id, c.contact_id]));
     if (contatoDa.size > 0) {
-      const { data: midias } = await admin
-        .from("messages")
-        .select("conversation_id, type")
-        .eq("organization_id", orgId)
-        .in("conversation_id", [...contatoDa.keys()])
-        .eq("direction", "outbound")
-        .in("type", ["image", "video"])
-        .in("sent_via", ENVIADO_POR_GENTE)
-        .limit(20000);
-      for (const m of (midias ?? []) as Array<{ conversation_id: string; type: string }>) {
+      const idsDasConversas = [...contatoDa.keys()];
+      const midias: Array<{ conversation_id: string; type: string }> = [];
+      for (let i = 0; i < idsDasConversas.length; i += IDS_POR_LOTE) {
+        const lote = idsDasConversas.slice(i, i + IDS_POR_LOTE);
+        midias.push(
+          ...(await todasAsPaginas<{ conversation_id: string; type: string }>((de, ate) =>
+            admin
+              .from("messages")
+              .select("conversation_id, type")
+              .eq("organization_id", orgId)
+              .in("conversation_id", lote)
+              .eq("direction", "outbound")
+              .in("type", ["image", "video"])
+              .in("sent_via", ENVIADO_POR_GENTE)
+              .order("id", { ascending: true })
+              .range(de, ate),
+          )),
+        );
+      }
+      for (const m of midias) {
         const c = contatoDa.get(m.conversation_id);
         if (!c) continue;
         const atual = porContato.get(c) ?? { fotos: 0, videos: 0 };

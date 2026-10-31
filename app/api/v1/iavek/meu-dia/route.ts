@@ -112,7 +112,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const { data, error } = await supabase
       .from("crm_leads")
       .select(
-        `id, title, status, pipeline_id, stage_id, created_at, contact_id, owner_user_id, ${CONTATO}`,
+        `id, title, status, pipeline_id, stage_id, created_at, source_metadata, contact_id, owner_user_id, ${CONTATO}`,
       )
       .eq("organization_id", orgId)
       .eq("pipeline_id", entrada.pipeline_id)
@@ -317,6 +317,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       comprou,
       perdidos,
       abertas,
+      abertasComPessoa,
       tarefasAbertas,
       tarefasFeitas,
     ] = await Promise.all([
@@ -359,13 +360,21 @@ export async function GET(req: NextRequest): Promise<Response> {
         .eq("status", "lost")
         .gte("closed_at", desde30)
         .limit(1000),
+      // Pacote de defeitos (D3): CONTAGEM no banco. Buscar as linhas e contar no
+      // servidor parava no teto do PostgREST (max_rows) e o número mentia.
       supabase
         .from("conversations")
-        .select("assigned_to_user_id")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("status", "open")
+        .eq("is_group", false),
+      supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
         .eq("organization_id", orgId)
         .eq("status", "open")
         .eq("is_group", false)
-        .limit(2000),
+        .not("assigned_to_user_id", "is", null),
       // v1.7.5: as tarefas da equipe — todas as abertas e as feitas em 7 dias.
       supabase
         .from("crm_tasks")
@@ -391,6 +400,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       comprou.error ??
       perdidos.error ??
       abertas.error ??
+      abertasComPessoa.error ??
       tarefasAbertas.error ??
       tarefasFeitas.error;
     if (falha) throw new Error(falha.message);
@@ -421,7 +431,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       ...resumoDasTarefas.map((p) => p.user_id),
     ]);
     const nomeDe = (u: string | null) => (u ? (nomes.get(u) ?? null) : null);
-    const comPessoa = (abertas.data ?? []).filter((c) => c.assigned_to_user_id).length;
+    const comPessoa = abertasComPessoa.count ?? 0;
     // v1.7.6: as propostas que os vendedores deixaram aguardando a aprovação.
     const { data: aguardando, error: erroAguardando } = await supabase
       .from("crm_proposals")
@@ -466,7 +476,7 @@ export async function GET(req: NextRequest): Promise<Response> {
           },
           conversas_abertas: {
             com_pessoa: comPessoa,
-            com_ia_ou_sem_dono: (abertas.data ?? []).length - comPessoa,
+            com_ia_ou_sem_dono: (abertas.count ?? 0) - comPessoa,
           },
           perdas_30d: perdasPorMotivo(perdidos.data ?? []),
           meta_agendamentos_dia: metaDoDia,

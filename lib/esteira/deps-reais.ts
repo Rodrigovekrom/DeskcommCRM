@@ -17,6 +17,8 @@ import { createLogger } from "@/lib/agent-engine/obs/logger";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
 import { logger } from "@/lib/logger";
+import { todasAsPaginas } from "@/lib/supabase/paginas";
+import { nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
 import { lerLeadDaPassagem, reativarLead } from "@/lib/iavek/passagem-servidor";
@@ -44,14 +46,14 @@ type LinhaDeLead = {
 };
 
 function paraLeadDaEsteira(r: LinhaDeLead): LeadDaEsteira {
-  const inicio = r.source_metadata?.esteira_inicio;
   return {
     id: r.id,
     contact_id: r.contact_id,
     stage_id: r.stage_id,
     created_at: r.created_at,
     owner_user_id: r.owner_user_id,
-    inicio: typeof inicio === "string" && !Number.isNaN(Date.parse(inicio)) ? inicio : r.created_at,
+    // D6: o mesmo relógio do cronômetro, da passagem e do Space.
+    inicio: nascimentoDoLead(r),
   };
 }
 
@@ -68,15 +70,22 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
     agora,
 
     async leadsAbertos(pipelineId) {
-      const { data, error } = await admin
-        .from("crm_leads")
-        .select("id, contact_id, stage_id, created_at, owner_user_id, source_metadata")
-        .eq("organization_id", orgId)
-        .eq("pipeline_id", pipelineId)
-        .eq("status", "open")
-        .limit(2000);
-      if (error) throw new Error(`esteira: leads do funil: ${error.message}`);
-      return ((data ?? []) as LinhaDeLead[]).map(paraLeadDaEsteira);
+      // Pacote de defeitos (D2): PAGINADO, em ordem de id, até a página vir
+      // vazia. Era um `.limit(2000)` sem ordem: acima do teto de linhas do
+      // PostgREST (`max_rows`, que não se mede daqui), uma parte dos leads nunca
+      // chegava à esteira — e nunca ia ao follow-up. Parar na página VAZIA (e não
+      // na página "incompleta") funciona com qualquer `max_rows`.
+      const linhas = await todasAsPaginas<LinhaDeLead>((de, ate) =>
+        admin
+          .from("crm_leads")
+          .select("id, contact_id, stage_id, created_at, owner_user_id, source_metadata")
+          .eq("organization_id", orgId)
+          .eq("pipeline_id", pipelineId)
+          .eq("status", "open")
+          .order("id", { ascending: true })
+          .range(de, ate),
+      );
+      return linhas.map(paraLeadDaEsteira);
     },
 
     async passarParaFollowup(lead, etapaId) {

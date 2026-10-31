@@ -182,7 +182,8 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   const criadasEntrada = await deps.ligacoesJaCriadas(naEntrada.map((l) => l.id));
   const handoffs = await deps.comHandoff(naEntrada.map((l) => l.id));
   for (const lead of naEntrada) {
-    const idade = agora.getTime() - new Date(lead.created_at).getTime();
+    // D6: a idade conta do NASCIMENTO no ciclo (o mesmo relógio da tela), não da criação da linha.
+    const idade = agora.getTime() - new Date(lead.inicio).getTime();
     if (idade >= entrada.horas * HORA) {
       const r = await deps.passarParaFollowup(lead, followup.fases[0]!.etapa_id);
       if (!r.ok) {

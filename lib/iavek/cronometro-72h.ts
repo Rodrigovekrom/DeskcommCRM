@@ -17,6 +17,19 @@ export interface LeadDoCronometro {
   pipeline_id: string;
   stage_id: string | null;
   created_at: string;
+  /** No clone da esteira (reativado, follow-up), `esteira_inicio` marca o ciclo. */
+  source_metadata?: Record<string, unknown> | null;
+}
+
+/**
+ * O NASCIMENTO do lead para a conta das 72h — o MESMO relógio em todo lugar
+ * (pacote de defeitos D6: a esteira, o cronômetro da conversa, a passagem e o
+ * Space do guardião contavam de pontos diferentes). No clone da esteira vale o
+ * `source_metadata.esteira_inicio` (o ciclo); sem ele, a criação do lead.
+ */
+export function nascimentoDoLead(lead: { created_at: string; source_metadata?: Record<string, unknown> | null }): string {
+  const inicio = lead.source_metadata?.esteira_inicio;
+  return typeof inicio === "string" && !Number.isNaN(Date.parse(inicio)) ? inicio : lead.created_at;
 }
 
 export interface Cronometro {
@@ -46,7 +59,7 @@ export function cronometroDoLead(
   if (lead.status !== "open") return null;
   if (lead.pipeline_id !== entrada.pipeline_id) return null;
   if (lead.stage_id && entrada.etapas_de_compromisso.includes(lead.stage_id)) return null;
-  const inicio = new Date(lead.created_at).getTime();
+  const inicio = new Date(nascimentoDoLead(lead)).getTime();
   if (Number.isNaN(inicio)) return null;
   return {
     inicio: new Date(inicio).toISOString(),

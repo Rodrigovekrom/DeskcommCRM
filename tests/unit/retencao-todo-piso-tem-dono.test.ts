@@ -95,6 +95,10 @@ const SEM_FUNCAO_NO_SQL: Record<string, string> = {
   // A razão está escrita em `politica.ts`, ao lado da declaração — a captação é
   // a mesma exceção, com a mesma frase.
   RASCUNHO: "admin client",
+  // ia.vek (D7) — as notificações JÁ LIDAS do sino pessoal (0579): a décima
+  // terceira poda é um DELETE do admin client, como o rascunho; a tabela não tem
+  // função de expurgo. A razão está escrita em `politica.ts`.
+  NOTIFICACOES: "admin client",
 };
 
 function paresDeclarados(): string[] {

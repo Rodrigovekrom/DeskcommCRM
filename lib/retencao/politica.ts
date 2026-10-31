@@ -244,6 +244,25 @@ export const RETENCAO_RASCUNHO_DIAS_PADRAO = 30;
 export const RETENCAO_RASCUNHO_DIAS_PISO = 7;
 
 /**
+ * ia.vek (pacote de defeitos D7): 90 dias para as NOTIFICAÇÕES JÁ LIDAS do sino
+ * pessoal (`notificacoes`, migration 0579). Cada passagem, etapa, tarefa
+ * vencida e pedido de agendamento grava uma linha por pessoa, e nada as apagava:
+ * a tabela crescia para sempre. Só as LIDAS saem — o relógio é `lida_em`, não a
+ * criação: aviso que ninguém leu continua no sino, em qualquer idade.
+ *
+ * Quem aplica é o cron `data-retention` (a décima terceira poda), em lotes, com
+ * o piso aplicado NO TYPESCRIPT: é um DELETE do admin client, como o rascunho —
+ * a tabela não tem função de expurgo. Mesma exceção, mesma frase, listada em
+ * `SEM_FUNCAO_NO_SQL` da cerca `tests/unit/retencao-todo-piso-tem-dono.test.ts`.
+ */
+export const RETENCAO_NOTIFICACOES_DIAS_PADRAO = 90;
+/**
+ * Piso de 30 dias CONTADOS DA LEITURA: o sino mostra o histórico recente, e um
+ * mês é o que alguém volta para conferir ("quem me passou aquele lead?").
+ */
+export const RETENCAO_NOTIFICACOES_DIAS_PISO = 30;
+
+/**
  * 90 dias para os CANDIDATOS AO GOLDEN SET (`golden_candidates`, migration 0428).
  *
  * A linha não guarda texto de cliente — só o rótulo do near-miss de skill ou da

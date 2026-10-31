@@ -27,6 +27,7 @@ import {
   RETENCAO_PROSPECCAO_DIAS_PADRAO,
   RETENCAO_PROSPECCAO_DIAS_PISO,
   RETENCAO_RASCUNHO_DIAS_PADRAO,
+  RETENCAO_NOTIFICACOES_DIAS_PADRAO,
   RETENCAO_RASCUNHO_DIAS_PISO,
   interpretarRetencao,
 } from "@/lib/retencao/politica";
@@ -64,7 +65,7 @@ let rascunhosApagados: Array<{ id: string }> = [];
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     rpc: async () => respostaRpc,
-    from: () => {
+    from: (tabela?: string) => {
       const q: Record<string, unknown> = {
         eq: () => q,
         in: () => q,
@@ -77,6 +78,8 @@ vi.mock("@/lib/supabase/admin", () => ({
       // (400 PGRST109): tirar o `.order()` do handler reprova este arquivo.
       let ordenado = false;
       const apagando: Record<string, unknown> = {
+        // ia.vek (D7): a décima terceira poda filtra `lida_em is not null`.
+        not: () => apagando,
         lt: () => apagando,
         select: () => apagando,
         order: () => {
@@ -87,8 +90,10 @@ vi.mock("@/lib/supabase/admin", () => ({
           if (!ordenado) throw new Error("PGRST109: A 'limit' was applied without an explicit 'order'");
           return apagando;
         },
+        // Só a décima poda (rascunhos) devolve linhas aqui; a das notificações
+        // (D7) tem o próprio caso, com o banco falso, em iavek-v1910-*.
         then: (r: (v: unknown) => unknown) =>
-          Promise.resolve({ data: rascunhosApagados, error: null }).then(r),
+          Promise.resolve({ data: tabela === "notificacoes" ? [] : rascunhosApagados, error: null }).then(r),
       };
       return { select: () => q, update: () => q, delete: () => apagando };
     },
@@ -148,6 +153,9 @@ function bancoQueDevolve(sequencias: {
     async apagarRascunhos(corte) {
       cortes.push(corte);
       return { data: restante.rascunhos.shift() ?? 0, error: null };
+    },
+    async apagarNotificacoesLidas() {
+      return { data: 0, error: null };
     },
     async enfileirarMidia(lote) {
       lotesDeMidia.push(lote);
@@ -282,6 +290,9 @@ describe("podarHistorico — o laço de lotes", () => {
       async apagarRascunhos() {
         return { data: null, error: { message: "permission denied for table conversation_drafts" } };
       },
+      async apagarNotificacoesLidas() {
+        return { data: 0, error: null };
+      },
       async enfileirarMidia() {
         return { data: { vencidas: 0, orfas: 0 }, error: null };
       },
@@ -365,6 +376,9 @@ describe("a décima poda — o rascunho sugerido vencido (issue #1686)", () => {
       async apagarRascunhos() {
         return { data: null, error: { message: "permission denied for table conversation_drafts" } };
       },
+      async apagarNotificacoesLidas() {
+        return { data: 0, error: null };
+      },
       async enfileirarMidia() {
         return { data: { vencidas: 0, orfas: 0 }, error: null };
       },
@@ -378,6 +392,9 @@ describe("a décima poda — o rascunho sugerido vencido (issue #1686)", () => {
         return { data: 0, error: null };
       },
       async apagarRascunhos() {
+        return { data: 0, error: null };
+      },
+      async apagarNotificacoesLidas() {
         return { data: 0, error: null };
       },
       async enfileirarMidia() {
@@ -445,6 +462,11 @@ describe("houveEfeito — as duas direções", () => {
     lotes_midia: 0,
     midia_tem_resto: false,
     retencao_midia_dias: RETENCAO_MIDIA_DIAS_PISO,
+    // Décima terceira poda (ia.vek, D7): a notificação JÁ LIDA do sino.
+    notificacoes_apagadas: 0,
+    lotes_notificacoes: 0,
+    notificacoes_tem_resto: false,
+    retencao_notificacoes_dias: RETENCAO_NOTIFICACOES_DIAS_PADRAO,
     avisos: [] as string[],
   };
 

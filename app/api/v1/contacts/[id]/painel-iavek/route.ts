@@ -48,7 +48,7 @@ export async function GET(
     createAdminClient().from("organizations").select("settings").eq("id", orgId).maybeSingle(),
     supabase
       .from("crm_leads")
-      .select("id, title, status, pipeline_id, stage_id, created_at, updated_at")
+      .select("id, title, status, pipeline_id, stage_id, created_at, updated_at, source_metadata")
       .eq("contact_id", contactId)
       .eq("organization_id", orgId)
       .eq("status", "open")

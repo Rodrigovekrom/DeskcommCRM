@@ -123,6 +123,16 @@ describe("regras puras", () => {
 });
 
 describe("rodada", () => {
+  it("D6: a idade das 72h conta do NASCIMENTO no ciclo (esteira_inicio), não da criação da linha", async () => {
+    // Lead reativado: a linha nasceu há 100 h, o ciclo novo começou há 10 h.
+    const reativado = lead({ id: "reativado", created_at: ha(100 * HORA), inicio: ha(10 * HORA) });
+    // O contrário: linha recente, ciclo vencido (clone que herdou o início).
+    const vencido = lead({ id: "vencido", created_at: ha(1 * HORA), inicio: ha(80 * HORA) });
+    const { deps, log } = montar({ entrada: [reativado, vencido] });
+    await rodarEsteira(cfg, deps);
+    expect(log.passados).toEqual(["vencido"]);
+  });
+
   it("esteira desligada não faz nada", async () => {
     const { deps, log } = montar({ entrada: [lead({ id: "a", created_at: ha(100 * HORA) })] });
     const r = await rodarEsteira({ ...cfg, funis: null }, deps);

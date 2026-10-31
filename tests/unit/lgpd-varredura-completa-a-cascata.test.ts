@@ -65,6 +65,7 @@ vi.mock("@/lib/supabase/admin", () => ({
     // aqui, sem passar por `bancoDoCron.cliente` (a que o caso faz explodir).
     const rascunhosVazios = () => {
       const q: Record<string, unknown> = {
+        not: () => q,
         lt: () => q,
         select: () => q,
         order: () => q,
@@ -73,10 +74,13 @@ vi.mock("@/lib/supabase/admin", () => ({
       };
       return { delete: () => q };
     };
+    // ia.vek (D7): a décima terceira poda (notificações lidas) também chama
+    // `from`, e pela mesma regra: superfície própria, vazia, fora da cascata.
+    const podasProprias = new Set(["conversation_drafts", "notificacoes"]);
     return {
       // Poda sem nada a fazer: o que este arquivo mede é a varredura.
       rpc: async () => ({ data: 0, error: null }),
-      from: (t: string) => (t === "conversation_drafts" ? rascunhosVazios() : cascata.from(t)),
+      from: (t: string) => (podasProprias.has(t) ? rascunhosVazios() : cascata.from(t)),
     };
   },
 }));

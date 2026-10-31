@@ -77,6 +77,8 @@ import {
   RETENCAO_PROSPECCAO_DIAS_PISO,
   RETENCAO_RASCUNHO_DIAS_PADRAO,
   RETENCAO_RASCUNHO_DIAS_PISO,
+  RETENCAO_NOTIFICACOES_DIAS_PADRAO,
+  RETENCAO_NOTIFICACOES_DIAS_PISO,
   interpretarRetencao,
 } from "@/lib/retencao/politica";
 import {
@@ -142,6 +144,11 @@ export interface ResultadoDaRetencao {
   lotes_rascunhos: number;
   rascunhos_tem_resto: boolean;
   retencao_rascunho_dias: number;
+  /** ia.vek (D7): a notificação JÁ LIDA do sino pessoal, vencida (0579). */
+  notificacoes_apagadas: number;
+  lotes_notificacoes: number;
+  notificacoes_tem_resto: boolean;
+  retencao_notificacoes_dias: number;
   /** O candidato ao golden set vencido — rótulo, sem texto de cliente (0428). */
   candidatos_do_golden_apagados: number;
   lotes_candidatos_do_golden: number;
@@ -222,6 +229,15 @@ export interface PodaDb {
     vencidosAntesDe: string,
     lote: number,
   ): Promise<{ data: number | null; error: { message: string } | null }>;
+  /**
+   * ia.vek (D7): a décima terceira poda, irmã da décima — DELETE do admin
+   * client (a tabela 0579 não tem função de expurgo), só de notificação LIDA
+   * antes do corte. Contagem ou erro, nunca silêncio.
+   */
+  apagarNotificacoesLidas(
+    lidasAntesDe: string,
+    lote: number,
+  ): Promise<{ data: number | null; error: { message: string } | null }>;
 }
 
 async function drenar(
@@ -281,6 +297,29 @@ async function drenarRascunhos(
   for (let i = 0; i < MAX_LOTES; i += 1) {
     const { data, error } = await db.apagarRascunhos(corte, TAMANHO_DO_LOTE);
     if (error) throw new Error(`conversation_drafts: ${error.message}`);
+    const n = data ?? 0;
+    lotes += 1;
+    apagadas += n;
+    if (n < TAMANHO_DO_LOTE) return { apagadas, lotes, temResto: false };
+  }
+  return { apagadas, lotes, temResto: true };
+}
+
+/**
+ * ia.vek (D7): a décima terceira poda — a notificação JÁ LIDA do sino pessoal.
+ * Mesmo laço e mesma regra de erro de `drenarRascunhos`; o relógio é `lida_em`
+ * (aviso não lido nunca entra no corte).
+ */
+async function drenarNotificacoes(
+  db: PodaDb,
+  dias: number,
+): Promise<{ apagadas: number; lotes: number; temResto: boolean }> {
+  const corte = new Date(Date.now() - dias * 86_400_000).toISOString();
+  let apagadas = 0;
+  let lotes = 0;
+  for (let i = 0; i < MAX_LOTES; i += 1) {
+    const { data, error } = await db.apagarNotificacoesLidas(corte, TAMANHO_DO_LOTE);
+    if (error) throw new Error(`notificacoes: ${error.message}`);
     const n = data ?? 0;
     lotes += 1;
     apagadas += n;
@@ -359,6 +398,7 @@ export async function podarHistorico(
     JEV_OBSERVACOES_RETENTION_DAYS?: string;
     DRAFT_RETENTION_DAYS?: string;
     GOLDEN_CANDIDATES_RETENTION_DAYS?: string;
+    NOTIFICACOES_RETENTION_DAYS?: string;
   },
 ): Promise<ResultadoDaRetencao> {
   const fila = interpretarRetencao(ambiente.JOB_QUEUE_RETENTION_DAYS, {
@@ -412,6 +452,12 @@ export async function podarHistorico(
     chave: "DRAFT_RETENTION_DAYS",
     padrao: RETENCAO_RASCUNHO_DIAS_PADRAO,
     piso: RETENCAO_RASCUNHO_DIAS_PISO,
+  });
+
+  const notificacoes = interpretarRetencao(ambiente.NOTIFICACOES_RETENTION_DAYS, {
+    chave: "NOTIFICACOES_RETENTION_DAYS",
+    padrao: RETENCAO_NOTIFICACOES_DIAS_PADRAO,
+    piso: RETENCAO_NOTIFICACOES_DIAS_PISO,
   });
 
   const candidatosDoGolden = interpretarRetencao(ambiente.GOLDEN_CANDIDATES_RETENTION_DAYS, {
@@ -470,6 +516,9 @@ export async function podarHistorico(
   // do corpo da função —, então o que este laço decide é só QUANTO drenar por
   // rodada: lotes de 1000, teto de 20, parando no primeiro incompleto.
   const midiaDrenada = await drenarMidia(db);
+  // Décima terceira poda (ia.vek, D7): a notificação JÁ LIDA do sino pessoal.
+  // Padrão 90 / piso 30, contados do `lida_em` — o piso mora no interpretador.
+  const notificacoesDrenadas = await drenarNotificacoes(db, notificacoes.dias);
 
   return {
     jobs_apagados: jobs.apagadas,
@@ -502,6 +551,10 @@ export async function podarHistorico(
     rascunhos_apagados: rascunhosDrenados.apagadas,
     lotes_rascunhos: rascunhosDrenados.lotes,
     rascunhos_tem_resto: rascunhosDrenados.temResto,
+    notificacoes_apagadas: notificacoesDrenadas.apagadas,
+    lotes_notificacoes: notificacoesDrenadas.lotes,
+    notificacoes_tem_resto: notificacoesDrenadas.temResto,
+    retencao_notificacoes_dias: notificacoes.dias,
     candidatos_do_golden_tem_resto: candidatosDrenados.temResto,
     midia_enfileirada: midiaDrenada.enfileirada,
     midia_expurgada: midiaDrenada.expurgada,
@@ -529,6 +582,7 @@ export async function podarHistorico(
       observacoesDoJev.aviso,
       rascunho.aviso,
       candidatosDoGolden.aviso,
+      notificacoes.aviso,
     ].filter((a): a is string => a !== null),
   };
 }
@@ -586,7 +640,10 @@ export function houveEfeito(resultado: ResultadoDaRetencao): boolean {
     // mutação, e uma rodada que só fez isso não pode ser indistinguível de uma
     // que não fez nada.
     resultado.midia_enfileirada > 0 ||
-    resultado.midia_expurgada > 0
+    resultado.midia_expurgada > 0 ||
+    // A décima terceira (ia.vek, D7), pela mesma razão das doze: apagar aviso do
+    // sino sem trilha seria encolhimento silencioso.
+    resultado.notificacoes_apagadas > 0
   );
 }
 
@@ -631,6 +688,17 @@ async function handle(req: NextRequest): Promise<Response> {
           .limit(lote);
         return { data: Array.isArray(data) ? data.length : null, error };
       },
+      async apagarNotificacoesLidas(lidasAntesDe, lote) {
+        const { data, error } = await admin
+          .from("notificacoes")
+          .delete()
+          .not("lida_em", "is", null)
+          .lt("lida_em", lidasAntesDe)
+          .select("id")
+          .order("id")
+          .limit(lote);
+        return { data: Array.isArray(data) ? data.length : null, error };
+      },
       // A décima segunda poda (migration 0557, #1534): a retenção de mídia. O
       // retorno é JSONB (`{vencidas, orfas, expurgadas}`), por isso um método
       // próprio em vez de mais uma entrada na união do `rpc` — ver a JSDoc de
@@ -651,6 +719,7 @@ async function handle(req: NextRequest): Promise<Response> {
       PROSPECCAO_RETENTION_DAYS: env.PROSPECCAO_RETENTION_DAYS,
       JEV_OBSERVACOES_RETENTION_DAYS: env.JEV_OBSERVACOES_RETENTION_DAYS,
       DRAFT_RETENTION_DAYS: env.DRAFT_RETENTION_DAYS,
+      NOTIFICACOES_RETENTION_DAYS: env.NOTIFICACOES_RETENTION_DAYS,
       GOLDEN_CANDIDATES_RETENTION_DAYS: env.GOLDEN_CANDIDATES_RETENTION_DAYS,
     });
     // ── A cascata de anonimização que ficou pela metade ──────────────────
