@@ -72,7 +72,7 @@ export function LeadsIncompletos() {
   if (!data?.ativo) return null;
   const total = data.vendedores.reduce((s, v) => s + v.leads.length, 0);
   return (
-    <section className="rounded-lg border p-4" data-testid="leads-incompletos">
+    <section className="rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="leads-incompletos">
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-sm font-semibold">{t("Leads incompletos")}</h2>
         <span className="rounded-full bg-muted px-2 text-xs tabular-nums">{total}</span>
@@ -116,7 +116,7 @@ export function CamposObrigatoriosConfig() {
   });
   const ativo = data?.ativo === true;
   return (
-    <section className="space-y-2 rounded-lg border p-4" data-testid="campos-obrigatorios-config">
+    <section className="space-y-2 rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="campos-obrigatorios-config">
       <label className="flex items-center gap-2 text-sm font-medium">
         <input
           type="checkbox"

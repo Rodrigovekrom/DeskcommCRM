@@ -296,7 +296,7 @@ export function FunisClient({
           </p>
           <ul
             id={ID_DA_LISTA_DE_ARQUIVADOS}
-            className="flex flex-col divide-y divide-border rounded-md border border-border"
+            className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface/90 backdrop-blur"
           >
             {arquivados.map((funil) => {
               const excluindoAqui = excluindo?.id === funil.id ? excluindo : null;
@@ -482,7 +482,7 @@ export function FunisClient({
         </p>
       )}
 
-      <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+      <ul className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface/90 backdrop-blur">
         {funis.map((funil, i) => {
           const renomeandoAqui = renomeando?.id === funil.id ? renomeando : null;
           const arquivandoAqui = arquivando?.id === funil.id ? arquivando : null;

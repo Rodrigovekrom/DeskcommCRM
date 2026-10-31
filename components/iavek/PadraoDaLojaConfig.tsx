@@ -48,7 +48,7 @@ export function PadraoDaLojaConfig({ etapas }: { etapas: Array<{ id: string; nam
   };
 
   return (
-    <section className="space-y-4 rounded-lg border p-4" data-testid="padrao-da-loja-config">
+    <section className="space-y-4 rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="padrao-da-loja-config">
       <div>
         <h2 className="text-lg font-semibold">{t("Padrão da loja")}</h2>
         <p className="text-sm text-muted-foreground">

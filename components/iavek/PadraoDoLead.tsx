@@ -136,7 +136,7 @@ export function ForaDoPadrao() {
   if (!data?.ativo) return null;
   const total = data.vendedores.reduce((s, v) => s + v.leads.length, 0);
   return (
-    <section className="rounded-lg border p-4" data-testid="fora-do-padrao">
+    <section className="rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="fora-do-padrao">
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-sm font-semibold">{t("Fora do padrão")}</h2>
         <span className="rounded-full bg-muted px-2 text-xs tabular-nums">{total}</span>
