@@ -256,7 +256,19 @@ export const NAV_CATALOG = [
     // listam). O admin sem função acha no hub do CRM e no ⌘K — a barra dele
     // segue nos 16 itens medidos em `interface-por-empresa.test.ts`.
     soComFuncao: true,
+  },  {
+    // ia.vek v1.9.7: o Space do guardião — os leads que ele passou aos
+    // vendedores, por urgência das 72h. Na barra só do guardião (MENU_DA_FUNCAO).
+    href: "/app/space-do-guardiao",
+    label: "Space do guardião",
+    description: "Os leads que você passou aos vendedores, do que vence primeiro ao último, com o prazo das 72h.",
+    icon: "ClockCountdown",
+    group: "crm",
+    section: "O dia a dia da venda",
+    sidebar: true,
+    soComFuncao: true,
   },
+
   {
     // ⚠️ ERA "Kanban", e a URL continua sendo. O nome saiu da interface porque o
     // produto tinha CINCO vocabulários para a mesma coisa — "Kanban" no menu,

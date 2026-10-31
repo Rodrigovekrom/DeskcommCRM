@@ -198,7 +198,13 @@ describe("2. Menu do gerente", () => {
 describe("3. Os outros menus não mudam (além do Espaço da IA)", () => {
   it("SDR, vendedor e suporte: as mesmas listas da v1.7.4 (o SDR perde só o Espaço)", () => {
     // v1.9.6 (Rodrigo, 30/10): guardião e Suporte IA com "literalmente apenas esses".
-    expect(DESTINOS_DA_FUNCAO.sdr).toEqual(["/app/meu-dia", "/app/pipeline", "/app/agenda", "/app/meus-numeros"]);
+    expect(DESTINOS_DA_FUNCAO.sdr).toEqual([
+      "/app/meu-dia",
+      "/app/pipeline",
+      "/app/space-do-guardiao", // v1.9.7
+      "/app/agenda",
+      "/app/meus-numeros",
+    ]);
     expect(DESTINOS_DA_FUNCAO.suporte).toEqual([
       "/app/meu-dia",
       "/app/inbox",
@@ -206,20 +212,8 @@ describe("3. Os outros menus não mudam (além do Espaço da IA)", () => {
       "/app/meus-numeros",
     ]);
     // v1.7.7: + o Pipeline (a carteira dele no quadro), logo depois do Meu dia.
-    expect(DESTINOS_DA_FUNCAO.vendedor).toEqual([
-      "/app/meu-dia",
-      "/app/pipeline",
-      "/app/meus-numeros",
-      "/app/inbox",
-      "/app/agenda",
-      "/app/kanban",
-      "/app/tasks",
-      "/app/contacts",
-      "/app/products",
-      "/app/proposals",
-      "/app/calls",
-      "/app/templates",
-    ]);
+    // v1.9.7 (Rodrigo, 30/10): o vendedor com "exatamente" estes quatro.
+    expect(DESTINOS_DA_FUNCAO.vendedor).toEqual(["/app/meu-dia", "/app/pipeline", "/app/agenda", "/app/meus-numeros"]);
   });
 
   it("admin sem função segue com tudo, e a barra de sempre (mais o Espaço)", () => {

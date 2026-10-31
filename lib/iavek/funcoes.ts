@@ -59,23 +59,13 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   // v1.9.6 (Rodrigo, 30/10): "literalmente apenas esses", nesta ordem (`MENU_DA_FUNCAO`).
   // Saem Entrada de leads, Tarefas, Contatos, Chamadas e Respostas rápidas. É
   // apresentação: o sino e os links diretos para a conversa continuam abrindo.
-  sdr: ["/app/meu-dia", "/app/pipeline", "/app/agenda", "/app/meus-numeros"],
-  vendedor: [
-    "/app/meu-dia",
-    // v1.7.7: a carteira dele no Kanban (antes de tudo o que é lista).
-    "/app/pipeline",
-    // v1.9.3: só os números dele.
-    "/app/meus-numeros",
-    "/app/inbox",
-    "/app/agenda",
-    "/app/kanban",
-    "/app/tasks",
-    "/app/contacts",
-    "/app/products",
-    "/app/proposals",
-    "/app/calls",
-    "/app/templates",
-  ],
+  // v1.9.7: + o Space do guardião, entre Meus leads e Agenda.
+  sdr: ["/app/meu-dia", "/app/pipeline", "/app/space-do-guardiao", "/app/agenda", "/app/meus-numeros"],
+  // v1.9.7 (Rodrigo, 30/10): "exatamente" Meu dia · Meus leads · Agenda · Meus
+  // dados. Saem Entrada de leads, Respostas rápidas, Funis, Contatos, Tarefas e
+  // os "Ver tudo". Só menu: as rotas seguem abertas (sino, links diretos, a
+  // resposta rápida dentro da conversa).
+  vendedor: ["/app/meu-dia", "/app/pipeline", "/app/agenda", "/app/meus-numeros"],
   /**
    * Não vira guardião do lead. v1.9.6: o Espaço da IA saiu do menu (a rota
    * segue aberta para ela, ver `veEspacoDaIa`), a Entrada de leads é o
@@ -135,9 +125,9 @@ export const MENU_DO_GERENTE = [
 ] as const;
 
 /**
- * ia.vek v1.9.6: o menu do guardião e do Suporte IA, com os rótulos que o
+ * ia.vek v1.9.6: o menu do guardião e do Suporte IA (v1.9.7: e do vendedor), com os rótulos que o
  * Rodrigo pediu, na ordem da barra. Mesmo princípio do `MENU_DO_GERENTE`.
- * O "Space do guardião" entra na v1.9.7.
+ * v1.9.7: o "Space do guardião" entra entre Meus leads e Agenda.
  */
 export const MENU_DA_FUNCAO: Partial<
   Record<Funcao, ReadonlyArray<{ id: string; label: string; itens: ReadonlyArray<{ href: string; label: string }> }>>
@@ -147,6 +137,19 @@ export const MENU_DA_FUNCAO: Partial<
   sdr: [
     {
       id: "iavek-guardiao",
+      label: "Meu trabalho",
+      itens: [
+        { href: "/app/meu-dia", label: "Meu dia" },
+        { href: "/app/pipeline", label: "Meus leads" },
+        { href: "/app/space-do-guardiao", label: "Space do guardião" },
+        { href: "/app/agenda", label: "Agenda" },
+        { href: "/app/meus-numeros", label: "Meus dados" },
+      ],
+    },
+  ],
+  vendedor: [
+    {
+      id: "iavek-vendedor",
       label: "Meu trabalho",
       itens: [
         { href: "/app/meu-dia", label: "Meu dia" },

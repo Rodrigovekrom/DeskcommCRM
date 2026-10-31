@@ -12,6 +12,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { funcaoDaTela, type Funcao } from "@/lib/iavek/funcoes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isServiceRoleConfigured } from "@/lib/audit";
 
@@ -21,6 +22,8 @@ interface AssignableMember {
   user_id: string;
   role: string;
   full_name: string | null;
+  /** ia.vek v1.9.7: a função na loja (sdr, vendedor…), para a tela mostrar "Guardião" em vez de "Atendente". */
+  funcao: Funcao | null;
 }
 
 export async function GET(_req: NextRequest): Promise<Response> {
@@ -35,7 +38,7 @@ export async function GET(_req: NextRequest): Promise<Response> {
   const client = isServiceRoleConfigured() ? createAdminClient() : await createClient();
   const { data: rows, error } = await client
     .from("user_organizations")
-    .select("user_id, role")
+    .select("user_id, role, interface_settings")
     .eq("organization_id", orgId)
     .is("revoked_at", null)
     .neq("role", "viewer")
@@ -43,7 +46,13 @@ export async function GET(_req: NextRequest): Promise<Response> {
 
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
-  const memberships = (rows ?? []) as Array<{ user_id: string; role: string }>;
+  const memberships = ((rows ?? []) as Array<{ user_id: string; role: string; interface_settings: unknown }>).map(
+    (m) => ({
+      user_id: m.user_id,
+      role: m.role,
+      funcao: funcaoDaTela((m.interface_settings as { funcao?: unknown } | null)?.funcao),
+    }),
+  );
 
   if (!isServiceRoleConfigured() || memberships.length === 0) {
     const degraded: AssignableMember[] = memberships.map((m) => ({ ...m, full_name: null }));

@@ -70,9 +70,11 @@ describe("menu por função", () => {
     }
   });
 
-  it("vendedor vê o funil e as propostas", () => {
+  it("v1.9.7: o vendedor vê exatamente Meu dia, Meus leads, Agenda e Meus dados", () => {
     const vendedor = hrefs({ preset: "completa", funcao: "vendedor" });
-    expect(vendedor).toContain("/app/kanban");
+    expect(vendedor).toContain("/app/pipeline");
+    expect(vendedor).not.toContain("/app/kanban");
+    expect(vendedor).not.toContain("/app/inbox");
     expect(vendedor).not.toContain("/app/espaco-ia");
   });
 
@@ -145,7 +147,9 @@ describe("funções novas da v1.7.1", () => {
   it("v1.9.6: o Suporte IA tem o Atendimento da IA e não tem Meus leads nem o Espaço da IA", () => {
     const suporte = hrefs({ preset: "completa", funcao: "suporte" });
     expect(suporte.filter((h) => h !== "/app/inbox")).toEqual(
-      hrefs({ preset: "completa", funcao: "sdr" }).filter((h) => h !== "/app/pipeline"),
+      hrefs({ preset: "completa", funcao: "sdr" }).filter(
+        (h) => h !== "/app/pipeline" && h !== "/app/space-do-guardiao",
+      ),
     );
     expect(suporte).not.toContain("/app/pipeline");
     expect(suporte).toContain("/app/inbox");

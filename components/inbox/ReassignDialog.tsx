@@ -25,6 +25,7 @@ import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSes
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useContinuarPorOutroNumero } from "@/hooks/inbox/useContinuarPorOutroNumero";
 import { useTransferConversation } from "@/hooks/inbox/useTransferConversation";
+import { ROTULO_DA_FUNCAO } from "@/lib/iavek/funcoes";
 import { outrosNumerosDoContato } from "@/lib/inbox/outros-numeros";
 
 export type AbaDeTransferencia = "atendente" | "numero";
@@ -181,7 +182,7 @@ export function ReassignDialog({
                   <SelectItem key={m.user_id} value={m.user_id}>
                     {m.full_name ?? `${t("Atendente")} ${m.user_id.slice(0, 8)}`}
                     <span className="ml-1 text-muted-foreground">
-                      · {t(ROLE_LABEL[m.role] ?? m.role)}
+                      · {t(m.funcao ? ROTULO_DA_FUNCAO[m.funcao] : (ROLE_LABEL[m.role] ?? m.role))}
                     </span>
                   </SelectItem>
                 ))}

@@ -86,10 +86,11 @@ describe("v1.9.6 — nomes e menus do guardião e do Suporte IA", () => {
       .filter((g) => g.group.id.startsWith("iavek-"))
       .flatMap((g) => g.items.map((i) => `${i.label} ${i.href}`));
 
-  it("guardião: literalmente Meu dia · Meus leads · Agenda · Meus dados", () => {
+  it("guardião: Meu dia · Meus leads · (v1.9.7) Space do guardião · Agenda · Meus dados", () => {
     expect(menu("sdr")).toEqual([
       "Meu dia /app/meu-dia",
       "Meus leads /app/pipeline",
+      "Space do guardião /app/space-do-guardiao",
       "Agenda /app/agenda",
       "Meus dados /app/meus-numeros",
     ]);
@@ -114,9 +115,12 @@ describe("v1.9.6 — nomes e menus do guardião e do Suporte IA", () => {
     expect(DESTINOS_DA_FUNCAO.sdr).not.toContain("/app/inbox");
   });
 
-  it("vendedor sem mudança", () => {
-    expect(DESTINOS_DA_FUNCAO.vendedor).toContain("/app/tasks");
-    expect(DESTINOS_DA_FUNCAO.vendedor).toContain("/app/inbox");
+  it("v1.9.7: vendedor = Meu dia · Meus leads · Agenda · Meus dados (os mesmos nomes do guardião)", () => {
+    expect(
+      sidebarGroups(false, "agent", { preset: "completa", funcao: "vendedor" })
+        .filter((g) => g.group.id.startsWith("iavek-"))
+        .flatMap((g) => g.items.map((i) => `${i.label} ${i.href}`)),
+    ).toEqual(["Meu dia /app/meu-dia", "Meus leads /app/pipeline", "Agenda /app/agenda", "Meus dados /app/meus-numeros"]);
   });
 });
 

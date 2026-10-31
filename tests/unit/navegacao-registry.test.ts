@@ -177,6 +177,7 @@ describe("hubSections", () => {
     expect(secoes.flatMap((s) => s.items.map((i) => i.href))).toEqual([
       "/app/prospecting",
       "/app/pipeline",
+      "/app/space-do-guardiao", // ia.vek v1.9.7
       "/app/kanban",
       "/app/campaigns",
       "/app/contacts",
