@@ -130,7 +130,7 @@ describe("2. Menu do gerente", () => {
       ["/app/agenda", "Agenda da loja"],
     ]);
     expect(grupos[1]!.items.map((d) => [d.href, d.label])).toEqual([
-      ["/app/kanban", "Kanban por vendedor"],
+      ["/app/pipeline", "Kanban por vendedor"], // v1.9.8: o Pipeline da loja
       ["/app/inbox", "Atendimento do lead"],
     ]);
     // nenhum hub "Ver tudo em …" nos grupos dele

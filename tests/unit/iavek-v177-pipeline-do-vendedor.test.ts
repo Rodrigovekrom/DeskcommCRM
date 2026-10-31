@@ -41,9 +41,9 @@ describe("a carteira é cortada NO SERVIDOR", () => {
     expect(rota).toMatch(/consultaDeLeads\.eq\("owner_user_id", user\.id\)/);
   });
 
-  it("o vendedor tem o Pipeline no menu; o gerente segue com o Kanban por vendedor", () => {
+  it("o vendedor tem o Pipeline no menu; o gerente segue com o Kanban por vendedor (v1.9.8: no Pipeline da loja)", () => {
     expect(DESTINOS_DA_FUNCAO.vendedor).toContain("/app/pipeline");
-    expect(DESTINOS_DA_FUNCAO.gerente).toContain("/app/kanban");
+    expect(DESTINOS_DA_FUNCAO.gerente).toContain("/app/pipeline");
   });
 });
 

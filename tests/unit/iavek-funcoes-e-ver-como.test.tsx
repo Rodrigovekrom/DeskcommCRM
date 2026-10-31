@@ -84,7 +84,7 @@ describe("menu por função", () => {
       [
         "/app/meu-dia",
         "/app/agenda",
-        "/app/kanban",
+        "/app/pipeline", // v1.9.8: o "Kanban por vendedor" abre o Pipeline da loja
         "/app/inbox",
         "/app/settings/profile",
         "/app/settings/security",

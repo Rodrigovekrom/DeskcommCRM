@@ -9053,5 +9053,14 @@
   "O integrador deve enviar external_id, ai_service_consent: true, submission_status: completed e ai_service_consent_version com a versão do aviso aceito. Aceitar apenas a política de privacidade não autoriza a IA. Sem external_id, o envio não concede nem renova a autorização; reenviar com o mesmo external_id não libera de novo. Uma recusa (false) num envio completo e válido revoga, mesmo sem external_id.": "The integration must send external_id, ai_service_consent: true, submission_status: completed, and ai_service_consent_version with the accepted notice version. Accepting only the privacy policy does not authorize AI. Without external_id, the submission neither grants nor renews authorization; resending with the same external_id does not authorize again. A refusal (false) in a complete, valid submission revokes, even without external_id.",
   "Configure a assinatura da fonte antes de autorizar IA. Para remover a assinatura, desligue primeiro a autorização de IA.": "Configure the source signature before authorizing AI. To remove the signature, first turn off AI authorization.",
   "Atendimento por IA autorizado pelo consentimento explícito deste formulário.": "AI support authorized by the explicit consent in this form.",
-  "Este envio não concedeu nova autorização de IA. Confira o consentimento e o estado do contato antes de configurar o atendimento.": "This submission did not grant a new AI authorization. Check the consent and the contact's status before configuring support."
+  "Este envio não concedeu nova autorização de IA. Confira o consentimento e o estado do contato antes de configurar o atendimento.": "This submission did not grant a new AI authorization. Check the consent and the contact's status before configuring support.",
+  "Novos": "New",
+  "Qual funil ver": "Which funnel to show",
+  "Tarefas de hoje": "Today's tasks",
+  "Sem tarefa": "No task",
+  "Visitas de hoje": "Today's visits",
+  "Todos os leads da loja": "All the store's leads",
+  "Sua carteira": "Your portfolio",
+  "Parado há 1 dia": "Idle for 1 day",
+  "Parado há {dias} dias": "Idle for {dias} days"
 }

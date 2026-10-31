@@ -53,7 +53,7 @@ export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
  * e, para quem administra, equipe e organização). Item que não existe na
  * instalação, ou que o papel não abre, simplesmente não aparece.
  */
-const MENU_GERENTE = ["/app/meu-dia", "/app/agenda", "/app/kanban", "/app/inbox"] as const;
+const MENU_GERENTE = ["/app/meu-dia", "/app/agenda", "/app/pipeline", "/app/inbox"] as const;
 
 export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   // v1.9.6 (Rodrigo, 30/10): "literalmente apenas esses", nesta ordem (`MENU_DA_FUNCAO`).
@@ -118,7 +118,10 @@ export const MENU_DO_GERENTE = [
     id: "iavek-acompanhamento",
     label: "Acompanhamento",
     itens: [
-      { href: "/app/kanban", label: "Kanban por vendedor" },
+      // v1.9.8 (CRM-218, ok do Rodrigo 31/10): o "Kanban por vendedor" abre o
+      // Pipeline da loja (um funil, botão Novos / Follow-up / Todos, o seletor de
+      // vendedor). A lista de funis segue aberta pelo endereço.
+      { href: "/app/pipeline", label: "Kanban por vendedor" },
       { href: "/app/inbox", label: "Atendimento do lead" },
     ],
   },

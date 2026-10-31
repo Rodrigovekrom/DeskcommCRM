@@ -3,6 +3,7 @@
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { createContext, useContext } from "react";
 
+import { AvisosDoCartao } from "@/components/iavek/AvisosDoCartao";
 import { DadosDaCompraNoCard, DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { ConversaNoQuadroContext } from "@/components/iavek/conversa-no-quadro-contexto";
 import { SeloIncompleto } from "@/components/iavek/CamposObrigatorios";
@@ -94,6 +95,8 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
         <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
       </DadosDaCompraNoCardContext.Provider>
       <SeloIncompleto leadId={lead.id} />
+      {/* ia.vek v1.9.8 (CRM-218): "sem tarefa" e "parado há N dias". */}
+      <AvisosDoCartao lead={lead} />
       {lojaDeCarros && (
         <p className="truncate" data-testid="carro-de-interesse" title={carro ?? undefined}>
           <span className="text-text-muted">{t("Carro")}:</span>{" "}
