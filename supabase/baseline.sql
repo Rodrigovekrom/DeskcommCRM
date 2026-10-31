@@ -47244,6 +47244,13 @@ begin
          or (old.sdr_user_id is null and new.sdr_user_id is not null
              and new.sdr_user_id is not distinct from old.owner_user_id
              and new.owner_user_id is distinct from old.owner_user_id)
+         -- A regra do sistema (gatilho da troca de dono): o GUARDIÃO que vira
+         -- dono vira também guardião — é o "Assumir" do Pipeline. Medido no
+         -- canário: sem esta linha, o Assumir do guardião dava 500.
+         or (old.sdr_user_id is null
+             and new.sdr_user_id is not distinct from new.owner_user_id
+             and new.owner_user_id is distinct from old.owner_user_id
+             and coalesce(public.fn_iavek_funcao_do_membro(new.organization_id, new.owner_user_id), '') = 'sdr')
        )
     then
       raise exception 'só a gerência muda o guardião de um lead'
@@ -47252,7 +47259,25 @@ begin
     return new;
   end if;
 
-  -- INSERT: guardião só o herdado de um clone (o lead de origem tem o mesmo).
+  -- INSERT: guardião só o herdado de um clone (o lead de origem tem o mesmo), ou
+  -- a regra do sistema (gatilho da chegada): o guardião que cria o PRÓPRIO lead é
+  -- guardião dele — desde que o contato não esteja nas mãos de outra pessoa (lead
+  -- aberto ou conversa de outro). Sem esta condição, criar um lead "seu" num
+  -- contato alheio abriria as conversas dele.
+  if new.sdr_user_id is not null
+     and new.sdr_user_id is not distinct from v_eu
+     and new.owner_user_id is not distinct from v_eu
+     and coalesce(public.fn_iavek_funcao_do_membro(new.organization_id, v_eu), '') = 'sdr'
+     and (new.contact_id is null or (
+       not exists (select 1 from public.crm_leads l
+                    where l.organization_id = new.organization_id and l.contact_id = new.contact_id
+                      and l.status = 'open' and l.owner_user_id is not null and l.owner_user_id <> v_eu)
+       and not exists (select 1 from public.conversations c
+                        where c.organization_id = new.organization_id and c.contact_id = new.contact_id
+                          and c.assigned_to_user_id is not null and c.assigned_to_user_id <> v_eu)))
+  then
+    return new;
+  end if;
   if new.sdr_user_id is not null then
     if new.source_metadata ? 'clonado_de'
        and (new.source_metadata->'clonado_de'->>'lead_id') ~* '^[0-9a-f-]{36}$' then

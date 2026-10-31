@@ -137,3 +137,17 @@ describe("v1.9.9-seg (parte 2) — as rotas que usam a chave de serviço", () =>
     expect(rota).toMatch(/\.gte\("created_at", new Date\(agora\.getTime\(\) - \(entrada\.horas \+ 24\) \* 3_600_000\)/);
   });
 });
+
+describe("v1.9.9-seg — a trava aceita as regras do próprio sistema (medido no canário com a v1.9.7)", () => {
+  it("o guardião que ASSUME vira guardião (sem isto, o Assumir dava 500)", () => {
+    const f = ultima("create or replace function public.fn_iavek_trava_guardiao_do_lead(");
+    expect(f).toMatch(
+      /new\.sdr_user_id is not distinct from new\.owner_user_id[\s\S]{0,200}fn_iavek_funcao_do_membro\(new\.organization_id, new\.owner_user_id\), ''\) = 'sdr'/,
+    );
+  });
+  it("o guardião que cria o PRÓPRIO lead é guardião dele, só se o contato não for de outra pessoa", () => {
+    const f = ultima("create or replace function public.fn_iavek_trava_guardiao_do_lead(");
+    expect(f).toMatch(/l\.status = 'open' and l\.owner_user_id is not null and l\.owner_user_id <> v_eu/);
+    expect(f).toMatch(/c\.assigned_to_user_id is not null and c\.assigned_to_user_id <> v_eu/);
+  });
+});
