@@ -24,12 +24,12 @@ describe("0600 — o estoque manda no lead aberto", () => {
       insert into public.catalog_products (id, organization_id, codigo, nome, preco_cents, moeda, origem)
         values ('${CARRO}', '${GOV_ORG}', 'ALT-0600', 'Carro da prova', 8000000, 'BRL', 'altimus')
         on conflict (id) do nothing;
-      insert into public.crm_pipelines (id, organization_id, name) values ('${FUNIL}', '${GOV_ORG}', 'Funil 0600')
+      insert into public.crm_pipelines (id, organization_id, name, slug) values ('${FUNIL}', '${GOV_ORG}', 'Funil 0600', 'funil-0600')
         on conflict (id) do nothing;
-      insert into public.crm_stages (id, organization_id, pipeline_id, name, position)
-        values ('${ABERTA}', '${GOV_ORG}', '${FUNIL}', 'Aberta', 1) on conflict (id) do nothing;
-      insert into public.crm_stages (id, organization_id, pipeline_id, name, position, is_won)
-        values ('${VENDIDO}', '${GOV_ORG}', '${FUNIL}', 'Vendido', 2, true) on conflict (id) do nothing;
+      insert into public.crm_stages (id, organization_id, pipeline_id, name, slug, position)
+        values ('${ABERTA}', '${GOV_ORG}', '${FUNIL}', 'Aberta', 'aberta', 1) on conflict (id) do nothing;
+      insert into public.crm_stages (id, organization_id, pipeline_id, name, slug, position, is_won)
+        values ('${VENDIDO}', '${GOV_ORG}', '${FUNIL}', 'Vendido', 'vendido', 2, true) on conflict (id) do nothing;
       insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, value_cents, position_in_stage, custom_fields)
         values ('${LEAD}', '${GOV_ORG}', '${FUNIL}', '${ABERTA}', 'Lead 0600', 111, 1,
                 '{"carro_interesse": "${CARRO}"}') on conflict (id) do nothing;

@@ -15,7 +15,7 @@ export function SeloCarroIndisponivel({ valor, status }: { valor: unknown; statu
   if (!carroIndisponivel(valor, status, produtos)) return null;
   return (
     <span
-      className="inline-block rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive"
+      className="inline-block self-start rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive"
       data-testid="selo-carro-indisponivel"
     >
       {t("Carro indisponível")}
