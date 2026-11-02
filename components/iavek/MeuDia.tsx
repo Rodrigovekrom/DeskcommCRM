@@ -546,7 +546,7 @@ function Numero({
   testId?: string;
 }) {
   return (
-    <div className="rounded-md border border-border p-3" data-testid={testId}>
+    <div className="rounded-md border border-border p-3 bg-surface/90 backdrop-blur" data-testid={testId}>
       <div className="text-2xl font-semibold tabular-nums">{valor}</div>
       <div className="text-xs text-muted-foreground">{rotulo}</div>
     </div>

@@ -34,7 +34,7 @@ export function PerfilDaEmpresaAdmin({ organizationId }: { organizationId: strin
   const ocupado = !perfil || gravar.isPending;
 
   return (
-    <section className="space-y-3 rounded-lg border p-4" data-testid="perfil-da-empresa">
+    <section className="space-y-3 rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="perfil-da-empresa">
       <h2 className="text-sm font-semibold">{t("Perfil ia.vek")}</h2>
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium">{t("Tipo de empresa")}</span>

@@ -70,7 +70,7 @@ export function RodizioDeLeads() {
   };
 
   return (
-    <section className="space-y-4 rounded-lg border p-4" data-testid="rodizio-de-leads">
+    <section className="space-y-4 rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="rodizio-de-leads">
       <div>
         <h2 className="text-lg font-semibold">{t("Rodízio de leads")}</h2>
         <p className="text-sm text-muted-foreground">

@@ -58,7 +58,7 @@ function LadosDoFunilDaLoja() {
   }
 
   return (
-    <section className="space-y-3 rounded-lg border p-4" data-testid="lados-do-funil-config">
+    <section className="space-y-3 rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="lados-do-funil-config">
       <div>
         <h2 className="text-sm font-semibold">{t("Etapas de cada função")}</h2>
         <p className="text-xs text-muted-foreground">

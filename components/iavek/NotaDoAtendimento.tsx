@@ -97,7 +97,7 @@ export function NotasDaSemana() {
   });
   if (!data?.ativo) return null;
   return (
-    <section className="rounded-lg border p-4" data-testid="notas-da-semana">
+    <section className="rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="notas-da-semana">
       <h2 className="mb-2 text-sm font-semibold">{t("Nota dos atendimentos (últimos 7 dias)")}</h2>
       {data.vendedores.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("Nenhum atendimento avaliado nos últimos 7 dias.")}</p>
@@ -147,7 +147,7 @@ export function NotaDoAtendimentoConfig() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["iavek", "nota-do-atendimento"] }),
   });
   return (
-    <section className="space-y-2 rounded-lg border p-4" data-testid="nota-do-atendimento-config">
+    <section className="space-y-2 rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="nota-do-atendimento-config">
       <label className="flex items-center gap-2 text-sm font-medium">
         <input
           type="checkbox"

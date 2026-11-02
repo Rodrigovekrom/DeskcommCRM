@@ -39,7 +39,7 @@ function AgendaDaIaDaClinica() {
     onSettled: () => void qc.invalidateQueries({ queryKey: chave }),
   });
   return (
-    <section className="space-y-3 rounded-lg border p-4" data-testid="agenda-da-ia-config">
+    <section className="space-y-3 rounded-lg border p-4 bg-surface/90 backdrop-blur" data-testid="agenda-da-ia-config">
       <h2 className="text-sm font-semibold">{t("A IA agenda na agenda da clínica")}</h2>
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium">{t("A IA marca como")}</span>

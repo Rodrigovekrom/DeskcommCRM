@@ -101,7 +101,7 @@ export function MeusNumeros() {
             <Cartao id="perdas" rotulo={t("Perdas")} valor={n.perdas} />
           </div>
           {n.motivos_de_perda.length > 0 && (
-            <section className="rounded-md border border-border p-3" data-testid="motivos-de-perda">
+            <section className="rounded-md border border-border p-3 bg-surface/90 backdrop-blur" data-testid="motivos-de-perda">
               <h2 className="text-sm font-semibold">{t("Por que perdi")}</h2>
               <ul className="mt-2 space-y-1 text-sm">
                 {n.motivos_de_perda.map((m) => (

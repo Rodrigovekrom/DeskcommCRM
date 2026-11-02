@@ -206,7 +206,7 @@ export function RiskRadarList() {
         </Badge>
       </div>
 
-      <ul className="divide-y divide-border rounded-lg border border-border">
+      <ul className="divide-y divide-border rounded-lg border border-border bg-surface/90 backdrop-blur">
         {data.items.map((lead) => (
           <RadarRow key={lead.id} lead={lead} />
         ))}

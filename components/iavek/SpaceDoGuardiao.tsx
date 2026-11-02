@@ -135,7 +135,7 @@ export function SpaceDoGuardiao() {
           {t("Nenhum lead passado a vendedores por aqui.")}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
+        <div className="overflow-x-auto rounded-md border border-border bg-surface/90 backdrop-blur">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
               <tr>
