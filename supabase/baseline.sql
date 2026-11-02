@@ -5724,6 +5724,7 @@ grant execute on function public.fn_can_view_lead(uuid, uuid)
   to authenticated, service_role;
 
 drop policy if exists "tenant_isolation_crm_leads_all" on public.crm_leads;
+
 drop policy if exists "crm_leads_select" on public.crm_leads;
 drop policy if exists "crm_leads_insert" on public.crm_leads;
 drop policy if exists "crm_leads_update" on public.crm_leads;
@@ -5734,6 +5735,31 @@ alter table public.crm_leads
   add column if not exists sdr_user_id uuid references auth.users(id) on delete set null;
 
 -- ia.vek (migration 0598): a versão final, no lugar da original.
+-- ia.vek (migration 0599): o corte dos sem dono para o guardião, logo antes da policy que o usa.
+-- O mapa { organização: corte } das organizações em que quem chama é GUARDIÃO
+-- (agente com função "sdr") com a chave gravada. Um valor só por consulta: a
+-- policy o lê como `(select ...)` (initplan) e só consulta o mapa por linha.
+create or replace function public.fn_iavek_corte_sem_dono()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(jsonb_object_agg(o.id::text, o.settings->'iavek'->>'guardiao_ve_sem_dono_desde'), '{}'::jsonb)
+    from public.organizations o
+    join public.user_organizations uo
+      on uo.organization_id = o.id
+     and uo.user_id = auth.uid()
+     and uo.revoked_at is null
+     and uo.role = 'agent'
+     and uo.interface_settings->>'funcao' = 'sdr'
+   where o.id in (select public.fn_user_org_ids())
+     and (o.settings->'iavek'->>'guardiao_ve_sem_dono_desde') ~ '^\d{4}-\d{2}-\d{2}T';
+$$;
+revoke execute on function public.fn_iavek_corte_sem_dono() from public, anon;
+grant execute on function public.fn_iavek_corte_sem_dono() to authenticated, service_role;
+
 create policy "crm_leads_select" on public.crm_leads
   for select using (
     (select public.fn_is_platform_admin())
@@ -5741,7 +5767,10 @@ create policy "crm_leads_select" on public.crm_leads
     or (owner_user_id = (select auth.uid())
         and organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v))
     or (owner_user_id is null
-        and organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_sem_dono))
+        and organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_sem_dono)
+        -- 0599: o guardião com data de corte vê só os sem dono criados a partir dela.
+        and created_at >= coalesce(((select public.fn_iavek_corte_sem_dono()) ->> organization_id::text)::timestamptz,
+                                   '-infinity'::timestamptz))
     or (sdr_user_id = (select auth.uid())
         and organization_id in (select public.fn_user_org_ids()))
   );
