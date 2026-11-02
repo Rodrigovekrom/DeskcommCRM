@@ -962,6 +962,18 @@ export async function deleteContactHandler(
       p_contact_id: contactId,
       p_organization_id: ctx.organization_id,
     });
+    // ia.vek (0598): só gerente+ apaga conversa. Para quem não pode, o DELETE
+    // das conversas não alcança linha nenhuma e a ficha bate na FK delas — é
+    // recusa de PAPEL, não de vínculo (gerente vê e apaga todas as conversas).
+    if (rpcErr?.code === "23503" && rpcErr.message.includes("conversations_contact_id_fkey")) {
+      throw new ApiError(
+        403,
+        "forbidden_role",
+        undefined,
+        ctx.requestId,
+        traduzir("Só gerente ou admin exclui um contato que já tem conversa.", ctx.idioma ?? "pt-BR"),
+      );
+    }
     throwOnDbError(rpcErr, ctx.requestId, ctx.idioma);
     apagou = data === true;
   } catch (err) {

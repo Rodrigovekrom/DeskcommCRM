@@ -11930,6 +11930,8 @@ export const DICIONARIO: Traducoes = {
   "Não foi possível excluir: o contato ainda tem registros vinculados.": {
     es: "No se pudo eliminar el contacto: todavía tiene registros vinculados.",
   },
+  // ia.vek v1.9.11: desde a 0598 só gerente+ apaga conversa.
+  "Só gerente ou admin exclui um contato que já tem conversa.": { es: "Solo un gerente o administrador elimina un contacto que ya tiene conversación." },
 
   // ─── Fase B: handlers compartidos REST/MCP (leads/_handler.ts) ───
   "Um lead tem um dono: informe owner_user_id OU owner_agent_id.": {

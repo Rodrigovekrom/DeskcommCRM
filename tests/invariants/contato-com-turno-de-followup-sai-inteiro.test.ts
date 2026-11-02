@@ -191,9 +191,11 @@ describe("excluir contato com turno de follow-up (#1862)", () => {
 
   it("(a) a rota apaga a ficha INTEIRA — contato, histórico e turno somem juntos", () => {
     // É a mesma chamada que deleteContactHandler faz (uma função, uma transação).
+    // ia.vek (0598): apagar conversa é de gerente+, então quem apaga a ficha com
+    // histórico é o gerente; o agente é a régua do caso (d).
     const fora = lastLine(
       comoUsuario(
-        GOV_AGENT_A,
+        GOV_MANAGER,
         `select public.${FUNCAO}('${CONTATO_B}', '${GOV_ORG}');`,
       ),
     );
@@ -211,11 +213,27 @@ describe("excluir contato com turno de follow-up (#1862)", () => {
     expect(contar(`select count(*) from public.contacts where organization_id = '${GOV_ORG}'`)).toBeGreaterThan(0);
   });
 
+  it("(d) ia.vek 0598: o AGENTE não apaga ficha com conversa, e nada sai", () => {
+    // A policy de DELETE de conversations é gerente+: para o agente o DELETE das
+    // conversas não alcança linha e a ficha bate na FK delas. A rota traduz esta
+    // FK em 403 (só gerente ou admin). A transação desfaz: o histórico fica.
+    const erro = stderrDe(
+      GOV_AGENT_A,
+      `select public.${FUNCAO}('${CONTATO_C}', '${GOV_ORG}');`,
+    );
+    expect(erro).toContain("conversations_contact_id_fkey");
+
+    expect(contar(`select count(*) from public.contacts where id = '${CONTATO_C}'`)).toBe(1);
+    expect(contar(`select count(*) from public.messages where id = '${MSG_C}'`)).toBe(1);
+    expect(contar(`select count(*) from public.conversations where id = '${CONV_C}'`)).toBe(1);
+  });
+
   it("(c) ficha recusada por outro motivo (compromisso na agenda) não leva nada", () => {
     // O RESTRICT de calendar_appointments recusa a ficha; a transação inteira
     // desfaz — o histórico que saiu junto com a recusa era o defeito da #1862.
+    // Gerente (0598): para ele as conversas saem, e quem recusa é a agenda.
     const erro = stderrDe(
-      GOV_AGENT_A,
+      GOV_MANAGER,
       `select public.${FUNCAO}('${CONTATO_C}', '${GOV_ORG}');`,
     );
     expect(erro).toContain("calendar_appointments");
