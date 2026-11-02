@@ -19,6 +19,8 @@ import { StageColumn } from "./StageColumn";
 import { nivelDaEtapa } from "@/lib/kanban/tom-da-etapa";
 import { LeadDossier } from "./LeadDossier";
 import { RetomarComoNovoNegocioDialog } from "./RetomarComoNovoNegocioDialog";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
+import { VendaDialog } from "./VendaDialog";
 import { LoseLeadDialog } from "./LoseLeadDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { ConversaNoQuadro, ConversaNoQuadroContext } from "@/components/iavek/ConversaNoQuadro";
@@ -132,6 +134,11 @@ export function KanbanBoard({
   // ia.vek v1.7.7: soltar o cartão numa etapa de PERDA pede o motivo (a mesma
   // janela do "Perder" do menu do cartão) em vez de tentar mover e levar recusa.
   const [perdaPendente, setPerdaPendente] = useState<string | null>(null);
+  const { lojaDeCarros } = usePerfilDaEmpresa();
+  const [vendaPendente, setVendaPendente] = useState<{
+    args: { leadId: string; stageId: string; positionInStage: number; expectedUpdatedAt: string };
+    valorCents: number | null;
+  } | null>(null);
   // ia.vek v1.8.3: a trava da loja (0590) abre a janela do que falta.
   const [travaDaLoja, setTravaDaLoja] = useState<TravaDaLoja | null>(null);
   const [focarCampos, setFocarCampos] = useState(false);
@@ -278,14 +285,25 @@ export function KanbanBoard({
         return;
       }
 
-      moveCard.mutate({
+      const args = {
         leadId: lead.id,
         stageId: destStageId,
         positionInStage: newPosition,
         expectedUpdatedAt: lead.updated_at,
-      });
+      };
+      // ia.vek v1.9.12: entrar na venda, na loja de carros, pede valor e data.
+      if (
+        lojaDeCarros &&
+        etapaDeDestino?.is_won &&
+        source.droppableId !== destStageId &&
+        lead.status !== "won"
+      ) {
+        setVendaPendente({ args, valorCents: lead.value_cents ?? null });
+        return;
+      }
+      moveCard.mutate(args);
     },
-    [data, grouped, moveCard],
+    [data, grouped, moveCard, lojaDeCarros],
   );
 
   if (isLoading) {
@@ -433,6 +451,20 @@ export function KanbanBoard({
             customFields,
             ...(wonReason !== undefined ? { wonReason } : {}),
           });
+        }}
+      />
+      <VendaDialog
+        open={vendaPendente !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) setVendaPendente(null);
+        }}
+        valorSugeridoCents={vendaPendente?.valorCents}
+        isPending={moveCard.isPending}
+        onConfirmar={(venda) => {
+          if (!vendaPendente) return;
+          const { args } = vendaPendente;
+          setVendaPendente(null);
+          moveCard.mutate({ ...args, venda });
         }}
       />
       {perdaPendente && (

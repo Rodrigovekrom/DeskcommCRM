@@ -1,4 +1,5 @@
 "use client";
+import type { VendaDaLoja } from "@/lib/iavek/venda-da-loja";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { liberarEcoLocal, marcarEcoLocal } from "@/lib/kanban/local-echo";
@@ -40,6 +41,8 @@ function gravaLeadNoQuadro(
 
 interface WinArgs {
   leadId: string;
+  /** ia.vek v1.9.12: valor final e data, na loja de carros. */
+  venda?: VendaDaLoja;
 }
 interface LoseArgs {
   leadId: string;
@@ -50,9 +53,9 @@ export function useWinLead(pipelineId: string) {
   const qc = useQueryClient();
   const queryKey = ["board", pipelineId] as const;
   return useMutation({
-    mutationFn: async ({ leadId }: WinArgs) => {
+    mutationFn: async ({ leadId, venda }: WinArgs) => {
       marcarEcoLocal(leadId);
-      return apiClient.post<{ data: Lead }>(`/api/v1/leads/${leadId}/win`, {});
+      return apiClient.post<{ data: Lead }>(`/api/v1/leads/${leadId}/win`, venda ? { venda } : {});
     },
     onSuccess: (res, { leadId }) => {
       gravaLeadNoQuadro(qc, queryKey, leadId, res?.data);

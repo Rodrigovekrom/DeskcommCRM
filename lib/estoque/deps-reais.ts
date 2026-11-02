@@ -13,7 +13,11 @@ import type { DepsDaSincronizacao, ProdutoGravado } from "./sincronizar";
  */
 const TETO_DO_FEED_BYTES = 10 * 1024 * 1024;
 
-export function depsReais(orgId: string, urlDoFeed: string): DepsDaSincronizacao {
+export function depsReais(
+  orgId: string,
+  urlDoFeed: string,
+  opcoes: { avisarALoja: boolean } = { avisarALoja: false },
+): DepsDaSincronizacao {
   const admin = createAdminClient();
 
   return {
@@ -116,5 +120,31 @@ export function depsReais(orgId: string, urlDoFeed: string): DepsDaSincronizacao
         .in("id", ids);
       if (error) throw new Error("desativação falhou");
     },
+
+    ...(opcoes.avisarALoja
+      ? {
+          async avisarCarrosQueSairam() {
+            const { data, error } = await admin
+              .from("catalog_products")
+              .select("id")
+              .eq("organization_id", orgId)
+              .eq("origem", ORIGEM_ALTIMUS)
+              .eq("ativo", false)
+              .is("aviso_da_loja_em", null);
+            if (error) throw new Error("carros não lidos");
+            let avisados = 0;
+            for (const { id } of data ?? []) {
+              const { error: erroDoAviso } = await admin.rpc("fn_iavek_aviso_da_loja", {
+                p_org: orgId,
+                p_evento: "carro_saiu",
+                p_carro: id,
+              });
+              if (erroDoAviso) throw new Error("aviso não gravado");
+              avisados += 1;
+            }
+            return avisados;
+          },
+        }
+      : {}),
   };
 }

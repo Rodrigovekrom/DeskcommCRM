@@ -41,6 +41,11 @@ export const moveLeadSchema = z.object({
    */
   won_reason: z.string().max(500).optional(),
   /**
+   * ia.vek v1.9.12: valor final e data, na loja de carros. Quem valida é
+   * `lerVendaDaLoja` (a recusa de negócio é a mesma do botão de ganho).
+   */
+  venda: z.unknown().optional(),
+  /**
    * Os campos que o diálogo de "campos obrigatórios" coletou (issue #1536).
    *
    * Entram NA MESMA escrita que muda a etapa — o mesmo desenho do

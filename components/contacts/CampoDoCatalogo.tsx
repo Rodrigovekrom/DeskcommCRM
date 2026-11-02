@@ -1,4 +1,6 @@
 "use client";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
+import { valorVemDoEstoque } from "@/lib/iavek/carro-do-lead";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
@@ -65,6 +67,14 @@ export function useNomeDoCarro(valor: unknown): string | null {
   if (nome === undefined) return t("Carregando…");
   if (nome === "") return t("Carro fora do catálogo");
   return nome;
+}
+
+/** ia.vek v1.9.12: na loja de carros, o valor deste lead é o do carro do estoque? */
+export function useValorVemDoEstoque(lead: { status?: string | null; custom_fields?: unknown }): boolean {
+  const { lojaDeCarros } = usePerfilDaEmpresa();
+  const valor = (lead.custom_fields as Record<string, unknown> | null | undefined)?.carro_interesse;
+  const { data: produtos } = useCatalogoDoCampo(lojaDeCarros && typeof valor === "string" && PARECE_ID.test(valor.trim()));
+  return lojaDeCarros && valorVemDoEstoque(valor, lead.status, produtos);
 }
 
 function normalizar(s: string): string {

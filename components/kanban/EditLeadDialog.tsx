@@ -1,4 +1,5 @@
 "use client";
+import { useValorVemDoEstoque } from "@/components/contacts/CampoDoCatalogo";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -49,6 +50,9 @@ export function EditLeadDialog({ open, onOpenChange, lead, pipelineId }: Props) 
   // reescreve o que nasceu antes, e o cartão e o dossiê mostram a persistida.
   const moedaDoValor = lead.currency ?? org?.currency ?? MOEDA_PADRAO;
   const edit = useEditLead(pipelineId);
+
+  // ia.vek v1.9.12: lead aberto com carro do estoque: o valor é o do carro.
+  const valorDoEstoque = useValorVemDoEstoque(lead);
 
   const form = useForm<FormShape>({
     defaultValues: {
@@ -144,8 +148,14 @@ export function EditLeadDialog({ open, onOpenChange, lead, pipelineId }: Props) 
                 id="valueReais"
                 inputMode="decimal"
                 placeholder="0,00"
+                readOnly={valorDoEstoque}
                 {...form.register("valueReais")}
               />
+              {valorDoEstoque && (
+                <p className="text-xs text-text-muted" data-testid="valor-vem-do-estoque">
+                  {t("O valor acompanha o preço do carro no estoque.")}
+                </p>
+              )}
               <EcoDoValor control={form.control} moeda={moedaDoValor} />
               {form.formState.errors.valueReais && (
                 <p className="text-xs text-error-fg">

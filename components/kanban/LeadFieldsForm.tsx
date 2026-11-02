@@ -1,5 +1,6 @@
 "use client";
 
+import { useValorVemDoEstoque } from "@/components/contacts/CampoDoCatalogo";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import { useEffect, useState } from "react";
@@ -64,6 +65,9 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
   const [camposCarregados, setCamposCarregados] = useState<Record<string, unknown>>(
     lead.custom_fields ?? {},
   );
+
+  // ia.vek v1.9.12: lead aberto com carro do estoque: o valor é o do carro.
+  const valorDoEstoque = useValorVemDoEstoque(lead);
 
   const form = useForm<FormShape>({
     defaultValues: {
@@ -159,8 +163,14 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
               id="valueReais"
               inputMode="decimal"
               placeholder="0,00"
+              readOnly={valorDoEstoque}
               {...form.register("valueReais")}
             />
+            {valorDoEstoque && (
+              <p className="text-xs text-text-muted" data-testid="valor-vem-do-estoque">
+                {t("O valor acompanha o preço do carro no estoque.")}
+              </p>
+            )}
             <EcoDoValor control={form.control} moeda={moedaDoValor} />
             {form.formState.errors.valueReais && (
               <p className="text-xs text-error-fg">

@@ -16,6 +16,7 @@ import { type NextRequest } from "next/server";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { lojaPedeDadosDaVenda } from "@/lib/iavek/venda-da-loja-servidor";
 import { encerraDemanda } from "@/lib/leads/encerramento";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,7 +55,15 @@ export async function POST(
         requestId,
         idioma: authz.user.idioma,
       },
-      { leadId, desfecho: "won", motivo: wonReason },
+      {
+        leadId,
+        desfecho: "won",
+        motivo: wonReason,
+        // ia.vek v1.9.12: na loja de carros, a venda pede valor final e data.
+        ...((await lojaPedeDadosDaVenda(supabase, authz.org.orgId))
+          ? { vendaDaLoja: { bruto: (corpo as { venda?: unknown }).venda } }
+          : {}),
+      },
     );
     return ok(lead, { requestId });
   } catch (err) {

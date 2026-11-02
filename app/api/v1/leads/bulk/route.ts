@@ -36,6 +36,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { observeServiceOrigin } from "@/lib/atendimento/origem";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { lojaPedeDadosDaVenda } from "@/lib/iavek/venda-da-loja-servidor";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -292,6 +293,18 @@ export async function POST(req: NextRequest): Promise<Response> {
         return fail(recusa.codigo, recusa.mensagem, 422, {
           requestId,
           details: { lead_ids: leadIdsSemCampos, faltando: faltandoPorCard },
+        });
+      }
+
+      // ia.vek v1.9.12: venda na loja de carros pede valor e data de CADA carro, e
+      // esta rota (lote e troca de etapa da barra da conversa) não tem como perguntar.
+      if (
+        etapaDeDestino.is_won &&
+        visible.some((l) => (l as { status?: string }).status !== "won") &&
+        (await lojaPedeDadosDaVenda(supabase, organizationId))
+      ) {
+        return fail("venda_incompleta", traduzir("A venda pede o valor final e a data: marque pelo cartão do lead, no Pipeline.", user.idioma), 422, {
+          requestId,
         });
       }
 

@@ -3,6 +3,7 @@
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { createContext, useContext } from "react";
 
+import { SeloCarroIndisponivel } from "@/components/iavek/SeloCarroIndisponivel";
 import { AvisosDoCartao } from "@/components/iavek/AvisosDoCartao";
 import { DadosDaCompraNoCard, DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { ConversaNoQuadroContext } from "@/components/iavek/conversa-no-quadro-contexto";
@@ -103,6 +104,7 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
           {carro ? <span className="font-medium text-text">{carro}</span> : <span className="text-text-muted">—</span>}
         </p>
       )}
+      {lojaDeCarros && <SeloCarroIndisponivel valor={campos.carro_interesse} status={lead.status} />}
       <button
         type="button"
         disabled={!podeAbrir || !abrirNoQuadro}

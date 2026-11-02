@@ -15,6 +15,8 @@ import { audit } from "@/lib/audit";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { lerVendaDaLoja } from "@/lib/iavek/venda-da-loja";
+import { lojaPedeDadosDaVenda } from "@/lib/iavek/venda-da-loja-servidor";
 import { moveLeadSchema, validateRequest } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
@@ -205,6 +207,19 @@ export async function POST(
     return fail(veredito.codigo, veredito.mensagem, 422, { requestId });
   }
 
+  // ia.vek v1.9.12: entrar na venda, na loja de carros, pede valor final e data.
+  // Reordenar a coluna ou andar entre etapas de venda não é outra venda.
+  const venda =
+    stage.is_won &&
+    !mesmaEtapa &&
+    (lead as { status?: string }).status !== "won" &&
+    (await lojaPedeDadosDaVenda(supabase, (lead as { organization_id: string }).organization_id))
+      ? lerVendaDaLoja(input.venda, user.idioma)
+      : null;
+  if (venda && !venda.ok) {
+    return fail(venda.codigo, venda.mensagem, 422, { requestId });
+  }
+
   // OCC update (Pattern B / Spec 09 §7.2). O motivo da perda entra NA MESMA
   // escrita que muda a etapa — nunca numa segunda, que teria janela.
   const { data: updated, error: updErr } = await supabase
@@ -214,6 +229,7 @@ export async function POST(
       position_in_stage: input.position_in_stage,
       updated_at: new Date().toISOString(),
       ...veredito.patch,
+      ...(venda?.ok ? { value_cents: venda.valorCents, closed_at: venda.fechadoEm } : {}),
       // O motivo de ganho sai NA MESMA escrita que muda a etapa — o mesmo
       // desenho do motivo da perda (#917): uma segunda escrita teria janela.
       ...(stage.is_won && input.won_reason?.trim()
@@ -293,6 +309,7 @@ export async function POST(
       from_stage_id: lead.stage_id,
       to_stage_id: input.stage_id,
       pipeline_id: lead.pipeline_id,
+      ...(venda?.ok ? { valor_final_cents: venda.valorCents, data_da_venda: venda.data } : {}),
     },
   });
   if (!atividade.ok) {

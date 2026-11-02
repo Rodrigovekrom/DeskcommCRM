@@ -29,7 +29,9 @@ import { usePropostaEnviadaDoLead } from "@/hooks/kanban/usePropostaEnviadaDoLea
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAssignableAgents } from "@/hooks/kanban/useAssignableAgents";
 import { usePermission } from "@/hooks/auth/AuthProvider";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { LoseLeadDialog } from "./LoseLeadDialog";
+import { VendaDialog } from "./VendaDialog";
 import { MoveToOtherPipelineDialog } from "./MoveToOtherPipelineDialog";
 import { EditLeadDialog } from "./EditLeadDialog";
 import type { Lead } from "@/lib/types/leads";
@@ -45,6 +47,9 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
   const [moveOpen, setMoveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // ia.vek v1.9.12: na loja de carros, a venda pede valor final e data.
+  const [vendaOpen, setVendaOpen] = useState(false);
+  const { lojaDeCarros } = usePerfilDaEmpresa();
   const winMutation = useWinLead(pipelineId);
   const editMutation = useEditLead(pipelineId);
   // Excluir um card é a mesma ação da barra de seleção, com um id só: mesma
@@ -168,7 +173,8 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
           <DropdownMenuItem
             disabled={winMutation.isPending}
             onSelect={() => {
-              winMutation.mutate({ leadId: lead.id });
+              if (lojaDeCarros) setVendaOpen(true);
+              else winMutation.mutate({ leadId: lead.id });
             }}
           >
             {t("Marcar como ganho")}
@@ -263,6 +269,16 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
         </AlertDialogContent>
       </AlertDialog>
 
+      <VendaDialog
+        open={vendaOpen}
+        onOpenChange={setVendaOpen}
+        valorSugeridoCents={lead.value_cents}
+        isPending={winMutation.isPending}
+        onConfirmar={(venda) => {
+          setVendaOpen(false);
+          winMutation.mutate({ leadId: lead.id, venda });
+        }}
+      />
       <LoseLeadDialog
         open={loseOpen}
         onOpenChange={setLoseOpen}

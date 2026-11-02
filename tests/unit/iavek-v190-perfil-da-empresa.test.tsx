@@ -32,7 +32,10 @@ vi.mock("@/components/iavek/CamposObrigatorios", () => ({
   useCamposQueFaltam: () => ({ data: undefined }),
   SeloIncompleto: () => null,
 }));
-vi.mock("@/components/contacts/CampoDoCatalogo", () => ({ useNomeDoCarro: () => "Onix 2020" }));
+vi.mock("@/components/contacts/CampoDoCatalogo", () => ({
+  useNomeDoCarro: () => "Onix 2020",
+  useCatalogoDoCampo: () => ({ data: undefined }),
+}));
 
 const { ResumoNaBarra } = await import("@/components/iavek/ResumoNaBarra");
 const { PassarFicha } = await import("@/components/iavek/PassarFicha");

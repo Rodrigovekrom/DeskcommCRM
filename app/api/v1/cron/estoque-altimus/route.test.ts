@@ -22,6 +22,7 @@ vi.mock("@/lib/instalacao/config", () => ({
 }));
 vi.mock("@/lib/organizacao/operante", () => ({ idsDeOrgsParadas: async () => mocks.paradas }));
 vi.mock("@/lib/audit", () => ({ audit: mocks.audit }));
+vi.mock("@/lib/iavek/venda-da-loja-servidor", () => ({ lojaPedeDadosDaVenda: async () => true }));
 vi.mock("@/lib/estoque/deps-reais", () => ({ depsReais: (orgId: string) => ({ orgId }) }));
 vi.mock("@/lib/estoque/sincronizar", () => ({
   sincronizarEstoque: mocks.sincronizar,

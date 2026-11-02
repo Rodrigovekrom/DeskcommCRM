@@ -4,6 +4,7 @@ import { apiClient } from "@/lib/api/client";
 import { liberarEcoLocal, marcarEcoLocal } from "@/lib/kanban/local-echo";
 import { ApiError } from "@/lib/api/types";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import type { VendaDaLoja } from "@/lib/iavek/venda-da-loja";
 import type { Lead } from "@/lib/types/leads";
 import type { BoardData } from "@/lib/kanban/types";
 
@@ -19,6 +20,8 @@ interface MoveArgs {
   customFields?: Record<string, unknown>;
   /** O motivo do ganho coletado pelo mesmo diálogo, quando o destino fecha. */
   wonReason?: string;
+  /** ia.vek v1.9.12: valor final e data, na loja de carros. */
+  venda?: VendaDaLoja;
 }
 
 /**
@@ -84,6 +87,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
         expected_updated_at: args.expectedUpdatedAt,
         ...(args.customFields ? { custom_fields: args.customFields } : {}),
         ...(args.wonReason !== undefined ? { won_reason: args.wonReason } : {}),
+        ...(args.venda ? { venda: args.venda } : {}),
       });
     },
     // ia.vek v1.7.7: por PREFIXO (`setQueriesData`) — o mesmo funil pode estar

@@ -1,5 +1,6 @@
 "use client";
 
+import { SeloCarroIndisponivel } from "@/components/iavek/SeloCarroIndisponivel";
 import { SeloIncompleto, useCamposQueFaltam } from "@/components/iavek/CamposObrigatorios";
 import { useNomeDoCarro } from "@/components/contacts/CampoDoCatalogo";
 import { ChipDeEtiqueta } from "@/components/tags/ChipDeEtiqueta";
@@ -15,6 +16,7 @@ export interface LeadDaBarra {
   updated_at?: string | null;
   custom_fields: Record<string, unknown> | null;
   etapa_nome: string | null;
+  status?: string | null;
   owner_kind?: string | null;
   owner_name?: string | null;
   guardiao_name?: string | null;
@@ -107,7 +109,14 @@ export function ResumoNaBarra({
         return (
           <div key={k} className="contents" data-campo={k}>
             <dt className="text-muted-foreground">{rotulo(k)}</dt>
-            <dd className="min-w-0 break-words font-medium">{v ?? <span className="font-normal text-muted-foreground">—</span>}</dd>
+            <dd className="min-w-0 break-words font-medium">
+              {v ?? <span className="font-normal text-muted-foreground">—</span>}
+              {k === "carro_interesse" && (
+                <span className="mt-1 block">
+                  <SeloCarroIndisponivel valor={campos.carro_interesse} status={lead?.status} />
+                </span>
+              )}
+            </dd>
           </div>
         );
       })}

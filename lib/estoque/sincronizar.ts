@@ -57,6 +57,12 @@ export interface DepsDaSincronizacao {
   subirFoto(caminho: string, bytes: Uint8Array, tipo: string): Promise<void>;
   apagarFotos(caminhos: string[]): Promise<void>;
   desativar(ids: string[]): Promise<void>;
+  /**
+   * ia.vek v1.9.12: avisa a loja dos carros fora do estoque que ainda não foram
+   * avisados e devolve quantos carros. Olha o estado, e não só esta rodada: um
+   * aviso que falhou sai na rodada seguinte. Ausente: empresa que não é loja de carros.
+   */
+  avisarCarrosQueSairam?(): Promise<number>;
 }
 
 export interface ResumoDaSincronizacao {
@@ -64,6 +70,7 @@ export interface ResumoDaSincronizacao {
   criados: number;
   atualizados: number;
   desativados: number;
+  carrosAvisados: number;
   fotosBaixadas: number;
   fotosRecusadas: number;
   produtosComFotoPendente: number;
@@ -80,6 +87,7 @@ export async function sincronizarEstoque(
     criados: 0,
     atualizados: 0,
     desativados: 0,
+    carrosAvisados: 0,
     fotosBaixadas: 0,
     fotosRecusadas: 0,
     produtosComFotoPendente: 0,
@@ -181,13 +189,20 @@ export async function sincronizarEstoque(
       resumo.erros.push("desativacao_falhou");
     }
   }
+  if (deps.avisarCarrosQueSairam) {
+    try {
+      resumo.carrosAvisados = await deps.avisarCarrosQueSairam();
+    } catch {
+      resumo.erros.push("aviso_do_carro_falhou");
+    }
+  }
   return resumo;
 }
 
 /** Algo mudou nesta rodada? (é o que decide se a rodada vai para a auditoria) */
 export function rodadaTeveEfeito(r: ResumoDaSincronizacao): boolean {
   return (
-    r.criados + r.atualizados + r.desativados + r.fotosBaixadas > 0 ||
+    r.criados + r.atualizados + r.desativados + r.carrosAvisados + r.fotosBaixadas > 0 ||
     r.erros.length > 0 ||
     r.fotosRecusadas > 0
   );

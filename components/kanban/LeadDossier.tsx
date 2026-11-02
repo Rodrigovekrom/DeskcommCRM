@@ -1,5 +1,6 @@
 "use client";
 
+import { SeloCarroIndisponivel } from "@/components/iavek/SeloCarroIndisponivel";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useEffect, useRef } from "react";
 
@@ -116,6 +117,12 @@ export function LeadDossier({
             {formatValor(lead.value_cents, lead.currency)}
           </span>
           <span className="text-text-muted">{stageName}</span>
+          {lojaDeCarros && (
+            <SeloCarroIndisponivel
+              valor={(lead.custom_fields as Record<string, unknown> | null)?.carro_interesse}
+              status={lead.status}
+            />
+          )}
           <OwnerBadge
             ownerKind={owner.kind}
             ownerName={owner.name}

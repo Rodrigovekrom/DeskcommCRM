@@ -22,6 +22,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 import { depsReais } from "@/lib/estoque/deps-reais";
+import { lojaPedeDadosDaVenda } from "@/lib/iavek/venda-da-loja-servidor";
 import { orgDonaDoEstoque } from "@/lib/estoque/org-dona";
 import { rodadaTeveEfeito, sincronizarEstoque } from "@/lib/estoque/sincronizar";
 import { valorDaInstalacao } from "@/lib/instalacao/config";
@@ -67,7 +68,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     return ok({ configurado: true, pulado: "organizacao_parada" }, { requestId });
   }
 
-  const resumo = await sincronizarEstoque(orgId, depsReais(orgId, url));
+  // ia.vek v1.9.12: o aviso de carro que saiu é só de loja de carros.
+  const resumo = await sincronizarEstoque(
+    orgId,
+    depsReais(orgId, url, { avisarALoja: await lojaPedeDadosDaVenda(admin, orgId) }),
+  );
 
   if (rodadaTeveEfeito(resumo)) {
     void audit({

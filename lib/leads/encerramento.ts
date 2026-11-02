@@ -18,6 +18,7 @@
  * só existia em `event_log` e `api_audit_log` — nenhum dos dois aparece na tela.
  * O dossiê de um negócio fechado terminava sem dizer que fechou.
  */
+import { lerVendaDaLoja } from "@/lib/iavek/venda-da-loja";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
@@ -58,6 +59,11 @@ export interface EncerraDemandaInput {
   razaoNaTimeline?: string;
   /** Acrescentado ao `payload` da linha (ex.: para onde o negócio foi). */
   payloadNaTimeline?: Record<string, unknown>;
+  /**
+   * ia.vek v1.9.12: presente quando a loja pede o valor final e a data da venda
+   * (`bruto` é o que o corpo trouxe). Só as rotas humanas passam isto.
+   */
+  vendaDaLoja?: { bruto: unknown };
 }
 
 export interface DemandaEncerrada {
@@ -130,6 +136,15 @@ export async function encerraDemanda(
 
   if ((lead as { status: string }).status === input.desfecho) {
     return { lead: lead as Record<string, unknown>, jaEstava: true };
+  }
+
+  // ia.vek v1.9.12: depois do "já estava" (ganhar de novo não é outra venda).
+  const venda =
+    input.desfecho === "won" && input.vendaDaLoja
+      ? lerVendaDaLoja(input.vendaDaLoja.bruto, ctx.idioma ?? "pt-BR")
+      : null;
+  if (venda && !venda.ok) {
+    throw new ApiError(422, venda.codigo, undefined, ctx.requestId, venda.mensagem);
   }
 
   const colunaTerminal = input.desfecho === "won" ? "is_won" : "is_lost";
@@ -246,6 +261,10 @@ export async function encerraDemanda(
   if (input.desfecho === "won" && input.motivo?.trim()) {
     patch.won_reason = input.motivo.trim();
   }
+  if (venda?.ok) {
+    patch.value_cents = venda.valorCents;
+    patch.closed_at = venda.fechadoEm;
+  }
 
   const { error: updErr } = await supabase
     .from("crm_leads")
@@ -303,6 +322,7 @@ export async function encerraDemanda(
       (input.desfecho === "won" ? "Ganho" : `Perdido — ${input.motivo}`),
     payload: {
       ...(input.payloadNaTimeline ?? {}),
+      ...(venda?.ok ? { valor_final_cents: venda.valorCents, data_da_venda: venda.data } : {}),
       desfecho: input.desfecho,
       from_stage_id: (lead as { stage_id: string }).stage_id,
       to_stage_id: (stage as { id: string }).id,

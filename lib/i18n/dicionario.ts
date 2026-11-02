@@ -11930,6 +11930,19 @@ export const DICIONARIO: Traducoes = {
   "Não foi possível excluir: o contato ainda tem registros vinculados.": {
     es: "No se pudo eliminar el contacto: todavía tiene registros vinculados.",
   },
+  // ia.vek v1.9.12: estoque no lead.
+  "Carro indisponível": { es: "Coche no disponible" },
+  "{carro} saiu do estoque": { es: "{carro} salió del inventario" },
+  "Um carro": { es: "Un coche" },
+  "Dados da venda": { es: "Datos de la venta" },
+  "Informe quanto o carro foi vendido e em que dia. É isso que entra nos relatórios.": { es: "Indica en cuánto se vendió el coche y en qué día. Eso es lo que entra en los informes." },
+  "Valor final (R$)": { es: "Valor final (R$)" },
+  "Data da venda": { es: "Fecha de la venta" },
+  "Confirmar venda": { es: "Confirmar venta" },
+  "O valor acompanha o preço do carro no estoque.": { es: "El valor sigue el precio del coche en el inventario." },
+  "Informe o valor final e a data da venda.": { es: "Indica el valor final y la fecha de la venta." },
+  "A data da venda não pode ser no futuro.": { es: "La fecha de la venta no puede estar en el futuro." },
+  "A venda pede o valor final e a data: marque pelo cartão do lead, no Pipeline.": { es: "La venta pide el valor final y la fecha: márcala desde la tarjeta del lead, en el Pipeline." },
   // ia.vek v1.9.11: desde a 0598 só gerente+ apaga conversa.
   "Só gerente ou admin exclui um contato que já tem conversa.": { es: "Solo un gerente o administrador elimina un contacto que ya tiene conversación." },
 
