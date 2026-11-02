@@ -190,6 +190,25 @@ describe("deleteContactHandler", () => {
     });
   });
 
+  it("ia.vek (0598): FK das conversas = quem chama não apaga conversa → 403 com o motivo", async () => {
+    // Gerente vê e apaga todas as conversas; só quem NÃO pode chega nesta FK.
+    const { deleteContactHandler } = await import("@/app/api/v1/contacts/_handler");
+    await expect(
+      deleteContactHandler(
+        clienteFalso({
+          rpcErro: {
+            code: "23503",
+            message: 'update or delete on table "contacts" violates foreign key constraint "conversations_contact_id_fkey" on table "conversations"',
+          },
+        }) as never,
+        ctxFalso(),
+        CONTATO,
+      ),
+    ).rejects.toMatchObject({ status: 403, code: "forbidden_role", details: { motivo: "conversa_so_gerente" } });
+    expect(chamadas).toEqual([]);
+    expect(ultimaAuditoria()).toMatchObject({ action: "contact.delete_blocked", metadata: { motivo: "falha_ao_apagar" } });
+  });
+
   it("erro que não é RESTRICT vira 500, ainda sem tocar em tabela", async () => {
     const { deleteContactHandler } = await import("@/app/api/v1/contacts/_handler");
     await expect(

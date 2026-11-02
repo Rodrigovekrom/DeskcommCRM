@@ -51,6 +51,11 @@ export function useDeleteContact() {
       apiClient.delete<unknown>(`/api/v1/contacts/${contactId}`),
     onError: (err) => {
       if (err instanceof ApiError && toastDeBloqueioPorVinculo(err)) return;
+      // ia.vek (0598): contato com conversa só sai pelas mãos de gerente/admin.
+      if (err instanceof ApiError && err.details?.motivo === "conversa_so_gerente") {
+        toast.warning(traduzir("Só gerente ou admin exclui um contato que já tem conversa.", idiomaAtual()));
+        return;
+      }
       showApiError(err);
     },
     onSuccess: () => {

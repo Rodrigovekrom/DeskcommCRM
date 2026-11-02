@@ -969,7 +969,7 @@ export async function deleteContactHandler(
       throw new ApiError(
         403,
         "forbidden_role",
-        undefined,
+        { motivo: "conversa_so_gerente" },
         ctx.requestId,
         traduzir("Só gerente ou admin exclui um contato que já tem conversa.", ctx.idioma ?? "pt-BR"),
       );
