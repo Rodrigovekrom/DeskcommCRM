@@ -120,6 +120,13 @@ export interface OrderRow {
 }
 
 /** ia.vek v1.8.4: o texto da nota do atendimento que cita o titular (o que a anonimização apaga). */
+/** ia.vek v1.9.13: o que a equipe orientou a IA sobre este atendimento (0601). */
+export interface OrientacaoDaIaRow {
+  id: string;
+  texto: string;
+  criada_em: string;
+}
+
 export interface NotaDoAtendimentoRow {
   id: string;
   trecho: string | null;
@@ -669,6 +676,7 @@ export interface ExportPayload {
   /** ia.vek v1.7.6 — opcional: payloads antigos (e os PDFs de teste) não o trazem. */
   pedidos_de_agendamento?: PedidoDeAgendamentoRow[];
   notas_de_atendimento?: NotaDoAtendimentoRow[];
+  orientacoes_da_ia?: OrientacaoDaIaRow[];
   /** ia.vek v1.7.8 — opcional, como os pedidos: só aparece quando há ficha. */
   fichas_de_credito?: FichaDeCreditoRow[];
   checkpoints: CheckpointRow[];
@@ -1445,6 +1453,28 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     } else if (data) {
       conferirTeto("notas_de_atendimento", data, 500);
       notasDeAtendimento = data;
+    }
+  }
+
+  // ia.vek v1.9.13: orientações à IA — contact_id direto. O texto que a anonimização
+  // zera é o que o titular recebe aqui.
+  let orientacoesDaIa: OrientacaoDaIaRow[] = [];
+  if (contactId) {
+    const { data, error } = await admin
+      .from("iavek_orientacoes_da_ia")
+      .select("id, texto, criada_em")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .order("criada_em", { ascending: false })
+      .limit(500);
+    if (error) {
+      logger.warn("[lgpd-export-worker] orientações à IA load failed", {
+        request_id: requestId,
+        error: error.message,
+      });
+    } else if (data) {
+      conferirTeto("orientacoes_da_ia", data, 500);
+      orientacoesDaIa = data;
     }
   }
 
@@ -2356,6 +2386,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     // Só aparece quando há pedido: o data.json de quem não tem fica igual ao de antes.
     ...(pedidosDeAgendamento.length > 0 ? { pedidos_de_agendamento: pedidosDeAgendamento } : {}),
     ...(notasDeAtendimento.length > 0 ? { notas_de_atendimento: notasDeAtendimento } : {}),
+    ...(orientacoesDaIa.length > 0 ? { orientacoes_da_ia: orientacoesDaIa } : {}),
     ...(fichasDeCredito.length > 0 ? { fichas_de_credito: fichasDeCredito } : {}),
     checkpoints,
     appointments,

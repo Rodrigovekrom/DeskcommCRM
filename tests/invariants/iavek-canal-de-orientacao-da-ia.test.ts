@@ -79,9 +79,12 @@ describe("0601 — o canal de orientação da IA", () => {
   });
 
   it("LGPD: anonimizar zera o texto da orientação", () => {
-    sql(`update public.contacts set is_anonymized = true where id='${CONTATO}';`);
-    expect(lastLine(sql(`select count(*) from public.iavek_orientacoes_da_ia where contact_id='${CONTATO}' and texto <> '[redigido]';`))).toBe("0");
-    sql(`update public.contacts set is_anonymized = false where id='${CONTATO}';`);
+    const C2 = `${N}011`; const V2 = `${N}012`;
+    sql(`insert into public.contacts (id, organization_id, display_name) values ('${C2}', '${GOV_ORG}', 'Contato 0601 B') on conflict (id) do nothing;
+         insert into public.conversations (id, organization_id, contact_id, channel_session_id, status) values ('${V2}', '${GOV_ORG}', '${C2}', '${GOV_SESSION}', 'open') on conflict (id) do nothing;
+         insert into public.iavek_orientacoes_da_ia (organization_id, conversation_id, contact_id, texto) values ('${GOV_ORG}', '${V2}', '${C2}', 'cita o cliente');`);
+    sql(`update public.contacts set is_anonymized = true, anonymized_at = now() where id='${C2}';`);
+    expect(lastLine(sql(`select texto from public.iavek_orientacoes_da_ia where contact_id='${C2}';`))).toBe("[redigido]");
   });
 
   it("sem ninguém no Suporte IA, os admins; e kind de fora não avisa", () => {
