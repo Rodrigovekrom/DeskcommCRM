@@ -235,8 +235,18 @@ async function recusaPessoalNaEscrita(
  */
 function recusaDaGuardaDoBanco(
   ctx: HandlerCtx,
-  erro: { code?: string } | null,
+  erro: { code?: string; message?: string } | null,
 ): ApiError | null {
+  // ia.vek v1.9.12 (0600): lead que nasceria vendido, sem valor e data.
+  if (erro?.message?.startsWith("venda_incompleta")) {
+    return new ApiError(
+      422,
+      "venda_incompleta",
+      undefined,
+      ctx.requestId,
+      traduzir("Informe o valor final e a data da venda.", ctx.idioma ?? "pt-BR"),
+    );
+  }
   if (erro?.code === "PT404") {
     return new ApiError(
       404,

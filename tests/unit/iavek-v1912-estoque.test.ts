@@ -30,7 +30,7 @@ describe("v1.9.12 — a frase do aviso", () => {
 
 describe("v1.9.12 — a recusa do banco vira recusa de negócio", () => {
   it("venda_incompleta é 422 legível, e não 500", () => {
-    expect(recusaDeMotivoDaPerdaPeloBanco({ code: "PT422", message: "venda_incompleta: informe" }, "pt-BR")).toMatchObject({ codigo: "venda_incompleta" });
+    expect(recusaDeMotivoDaPerdaPeloBanco({ code: "P0001", message: "venda_incompleta: informe" }, "pt-BR")).toMatchObject({ codigo: "venda_incompleta" });
   });
 });
 

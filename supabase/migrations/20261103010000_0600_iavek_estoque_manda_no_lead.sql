@@ -237,10 +237,15 @@ begin
                   where p.organization_id = new.organization_id and p.origem = 'altimus') then
     return new;
   end if;
+  -- Só perfil loja de carros: ausente vale como loja (`lerPerfilDaEmpresa`).
+  if coalesce((select o.settings->'iavek'->'perfil'->>'nicho' from public.organizations o
+                where o.id = new.organization_id), 'loja_de_carros') <> 'loja_de_carros' then
+    return new;
+  end if;
   if coalesce(new.value_cents, 0) <= 0
      or new.closed_at is null
      or (tg_op = 'UPDATE' and new.closed_at is not distinct from old.closed_at) then
-    raise exception 'venda_incompleta: informe o valor final e a data da venda' using errcode = 'PT422';
+    raise exception 'venda_incompleta: informe o valor final e a data da venda';
   end if;
   return new;
 end;
