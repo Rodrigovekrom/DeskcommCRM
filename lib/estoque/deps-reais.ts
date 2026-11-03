@@ -1,7 +1,7 @@
 import { BUCKET_DAS_FOTOS } from "@/lib/catalogo/fotos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ORIGEM_ALTIMUS, PREFIXO_DO_CODIGO, type ProdutoDoEstoque } from "./altimus";
-import type { DepsDaSincronizacao, ProdutoGravado } from "./sincronizar";
+import { MAXIMO_DE_AVISOS_SEPARADOS, type DepsDaSincronizacao, type ProdutoGravado } from "./sincronizar";
 
 /**
  * As dependências REAIS da sincronização do estoque (ia.vek D2): o feed por
@@ -132,8 +132,17 @@ export function depsReais(
               .eq("ativo", false)
               .is("aviso_da_loja_em", null);
             if (error) throw new Error("carros não lidos");
+            const pendentes = (data ?? []).map((c) => c.id as string);
+            if (pendentes.length > MAXIMO_DE_AVISOS_SEPARADOS) {
+              const { error: erroDoResumo } = await admin.rpc("fn_iavek_aviso_resumido_da_loja", {
+                p_org: orgId,
+                p_carros: pendentes,
+              });
+              if (erroDoResumo) throw new Error("aviso não gravado");
+              return pendentes.length;
+            }
             let avisados = 0;
-            for (const { id } of data ?? []) {
+            for (const id of pendentes) {
               const { error: erroDoAviso } = await admin.rpc("fn_iavek_aviso_da_loja", {
                 p_org: orgId,
                 p_evento: "carro_saiu",

@@ -74,6 +74,34 @@ describe("0600 — o estoque manda no lead aberto", () => {
     expect(aviso("carro_saiu")).toBe(membros);
   });
 
+  it("feed parcial: um aviso resumido, só com a quantidade, e todos os carimbos", () => {
+    const CARROS = [`${N}011`, `${N}012`, `${N}013`];
+    sql(CARROS.map((id, i) => `insert into public.catalog_products (id, organization_id, codigo, nome, preco_cents, moeda, origem, ativo)
+      values ('${id}', '${GOV_ORG}', 'ALT-06${i}', 'Carro ${i}', 100, 'BRL', 'altimus', false) on conflict (id) do nothing;`).join("\n"));
+    const lista = `array[${CARROS.map((c) => `'${c}'`).join(",")}]::uuid[]`;
+    const membros = Number(lastLine(sql(`select public.fn_iavek_aviso_resumido_da_loja('${GOV_ORG}', ${lista});`)));
+    expect(membros).toBeGreaterThan(0);
+    expect(lastLine(sql(`select public.fn_iavek_aviso_resumido_da_loja('${GOV_ORG}', ${lista});`))).toBe("0");
+    expect(lastLine(sql(`select count(*) from public.catalog_products where id = any(${lista}) and aviso_da_loja_em is not null;`))).toBe("3");
+    expect(lastLine(sql(`select count(*) || '|' || min(dados->>'quantidade') from public.notificacoes
+      where tipo = 'aviso_da_loja' and dados->>'evento' = 'carros_sairam' and organization_id = '${GOV_ORG}';`))).toBe(`${membros}|3`);
+  });
+
+  it("na dona do estoque, nenhum caminho vende sem valor e data; reabrir e reordenar passam", () => {
+    const LEAD2 = `${N}021`;
+    sql(`insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, value_cents, position_in_stage)
+      values ('${LEAD2}', '${GOV_ORG}', '${FUNIL}', '${ABERTA}', 'Lead 2', 500, 2) on conflict (id) do nothing;`);
+    expect(() => sql(`update public.crm_leads set stage_id = '${VENDIDO}' where id = '${LEAD2}';`)).toThrow(/venda_incompleta/);
+    expect(() => sql(`update public.crm_leads set stage_id = '${VENDIDO}', closed_at = now(), value_cents = 0 where id = '${LEAD2}';`)).toThrow(/venda_incompleta/);
+    expect(() => sql(`insert into public.crm_leads (organization_id, pipeline_id, stage_id, title, position_in_stage)
+      values ('${GOV_ORG}', '${FUNIL}', '${VENDIDO}', 'Nasce vendido', 3);`)).toThrow(/venda_incompleta/);
+    sql(`update public.crm_leads set stage_id = '${VENDIDO}', closed_at = now() where id = '${LEAD2}';`);
+    expect(lastLine(sql(`select status from public.crm_leads where id = '${LEAD2}';`))).toBe("won");
+    sql(`update public.crm_leads set position_in_stage = 9 where id = '${LEAD2}';`);
+    sql(`update public.crm_leads set stage_id = '${ABERTA}' where id = '${LEAD2}';`);
+    expect(lastLine(sql(`select status from public.crm_leads where id = '${LEAD2}';`))).toBe("open");
+  });
+
   it("sessão de usuário não dispara o aviso", () => {
     expect(() =>
       sql(`set role authenticated; select public.fn_iavek_aviso_da_loja('${GOV_ORG}', 'carro_saiu', '${CARRO}');`),

@@ -24,6 +24,12 @@ import {
  */
 export const TETO_DE_FOTOS_POR_RODADA = 80;
 
+/**
+ * ia.vek v1.9.12: acima disto, os carros pendentes viram UM aviso resumido. Protege
+ * do feed parcial: se o Altimus omitir dezenas de carros, ninguém leva dezenas de avisos.
+ */
+export const MAXIMO_DE_AVISOS_SEPARADOS = 5;
+
 export interface ProdutoGravado {
   id: string;
   codigo: string;

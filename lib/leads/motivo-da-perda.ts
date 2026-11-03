@@ -201,13 +201,21 @@ export function recusaDeMotivoDaPerdaPeloBanco(
   erro: { code?: string | null; message?: string | null } | null | undefined,
   idioma?: Idioma | null,
 ): {
-  codigo: "lost_reason_required" | "lost_reason_invalid" | "iavek_campos_obrigatorios";
+  codigo: "lost_reason_required" | "lost_reason_invalid" | "iavek_campos_obrigatorios" | "venda_incompleta";
   mensagem: string;
   /** ia.vek v1.8.3: os rótulos do que falta, para a tela abrir a janela da trava. */
   faltam?: string[];
 } | null {
   const codigo = erro?.code ?? "";
   const texto = erro?.message ?? "";
+
+  // ia.vek v1.9.12 (0600): venda sem valor e data, na organização dona do estoque.
+  if (texto.startsWith("venda_incompleta")) {
+    return {
+      codigo: "venda_incompleta",
+      mensagem: traduzir("Informe o valor final e a data da venda.", idioma ?? IDIOMA_PADRAO),
+    };
+  }
 
   // ia.vek v1.8.2 (0590): a trava dos campos obrigatórios ao mover. A mensagem
   // do banco já diz o que falta ("Faltam campos obrigatórios: …").

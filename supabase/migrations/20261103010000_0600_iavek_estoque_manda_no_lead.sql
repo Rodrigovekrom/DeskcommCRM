@@ -19,7 +19,7 @@
 -- estoque começa um ciclo novo. Por isso um aviso futuro de "vendido" entra sem
 -- retrabalho e sem um segundo aviso quando o carro depois sai do Altimus.
 --
--- ADITIVA: 2 colunas, 2 funções de gatilho, 1 função de aviso e 1 tipo de aviso.
+-- ADITIVA: 2 colunas, 4 funções de gatilho, 2 funções de aviso e 1 tipo de aviso.
 -- Dados: os leads abertos passam a ter o valor do carro (regra 1), e os carros que
 -- JÁ estão fora do estoque ganham o carimbo, para não avisar o passado.
 
@@ -178,6 +178,79 @@ end;
 $$;
 revoke execute on function public.fn_iavek_aviso_da_loja(uuid, text, uuid, uuid) from public, anon, authenticated;
 grant execute on function public.fn_iavek_aviso_da_loja(uuid, text, uuid, uuid) to service_role;
+
+-- Feed parcial: quando muitos carros saem na mesma rodada, UM aviso resumido a
+-- todos, só com a quantidade. Os carimbos saem iguais, e os selos não mudam.
+create or replace function public.fn_iavek_aviso_resumido_da_loja(
+  p_org uuid,
+  p_carros uuid[]
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_carros integer;
+  v_avisados integer;
+begin
+  update public.catalog_products
+     set aviso_da_loja_em = now()
+   where id = any(p_carros)
+     and organization_id = p_org
+     and aviso_da_loja_em is null;
+  get diagnostics v_carros = row_count;
+  if v_carros = 0 then
+    return 0;
+  end if;
+  insert into public.notificacoes (organization_id, user_id, tipo, dados)
+  select p_org, uo.user_id, 'aviso_da_loja',
+         jsonb_build_object('evento', 'carros_sairam', 'quantidade', v_carros)
+    from public.user_organizations uo
+   where uo.organization_id = p_org
+     and uo.revoked_at is null
+     and uo.accepted_at is not null;
+  get diagnostics v_avisados = row_count;
+  return v_avisados;
+end;
+$$;
+revoke execute on function public.fn_iavek_aviso_resumido_da_loja(uuid, uuid[]) from public, anon, authenticated;
+grant execute on function public.fn_iavek_aviso_resumido_da_loja(uuid, uuid[]) to service_role;
+
+-- Na organização dona do estoque, nenhum caminho vende sem valor e data: a janela
+-- é da tela, e esta é a garantia dos demais (MCP, follow-up, ligação, automação,
+-- API direta). Roda ANTES de `trg_crm_lead_close_on_stage`, que preencheria a data.
+create or replace function public.fn_iavek_venda_exige_dados()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if tg_op = 'UPDATE' and (new.stage_id is not distinct from old.stage_id or old.status = 'won') then
+    return new;
+  end if;
+  if not exists (select 1 from public.crm_stages s where s.id = new.stage_id and s.is_won) then
+    return new;
+  end if;
+  if not exists (select 1 from public.catalog_products p
+                  where p.organization_id = new.organization_id and p.origem = 'altimus') then
+    return new;
+  end if;
+  if coalesce(new.value_cents, 0) <= 0
+     or new.closed_at is null
+     or (tg_op = 'UPDATE' and new.closed_at is not distinct from old.closed_at) then
+    raise exception 'venda_incompleta: informe o valor final e a data da venda' using errcode = 'PT422';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.fn_iavek_venda_exige_dados() from public, anon, authenticated;
+
+drop trigger if exists trg_a_iavek_venda_exige_dados on public.crm_leads;
+create trigger trg_a_iavek_venda_exige_dados
+  before insert or update of stage_id on public.crm_leads
+  for each row execute function public.fn_iavek_venda_exige_dados();
 
 -- O que já está fora do estoque não vira aviso: só o que sair daqui em diante.
 update public.catalog_products

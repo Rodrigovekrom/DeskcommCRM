@@ -101,6 +101,9 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
       );
     // ia.vek v1.9.12: aviso a toda a loja, só com o carro (nunca lead nem cliente).
     case "aviso_da_loja":
+      if (n.dados.evento === "carros_sairam") {
+        return t("{n} carros saíram do estoque").replace("{n}", String(n.dados.quantidade ?? "—"));
+      }
       return t("{carro} saiu do estoque").replace("{carro}", String(n.dados.carro_nome ?? t("Um carro")));
     default:
       return quem;

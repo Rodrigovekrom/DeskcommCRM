@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { PREFIXO_DO_CODIGO } from "@/lib/estoque/altimus";
-import { sincronizarEstoque, rodadaTeveEfeito, type DepsDaSincronizacao } from "@/lib/estoque/sincronizar";
+import { MAXIMO_DE_AVISOS_SEPARADOS, sincronizarEstoque, rodadaTeveEfeito, type DepsDaSincronizacao } from "@/lib/estoque/sincronizar";
+import { fraseDaNotificacao } from "@/components/shell/SinoPessoal";
+import { recusaDeMotivoDaPerdaPeloBanco } from "@/lib/leads/motivo-da-perda";
 import {
   PREFIXO_DO_CARRO_DO_ESTOQUE,
   carroIndisponivel,
@@ -14,6 +16,23 @@ const ID = "69278c77-0000-4000-8000-000000000001";
 const produto = (extra = {}) => ({ id: ID, codigo: "ALT-1", preco_cents: 8_000_000, ativo: true, ...extra });
 // 02/11/2026 às 23h30 em São Paulo já é 03/11 em UTC.
 const AGORA = new Date("2026-11-03T02:30:00Z");
+
+describe("v1.9.12 — a frase do aviso", () => {
+  const base = { id: "1", tipo: "aviso_da_loja", lida: false, created_at: "", lead_id: null, lead_titulo: null, contato_nome: null, tarefa_titulo: null, ator_nome: null, conversation_id: null };
+  it("um carro diz qual; o resumo só diz quantos", () => {
+    expect(fraseDaNotificacao({ ...base, dados: { evento: "carro_saiu", carro_nome: "Onix" } }, (s) => s)).toBe("Onix saiu do estoque");
+    expect(fraseDaNotificacao({ ...base, dados: { evento: "carros_sairam", quantidade: 6 } }, (s) => s)).toBe("6 carros saíram do estoque");
+  });
+  it("o limite do resumo é 5", () => {
+    expect(MAXIMO_DE_AVISOS_SEPARADOS).toBe(5);
+  });
+});
+
+describe("v1.9.12 — a recusa do banco vira recusa de negócio", () => {
+  it("venda_incompleta é 422 legível, e não 500", () => {
+    expect(recusaDeMotivoDaPerdaPeloBanco({ code: "PT422", message: "venda_incompleta: informe" }, "pt-BR")).toMatchObject({ codigo: "venda_incompleta" });
+  });
+});
 
 describe("v1.9.12 — a venda da loja de carros", () => {
   it("a data de hoje é a da loja, não a de UTC", () => {

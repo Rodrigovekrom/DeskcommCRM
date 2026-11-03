@@ -11933,6 +11933,7 @@ export const DICIONARIO: Traducoes = {
   // ia.vek v1.9.12: estoque no lead.
   "Carro indisponível": { es: "Coche no disponible" },
   "{carro} saiu do estoque": { es: "{carro} salió del inventario" },
+  "{n} carros saíram do estoque": { es: "{n} coches salieron del inventario" },
   "Um carro": { es: "Un coche" },
   "Dados da venda": { es: "Datos de la venta" },
   "Informe quanto o carro foi vendido e em que dia. É isso que entra nos relatórios.": { es: "Indica en cuánto se vendió el coche y en qué día. Eso es lo que entra en los informes." },

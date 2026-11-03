@@ -7136,6 +7136,7 @@
   "Não foi possível excluir: o contato ainda tem registros vinculados.": "Couldn't delete: the contact still has linked records.",
   "Carro indisponível": "Car unavailable",
   "{carro} saiu do estoque": "{carro} left the stock",
+  "{n} carros saíram do estoque": "{n} cars left the stock",
   "Um carro": "A car",
   "Dados da venda": "Sale details",
   "Informe quanto o carro foi vendido e em que dia. É isso que entra nos relatórios.": "Enter how much the car sold for and on which day. This is what goes into the reports.",
