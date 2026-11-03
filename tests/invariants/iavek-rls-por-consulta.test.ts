@@ -27,6 +27,15 @@ describe("0602 — RLS de tarefas, atividades e notas por consulta", () => {
     ).toThrow(/row-level security/);
   });
 
+  it("0603: auditoria, tokens e convites sem regra 'para tudo' nem função por linha", () => {
+    for (const t of ["api_tokens", "team_invites"]) {
+      expect(lastLine(sql(`select count(*) from pg_policies where schemaname='public' and tablename='${t}' and cmd='ALL';`))).toBe("0");
+    }
+    for (const t of ["api_audit_log", "api_tokens", "team_invites"]) {
+      expect(qual(t, "SELECT")).not.toMatch(/fn_role_at_least\(organization_id/);
+    }
+  });
+
   it("a função de conjunto não fica exposta a anônimo", () => {
     expect(lastLine(sql(`select has_function_privilege('anon','public.fn_iavek_orgs_com_papel(text)','execute');`))).toBe("f");
   });

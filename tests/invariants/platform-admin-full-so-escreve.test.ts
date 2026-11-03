@@ -129,7 +129,10 @@ const CONTACT_PROBE_0529 = "cccccccc-2115-4000-8000-00000000000b";
 
 /** As 11 policies da fatia — `[tabela, policy]`, na ordem do issue. */
 const FATIA_1: ReadonlyArray<readonly [string, string]> = [
-  ["team_invites", "team_invites_write"],
+  // ia.vek 0603: a de escrita virou uma por operação.
+  ["team_invites", "team_invites_insert"],
+  ["team_invites", "team_invites_update"],
+  ["team_invites", "team_invites_delete"],
   ["messages", "messages_insert"],
   ["messages", "messages_update"],
   ["messages", "messages_delete"],

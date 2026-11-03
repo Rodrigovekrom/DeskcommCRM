@@ -4041,12 +4041,6 @@ ALTER TABLE "public"."api_audit_log" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."api_tokens" ENABLE ROW LEVEL SECURITY;
 
 
-DO $baseline_guard$ BEGIN
-IF NOT EXISTS (SELECT 1 FROM pg_policy
-                WHERE polname = 'api_tokens_tenant_read' AND polrelid = '"public"."api_tokens"'::regclass) THEN
-CREATE POLICY "api_tokens_tenant_read" ON "public"."api_tokens" FOR SELECT USING (("public"."fn_role_at_least"("organization_id", 'admin'::"text") OR "public"."fn_is_platform_admin"()));
-CREATE POLICY "api_tokens_admin_write" ON "public"."api_tokens" FOR ALL USING (("public"."fn_role_at_least"("organization_id", 'admin'::"text") OR "public"."fn_is_platform_admin_full"())) WITH CHECK (("public"."fn_role_at_least"("organization_id", 'admin'::"text") OR "public"."fn_is_platform_admin_full"()));
-END IF; END $baseline_guard$;
 
 
 
@@ -4058,11 +4052,6 @@ END IF; END $baseline_guard$;
 
 
 
-DO $baseline_guard$ BEGIN
-IF NOT EXISTS (SELECT 1 FROM pg_policy
-                WHERE polname = 'audit_log_select' AND polrelid = '"public"."api_audit_log"'::regclass) THEN
-CREATE POLICY "audit_log_select" ON "public"."api_audit_log" FOR SELECT USING (("public"."fn_is_platform_admin"() OR (("organization_id" IN ( SELECT "public"."fn_user_org_ids"() AS "fn_user_org_ids")) AND "public"."fn_role_at_least"("organization_id", 'admin'::"text"))));
-END IF; END $baseline_guard$;
 
 
 
@@ -24061,25 +24050,8 @@ create unique index if not exists team_invites_um_pendente_por_email_idx
 alter table public.team_invites enable row level security;
 
 drop policy if exists team_invites_select on public.team_invites;
-create policy team_invites_select on public.team_invites
-  for select using (
-    public.fn_is_platform_admin()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'manager'))
-  );
 
 drop policy if exists team_invites_write on public.team_invites;
-create policy team_invites_write on public.team_invites
-  using (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'admin'))
-  )
-  with check (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'admin'))
-  );
 
 revoke all on public.team_invites from anon;
 grant select, insert, update, delete on public.team_invites to authenticated;
@@ -47883,6 +47855,73 @@ alter table public.iavek_notas_reservas enable row level security;
 revoke all on table public.iavek_notas_reservas from anon, authenticated;
 grant all on table public.iavek_notas_reservas to service_role;
 
+-- ---- RLS de auditoria, tokens e convites por consulta (migration 0603) ----
+-- Corpo e porquê: a migration 0603.
+drop policy if exists "audit_log_select" on public.api_audit_log;
+create policy "audit_log_select" on public.api_audit_log
+  for select using (
+    (select public.fn_is_platform_admin())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+  );
+
+drop policy if exists "api_tokens_tenant_read" on public.api_tokens;
+create policy "api_tokens_tenant_read" on public.api_tokens
+  for select using (
+    organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+    or (select public.fn_is_platform_admin())
+  );
+drop policy if exists "api_tokens_admin_write" on public.api_tokens;
+drop policy if exists "api_tokens_insert" on public.api_tokens;
+create policy "api_tokens_insert" on public.api_tokens
+  for insert with check (
+    organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+    or (select public.fn_is_platform_admin_full())
+  );
+drop policy if exists "api_tokens_update" on public.api_tokens;
+create policy "api_tokens_update" on public.api_tokens
+  for update using (
+    organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+    or (select public.fn_is_platform_admin_full())
+  ) with check (
+    organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+    or (select public.fn_is_platform_admin_full())
+  );
+drop policy if exists "api_tokens_delete" on public.api_tokens;
+create policy "api_tokens_delete" on public.api_tokens
+  for delete using (
+    organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+    or (select public.fn_is_platform_admin_full())
+  );
+
+drop policy if exists team_invites_select on public.team_invites;
+create policy team_invites_select on public.team_invites
+  for select using (
+    (select public.fn_is_platform_admin())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('manager'))
+  );
+drop policy if exists team_invites_write on public.team_invites;
+drop policy if exists team_invites_insert on public.team_invites;
+create policy team_invites_insert on public.team_invites
+  for insert with check (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+  );
+drop policy if exists team_invites_update on public.team_invites;
+create policy team_invites_update on public.team_invites
+  for update using (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+  ) with check (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+  );
+drop policy if exists team_invites_delete on public.team_invites;
+create policy team_invites_delete on public.team_invites
+  for delete using (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+  );
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -48681,10 +48720,6 @@ do $f$ begin perform public.fn_proteger_tabelas_de_organizacao(); end $f$;
 -- — support_readonly segue lendo, só não escreve mais.
 
 drop policy if exists "api_tokens_admin_only" on "public"."api_tokens";
-drop policy if exists "api_tokens_tenant_read" on "public"."api_tokens";
-create policy "api_tokens_tenant_read" on "public"."api_tokens" for select using (public.fn_role_at_least("organization_id",'admin') or public.fn_is_platform_admin());
-drop policy if exists "api_tokens_admin_write" on "public"."api_tokens";
-create policy "api_tokens_admin_write" on "public"."api_tokens" for all using (public.fn_role_at_least("organization_id",'admin') or public.fn_is_platform_admin_full()) with check (public.fn_role_at_least("organization_id",'admin') or public.fn_is_platform_admin_full());
 
 drop policy if exists "nuvemshop_products_tenant" on "public"."nuvemshop_products";
 drop policy if exists "nuvemshop_products_read" on "public"."nuvemshop_products";
