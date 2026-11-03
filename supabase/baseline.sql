@@ -6399,14 +6399,7 @@ drop policy if exists "tenant_isolation_crm_lead_activities_insert" on public.cr
 drop policy if exists "crm_lead_activities_select" on public.crm_lead_activities;
 drop policy if exists "crm_lead_activities_insert" on public.crm_lead_activities;
 
-create policy "crm_lead_activities_select" on public.crm_lead_activities
-  for select using (
-    exists (
-      select 1 from public.crm_leads l
-      where l.id = crm_lead_activities.lead_id
-        and public.fn_can_view_lead(l.organization_id, l.owner_user_id)
-    )
-  );
+-- (a regra crm_lead_activities_select mora no bloco da migration 0602, mais abaixo)
 
 create policy "crm_lead_activities_insert" on public.crm_lead_activities
   for insert with check (
@@ -18353,23 +18346,10 @@ create index if not exists crm_tasks_lead_idx
 alter table public.crm_tasks enable row level security;
 
 drop policy if exists crm_tasks_select on public.crm_tasks;
-create policy crm_tasks_select on public.crm_tasks
-  for select using (
-    (organization_id in (select public.fn_user_org_ids())) or public.fn_is_platform_admin()
-  );
+-- (a regra crm_tasks_select mora no bloco da migration 0602, mais abaixo)
 
 drop policy if exists crm_tasks_write on public.crm_tasks;
-create policy crm_tasks_write on public.crm_tasks
-  using (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
-  )
-  with check (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and public.fn_role_at_least(organization_id, 'agent'))
-  );
+-- (a regra crm_tasks_write mora no bloco da migration 0602, mais abaixo)
 
 -- `ALTER DEFAULT PRIVILEGES ... GRANT ALL ON TABLES TO anon` do baseline alcança
 -- TODA tabela criada depois dele — inclusive esta. Sem o revoke, as tarefas da
@@ -47032,10 +47012,7 @@ alter table public.iavek_notas_de_atendimento enable row level security;
 -- Quem lê: gerente e admin da organização. O vendedor NÃO lê (nem a própria —
 -- chave futura do Rodrigo). Quem escreve: só o servidor (worker, service_role).
 drop policy if exists iavek_notas_de_atendimento_select on public.iavek_notas_de_atendimento;
-create policy iavek_notas_de_atendimento_select on public.iavek_notas_de_atendimento
-  for select to authenticated
-  using (organization_id in (select public.fn_user_org_ids())
-         and public.fn_role_at_least(organization_id, 'manager'));
+-- (a regra notas mora no bloco da migration 0602, mais abaixo)
 
 revoke all on table public.iavek_notas_de_atendimento from anon, authenticated;
 grant select on table public.iavek_notas_de_atendimento to authenticated;
@@ -47829,6 +47806,82 @@ create trigger trg_iavek_trava_pela_sugestao
   for each row
   when (new.status = 'failed' and old.status is distinct from 'failed')
   execute function public.fn_iavek_trava_pela_sugestao();
+
+-- ---- RLS de tarefas, atividades e notas por consulta; reserva da avaliação (migration 0602) ----
+-- Corpo e porquê: a migration 0602. Cria função: entra ANTES da VARREDURA anon.
+-- As organizações em que quem chama tem pelo menos este papel. Uma vez por consulta.
+create or replace function public.fn_iavek_orgs_com_papel(p_min text)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select x.org from public.fn_user_org_ids() as x(org) where public.fn_role_at_least(x.org, p_min);
+$$;
+revoke execute on function public.fn_iavek_orgs_com_papel(text) from public, anon;
+grant execute on function public.fn_iavek_orgs_com_papel(text) to authenticated, service_role;
+
+-- Tarefas: a de escrita sai de "para tudo" e vira uma por operação.
+drop policy if exists crm_tasks_select on public.crm_tasks;
+create policy crm_tasks_select on public.crm_tasks
+  for select using (
+    organization_id in (select public.fn_user_org_ids()) or (select public.fn_is_platform_admin())
+  );
+drop policy if exists crm_tasks_write on public.crm_tasks;
+drop policy if exists crm_tasks_insert on public.crm_tasks;
+create policy crm_tasks_insert on public.crm_tasks
+  for insert with check (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
+  );
+drop policy if exists crm_tasks_update on public.crm_tasks;
+create policy crm_tasks_update on public.crm_tasks
+  for update using (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
+  ) with check (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
+  );
+drop policy if exists crm_tasks_delete on public.crm_tasks;
+create policy crm_tasks_delete on public.crm_tasks
+  for delete using (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
+  );
+
+-- Atividades: o mesmo que fn_can_view_lead, em conjunto (fn_iavek_visao_de_conversas).
+drop policy if exists "crm_lead_activities_select" on public.crm_lead_activities;
+create policy "crm_lead_activities_select" on public.crm_lead_activities
+  for select using (
+    exists (
+      select 1 from public.crm_leads l
+       where l.id = crm_lead_activities.lead_id
+         and ((select public.fn_is_platform_admin())
+              or l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_tudo)
+              or (l.owner_user_id = (select auth.uid())
+                  and l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v))
+              or (l.owner_user_id is null
+                  and l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_sem_dono)))
+    )
+  );
+
+-- Notas do atendimento: gerente e admin, em conjunto.
+drop policy if exists iavek_notas_de_atendimento_select on public.iavek_notas_de_atendimento;
+create policy iavek_notas_de_atendimento_select on public.iavek_notas_de_atendimento
+  for select to authenticated
+  using (organization_id in (select public.fn_iavek_orgs_com_papel('manager')));
+
+-- A reserva da avaliação: quem reserva chama a IA; o outro espera a nota aparecer.
+create table if not exists public.iavek_notas_reservas (
+  event_id uuid primary key,
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  criada_em timestamptz not null default now()
+);
+alter table public.iavek_notas_reservas enable row level security;
+revoke all on table public.iavek_notas_reservas from anon, authenticated;
+grant all on table public.iavek_notas_reservas to service_role;
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --

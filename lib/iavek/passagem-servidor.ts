@@ -272,7 +272,9 @@ export async function reativarLead(
   lead: LeadDaPassagem,
   args: { atorId: string | null; motivo: string },
 ): Promise<{ ok: true; novoLeadId: string; para: string | null } | { ok: false; erro: string }> {
-  const { data: org } = await admin.from("organizations").select("settings").eq("id", lead.organization_id).maybeSingle();
+  const { data: org, error: erroDaOrg } = await admin.from("organizations").select("settings").eq("id", lead.organization_id).maybeSingle();
+  // ia.vek v1.9.14: erro de leitura não é "sem funil": dizia que a reativação não tinha para onde ir.
+  if (erroDaOrg) return { ok: false, erro: "leitura_da_organizacao" };
   const entrada = entradaDaEsteira((org as { settings?: unknown } | null)?.settings);
   if (!entrada) return { ok: false, erro: "sem_funil_de_entrada" };
   const { data: funil } = await admin

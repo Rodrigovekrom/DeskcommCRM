@@ -108,14 +108,14 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       const metadata = { ...(clone.source_metadata ?? {}), esteira_inicio: lead.inicio };
       // v1.9.4 (Rodrigo, 27/10): no follow-up o dono é o GUARDIÃO (o SDR), não o
       // vendedor que estava com o lead. O clone herda o guardião (gatilho 0579).
-      const { data: comGuardiao } = await admin
+      const { data: comGuardiao, error: erroDoGuardiao } = await admin
         .from("crm_leads")
         .select("sdr_user_id")
         .eq("organization_id", orgId)
         .eq("id", clone.id)
         .maybeSingle();
       const guardiao = (comGuardiao as { sdr_user_id: string | null } | null)?.sdr_user_id ?? null;
-      await admin
+      const { error: erroDoClone } = await admin
         .from("crm_leads")
         .update({
           source_metadata: metadata,
@@ -123,6 +123,14 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         })
         .eq("organization_id", orgId)
         .eq("id", clone.id);
+      // ia.vek v1.9.14: o lead já passou; sem isto ficava sem dono e sem relógio em silêncio.
+      if (erroDoGuardiao || erroDoClone) {
+        logger.error("esteira_followup_incompleto", {
+          organization_id: orgId,
+          lead_id: clone.id,
+          erro: (erroDoGuardiao ?? erroDoClone)?.message,
+        });
+      }
       if (guardiao) clone.owner_user_id = guardiao;
 
       // A conversa passa para a equipe (SDR): o MESMO handoff da IA — silencia,

@@ -58,6 +58,7 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
   const fechadoPor = (event.payload?.["closed_by_user_id"] as string | undefined) ?? null;
   if (!conversationId) return { status: "skipped", reason: "sem_conversa" };
 
+  let reservou = false;
   try {
     const admin = createAdminClient();
 
@@ -93,13 +94,15 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
     if (conv.is_group) return { status: "skipped", reason: "grupo" };
 
     // O atendimento: desde a última nota desta conversa.
-    const { data: ultima } = await admin
+    const { data: ultima, error: erroDaUltima } = await admin
       .from("iavek_notas_de_atendimento")
       .select("ate")
       .eq("organization_id", orgId)
       .eq("conversation_id", conversationId)
       .order("ate", { ascending: false })
       .limit(1);
+    // ia.vek v1.9.14: sem saber da nota anterior, reavaliaria a conversa inteira (e pagaria).
+    if (erroDaUltima) return { status: "error", reason: `leitura_da_ultima_nota: ${erroDaUltima.message}` };
     const desde = ((ultima ?? [])[0] as { ate: string } | undefined)?.ate ?? null;
 
     let consulta = admin
@@ -168,6 +171,22 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
     ]
       .filter((l, i) => l !== "" || i === 2)
       .join("\n");
+
+    // ia.vek v1.9.14: a reserva. Duas rodadas do mesmo evento não chamam a IA duas vezes.
+    // Reserva de quem morreu no meio (mais de 10 min) não prende a próxima.
+    await admin
+      .from("iavek_notas_reservas")
+      .delete()
+      .eq("event_id", event.id)
+      .lt("criada_em", new Date(Date.now() - 10 * 60_000).toISOString());
+    const { error: erroDaReserva } = await admin
+      .from("iavek_notas_reservas")
+      .insert({ event_id: event.id, organization_id: orgId });
+    if (erroDaReserva) {
+      if (erroDaReserva.code === "23505") return { status: "skipped", reason: "avaliacao_em_andamento" };
+      return { status: "error", reason: `reserva: ${erroDaReserva.message}` };
+    }
+    reservou = true;
 
     const inicio = Date.now();
     const abortar = new AbortController();
@@ -272,6 +291,15 @@ export async function avaliarAtendimento(event: EventRow): Promise<DesfechoDaNot
       causa: err instanceof Error ? err.message : String(err),
     });
     return { status: "error", reason: err instanceof Error ? err.message.slice(0, 200) : "erro" };
+  } finally {
+    // Com a nota gravada, a guarda de cima já barra a repetição; sem ela, pode tentar de novo.
+    if (reservou) {
+      await createAdminClient()
+        .from("iavek_notas_reservas")
+        .delete()
+        .eq("event_id", event.id)
+        .then(undefined, () => undefined);
+    }
   }
 }
 

@@ -29,6 +29,7 @@ import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { createClient } from "@/lib/supabase/server";
 import { idsDeContatosPessoais } from "@/app/api/v1/conversations/_handler";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
+import { todasAsPaginas } from "@/lib/supabase/paginas";
 import type { Lead } from "@/lib/types/leads";
 import { etapaDoLado, ladoDaFuncao, lerLados } from "@/lib/iavek/lados-do-funil";
 
@@ -462,22 +463,27 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   // as etapas e, para o SDR, a carteira são os leads de que ele é dono OU
   // guardião. A função vem do vínculo desta organização.
   const lado = soMinhaCarteira ? await ladoDeQuemPede(supabase, pipelineId, user.id) : null;
-  let consultaDeLeads = supabase
-    .from("crm_leads")
-    .select("*")
-    .eq("pipeline_id", pipelineId)
-    .neq("status", "archived");
-  if (soMinhaCarteira) {
-    consultaDeLeads =
-      lado === "sdr"
-        ? consultaDeLeads.or(`owner_user_id.eq.${user.id},sdr_user_id.eq.${user.id}`)
-        : consultaDeLeads.eq("owner_user_id", user.id);
-  }
+  // ia.vek v1.9.14: o quadro lê em páginas. Sem isso, acima do teto de linhas do
+  // servidor os últimos cartões somem da tela sem aviso nenhum. Ordem estável com `id`.
+  const paginaDeLeads = (de: number, ate: number) => {
+    let consultaDeLeads = supabase
+      .from("crm_leads")
+      .select("*")
+      .eq("pipeline_id", pipelineId)
+      .neq("status", "archived");
+    if (soMinhaCarteira) {
+      consultaDeLeads =
+        lado === "sdr"
+          ? consultaDeLeads.or(`owner_user_id.eq.${user.id},sdr_user_id.eq.${user.id}`)
+          : consultaDeLeads.eq("owner_user_id", user.id);
+    }
+    return consultaDeLeads.order("position_in_stage").order("id").range(de, ate);
+  };
 
   const [
     { data: pipeline, error: pipelineErr },
     { data: stages, error: stagesErr },
-    { data: leads, error: leadsErr },
+    { leads, leadsErr },
   ] = await Promise.all([
     supabase.from("crm_pipelines").select("*").eq("id", pipelineId).maybeSingle(),
     supabase
@@ -486,7 +492,10 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
       .eq("pipeline_id", pipelineId)
       .eq("is_archived", false)
       .order("position"),
-    consultaDeLeads.order("position_in_stage"),
+    todasAsPaginas<Lead>(paginaDeLeads as never).then(
+      (lidos) => ({ leads: lidos, leadsErr: null as { message: string } | null }),
+      (erro: unknown) => ({ leads: [] as Lead[], leadsErr: { message: erro instanceof Error ? erro.message : String(erro) } }),
+    ),
   ]);
 
   if (pipelineErr) return fail("internal_error", pipelineErr.message, 500, { requestId });

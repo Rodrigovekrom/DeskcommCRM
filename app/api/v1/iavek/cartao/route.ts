@@ -14,6 +14,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { objetivosDosLeads, pessoasDosLeads } from "@/lib/iavek/responsavel-do-lead";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { todasAsPaginas } from "@/lib/supabase/paginas";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -24,15 +25,24 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (!authz.ok) return authz.response;
   const funil = req.nextUrl.searchParams.get("pipeline_id") ?? "";
   if (!z.uuid().safeParse(funil).success) return fail("validation_failed", "pipeline_id", 422, { requestId });
-  const { data, error } = await (await createClient())
-    .from("crm_leads")
-    .select("id, owner_user_id, sdr_user_id")
-    .eq("organization_id", authz.org.orgId)
-    .eq("pipeline_id", funil)
-    .eq("status", "open")
-    .limit(1000);
-  if (error) return fail("internal_error", error.message, 500, { requestId });
-  const leads = (data ?? []) as Array<{ id: string; owner_user_id: string | null; sdr_user_id: string | null }>;
+  const sessao = await createClient();
+  // ia.vek v1.9.14: em páginas. Com corte em 1000, o cartão além do corte ficava sem responsável.
+  type LinhaDoCartao = { id: string; owner_user_id: string | null; sdr_user_id: string | null };
+  let leads: LinhaDoCartao[];
+  try {
+    leads = await todasAsPaginas<LinhaDoCartao>((de, ate) =>
+      sessao
+        .from("crm_leads")
+        .select("id, owner_user_id, sdr_user_id")
+        .eq("organization_id", authz.org.orgId)
+        .eq("pipeline_id", funil)
+        .eq("status", "open")
+        .order("id")
+        .range(de, ate) as never,
+    );
+  } catch (erro) {
+    return fail("internal_error", erro instanceof Error ? erro.message : String(erro), 500, { requestId });
+  }
   const admin = createAdminClient();
   const [pessoas, objetivos] = await Promise.all([
     pessoasDosLeads(

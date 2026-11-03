@@ -23,6 +23,7 @@ import { FUNCOES, funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
   atrasosPorPessoa,
   limitesDoDia,
+  type AtrasoDaTarefa,
   perdasPorMotivo,
   porPrazo,
   tarefasPorPessoa,
@@ -30,6 +31,7 @@ import {
 import { SOURCE_KIND_PROXIMO_PASSO } from "@/lib/iavek/proximo-passo";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { todasAsPaginas } from "@/lib/supabase/paginas";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 
@@ -37,6 +39,15 @@ export const dynamic = "force-dynamic";
 
 const querySchema = z.object({ funcao: z.enum(FUNCOES) });
 const DIA = 86_400_000;
+
+/** `todasAsPaginas` no formato `{ data, error }`, que o `Promise.all` abaixo confere. */
+async function emPaginas<T>(pagina: (de: number, ate: number) => unknown) {
+  try {
+    return { data: await todasAsPaginas<T>(pagina as never), error: null };
+  } catch (erro) {
+    return { data: [] as T[], error: { message: erro instanceof Error ? erro.message : String(erro) } };
+  }
+}
 const CONTATO = "contacts(name, display_name, phone_number)";
 const TAREFA = `id, title, due_date, status, source_kind, contact_id, lead_id, assigned_to, ${CONTATO}`;
 
@@ -328,13 +339,18 @@ export async function GET(req: NextRequest): Promise<Response> {
         .gte("created_at", inicio.toISOString())
         .lt("created_at", fim.toISOString()),
       leadsComPrazo(500),
-      supabase
-        .from("crm_tasks")
-        .select("assigned_to, source_kind")
-        .eq("organization_id", orgId)
-        .in("status", ["pending", "in_progress"])
-        .lt("due_date", agora.toISOString())
-        .limit(1000),
+      // ia.vek v1.9.14: as tarefas em páginas. Com corte em 1000, a contagem por pessoa
+      // e a lista paravam de crescer sem aviso (a loja ganha ~70 tarefas por dia).
+      emPaginas<AtrasoDaTarefa>((de, ate) =>
+        supabase
+          .from("crm_tasks")
+          .select("assigned_to, source_kind")
+          .eq("organization_id", orgId)
+          .in("status", ["pending", "in_progress"])
+          .lt("due_date", agora.toISOString())
+          .order("id")
+          .range(de, ate),
+      ),
       supabase
         .from("calendar_appointments")
         .select("id", { count: "exact", head: true })
@@ -376,13 +392,16 @@ export async function GET(req: NextRequest): Promise<Response> {
         .eq("is_group", false)
         .not("assigned_to_user_id", "is", null),
       // v1.7.5: as tarefas da equipe — todas as abertas e as feitas em 7 dias.
-      supabase
-        .from("crm_tasks")
-        .select(TAREFA)
-        .eq("organization_id", orgId)
-        .in("status", ["pending", "in_progress"])
-        .order("due_date", { ascending: true, nullsFirst: false })
-        .limit(1000),
+      emPaginas((de, ate) =>
+        supabase
+          .from("crm_tasks")
+          .select(TAREFA)
+          .eq("organization_id", orgId)
+          .in("status", ["pending", "in_progress"])
+          .order("due_date", { ascending: true, nullsFirst: false })
+          .order("id")
+          .range(de, ate),
+      ),
       supabase
         .from("crm_tasks")
         .select(TAREFA)

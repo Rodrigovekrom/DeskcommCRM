@@ -81,6 +81,11 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "tests/invariants/iavek-preferencias-de-tela.test.ts — ia.vek 0587: por JWT, o vendedor grava e lê só a própria linha; o colega da MESMA organização lê zero e não altera; ninguém grava com user_id alheio; quem é de OUTRA organização lê zero e não grava na nossa.",
   },
   {
+    tabela: "iavek_notas_reservas",
+    razao:
+      "ia.vek 0602: RLS ligada e NENHUMA policy nem GRANT para a sessão; só o worker usa, pela chave de serviço.",
+  },
+  {
     tabela: "iavek_orientacoes_da_ia",
     razao:
       "tests/invariants/iavek-canal-de-orientacao-da-ia.test.ts — ia.vek 0601: por JWT, a autora lê as suas, gerente lê todas e a sessão não grava direto.",
