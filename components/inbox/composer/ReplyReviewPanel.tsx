@@ -48,6 +48,45 @@ export function ReplyReviewPanel({
   // uma sugestão rejeitada ficava na tela para sempre, sem botão de fechar.
   const draft = sugestaoParaMostrar(query.data?.data.drafts);
   const body = draft ? (edits[draft.id] ?? draft.edited_body ?? draft.original_body ?? "") : "";
+  // ia.vek v1.9.13: orientar a IA. Só aparece com o canal ligado, para quem pode.
+  const chaveDoCanal = ["orientar-ia", conversationId];
+  const { data: canal } = useQuery({
+    queryKey: chaveDoCanal,
+    queryFn: () =>
+      apiClient
+        .get<{ data: { pode: boolean; orientacoes: Array<{ id: string; texto: string }> } }>(
+          `/api/v1/conversations/${conversationId}/orientar-ia`,
+        )
+        .then((r) => r.data),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const [orientacao, setOrientacao] = useState("");
+  const [avisoDoCanal, setAvisoDoCanal] = useState<string | null>(null);
+  async function orientar() {
+    setBusy(true);
+    setAvisoDoCanal(null);
+    try {
+      const r = await apiClient.post<{ data: { sugestao: boolean; motivo?: string } }>(
+        `/api/v1/conversations/${conversationId}/orientar-ia`,
+        { texto: orientacao.trim() },
+      );
+      setOrientacao("");
+      setAvisoDoCanal(
+        r.data.sugestao
+          ? t("Orientação guardada. A IA escreveu a resposta abaixo.")
+          : `${t("Orientação guardada, mas a IA não escreveu a resposta.")} ${r.data.motivo ?? ""}`,
+      );
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: chaveDoCanal }),
+        qc.invalidateQueries({ queryKey: key }),
+      ]);
+    } catch (e) {
+      showApiError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function generate() {
     setNotice(null);
     setBusy(true);
@@ -123,6 +162,40 @@ export function ReplyReviewPanel({
           {t(busy ? "Preparando…" : "Sugerir resposta")}
         </Button>
       </div>
+      {canal?.pode && (
+        <div className="space-y-2" data-testid="orientar-a-ia">
+          <div className="flex gap-2">
+            <Input
+              aria-label={t("Orientar a IA")}
+              placeholder={t("Orientar a IA: diga o que ela deve fazer. Quem escreve ao cliente é ela.")}
+              value={orientacao}
+              onChange={(e) => setOrientacao(e.target.value)}
+              maxLength={1000}
+              disabled={disabled || busy}
+            />
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled || busy || !orientacao.trim()}
+              onClick={orientar}
+            >
+              {t("Orientar")}
+            </Button>
+          </div>
+          {avisoDoCanal && (
+            <p role="status" className="text-xs" data-testid="orientar-a-ia-aviso">
+              {avisoDoCanal}
+            </p>
+          )}
+          {canal.orientacoes.length > 0 && (
+            <ul className="space-y-1 text-xs text-muted-foreground" data-testid="orientacoes-da-conversa">
+              {canal.orientacoes.map((o) => (
+                <li key={o.id}>· {o.texto}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {draft && (
         <>
           <p className="text-xs text-muted-foreground">

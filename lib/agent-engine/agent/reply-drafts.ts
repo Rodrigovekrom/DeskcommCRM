@@ -3,6 +3,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { loadConversationAgentConfig, type PublishedAgentConfig } from "./agent-config";
 import { getLeadContext } from "../edge/crm/get-lead-context";
+import { blocoDeOrientacoes } from "@/lib/iavek/canal-da-ia";
 import { fusoDaOrganizacao } from "./fuso-da-org";
 import { latestCheckpoint, runAgentPreview, type InboundTurnDeps } from "./inbound-turn";
 import { newPreviewResult } from "./preview";
@@ -87,6 +88,12 @@ export async function generateReplyDraft(
         "select feedback from ai_reply_drafts where organization_id=$1 and conversation_id=$2 and service_boundary=$3 and feedback is not null order by updated_at desc limit 3",
         [input.organizationId, input.conversationId, boundary],
       );
+      // ia.vek v1.9.13: as orientações DESTA conversa (0601), as mais novas primeiro.
+      const { rows: orientacoes } = await pool.query<{ texto: string }>(
+        "select texto from iavek_orientacoes_da_ia where organization_id=$1 and conversation_id=$2 order by criada_em desc limit 5",
+        [input.organizationId, input.conversationId],
+      );
+      const blocoDaEquipe = blocoDeOrientacoes(orientacoes.map((o) => o.texto));
       const result = newPreviewResult();
       await runAgentPreview(deps, pool, {
         kind: "assisted",
@@ -96,7 +103,7 @@ export async function generateReplyDraft(
         context,
         previous: await latestCheckpoint(pool, input.organizationId, input.contactId),
         notes,
-        feedback: JSON.stringify(feedback.map((r) => r.feedback)),
+        feedback: [JSON.stringify(feedback.map((r) => r.feedback)), blocoDaEquipe].filter(Boolean).join("\n\n"),
         contactId: input.contactId,
         channelId: input.channelId,
         result,

@@ -327,6 +327,25 @@ export async function completarRedacaoDoContato(
   // anonimização pela LGPD espera que o dado saia de todo lugar onde o sistema
   // o guardou — a memória da IA guarda dado pessoal, então é parte do expurgo.
   //
+  // ia.vek v1.9.13 (0601): a orientação da equipe pode citar o cliente. O texto sai;
+  // a linha fica, para a contagem da revisão. Só o que ainda não foi redigido: a
+  // segunda passada não encontra linha e não grava nada.
+  const { data: orientacaoData, error: orientacaoSelErr } = await db
+    .from("iavek_orientacoes_da_ia")
+    .select("id, texto")
+    .eq("organization_id", contato.organizationId)
+    .eq("contact_id", contato.id);
+  if (orientacaoSelErr) falhas.push(`iavek_orientacoes_da_ia select: ${orientacaoSelErr.message}`);
+  for (const o of (orientacaoData ?? []) as { id: string; texto: string }[]) {
+    if (o.texto === NOTA_REDIGIDA) continue;
+    const { error } = await db
+      .from("iavek_orientacoes_da_ia")
+      .update({ texto: NOTA_REDIGIDA })
+      .eq("organization_id", contato.organizationId)
+      .eq("id", o.id);
+    if (error) falhas.push(`iavek_orientacoes_da_ia update: ${error.message}`);
+  }
+
   // SELECT antes do UPDATE, como no passo 3 e pelo mesmo motivo: em regime as
   // notas já estão redigidas, e reescrever seria gravar sobre dado certo em
   // O marcador de "já redigida" é o próprio `NOTA_REDIGIDA`

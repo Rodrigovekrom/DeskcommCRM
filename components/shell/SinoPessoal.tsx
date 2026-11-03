@@ -99,6 +99,9 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
         "{when}",
         quandoDoAviso(n.dados.quando),
       );
+    // ia.vek v1.9.13: a IA travou, com o motivo (o canal de orientação, 0601).
+    case "ia_travou":
+      return troca("A IA travou em {lead}: {reason}");
     // ia.vek v1.9.12: aviso a toda a loja, só com o carro (nunca lead nem cliente).
     case "aviso_da_loja":
       if (n.dados.evento === "carros_sairam") {
@@ -190,7 +193,9 @@ export function SinoPessoal() {
               // ia.vek v1.7.6: aviso de proposta abre a proposta; de pedido de
               // agendamento abre o Meu dia (onde o admin confirma).
               const href =
-                typeof n.dados.proposta_id === "string"
+                typeof n.dados.conversa_id === "string"
+                  ? `/app/inbox?id=${n.dados.conversa_id}`
+                  : typeof n.dados.proposta_id === "string"
                   ? `/app/proposals/${n.dados.proposta_id}`
                   : typeof n.dados.pedido_id === "string"
                     ? "/app/meu-dia"

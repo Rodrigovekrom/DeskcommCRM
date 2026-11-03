@@ -6,6 +6,7 @@ import { normalizarIdioma } from "@/lib/i18n/idiomas";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { moedaServidaOu } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
+import { CanalDaIaConfig } from "@/components/iavek/CanalDaIaConfig";
 import { AltimusDaOrganizacao } from "./_altimus";
 import { ZonaDePerigoDaOrganizacao } from "./_danger-zone";
 import { TenantForm } from "./_form";
@@ -88,6 +89,9 @@ export default async function TenantSettingsPage() {
         />
       )}
       {row && <AltimusDaOrganizacao />}
+      {row && (activeOrg.role === "admin" || activeOrg.role === "manager") && (
+        <CanalDaIaConfig ehAdmin={activeOrg.role === "admin"} />
+      )}
       {row && <ZonaDePerigoDaOrganizacao displayName={row.display_name} />}
     </div>
   );

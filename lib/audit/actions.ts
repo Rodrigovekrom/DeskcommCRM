@@ -730,6 +730,10 @@ export const AUDIT_ACTIONS = [
   // ia.vek D2: a rodada de sincronização do estoque do Altimus que mudou o catálogo
   // (criou, atualizou, desativou, baixou foto ou registrou erro). Rodada sem efeito não audita.
   "catalog.estoque_altimus_sincronizado",
+  // ia.vek v1.9.13: o canal de orientação da IA (0601).
+  "ai_orientation.created",
+  "ai_orientation.reviewed",
+  "settings.canal_ia_changed",
 
   // As tarefas do CRM (migration 0210). Tarefa é combinado de trabalho entre
   // pessoas do time — quem a criou, quem mudou o prazo e quem a apagou é

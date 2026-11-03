@@ -1,3 +1,4 @@
+import { blocoDeOrientacoes } from '@/lib/iavek/canal-da-ia';
 import { prospectingConversationContext } from "@/lib/prospecting/context";
 import { setExecutionAgentOperation } from '@/lib/atendimento/fronteira-server';
 import { TIPOS_DE_CASO, TIPOS_DE_CASO_PARA_A_IA } from "@/lib/ai/case-copy";
@@ -4461,6 +4462,21 @@ async function executarTurnoDoAgente(
     // ponto só cobre os três — e alcança de carona a chamada de fechamento, que
     // reusa `openingTextOnly` e é onde nasce o `prazo` ISO da declaração.
     const agoraBlock = renderAgora(clock(), fusoDaOrg);
+    // ia.vek v1.9.13: no modo automático ("depois sai direto"), a orientação da
+    // equipe (0601) segue valendo nesta conversa. No assistido ela vem no rascunho.
+    // Só lê; uma falha aqui não atrapalha o turno.
+    let orientacoesDaEquipe = '';
+    if (!preview) {
+      try {
+        const { rows } = await pool.query<{ texto: string }>(
+          'select texto from iavek_orientacoes_da_ia where organization_id=$1 and conversation_id=$2 order by criada_em desc limit 5',
+          [tenantId, input.conversationId],
+        );
+        orientacoesDaEquipe = blocoDeOrientacoes((rows ?? []).map((o) => o.texto));
+      } catch {
+        orientacoesDaEquipe = '';
+      }
+    }
     const openingSuffixes = [
       agoraBlock,
       blocoComercial,
@@ -4470,6 +4486,7 @@ async function executarTurnoDoAgente(
       caseAwaitingLeadBlock,
       roteiro?.bloco ?? '',
       preview?.feedback ? '## Revisão humana deste atendimento\n' + preview.feedback : '',
+      orientacoesDaEquipe,
     ].filter((b) => b !== '');
     const openingText =
       openingSuffixes.length === 0
