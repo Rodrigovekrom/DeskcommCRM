@@ -342,7 +342,10 @@ const FATIA_2: ReadonlyArray<readonly [string, string]> = [
   ["crm_lead_links", "crm_lead_links_update"],
   ["crm_pipelines", "crm_pipelines_manager_write"],
   ["crm_stages", "crm_stages_manager_write"],
-  ["crm_tasks", "crm_tasks_write"],
+  // ia.vek 0602: a de escrita virou uma por operação, para não rodar na leitura.
+  ["crm_tasks", "crm_tasks_insert"],
+  ["crm_tasks", "crm_tasks_update"],
+  ["crm_tasks", "crm_tasks_delete"],
   ["honorarios_contratos", "honorarios_contratos_delete"],
   ["honorarios_contratos", "honorarios_contratos_insert"],
   ["honorarios_contratos", "honorarios_contratos_update"],
