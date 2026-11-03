@@ -281,6 +281,11 @@ const DECISOES: Record<string, Decisao> = {
     caminho: "gatilho",
     razao: "ia.vek 0586: a ficha de crédito guarda CPF, RG, renda e endereço em `dados` e o motivo da analista em texto livre — zerados na virada de is_anonymized pelo gatilho fn_iavek_redigir_fichas_ao_anonimizar, que também manda os documentos para storage_redaction_queue e apaga as linhas de iavek_ficha_documentos. Status e datas ficam (operação da loja).",
   },
+  iavek_orientacoes_da_ia: {
+    decidida: "redigir",
+    caminho: "gatilho",
+    razao: "ia.vek 0601: a orientação é texto livre da equipe e pode citar o cliente — zerada na virada de is_anonymized pelo gatilho fn_iavek_redigir_orientacoes_ao_anonimizar; a linha fica, sem o texto, para a revisão.",
+  },
   iavek_notas_de_atendimento: {
     decidida: "redigir",
     caminho: "gatilho",

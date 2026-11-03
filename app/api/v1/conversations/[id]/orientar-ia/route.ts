@@ -67,7 +67,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   if (error) {
     if (error.message.includes("canal_desligado"))
       return fail("canal_desligado", t("O canal de orientação da IA está desligado nesta empresa."), 409, { requestId });
-    if (error.message.includes("orientacao_sem_permissao"))
+    if (error.message.includes("orientacao_sem_permissao") || error.message.includes("caller_not_authorized_for_org"))
       return fail("forbidden_role", t("Só Suporte IA, gerente ou admin orientam a IA."), 403, { requestId });
     return fail("internal_error", error.message, 500, { requestId });
   }

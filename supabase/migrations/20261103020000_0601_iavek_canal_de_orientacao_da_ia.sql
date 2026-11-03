@@ -80,8 +80,8 @@ as $$
   select coalesce((select (o.settings->'iavek'->'canal_orientacao_ia'->>'ativo') = 'true'
                      from public.organizations o where o.id = p_org), false);
 $$;
-revoke execute on function public.fn_iavek_canal_da_ia_ativo(uuid) from public, anon;
-grant execute on function public.fn_iavek_canal_da_ia_ativo(uuid) to authenticated, service_role;
+revoke execute on function public.fn_iavek_canal_da_ia_ativo(uuid) from public, anon, authenticated;
+grant execute on function public.fn_iavek_canal_da_ia_ativo(uuid) to service_role;
 
 -- Orientar: guarda e invalida a sugestão atual (a conversa mudou), na mesma
 -- transação. Quem orienta: Suporte IA, gerente e admin.
@@ -97,13 +97,14 @@ declare
   v_id uuid;
 begin
   if auth.uid() is null or p_org not in (select public.fn_user_org_ids()) then
-    raise exception 'orientacao_sem_permissao' using errcode = '42501';
+    raise exception 'caller_not_authorized_for_org' using errcode = '42501';
   end if;
   if not public.fn_iavek_canal_da_ia_ativo(p_org) then
     raise exception 'canal_desligado' using errcode = '42501';
   end if;
-  if not (public.fn_role_at_least(p_org, 'manager')
-          or (public.fn_role_at_least(p_org, 'agent') and public.fn_iavek_funcao_na_org(p_org) = 'suporte')) then
+  -- coalesce: sem função, a comparação dá NULL, e `not NULL` deixaria passar.
+  if not coalesce(public.fn_role_at_least(p_org, 'manager')
+          or (public.fn_role_at_least(p_org, 'agent') and public.fn_iavek_funcao_na_org(p_org) = 'suporte'), false) then
     raise exception 'orientacao_sem_permissao' using errcode = '42501';
   end if;
   if not public.fn_support_write_allowed(p_org) then
@@ -135,7 +136,10 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if auth.uid() is null or not public.fn_role_at_least(p_org, 'manager') or not public.fn_support_write_allowed(p_org) then
+  if auth.uid() is null or p_org not in (select public.fn_user_org_ids()) then
+    raise exception 'caller_not_authorized_for_org' using errcode = '42501';
+  end if;
+  if not public.fn_role_at_least(p_org, 'manager') or not public.fn_support_write_allowed(p_org) then
     raise exception 'orientacao_sem_permissao' using errcode = '42501';
   end if;
   update public.iavek_orientacoes_da_ia
@@ -146,6 +150,30 @@ end;
 $$;
 revoke execute on function public.fn_iavek_revisar_orientacao(uuid, uuid, text) from public, anon;
 grant execute on function public.fn_iavek_revisar_orientacao(uuid, uuid, text) to authenticated;
+
+-- LGPD: a orientação é texto livre da equipe e pode citar o cliente. Zerada na virada
+-- de is_anonymized, como as outras tabelas ia.vek; a linha fica para a revisão contar.
+create or replace function public.fn_iavek_redigir_orientacoes_ao_anonimizar()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.iavek_orientacoes_da_ia
+     set texto = '[redigido]'
+   where organization_id = new.organization_id and contact_id = new.id and texto <> '[redigido]';
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_redigir_orientacoes_ao_anonimizar() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_redigir_orientacoes_ao_anonimizar on public.contacts;
+create trigger trg_iavek_redigir_orientacoes_ao_anonimizar
+  after update of is_anonymized on public.contacts
+  for each row
+  when (new.is_anonymized and not coalesce(old.is_anonymized, false))
+  execute function public.fn_iavek_redigir_orientacoes_ao_anonimizar();
 
 -- O sino: quem é do Suporte IA; sem ninguém nessa função, os admins. Um aviso por
 -- conversa e motivo enquanto o anterior não foi lido.

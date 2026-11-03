@@ -67,6 +67,19 @@ const ANON_PERMITIDO: readonly Excecao[] = [];
  */
 const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
   {
+    fn: "fn_iavek_orientar_ia(uuid,uuid,text)",
+    razao:
+      "ia.vek 0601: POST app/api/v1/conversations/[id]/orientar-ia/route.ts usa a sessão. " +
+      "Definer porque a tabela não dá escrita à sessão e porque sobe a revisão da conversa na " +
+      "mesma transação. Confere organização, papel/função, conversa visível e a chave da empresa.",
+  },
+  {
+    fn: "fn_iavek_revisar_orientacao(uuid,uuid,text)",
+    razao:
+      "ia.vek 0601: PATCH app/api/v1/iavek/orientacoes/[id]/route.ts usa a sessão. Definer porque " +
+      "a tabela não dá escrita à sessão. Confere organização e papel de gerente; só grava a revisão.",
+  },
+  {
     fn: "fn_honorarios_parcela_pagar(uuid,uuid,uuid,uuid)",
     razao:
       "POST app/api/v1/honorarios/parcelas/[id]/pagar/route.ts usa createClient da " +

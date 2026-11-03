@@ -78,6 +78,12 @@ describe("0601 — o canal de orientação da IA", () => {
     expect(avisos(`and user_id='${GOV_AGENT_A}'`)).toBe(2);
   });
 
+  it("LGPD: anonimizar zera o texto da orientação", () => {
+    sql(`update public.contacts set is_anonymized = true where id='${CONTATO}';`);
+    expect(lastLine(sql(`select count(*) from public.iavek_orientacoes_da_ia where contact_id='${CONTATO}' and texto <> '[redigido]';`))).toBe("0");
+    sql(`update public.contacts set is_anonymized = false where id='${CONTATO}';`);
+  });
+
   it("sem ninguém no Suporte IA, os admins; e kind de fora não avisa", () => {
     funcao(GOV_AGENT_A, null);
     sql(`delete from public.notificacoes where tipo='ia_travou' and organization_id='${GOV_ORG}';`);
