@@ -19,7 +19,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { requireRole } from "@/lib/auth/require-role";
 import { capacidadePorHorario } from "@/lib/iavek/capacidade-da-agenda";
 import { cronometroDoLead, entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
-import { FUNCOES, funcaoDaTela } from "@/lib/iavek/funcoes";
+import { FUNCOES, funcaoDaTela, podePedirODia } from "@/lib/iavek/funcoes";
 import {
   atrasosPorPessoa,
   limitesDoDia,
@@ -99,6 +99,10 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (!parsed.success) return fail("validation_failed", "Função inválida.", 422, { requestId });
   // v1.7.5: "apoio" é apelido de gerente — o dia é o do gerente.
   const funcao = funcaoDaTela(parsed.data.funcao) ?? parsed.data.funcao;
+  const administra = authz.org.role === "admin" || (authz.user.is_platform_admin && !authz.user.support);
+  if (!podePedirODia(funcao, { funcao: authz.org.interface_settings?.funcao, role: authz.org.role, administra })) {
+    return fail("forbidden_role", "Sem permissão para esta visão.", 403, { requestId });
+  }
 
   const orgId = authz.org.orgId;
   const eu = authz.user.id;

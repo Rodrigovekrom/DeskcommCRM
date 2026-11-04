@@ -1,3 +1,5 @@
+import { ROLE_RANK } from "@/lib/auth/types";
+
 /**
  * ia.vek v1.6: a FUNÇÃO de quem trabalha na loja (SDR, vendedor, gerente).
  *
@@ -190,4 +192,32 @@ export function veEspacoDaIa(
 ): boolean {
   if (funcaoDaTela(funcao)) return funcao === "suporte";
   return platform || role === "admin";
+}
+
+/** O dia que é da própria pessoa: o da função gravada; sem função, conforme o papel. */
+export function funcaoDoDia(funcao: unknown, role: string | null | undefined): Funcao {
+  const daTela = funcaoDaTela(funcao); // "apoio" → "gerente" (v1.7.5)
+  if (daTela) return daTela;
+  const rank = role ? (ROLE_RANK as Record<string, number>)[role] : undefined;
+  return rank !== undefined && rank >= ROLE_RANK.manager ? "gerente" : "vendedor";
+}
+
+/**
+ * ia.vek v1.9.17: quem pode pedir o dia de qual função. Quem administra escolhe qualquer
+ * uma (o "Ver como"); os demais, a própria.
+ */
+export function podePedirODia(
+  pedida: unknown,
+  quem: { funcao: unknown; role: string | null | undefined; administra: boolean },
+): boolean {
+  const alvo = funcaoDaTela(pedida);
+  if (!alvo) return false;
+  return quem.administra || alvo === funcaoDoDia(quem.funcao, quem.role);
+}
+
+/** ia.vek v1.9.17: a tela de Tarefas segue o menu da função, para quem atende. */
+export function abreATelaDeTarefas(funcao: unknown, role: string | null | undefined, administra: boolean): boolean {
+  if (administra || role !== "agent") return true;
+  const f = funcaoDaTela(funcao);
+  return !f || DESTINOS_DA_FUNCAO[f].includes("/app/tasks");
 }

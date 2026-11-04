@@ -36,6 +36,16 @@ describe("0602 — RLS de tarefas, atividades e notas por consulta", () => {
     }
   });
 
+  it("0604: as regras de tarefas seguem por conjunto, e as funções novas não ficam expostas", () => {
+    for (const cmd of ["SELECT", "UPDATE", "DELETE"]) {
+      expect(qual("crm_tasks", cmd)).not.toMatch(/fn_role_at_least\(organization_id/);
+      expect(qual("crm_tasks", cmd)).toContain("fn_iavek_leads_das_minhas_tarefas");
+    }
+    for (const fn of ["fn_iavek_orgs_com_todas_as_tarefas", "fn_iavek_leads_das_minhas_tarefas"]) {
+      expect(lastLine(sql(`select has_function_privilege('anon','public.${fn}()','execute');`))).toBe("f");
+    }
+  });
+
   it("a função de conjunto não fica exposta a anônimo", () => {
     expect(lastLine(sql(`select has_function_privilege('anon','public.fn_iavek_orgs_com_papel(text)','execute');`))).toBe("f");
   });

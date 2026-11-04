@@ -47795,11 +47795,7 @@ revoke execute on function public.fn_iavek_orgs_com_papel(text) from public, ano
 grant execute on function public.fn_iavek_orgs_com_papel(text) to authenticated, service_role;
 
 -- Tarefas: a de escrita sai de "para tudo" e vira uma por operação.
-drop policy if exists crm_tasks_select on public.crm_tasks;
-create policy crm_tasks_select on public.crm_tasks
-  for select using (
-    organization_id in (select public.fn_user_org_ids()) or (select public.fn_is_platform_admin())
-  );
+-- (a regra crm_tasks_select mora no bloco da migration 0604, mais abaixo)
 drop policy if exists crm_tasks_write on public.crm_tasks;
 drop policy if exists crm_tasks_insert on public.crm_tasks;
 create policy crm_tasks_insert on public.crm_tasks
@@ -47807,21 +47803,8 @@ create policy crm_tasks_insert on public.crm_tasks
     (select public.fn_is_platform_admin_full())
     or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
   );
-drop policy if exists crm_tasks_update on public.crm_tasks;
-create policy crm_tasks_update on public.crm_tasks
-  for update using (
-    (select public.fn_is_platform_admin_full())
-    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
-  ) with check (
-    (select public.fn_is_platform_admin_full())
-    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
-  );
-drop policy if exists crm_tasks_delete on public.crm_tasks;
-create policy crm_tasks_delete on public.crm_tasks
-  for delete using (
-    (select public.fn_is_platform_admin_full())
-    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
-  );
+-- (a regra crm_tasks_update mora no bloco da migration 0604, mais abaixo)
+-- (a regra crm_tasks_delete mora no bloco da migration 0604, mais abaixo)
 
 -- Atividades: o mesmo que fn_can_view_lead, em conjunto (fn_iavek_visao_de_conversas).
 drop policy if exists "crm_lead_activities_select" on public.crm_lead_activities;
@@ -47920,6 +47903,77 @@ create policy team_invites_delete on public.team_invites
   for delete using (
     (select public.fn_is_platform_admin_full())
     or organization_id in (select public.fn_iavek_orgs_com_papel('admin'))
+  );
+
+-- ---- Tarefas por função (migration 0604) ----
+-- Corpo e porquê: a migration 0604. Cria função: entra ANTES da VARREDURA anon.
+create or replace function public.fn_iavek_orgs_com_todas_as_tarefas()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select x.org
+    from public.fn_user_org_ids() as x(org)
+   where not (public.fn_user_role_in_org(x.org) = 'agent'
+              and coalesce(public.fn_iavek_funcao_na_org(x.org), '') in ('vendedor', 'sdr', 'suporte'));
+$$;
+revoke execute on function public.fn_iavek_orgs_com_todas_as_tarefas() from public, anon;
+grant execute on function public.fn_iavek_orgs_com_todas_as_tarefas() to authenticated, service_role;
+
+create or replace function public.fn_iavek_leads_das_minhas_tarefas()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select l.id
+    from public.fn_user_org_ids() as x(org)
+    join public.crm_leads l on l.organization_id = x.org
+   where public.fn_user_role_in_org(x.org) = 'agent'
+     and (l.owner_user_id = auth.uid()
+          or l.sdr_user_id = auth.uid()
+          or (l.owner_user_id is null and public.fn_iavek_funcao_na_org(x.org) = 'suporte'));
+$$;
+revoke execute on function public.fn_iavek_leads_das_minhas_tarefas() from public, anon;
+grant execute on function public.fn_iavek_leads_das_minhas_tarefas() to authenticated, service_role;
+
+drop policy if exists crm_tasks_select on public.crm_tasks;
+create policy crm_tasks_select on public.crm_tasks
+  for select using (
+    (select public.fn_is_platform_admin())
+    or organization_id in (select public.fn_iavek_orgs_com_todas_as_tarefas())
+    or (organization_id in (select public.fn_user_org_ids())
+        and (assigned_to = (select auth.uid())
+             or created_by = (select auth.uid())
+             or lead_id in (select public.fn_iavek_leads_das_minhas_tarefas())))
+  );
+
+drop policy if exists crm_tasks_update on public.crm_tasks;
+create policy crm_tasks_update on public.crm_tasks
+  for update using (
+    (select public.fn_is_platform_admin_full())
+    or (organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
+        and (organization_id in (select public.fn_iavek_orgs_com_todas_as_tarefas())
+             or assigned_to = (select auth.uid())
+             or created_by = (select auth.uid())
+             or lead_id in (select public.fn_iavek_leads_das_minhas_tarefas())))
+  ) with check (
+    (select public.fn_is_platform_admin_full())
+    or organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
+  );
+
+drop policy if exists crm_tasks_delete on public.crm_tasks;
+create policy crm_tasks_delete on public.crm_tasks
+  for delete using (
+    (select public.fn_is_platform_admin_full())
+    or (organization_id in (select public.fn_iavek_orgs_com_papel('agent'))
+        and (organization_id in (select public.fn_iavek_orgs_com_todas_as_tarefas())
+             or assigned_to = (select auth.uid())
+             or created_by = (select auth.uid())
+             or lead_id in (select public.fn_iavek_leads_das_minhas_tarefas())))
   );
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----

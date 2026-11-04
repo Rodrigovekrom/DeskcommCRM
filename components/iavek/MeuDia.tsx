@@ -11,9 +11,8 @@ import { fraseDoDia } from "@/lib/iavek/frase-do-dia";
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
-import { ROLE_RANK } from "@/lib/auth/types";
 import { corDoCronometro, textoDoRestante } from "@/lib/iavek/cronometro-72h";
-import { ROTULO_DA_FUNCAO, funcaoDaTela, type Funcao } from "@/lib/iavek/funcoes";
+import { ROTULO_DA_FUNCAO, funcaoDaTela, funcaoDoDia, type Funcao } from "@/lib/iavek/funcoes";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { SecaoRecolhivel } from "@/components/inbox/SecaoRecolhivel";
@@ -130,12 +129,7 @@ interface TarefaDaEquipe extends Tarefa {
   responsavel_nome: string | null;
 }
 
-export function funcaoDoDia(funcao: unknown, role: string | null | undefined): Funcao {
-  const daTela = funcaoDaTela(funcao); // "apoio" → "gerente" (v1.7.5)
-  if (daTela) return daTela;
-  const rank = role ? (ROLE_RANK as Record<string, number>)[role] : undefined;
-  return rank !== undefined && rank >= ROLE_RANK.manager ? "gerente" : "vendedor";
-}
+export { funcaoDoDia };
 
 export function chaveDoMeuDia(funcao: Funcao) {
   return ["iavek", "meu-dia", funcao] as const;

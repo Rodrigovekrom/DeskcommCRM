@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { abreATelaDeTarefas } from "@/lib/iavek/funcoes";
 
 import { TarefasClient } from "./_components/TarefasClient";
 
@@ -30,6 +31,9 @@ export default async function TarefasPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
+
+  const administra = (user.is_platform_admin && !user.support) || activeOrg.role === "admin";
+  if (!abreATelaDeTarefas(activeOrg.interface_settings?.funcao, activeOrg.role, administra)) redirect("/app/meu-dia");
 
   const podeEditar = (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent;
 
