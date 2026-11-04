@@ -27,6 +27,8 @@ interface AuthCtx {
    * sai com a função escolhida; a função real fica em `funcaoReal`.
    */
   verComo: Funcao | null;
+  /** v1.9.18: já se sabe o "Ver como" lembrado neste navegador. */
+  verComoPronto: boolean;
   definirVerComo: (f: Funcao | null) => void;
   podeVerComo: boolean;
   funcaoReal: Funcao | null;
@@ -50,7 +52,9 @@ export function AuthProvider({
   const podeVerComo = (user.is_platform_admin && !user.support) || activeOrg?.role === "admin";
   const chaveVerComo = `iavek:ver-como:${user.id}:${activeOrg?.orgId ?? "-"}`;
   const [verComo, setVerComo] = useState<Funcao | null>(null);
+  const [verComoPronto, setVerComoPronto] = useState(false);
   useEffect(() => {
+    setVerComoPronto(true);
     if (!podeVerComo) return setVerComo(null);
     try {
       const salvo = window.localStorage.getItem(chaveVerComo);
@@ -138,6 +142,7 @@ export function AuthProvider({
       user,
       activeOrg: orgVista,
       verComo: podeVerComo ? verComo : null,
+      verComoPronto,
       definirVerComo,
       podeVerComo,
       funcaoReal,
@@ -149,7 +154,7 @@ export function AuthProvider({
         await signOut();
       },
     }),
-    [user, orgVista, refreshing, podeVerComo, verComo, definirVerComo, funcaoReal],
+    [user, orgVista, refreshing, podeVerComo, verComo, verComoPronto, definirVerComo, funcaoReal],
   );
 
   return (

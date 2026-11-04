@@ -41,6 +41,9 @@ interface StageColumnProps {
   nivel?: number;
 }
 
+/** ia.vek v1.9.18: uma coluna desenha aos poucos; centenas de cartões travavam a tela. */
+const CARTOES_POR_VEZ = 40;
+
 export function StageColumn({
   stage,
   leads,
@@ -58,6 +61,7 @@ export function StageColumn({
   nivel = 0,
 }: StageColumnProps) {
   const t = useT();
+  const [limite, setLimite] = useState(CARTOES_POR_VEZ);
   // O TOTAL É POR MOEDA (#1531). Antes ele somava todos os `value_cents` e
   // escrevia o resultado na moeda do primeiro negócio: R$ 5.000 e 5.000 € saíam
   // "R$ 10.000,00", um valor que não existe. Agora cada moeda tem o seu total,
@@ -244,7 +248,7 @@ export function StageColumn({
               snapshot.isDraggingOver && "bg-accent/5",
             )}
           >
-            {leads.map((lead, idx) => (
+            {leads.slice(0, limite).map((lead, idx) => (
               <KanbanCard
                 key={lead.id}
                 card={buildCardInput(lead, {
@@ -265,6 +269,16 @@ export function StageColumn({
               />
             ))}
             {provided.placeholder}
+            {leads.length > limite && (
+              <button
+                type="button"
+                className="min-h-11 rounded-md border border-dashed text-xs text-text-muted hover:text-text md:min-h-8"
+                onClick={() => setLimite((n) => n + CARTOES_POR_VEZ)}
+                data-testid="ver-mais-cartoes"
+              >
+                {t("Ver mais")} ({leads.length - limite})
+              </button>
+            )}
             {leads.length === 0 && !snapshot.isDraggingOver && (
               <div className="flex h-20 items-center justify-center text-[11px] text-text-muted">
                 {t("vazio")}

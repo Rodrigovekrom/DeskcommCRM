@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
-import { funisDaLoja, recorteDaFuncao } from "@/lib/iavek/painel-do-pipeline";
+import { funisDaLoja } from "@/lib/iavek/painel-do-pipeline";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -47,14 +47,10 @@ export default async function PipelinePage() {
     return <p className="p-6 text-sm text-muted-foreground">{t("Nenhum funil configurado ainda.")}</p>;
   }
   const followup = funis?.followup ? lista.find((f) => f.id === funis.followup) ?? null : null;
-  const recorte = recorteDaFuncao(activeOrg.interface_settings?.funcao);
-  const ehVendedor = recorte.tipo === "carteira" && recorte.lado === "vendedor";
   return (
     <CarteiraClient
       entrada={{ id: entrada.id, nome: entrada.name }}
       followup={followup ? { id: followup.id, nome: followup.name } : null}
-      recorte={recorte.tipo}
-      comBotao={followup !== null && !ehVendedor}
     />
   );
 }

@@ -45,10 +45,13 @@ function paraCampoLocal(d: Date): string {
 }
 
 export function PedirAgendamento({
+  rotulo,
   contactId,
   conversationId,
   leadId,
 }: {
+  /** v1.9.18: o texto do botão. */
+  rotulo?: string;
   contactId: string;
   conversationId?: string | null;
   leadId?: string | null;
@@ -149,7 +152,7 @@ export function PedirAgendamento({
         onClick={() => void abrir()}
         data-testid="pedir-agendamento"
       >
-        {marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento")}
+        {rotulo ?? (marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento"))}
       </Button>
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className={marcaDireto ? "max-h-[90vh] overflow-y-auto sm:max-w-xl" : "sm:max-w-md"}>

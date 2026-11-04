@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ehEcoLocal } from "@/lib/kanban/local-echo";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
+import { aplicarConversaNoQuadro } from "@/lib/iavek/ordem-do-quadro";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
 import type { BoardData } from "@/lib/kanban/types";
@@ -15,9 +16,9 @@ import type { BoardData } from "@/lib/kanban/types";
  * and PostgREST returns PGRST116. Routing through /api/v1/pipelines/[id]/board
  * uses the server-side cookie reader, identical to every other authed query.
  */
-async function fetchBoard(pipelineId: string, escopo?: EscopoDoQuadro): Promise<BoardData> {
+async function fetchBoard(pipelineId: string, escopo?: EscopoDoQuadro, verComo?: string | null): Promise<BoardData> {
   const res = await apiClient.get<{ data: BoardData }>(
-    `/api/v1/pipelines/${pipelineId}/board${escopo ? `?escopo=${escopo}` : ""}`,
+    `/api/v1/pipelines/${pipelineId}/board${escopo ? `?escopo=${escopo}${verComo ? `&ver_como=${verComo}` : ""}` : ""}`,
   );
   // apiClient unwraps { data, meta } envelope already in some helpers;
   // ours returns the parsed JSON literally. Handle both shapes safely.
@@ -80,12 +81,16 @@ export interface OpcoesDoQuadro {
    * aba aberta — com o pool pequeno, a rajada de leads novos vira fila.
    */
   agruparEventosMs?: number;
+  /** v1.9.18: a função do "Ver como" de quem administra; só recorta a apresentação. */
+  verComo?: string | null;
+  /** v1.9.18: espera saber o "Ver como" antes de baixar o quadro. */
+  esperar?: boolean;
 }
 
 export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {}) {
   const qc = useQueryClient();
-  const { escopo, agruparEventosMs = 0 } = opcoes;
-  const queryKey = escopo ? chaveDaCarteira(pipelineId) : chaveDoQuadro(pipelineId);
+  const { escopo, agruparEventosMs = 0, verComo = null, esperar = false } = opcoes;
+  const queryKey = escopo ? [...chaveDaCarteira(pipelineId), verComo] : chaveDoQuadro(pipelineId);
   const agrupador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
@@ -101,8 +106,8 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
 
   const query = useQuery({
     queryKey,
-    queryFn: () => fetchBoard(pipelineId as string, escopo),
-    enabled: !!pipelineId,
+    queryFn: () => fetchBoard(pipelineId as string, escopo, verComo),
+    enabled: !!pipelineId && !esperar,
   });
 
   const onChange = useCallback(
@@ -199,13 +204,21 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
   const agrupadorDaConversa = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aoMudarAConversa = useCallback(
     (payload: unknown) => {
-      const nova = (payload as { new?: { contact_id?: string | null } } | null)?.new;
+      const nova = (payload as { new?: { id?: string; contact_id?: string | null } } | null)?.new;
       if (!nova?.contact_id || !contatosDoQuadro.current.has(nova.contact_id)) return;
+      // ia.vek v1.9.18: o cartão sobe na hora, com o que o tempo real trouxe; baixar o
+      // quadro inteiro levava segundos. A recarga abaixo só reconcilia, sem pressa.
+      if (nova.id) {
+        const conversa = nova as Parameters<typeof aplicarConversaNoQuadro>[1];
+        qc.setQueryData<BoardData>(queryKey, (atual) =>
+          atual ? { ...atual, leads: aplicarConversaNoQuadro(atual.leads, conversa) } : atual,
+        );
+      }
       if (agrupadorDaConversa.current) return;
       agrupadorDaConversa.current = setTimeout(() => {
         agrupadorDaConversa.current = null;
         void qc.invalidateQueries({ queryKey });
-      }, Math.max(agruparEventosMs, 1_500));
+      }, Math.max(agruparEventosMs, 30_000));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo
     [qc, pipelineId, escopo, agruparEventosMs],

@@ -1,4 +1,7 @@
 "use client";
+import { MarcaDeNovaMensagem } from "@/components/iavek/MarcaDeNovaMensagem";
+import { MoverParaColuna } from "@/components/kanban/mover-no-quadro";
+import { esperandoDesde } from "@/lib/iavek/ordem-do-quadro";
 
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { createContext, useContext } from "react";
@@ -58,7 +61,7 @@ export function quandoFalou(
   return `${ddmm} ${hora}`;
 }
 
-export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineId: string }) {
+export function CorpoDoCartaoIavek({ lead, pipelineId, nomeDaEtapa }: { lead: Lead; pipelineId: string; nomeDaEtapa?: string | null }) {
   const t = useT();
   const idioma = useTagDeIdioma();
   const abrirNoQuadro = useContext(ConversaNoQuadroContext);
@@ -71,9 +74,11 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
   // Há com quem conversar: conversa já existe, ou contato com quem iniciar.
   const podeAbrir = lead.conversa != null || temAlvoParaAbrir(lead.contact_id, lead.contact_phone);
   const parar = (e: React.SyntheticEvent) => e.stopPropagation();
+  const espera = esperandoDesde(lead, nomeDaEtapa);
 
   return (
     <div className="mt-1 flex flex-col gap-1.5 text-xs" data-testid="cartao-iavek" data-lead-id={lead.id}>
+      {espera !== null && <MarcaDeNovaMensagem desde={espera} />}
       <p className="text-text-muted" data-testid="ultimo-horario">
         {falou ? (
           <>
@@ -105,6 +110,7 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
         </p>
       )}
       {lojaDeCarros && <SeloCarroIndisponivel valor={campos.carro_interesse} status={lead.status} />}
+      <MoverParaColuna lead={lead} />
       <button
         type="button"
         disabled={!podeAbrir || !abrirNoQuadro}
@@ -126,7 +132,7 @@ export function CorpoDoCartaoIavek({ lead, pipelineId }: { lead: Lead; pipelineI
         {podeAbrir ? t("Abrir conversa") : t("Sem contato")}
         {naoLidas > 0 && (
           <span
-            className="rounded-full bg-primary-foreground px-1.5 text-[11px] font-bold text-primary tabular-nums"
+            className="rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white tabular-nums"
             aria-label={`${naoLidas} ${t("sem ler")}`}
           >
             {naoLidas}

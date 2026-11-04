@@ -19,6 +19,7 @@ import { ChannelLogo } from "@/components/inbox/ChannelLogo";
 import { Phone, ArrowRight, MagnifyingGlass } from "@/lib/ui/icons";
 import { SeloCronometro72h } from "./SeloCronometro72h";
 import { useAuth } from "@/hooks/auth/AuthProvider";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useReleaseConversation } from "@/hooks/inbox/useReleaseConversation";
 import {
@@ -101,6 +102,8 @@ export function ConversationHeader({
 }: Props) {
   const t = useT();
   const { user, activeOrg } = useAuth();
+  // v1.9.18: o vendedor fica com Lembrar; Assumir, Transferir, Arquivar e Pessoal saem da tela dele.
+  const ehVendedor = funcaoDaTela(activeOrg?.interface_settings?.funcao) === "vendedor";
   const claim = useClaimConversation();
   const release = useReleaseConversation();
   const close = useCloseConversation();
@@ -309,7 +312,7 @@ export function ConversationHeader({
           bloqueio={motivoDoContato(c, t)}
           encerrada={status === "closed"}
         />
-        {isOpen && (
+        {isOpen && !ehVendedor && (
           <Button
             size="sm"
             variant="default"
@@ -388,7 +391,7 @@ export function ConversationHeader({
             {pausar.isPending ? t("Pausando...") : t("Pausar o automático")}
           </Button>
         )}
-        {!encerrada && (
+        {!encerrada && !ehVendedor && (
           <Button size="sm" variant="outline" onClick={() => setReassignOpen(true)}>
             {t("Transferir")}
           </Button>
@@ -426,7 +429,7 @@ export function ConversationHeader({
             `requireSupportWrite`): quem pode encerrar, pode arquivar. */}
         {/* ia.vek v1.7.6: arquivar não aparece para o atendente (vendedor,
             SDR, suporte) — só gerente e admin; a rota recusa o resto. */}
-        {status !== "archived" && podeArquivar && (
+        {status !== "archived" && podeArquivar && !ehVendedor && (
           <Button
             size="sm"
             variant="ghost"
@@ -442,7 +445,7 @@ export function ConversationHeader({
         {/* PESSOAL (spec 21, etapa 15): marcar tira a conversa do inbox na
             hora; desmarcar relista. O `data-testid` é contrato do e2e da
             spec (`contato-pessoal-sai-da-operacao.spec.ts`). */}
-        {podeMarcarPessoal && c?.id && !ehPessoal && (
+        {podeMarcarPessoal && !ehVendedor && c?.id && !ehPessoal && (
           <Button
             size="sm"
             variant="outline"

@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useContext, useMemo, useState } from "react";
-import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { DragDropContext, useKeyboardSensor, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +21,12 @@ import { LeadDossier } from "./LeadDossier";
 import { RetomarComoNovoNegocioDialog } from "./RetomarComoNovoNegocioDialog";
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { VendaDialog } from "./VendaDialog";
+import { toast } from "sonner";
+import { MoverNoQuadroContext, type ColunaDoMenu } from "./mover-no-quadro";
+import { useSensorDoArrasto } from "./sensor-do-arrasto";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api/client";
+import { compararLeads, ehColunaDaIa, manterOrdem, type OrdemDoQuadro } from "@/lib/iavek/ordem-do-quadro";
 import { LoseLeadDialog } from "./LoseLeadDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { ConversaNoQuadro, ConversaNoQuadroContext } from "@/components/iavek/ConversaNoQuadro";
@@ -57,7 +63,7 @@ interface KanbanBoardProps {
    * ia.vek v1.7.7: `"chegada"` = o mais NOVO no topo de cada coluna (o Pipeline
    * do vendedor). O padrão segue a posição manual (`position_in_stage`).
    */
-  ordem?: "posicao" | "chegada" | "atividade";
+  ordem?: "posicao" | OrdemDoQuadro;
   /**
    * ia.vek v1.7.9 — só VISUALIZAÇÃO, por pessoa: etapas que não aparecem e
    * etapas recolhidas (uma faixa estreita com nome e contagem). Não muda dado.
@@ -67,26 +73,34 @@ interface KanbanBoardProps {
   onAbrirEtapa?: (stageId: string) => void;
 }
 
-/** "Atividade recente": a última atividade do negócio; sem ela, a última mudança. */
-function instanteDeAtividade(l: Lead): string {
-  return l.last_activity_at ?? l.updated_at ?? l.created_at;
-}
-
-function groupLeadsByStage(stages: Stage[], leads: Lead[], ordem: "posicao" | "chegada" | "atividade" = "posicao"): Map<string, Lead[]> {
+function groupLeadsByStage(
+  stages: Stage[],
+  leads: Lead[],
+  ordem: "posicao" | OrdemDoQuadro = "posicao",
+  vencimentos?: Readonly<Record<string, string | null | undefined>>,
+  congelada?: ReadonlyMap<string, readonly string[]> | null,
+) {
   const map = new Map<string, Lead[]>();
-  for (const stage of stages) map.set(stage.id, []);
+  const nomes = new Map<string, string>();
+  for (const stage of stages) {
+    map.set(stage.id, []);
+    nomes.set(stage.id, stage.name);
+  }
   for (const lead of leads) {
     const bucket = map.get(lead.stage_id);
     if (bucket) bucket.push(lead);
   }
-  // Already ordered by position_in_stage at fetch time, but be defensive.
-  for (const list of map.values()) {
-    if (ordem === "chegada") list.sort((a, b) => b.created_at.localeCompare(a.created_at));
-    else if (ordem === "atividade") list.sort((a, b) => instanteDeAtividade(b).localeCompare(instanteDeAtividade(a)));
-    else list.sort((a, b) => a.position_in_stage - b.position_in_stage);
+  for (const [stageId, list] of map) {
+    if (ordem === "posicao") list.sort((a, b) => a.position_in_stage - b.position_in_stage);
+    // ia.vek v1.9.18: na coluna da IA, por chegada; ainda não há sinal de "pediu um humano".
+    else list.sort(compararLeads(ehColunaDaIa(nomes.get(stageId)) ? "chegada" : ordem, vencimentos));
+    const anterior = congelada?.get(stageId);
+    if (anterior) map.set(stageId, manterOrdem(list, anterior));
   }
   return map;
 }
+
+const SENSORES_DO_QUADRO = [useSensorDoArrasto, useKeyboardSensor];
 
 function BoardSkeleton() {
   return (
@@ -218,10 +232,34 @@ export function KanbanBoard({
     ? (data?.leads.find((l) => l.id === dossieId) ?? null)
     : null;
 
+  // ia.vek v1.9.18: só "tarefa mais atrasada" precisa dos vencimentos.
+  const { data: dadosDosCartoes } = useQuery({
+    queryKey: ["iavek", "cartao", pipelineId],
+    enabled: ordem === "tarefa_atrasada",
+    queryFn: () =>
+      apiClient
+        .get<{ data: { objetivos: Record<string, { vence_em?: string | null }> } }>(`/api/v1/iavek/cartao?pipeline_id=${pipelineId}`)
+        .then((r) => r.data),
+    staleTime: 60_000,
+  });
+  const vencimentos = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(dadosDosCartoes?.objetivos ?? {}).map(([id, o]) => [id, o.vence_em ?? null]),
+      ),
+    [dadosDosCartoes],
+  );
+  // Enquanto um cartão é arrastado, ou está com o menu de mover aberto, a ordem não muda.
+  const [ordemCongelada, setOrdemCongelada] = useState<ReadonlyMap<string, readonly string[]> | null>(null);
   const grouped = useMemo(() => {
     if (!data) return null;
-    return groupLeadsByStage(data.stages, data.leads, ordem);
-  }, [data, ordem]);
+    return groupLeadsByStage(data.stages, data.leads, ordem, vencimentos, ordemCongelada);
+  }, [data, ordem, vencimentos, ordemCongelada]);
+  const congelar = useCallback(
+    (sim: boolean) =>
+      setOrdemCongelada(sim && grouped ? new Map([...grouped].map(([id, l]) => [id, l.map((x) => x.id)])) : null),
+    [grouped],
+  );
 
   // Um conjunto por vez, e não um card por vez: o board recebe o resultado do
   // gesto já resolvido pela coluna (um card, um intervalo, a etapa inteira). A
@@ -246,6 +284,69 @@ export function KanbanBoard({
     [onSelectionChange, selectedLeadIds],
   );
 
+  // ia.vek v1.9.18: "Movido para [coluna]. Desfazer", por 8 segundos. Desfazer é outro
+  // movimento, registrado como tal: nada é apagado. Em Vendido não há Desfazer.
+  const leadsAtuais = useRef<Lead[]>([]);
+  useEffect(() => {
+    leadsAtuais.current = data?.leads ?? [];
+  }, [data]);
+  const avisarMovimento = useCallback(
+    (lead: Lead, destino: Stage) => {
+      const origem = { stageId: lead.stage_id, posicao: lead.position_in_stage };
+      if (destino.is_won) {
+        toast.success(`${t("Movido para")} ${destino.name}.`, { duration: 8000 });
+        return;
+      }
+      toast(`${t("Movido para")} ${destino.name}.`, {
+        duration: 8000,
+        action: {
+          label: t("Desfazer"),
+          onClick: () => {
+            const atual = leadsAtuais.current.find((l) => l.id === lead.id);
+            moveCard.mutate({
+              leadId: lead.id,
+              stageId: origem.stageId,
+              positionInStage: origem.posicao,
+              expectedUpdatedAt: atual?.updated_at ?? lead.updated_at,
+              via: "desfazer",
+            });
+          },
+        },
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- moveCard é estável o bastante para o clique
+    [t],
+  );
+
+  const moverPara = useCallback(
+    (lead: Lead, etapa: Stage | undefined, positionInStage: number, via: "arrasto" | "botao") => {
+      if (!etapa) return;
+      const mudaDeEtapa = lead.stage_id !== etapa.id;
+      if (etapa.is_lost && mudaDeEtapa && lead.status === "open") {
+        setPerdaPendente(lead.id);
+        return;
+      }
+      const args = {
+        leadId: lead.id,
+        stageId: etapa.id,
+        positionInStage,
+        expectedUpdatedAt: lead.updated_at,
+        via,
+      };
+      // ia.vek v1.9.12: entrar na venda, na loja de carros, pede valor e data.
+      if (lojaDeCarros && etapa.is_won && mudaDeEtapa && lead.status !== "won") {
+        setVendaPendente({ args, valorCents: lead.value_cents ?? null });
+        return;
+      }
+      moveCard.mutate(args, {
+        onSuccess: () => {
+          if (mudaDeEtapa) avisarMovimento(lead, etapa);
+        },
+      });
+    },
+    [moveCard, lojaDeCarros, avisarMovimento],
+  );
+
   const handleDragEnd = useCallback(
     (result: DropResult) => {
       if (!data || !grouped) return;
@@ -263,10 +364,6 @@ export function KanbanBoard({
 
       const destStageId = destination.droppableId;
       const etapaDeDestino = data.stages.find((s) => s.id === destStageId);
-      if (etapaDeDestino?.is_lost && source.droppableId !== destStageId && lead.status === "open") {
-        setPerdaPendente(lead.id);
-        return;
-      }
       const destList = (grouped.get(destStageId) ?? []).filter(
         (l) => l.id !== draggableId,
       );
@@ -284,26 +381,36 @@ export function KanbanBoard({
         // Collision — Wave 8 will handle global rebalance. For now, abort silently.
         return;
       }
-
-      const args = {
-        leadId: lead.id,
-        stageId: destStageId,
-        positionInStage: newPosition,
-        expectedUpdatedAt: lead.updated_at,
-      };
-      // ia.vek v1.9.12: entrar na venda, na loja de carros, pede valor e data.
-      if (
-        lojaDeCarros &&
-        etapaDeDestino?.is_won &&
-        source.droppableId !== destStageId &&
-        lead.status !== "won"
-      ) {
-        setVendaPendente({ args, valorCents: lead.value_cents ?? null });
-        return;
-      }
-      moveCard.mutate(args);
+      moverPara(lead, etapaDeDestino, newPosition, "arrasto");
     },
-    [data, grouped, moveCard, lojaDeCarros],
+    [data, grouped, moverPara],
+  );
+
+  // O menu "Mover para a coluna:": a coluna vai ao topo do destino, com a mesma regra do arrasto.
+  const colunasDoMenu = useMemo<ColunaDoMenu[]>(
+    () =>
+      data && grouped
+        ? data.stages
+            .filter((s) => !etapasOcultas?.has(s.id))
+            .map((s) => {
+              const lista = grouped.get(s.id) ?? [];
+              return { id: s.id, nome: s.name, quantidade: lista.length, totalCents: lista.reduce((t2, l) => t2 + (l.value_cents ?? 0), 0) };
+            })
+        : [],
+    [data, grouped, etapasOcultas],
+  );
+  const contextoDeMover = useMemo(
+    () => ({
+      colunas: colunasDoMenu,
+      congelar,
+      mover: (lead: Lead, etapaId: string) => {
+        const etapa = data?.stages.find((s) => s.id === etapaId);
+        const primeiro = (grouped?.get(etapaId) ?? [])[0];
+        const pos = midpoint(null, primeiro?.position_in_stage ?? null);
+        if (!Number.isNaN(pos)) moverPara(lead, etapa, pos, "botao");
+      },
+    }),
+    [colunasDoMenu, congelar, data, grouped, moverPara],
   );
 
   if (isLoading) {
@@ -339,7 +446,16 @@ export function KanbanBoard({
     <ConversaNoQuadroContext.Provider value={abrirConversaNoQuadro}>
     {/* ia.vek v1.8.2: o selo "Incompleto" dos cartões, só no cartão do ia.vek. */}
     <ComIncompletos leads={cartaoIavek ? data.leads : []}>
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <MoverNoQuadroContext.Provider value={contextoDeMover}>
+    <DragDropContext
+      enableDefaultSensors={false}
+      sensors={SENSORES_DO_QUADRO}
+      onDragStart={() => congelar(true)}
+      onDragEnd={(r) => {
+        handleDragEnd(r);
+        congelar(false);
+      }}
+    >
       {/* UM contêiner de rolagem só, nos dois eixos. Rolar cada coluna por
           conta própria seria o desenho "Trello", mas o @hello-pangea/dnd não
           suporta Droppable rolável dentro de outro contêiner rolável ("nested
@@ -464,7 +580,13 @@ export function KanbanBoard({
           if (!vendaPendente) return;
           const { args } = vendaPendente;
           setVendaPendente(null);
-          moveCard.mutate({ ...args, venda });
+          moveCard.mutate({ ...args, venda }, {
+            onSuccess: () => {
+              const etapa = data?.stages.find((e) => e.id === args.stageId);
+              const lead = data?.leads.find((l) => l.id === args.leadId);
+              if (etapa && lead) avisarMovimento(lead, etapa);
+            },
+          });
         }}
       />
       {perdaPendente && (
@@ -473,6 +595,11 @@ export function KanbanBoard({
           onOpenChange={(v: boolean) => !v && setPerdaPendente(null)}
           leadId={perdaPendente}
           pipelineId={pipelineId}
+          aoPerder={() => {
+            const lead = data?.leads.find((l) => l.id === perdaPendente);
+            const etapa = data?.stages.find((e) => e.is_lost);
+            if (lead && etapa) avisarMovimento(lead, etapa);
+          }}
         />
       )}
       {retomada && (
@@ -493,6 +620,7 @@ export function KanbanBoard({
         />
       )}
     </DragDropContext>
+    </MoverNoQuadroContext.Provider>
     </ComIncompletos>
     </ConversaNoQuadroContext.Provider>
   );

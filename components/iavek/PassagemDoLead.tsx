@@ -19,6 +19,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
+import { useAuth } from "@/hooks/auth/AuthProvider";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { apiClient } from "@/lib/api/client";
 import { CONTEXTO_MINIMO, type CamposDaPassagem } from "@/lib/iavek/passagem";
@@ -73,6 +75,8 @@ export function PassagemDoLead({ leadId }: { leadId: string | null | undefined }
 
 function PassagemDaLoja({ leadId }: { leadId: string }) {
   const t = useT();
+  const { activeOrg } = useAuth();
+  const ehVendedor = funcaoDaTela(activeOrg?.interface_settings?.funcao) === "vendedor";
   const qc = useQueryClient();
   const chave = ["iavek", "passagem", leadId];
   const { data } = useQuery({
@@ -221,7 +225,7 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
       )}
       <div className="flex flex-wrap gap-1">
         {(Object.keys(titulo) as Acao[])
-          .filter((a) => data.pode[a])
+          .filter((a) => data.pode[a] && !(a === "negociar" && ehVendedor))
           .map((a) => (
             <Button key={a} size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => abrir(a)} data-testid={`passagem-${a}`}>
               {t(titulo[a])}

@@ -6,6 +6,7 @@ import { AcervoSearch } from "./AcervoSearch";
 import { LeadEnrichment } from "./LeadEnrichment";
 import type { ProspectEnrichment } from "@/lib/prospecting/schema";
 import { useAuth } from "@/hooks/auth/AuthProvider";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
 import { PassagemDoLead } from "@/components/iavek/PassagemDoLead";
 import { PassarFicha } from "@/components/iavek/PassarFicha";
@@ -723,7 +724,7 @@ export function CRMSidePanel({ conversation, verMaisInicial = false }: Props) {
         {contactId&&conversation&&marcaDireto?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
         {contactId&&conversation&&!marcaDireto?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
         {/* ia.vek v1.7.8: Passar Ficha do lead deste atendimento. */}
-        {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l ? <PassarFicha leadId={l.id} donoDoLead={(l as { owner_user_id?: string | null }).owner_user_id ?? null} /> : null; })()}
+        {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l && funcaoDaTela(activeOrg?.interface_settings?.funcao) !== "vendedor" ? <PassarFicha leadId={l.id} donoDoLead={(l as { owner_user_id?: string | null }).owner_user_id ?? null} /> : null; })()}
       </div>
       <button
         type="button"

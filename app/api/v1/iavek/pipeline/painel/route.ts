@@ -42,7 +42,7 @@ interface LinhaDoLead {
   contact_id: string | null;
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(req: Request): Promise<Response> {
   const requestId = randomUUID();
   const authz = await requireRole("viewer", { requestId, resource: "crm_leads" });
   if (!authz.ok) return authz.response;
@@ -51,7 +51,9 @@ export async function GET(): Promise<Response> {
   const fuso = authz.org.timezone || "America/Sao_Paulo";
   const agora = new Date();
   const hoje = limitesDoDia(agora, fuso);
-  const recorte = recorteDaFuncao(authz.org.interface_settings?.funcao);
+  // v1.9.18: o "Ver como" do admin só recorta a apresentação.
+  const verComo = authz.org.role === "admin" ? new URL(req.url).searchParams.get("ver_como") : null;
+  const recorte = recorteDaFuncao(verComo ?? authz.org.interface_settings?.funcao);
 
   const { data: org, error: erroOrg } = await createAdminClient()
     .from("organizations")
@@ -96,7 +98,7 @@ export async function GET(): Promise<Response> {
   const lados = lerLados((funilDeEntrada as { settings?: unknown } | null)?.settings);
   const lado = recorte.tipo === "carteira" ? recorte.lado : null;
   const leads = ((linhas ?? []) as LinhaDoLead[]).filter(
-    (l) => l.pipeline_id !== funis.entrada || etapaDoLado(lados, l.stage_id, lado),
+    (l) => l.pipeline_id !== funis.entrada || lado === "vendedor" || etapaDoLado(lados, l.stage_id, lado),
   );
   const idsDosLeads = leads.map((l) => l.id);
   const contatos = [...new Set(leads.map((l) => l.contact_id).filter((c): c is string => !!c))];

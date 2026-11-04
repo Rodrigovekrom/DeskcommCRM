@@ -221,3 +221,13 @@ export function abreATelaDeTarefas(funcao: unknown, role: string | null | undefi
   const f = funcaoDaTela(funcao);
   return !f || DESTINOS_DA_FUNCAO[f].includes("/app/tasks");
 }
+
+/**
+ * ia.vek v1.9.18: na loja, o primeiro envio de quem atende assume a conversa sem dono.
+ * O vendedor não: ele nunca pega lead sem dono.
+ */
+export function primeiroEnvioAssume(funcao: unknown, role: string | null | undefined): boolean {
+  const f = funcaoDaTela(funcao);
+  if (f === "vendedor" || f === "analista_ficha") return false;
+  return f !== null || role === "admin" || role === "manager";
+}

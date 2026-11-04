@@ -143,7 +143,8 @@ export async function gravarPedidoDeAgendamento(
     return { ok: false, status: 500, motivo: error?.message ?? "Falha ao gravar o pedido." };
 
   if (args.avisarAdmins === false) return { ok: true, pedido: pedido as PedidoGravado };
-  const admins = await membrosComPapel(admin, orgId, ["admin"]);
+  // v1.9.18: gerente e admin recebem o aviso; confirmar segue com o admin.
+  const admins = await membrosComPapel(admin, orgId, ["manager", "admin"]);
   await avisarSobrePedidoDeAgendamento(admin, {
     orgId,
     destinos: admins,

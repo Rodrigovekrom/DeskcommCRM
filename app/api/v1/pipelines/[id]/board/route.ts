@@ -31,7 +31,7 @@ import { idsDeContatosPessoais } from "@/app/api/v1/conversations/_handler";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
 import { todasAsPaginas } from "@/lib/supabase/paginas";
 import type { Lead } from "@/lib/types/leads";
-import { etapaDoLado, ladoDaFuncao, lerLados } from "@/lib/iavek/lados-do-funil";
+import { etapaDoLado, etapasDoLado, ladoDaFuncao, lerLados } from "@/lib/iavek/lados-do-funil";
 
 export const dynamic = "force-dynamic";
 
@@ -272,7 +272,7 @@ async function withConversas(
   const { data, error } = await buscaEmLotes(contactIds, (lote) =>
     supabase
       .from("conversations")
-      .select("id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags")
+      .select("id, contact_id, last_message_preview, last_message_at, last_inbound_at, ultima_resposta_humana_em, unread_count_for_assignee, tags")
       .eq("organization_id", organizationId)
       .in("contact_id", lote)
       .order("last_message_at", { ascending: false, nullsFirst: false }),
@@ -286,6 +286,8 @@ async function withConversas(
     contact_id: string;
     last_message_preview: string | null;
     last_message_at: string | null;
+    last_inbound_at: string | null;
+    ultima_resposta_humana_em: string | null;
     unread_count_for_assignee: number | null;
     tags: string[] | null;
   }>) {
@@ -302,6 +304,8 @@ async function withConversas(
       preview: row.last_message_preview,
       last_message_at: row.last_message_at,
       unread: row.unread_count_for_assignee ?? 0,
+      last_inbound_at: row.last_inbound_at,
+      ultima_resposta_humana_em: row.ultima_resposta_humana_em,
     });
   }
 
@@ -462,7 +466,9 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   // ia.vek v1.9.3: na carteira, o LADO de quem pede (SDR ou vendedor) recorta
   // as etapas e, para o SDR, a carteira são os leads de que ele é dono OU
   // guardião. A função vem do vínculo desta organização.
-  const lado = soMinhaCarteira ? await ladoDeQuemPede(supabase, pipelineId, user.id) : null;
+  const lado = soMinhaCarteira
+    ? await ladoDeQuemPede(supabase, pipelineId, user.id, req.nextUrl.searchParams.get("ver_como"))
+    : null;
   // ia.vek v1.9.14: o quadro lê em páginas. Sem isso, acima do teto de linhas do
   // servidor os últimos cartões somem da tela sem aviso nenhum. Ordem estável com `id`.
   const paginaDeLeads = (de: number, ate: number) => {
@@ -513,7 +519,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   );
   // ia.vek v1.9.3: só as etapas do lado de quem pede (funil sem lados: todas).
   const lados = lerLados((pipeline as Pipeline).settings);
-  const etapasVisiveis = ((stages ?? []) as Stage[]).filter((st) => etapaDoLado(lados, st.id, lado));
+  const etapasVisiveis = etapasDoLado((stages ?? []) as Stage[], lados, lado);
   const idsVisiveis = new Set(etapasVisiveis.map((st) => st.id));
   const leadsVisiveis = ((leads ?? []) as Lead[]).filter(
     (l) =>
@@ -591,6 +597,7 @@ async function ladoDeQuemPede(
   supabase: Awaited<ReturnType<typeof createClient>>,
   pipelineId: string,
   userId: string,
+  verComo?: string | null,
 ): Promise<"sdr" | "vendedor" | null> {
   const { data: funil } = await supabase
     .from("crm_pipelines")
@@ -600,11 +607,13 @@ async function ladoDeQuemPede(
   if (!funil) return null;
   const { data: vinculo } = await supabase
     .from("user_organizations")
-    .select("interface_settings")
+    .select("interface_settings, role")
     .eq("organization_id", (funil as { organization_id: string }).organization_id)
     .eq("user_id", userId)
     .is("revoked_at", null)
     .maybeSingle();
   if (!vinculo) return null;
+  // v1.9.18: o "Ver como" do admin só RECORTA a apresentação, nunca abre mais do que ele já vê.
+  if (verComo && (vinculo as { role?: string }).role === "admin") return ladoDaFuncao(verComo);
   return ladoDaFuncao((vinculo.interface_settings as { funcao?: unknown } | null)?.funcao);
 }

@@ -248,7 +248,7 @@ export function KanbanCard({
           </div>
 
           {cartaoIavek ? (
-            <CorpoDoCartaoIavek lead={lead} pipelineId={pipelineId} />
+            <CorpoDoCartaoIavek lead={lead} pipelineId={pipelineId} nomeDaEtapa={card.stageName} />
           ) : (
           <>
           {/* ② valor — altura reservada mesmo sem valor, senão o card encolhe. */}

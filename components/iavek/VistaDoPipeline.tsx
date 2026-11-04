@@ -66,10 +66,14 @@ export function VistaDoPipeline({
         <select
           className="rounded-md border px-2 py-1"
           value={prefs.ordem}
-          onChange={(e) => gravar({ ...prefs, ordem: e.target.value as PreferenciasDoPipeline["ordem"] })}
+          onChange={(e) => gravar({ ...prefs, v: 2, ordem: e.target.value as PreferenciasDoPipeline["ordem"] })}
           aria-label={t("Ordenar")}
           data-testid="ordem-do-pipeline"
         >
+          <option value="ultima_mensagem">{t("Última mensagem do lead")}</option>
+          <option value="maior_valor">{t("Maior valor")}</option>
+          <option value="parado">{t("Parado há mais tempo")}</option>
+          <option value="tarefa_atrasada">{t("Tarefa mais atrasada")}</option>
           <option value="chegada">{t("Mais novos primeiro")}</option>
           <option value="atividade">{t("Atividade recente")}</option>
         </select>

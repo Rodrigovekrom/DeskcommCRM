@@ -25,6 +25,8 @@ import {
 } from "@/lib/messaging/ritmo-do-envio-por-token";
 import { sendMessageSchema, validateRequest, type SendMessageInput } from "@/lib/schemas";
 import { conversaFicaComQuemAtendeu } from "@/lib/schemas/routing";
+import { primeiroEnvioAssume } from "@/lib/iavek/funcoes";
+import { ehLojaDeCarros, lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Message } from "@/lib/types/messaging";
 
@@ -256,7 +258,20 @@ export async function POST(req: NextRequest): Promise<Response> {
           .eq("id", organizationId)
           .maybeSingle();
         if (orgError) throw orgError;
-        if (conversaFicaComQuemAtendeu(org?.settings)) {
+        const perfil = lerPerfilDaEmpresa(org?.settings);
+        let assumeNaLoja = false;
+        if (ehLojaDeCarros(perfil) && !perfil.modo_agendamento) {
+          const { data: vinculo } = await supabase
+            .from("user_organizations")
+            .select("role, interface_settings")
+            .eq("organization_id", organizationId)
+            .eq("user_id", actor.id)
+            .is("revoked_at", null)
+            .maybeSingle();
+          const v = vinculo as { role?: string; interface_settings?: { funcao?: unknown } | null } | null;
+          assumeNaLoja = primeiroEnvioAssume(v?.interface_settings?.funcao, v?.role);
+        }
+        if (assumeNaLoja || conversaFicaComQuemAtendeu(org?.settings)) {
           const { data: claimed, error: claimError } = await supabase.rpc("fn_conversation_assign", {
             p_organization_id: organizationId,
             p_conversation_id: message.conversation_id,

@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { DadosDaCompraNoCard, DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
+import { IncompletosNoCardContext } from "@/components/iavek/CamposObrigatorios";
+import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
+import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
+import { esperandoDesde, tempoDeEspera } from "@/lib/iavek/ordem-do-quadro";
 import { ChatThread } from "@/components/inbox/ChatThread";
 import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
 import { Composer, type ComposerHandle } from "@/components/inbox/Composer";
@@ -72,6 +77,8 @@ export function ConversaNoQuadro({
   const [conversaEscolhida, setConversaEscolhida] = useState<string | null>(null);
   const conversaId = conversaEscolhida ?? lead.conversa?.id ?? null;
   const telefone = lead.contact_phone ? phoneForDisplay(lead.contact_phone) : null;
+  const espera = esperandoDesde(lead, nomeDaEtapa);
+  const [agoraDaAbertura] = useState(() => Date.now());
 
   return (
     <Dialog open onOpenChange={(aberto) => !aberto && onFechar()}>
@@ -99,6 +106,16 @@ export function ConversaNoQuadro({
           <p className="text-xs text-muted-foreground" data-testid="conversa-no-quadro-linha">
             {telefone ? `${telefone} · ` : ""}
             {t("Etapa")}: <strong className="font-medium text-foreground">{nomeDaEtapa}</strong>
+            {!lead.owner_user_id && (
+              <span className="ml-1.5 rounded-full border px-1.5 text-[11px]" data-testid="etiqueta-sem-dono">
+                {t("sem dono")}
+              </span>
+            )}
+            {espera !== null && (
+              <span className="ml-1.5 rounded-full border border-amber-500/50 px-1.5 text-[11px] text-amber-700 dark:text-amber-400" data-testid="etiqueta-espera">
+                {t("sem resposta há")} {tempoDeEspera(agoraDaAbertura - espera)}
+              </span>
+            )}
             {conversaId && (
               <>
                 {" · "}
@@ -112,14 +129,10 @@ export function ConversaNoQuadro({
               </>
             )}
           </p>
-          {/* Troca e forma de pagamento, os mesmos chips do cartão (2 toques). */}
-          <DadosDaCompraNoCardContext.Provider value={{ ligado: true }}>
-            <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
-          </DadosDaCompraNoCardContext.Provider>
         </div>
 
         {conversaId ? (
-          <PainelDaConversa key={conversaId} conversaId={conversaId} onAbrirConversa={setConversaEscolhida} />
+          <PainelDaConversa key={conversaId} lead={lead} pipelineId={pipelineId} conversaId={conversaId} onAbrirConversa={setConversaEscolhida} />
         ) : (
           <SemConversa lead={lead} onIniciada={setConversaEscolhida} />
         )}
@@ -131,7 +144,17 @@ export function ConversaNoQuadro({
 /** O intervalo que pega a troca de dono feita por outra pessoa, sem tempo real próprio. */
 const RECARGA_DA_CONVERSA_MS = 20_000;
 
-function PainelDaConversa({ conversaId, onAbrirConversa }: { conversaId: string; onAbrirConversa: (id: string) => void }) {
+function PainelDaConversa({
+  lead,
+  pipelineId,
+  conversaId,
+  onAbrirConversa,
+}: {
+  lead: Lead;
+  pipelineId: string;
+  conversaId: string;
+  onAbrirConversa: (id: string) => void;
+}) {
   const t = useT();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -150,7 +173,13 @@ function PainelDaConversa({ conversaId, onAbrirConversa }: { conversaId: string;
   const composerRef = useRef<ComposerHandle | null>(null);
   const [respondendo, setRespondendo] = useState<ConversationMensagem | null>(null);
   const { garantir, dialogo } = useProximoPassoObrigatorio();
-  const [fichaNoCelular, setFichaNoCelular] = useState(false);
+  // ia.vek v1.9.18: abre só com o chat; ações e painel abrem por botão, a cada abertura.
+  const [painelAberto, setPainelAberto] = useState(false);
+  const [acoesAbertas, setAcoesAbertas] = useState(false);
+  const { activeOrg } = useAuth();
+  const ehVendedor = funcaoDaTela(activeOrg?.interface_settings?.funcao) === "vendedor";
+  const assumir = useClaimConversation();
+  const faltam = useContext(IncompletosNoCardContext)?.[lead.id] ?? [];
 
   useMarkAsRead(conversa?.id ?? null, conversa?.unread_count_for_assignee ?? 0);
 
@@ -198,22 +227,47 @@ function PainelDaConversa({ conversaId, onAbrirConversa }: { conversaId: string;
     <OpenConversationProvider conversationId={conversa.id}>
       {/* v1.8.2: a conversa à esquerda e a barra lateral enxuta à direita (a
           MESMA da Entrada). No celular a barra abre por "Ficha", no lugar da conversa. */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="mx-3 my-1.5 h-8 shrink-0 lg:hidden"
-        onClick={() => setFichaNoCelular((v) => !v)}
-        data-testid="alternar-ficha-celular"
-      >
-        {fichaNoCelular ? t("Voltar à conversa") : t("Ficha do lead")}
-      </Button>
+      {faltam.length > 0 && (
+        <button
+          type="button"
+          className="shrink-0 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1 text-left text-xs font-medium text-amber-800 dark:text-amber-300"
+          onClick={() => setPainelAberto(true)}
+          data-testid="faixa-faltam-dados"
+        >
+          {t("faltam")} {faltam.length} {t("dados")}
+        </button>
+      )}
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5">
+        <Button variant="outline" size="sm" className="h-11 md:h-8" onClick={() => setAcoesAbertas((v) => !v)} aria-expanded={acoesAbertas} data-testid="alternar-acoes">
+          {t("Ações")}
+        </Button>
+        <Button variant="outline" size="sm" className="h-11 md:h-8" onClick={() => setPainelAberto((v) => !v)} aria-expanded={painelAberto} data-testid="alternar-ficha-celular">
+          {painelAberto ? t("Voltar à conversa") : t("Dados do lead")}
+        </Button>
+        {!ehVendedor && !conversa.assigned_to_user_id && conversa.status !== "closed" && (
+          <Button
+            size="sm"
+            className="h-11 md:h-8"
+            disabled={assumir.isPending}
+            onClick={() => assumir.mutate({ conversation_id: conversa.id, expected_assignee: null })}
+            data-testid="assumir-na-conversa"
+          >
+            {t("Assumir")}
+          </Button>
+        )}
+        {ehVendedor && conversa.contacts?.id && (
+          <PedirAgendamento rotulo={t("Agendar horário")} contactId={conversa.contacts.id} conversationId={conversa.id} leadId={lead.id} />
+        )}
+      </div>
       <div className="flex min-h-0 flex-1">
-      <div className={fichaNoCelular ? "hidden min-h-0 flex-1 flex-col lg:flex" : "flex min-h-0 flex-1 flex-col"} data-testid="painel-da-conversa">
-        <ConversationHeader
-          conversation={conversa}
-          onAbrirConversa={onAbrirConversa}
-          antesDeEncerrar={(acao) => garantir(conversa, acao)}
-        />
+      <div className={painelAberto ? "hidden min-h-0 flex-1 flex-col lg:flex" : "flex min-h-0 flex-1 flex-col"}>
+        {acoesAbertas && (
+          <ConversationHeader
+            conversation={conversa}
+            onAbrirConversa={onAbrirConversa}
+            antesDeEncerrar={(acao) => garantir(conversa, acao)}
+          />
+        )}
         <div className="min-h-0 flex-1 overflow-hidden">
           <ChatThread
             conversationId={conversa.id}
@@ -252,9 +306,14 @@ function PainelDaConversa({ conversaId, onAbrirConversa }: { conversaId: string;
         />
       </div>
       <div
-        className={fichaNoCelular ? "flex min-h-0 w-full flex-col lg:w-[22rem] lg:shrink-0" : "hidden min-h-0 w-[22rem] shrink-0 flex-col lg:flex"}
+        className={painelAberto ? "flex min-h-0 w-full flex-col overflow-y-auto lg:w-[22rem] lg:shrink-0" : "hidden"}
         data-testid="barra-lateral-da-janela"
       >
+        <DadosDaCompraNoCardContext.Provider value={{ ligado: true }}>
+          <div className="px-3 pt-2">
+            <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
+          </div>
+        </DadosDaCompraNoCardContext.Provider>
         <CRMSidePanel conversation={conversa} />
       </div>
       </div>

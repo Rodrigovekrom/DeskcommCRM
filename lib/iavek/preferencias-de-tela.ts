@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ORDEM_PADRAO, ORDENS_DO_QUADRO, type OrdemDoQuadro } from "@/lib/iavek/ordem-do-quadro";
+
 /**
  * ia.vek v1.7.9 — preferências de VISUALIZAÇÃO por pessoa.
  *
@@ -11,22 +13,26 @@ import { z } from "zod";
 export const TELAS = ["pipeline"] as const;
 export type Tela = (typeof TELAS)[number];
 
-export const ORDENS_DO_PIPELINE = ["chegada", "atividade"] as const;
-export type OrdemDoPipeline = (typeof ORDENS_DO_PIPELINE)[number];
+export const ORDENS_DO_PIPELINE = ORDENS_DO_QUADRO;
+export type OrdemDoPipeline = OrdemDoQuadro;
 
 export const preferenciasDoPipelineSchema = z
   .object({
-    ordem: z.enum(ORDENS_DO_PIPELINE).default("chegada"),
+    ordem: z.enum(ORDENS_DO_PIPELINE).default(ORDEM_PADRAO),
+    // v1.9.18: a ordem gravada antes desta versão era só o padrão antigo; quem não tem a marca
+    // começa na nova ordem. Escolher de novo grava a marca.
+    v: z.literal(2).optional(),
     ocultas: z.array(z.uuid()).max(50).default([]),
     recolhidas: z.array(z.uuid()).max(50).default([]),
   })
   .strict();
 export type PreferenciasDoPipeline = z.infer<typeof preferenciasDoPipelineSchema>;
 
-export const PIPELINE_PADRAO: PreferenciasDoPipeline = { ordem: "chegada", ocultas: [], recolhidas: [] };
+export const PIPELINE_PADRAO: PreferenciasDoPipeline = { ordem: ORDEM_PADRAO, ocultas: [], recolhidas: [] };
 
 /** Lê o que veio do banco; valor estranho volta ao padrão em vez de quebrar a tela. */
 export function lerPreferenciasDoPipeline(valor: unknown): PreferenciasDoPipeline {
   const lido = preferenciasDoPipelineSchema.safeParse(valor ?? {});
-  return lido.success ? lido.data : { ...PIPELINE_PADRAO };
+  if (!lido.success) return { ...PIPELINE_PADRAO };
+  return lido.data.v === 2 ? lido.data : { ...lido.data, ordem: ORDEM_PADRAO, v: 2 };
 }

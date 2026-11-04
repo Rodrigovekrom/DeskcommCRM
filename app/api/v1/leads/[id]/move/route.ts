@@ -368,6 +368,7 @@ export async function POST(
       from_stage_id: lead.stage_id,
       to_stage_id: input.stage_id,
       position_in_stage: input.position_in_stage,
+      ...(input.via ? { via: input.via } : {}),
     },
   });
 

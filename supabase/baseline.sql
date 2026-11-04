@@ -47976,6 +47976,43 @@ create policy crm_tasks_delete on public.crm_tasks
              or lead_id in (select public.fn_iavek_leads_das_minhas_tarefas())))
   );
 
+-- ---- Última resposta humana na conversa (migration 0605) ----
+-- Corpo e porquê: a migration 0605. Cria função: entra ANTES da VARREDURA anon.
+alter table public.conversations add column if not exists ultima_resposta_humana_em timestamptz;
+
+create or replace function public.fn_iavek_marca_resposta_humana()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.direction = 'outbound' and new.sent_by_user_id is not null then
+    update public.conversations
+       set ultima_resposta_humana_em = greatest(coalesce(ultima_resposta_humana_em, new.created_at), new.created_at)
+     where id = new.conversation_id;
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_marca_resposta_humana() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_marca_resposta_humana on public.messages;
+create trigger trg_iavek_marca_resposta_humana
+  after insert on public.messages
+  for each row
+  when (new.direction = 'outbound' and new.sent_by_user_id is not null)
+  execute function public.fn_iavek_marca_resposta_humana();
+
+update public.conversations c
+   set ultima_resposta_humana_em = m.em
+  from (select conversation_id, max(created_at) em
+          from public.messages
+         where direction = 'outbound' and sent_by_user_id is not null
+         group by conversation_id) m
+ where c.id = m.conversation_id
+   and c.ultima_resposta_humana_em is distinct from m.em;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

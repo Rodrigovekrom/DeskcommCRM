@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useBoard } from "@/hooks/kanban/useBoard";
+import { useAuth } from "@/hooks/auth/AuthProvider";
+import { recorteDaFuncao } from "@/lib/iavek/painel-do-pipeline";
 import { apiClient } from "@/lib/api/client";
 import type { ApiSuccess } from "@/lib/api/wrappers";
 import { VISOES, ehVisao, funisDaVisao, type Visao } from "@/lib/iavek/painel-do-pipeline";
@@ -65,16 +67,18 @@ function visaoGuardada(): Visao {
 export function CarteiraClient({
   entrada,
   followup,
-  recorte,
-  comBotao,
 }: {
   entrada: FunilDaTela;
   followup: FunilDaTela | null;
-  recorte: "carteira" | "loja";
-  /** O botão Novos / Follow-up / Todos (sem follow-up declarado, ou sem a parte do follow-up: não há). */
-  comBotao: boolean;
 }) {
   const t = useT();
+  // v1.9.18: a tela segue a função VISTA: a do vínculo, ou a do "Ver como" de quem administra.
+  // O servidor segue valendo o papel real; o "Ver como" só recorta.
+  const { activeOrg, verComo, verComoPronto } = useAuth();
+  const vista = recorteDaFuncao(activeOrg?.interface_settings?.funcao);
+  const recorte = vista.tipo;
+  const ehVendedor = vista.tipo === "carteira" && vista.lado === "vendedor";
+  const comBotao = followup !== null && !ehVendedor;
   const [visao, setVisao] = useState<Visao>("novos");
   useEffect(() => {
     if (comBotao) setVisao(visaoGuardada());
@@ -94,7 +98,7 @@ export function CarteiraClient({
 
   // v1.7.9: a vista de cada um (ordem, colunas recolhidas/ocultas) — 0587.
   const { prefs, gravar } = usePreferenciasDoPipeline();
-  const painel = usePainelDoPipeline();
+  const painel = usePainelDoPipeline(verComo, verComoPronto);
   const comTarefa = useMemo(() => new Set(painel.data?.com_tarefa ?? []), [painel.data]);
   // A gerência já escolhia o vendedor no quadro dela (v1.7.5): o mesmo seletor vem
   // para a visão da loja, no MESMO filtro de responsável. Os contadores não
@@ -110,7 +114,7 @@ export function CarteiraClient({
     >
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Pipeline")}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{ehVendedor ? t("Meus leads") : t("Pipeline")}</h1>
           <p className="text-sm text-muted-foreground">
             {recorte === "loja" ? t("Todos os leads da loja") : t("Sua carteira")}
           </p>
@@ -122,7 +126,8 @@ export function CarteiraClient({
 
       {recorte === "loja" && <SeletorDeVendedor filters={filtros} onChange={setFiltros} />}
 
-      {recorte === "carteira" && visaoEfetiva !== "followup" && (
+      {/* v1.9.18: o vendedor nunca vê a faixa de sem dono nem o Assumir. */}
+      {recorte === "carteira" && !ehVendedor && visaoEfetiva !== "followup" && (
         // O painel recarrega a cada evento do quadro; a faixa vai junto.
         <FaixaSemDono pipelineId={entrada.id} quadroAtualizadoEm={painel.dataUpdatedAt} />
       )}
@@ -227,14 +232,15 @@ interface ContadoresDoPainel {
   visitas_hoje: number;
 }
 
-function usePainelDoPipeline() {
+function usePainelDoPipeline(verComo: string | null, pronto: boolean) {
   const qc = useQueryClient();
-  const chave = ["iavek", "pipeline", "painel"] as const;
+  const chave = ["iavek", "pipeline", "painel", verComo] as const;
   const { data, dataUpdatedAt } = useQuery({
     queryKey: chave,
+    enabled: pronto,
     queryFn: () =>
       apiClient
-        .get<ApiSuccess<{ contadores: ContadoresDoPainel; com_tarefa: string[] }>>("/api/v1/iavek/pipeline/painel")
+        .get<ApiSuccess<{ contadores: ContadoresDoPainel; com_tarefa: string[] }>>(`/api/v1/iavek/pipeline/painel${verComo ? `?ver_como=${verComo}` : ""}`)
         .then((r) => r.data),
     // Rede de segurança: o quadro já pede recarga quando o tempo real chega.
     refetchInterval: 60_000,
@@ -263,8 +269,11 @@ function QuadroDoFunil({
 }) {
   const t = useT();
   const pipelineId = funil.id;
+  const { verComo, verComoPronto } = useAuth();
   const { data, isLoading, error, pulses, realtimeStatus, dataUpdatedAt } = useBoard(pipelineId, {
     ...(recorte === "carteira" ? { escopo: "carteira" as const } : {}),
+    verComo: recorte === "carteira" ? verComo : null,
+    esperar: !verComoPronto,
     agruparEventosMs: AGRUPAR_EVENTOS_MS,
   });
   // v1.8.0: o padrão da loja da carteira (selo no cartão). Desligado: mapa vazio.

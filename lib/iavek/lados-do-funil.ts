@@ -46,3 +46,19 @@ export function etapaDoLado(lados: LadosDoFunil, stageId: string, lado: Exclude<
   const daEtapa = lados[stageId];
   return daEtapa === lado || daEtapa === "ambos";
 }
+
+/**
+ * ia.vek v1.9.18: as colunas de cada lado. O vendedor vê da primeira etapa depois do
+ * Suporte IA até Vendido e Perdido; funil sem essa etapa segue a regra dos lados.
+ */
+export function etapasDoLado<E extends { id: string; name: string; position: number }>(
+  etapas: readonly E[],
+  lados: LadosDoFunil,
+  lado: Exclude<Lado, "ambos"> | null,
+): E[] {
+  if (lado === "vendedor") {
+    const suporte = etapas.find((e) => /^suporte ia$/i.test(e.name.trim()));
+    if (suporte) return etapas.filter((e) => e.position > suporte.position);
+  }
+  return etapas.filter((e) => etapaDoLado(lados, e.id, lado));
+}

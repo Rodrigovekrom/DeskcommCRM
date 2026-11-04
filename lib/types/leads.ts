@@ -80,6 +80,9 @@ export interface Lead {
     preview: string | null;
     last_message_at: string | null;
     unread: number;
+    /** v1.9.18: a última mensagem do lead e a última resposta de uma pessoa pelo sistema. */
+    last_inbound_at?: string | null;
+    ultima_resposta_humana_em?: string | null;
   } | null;
   score?: {
     probability: number;

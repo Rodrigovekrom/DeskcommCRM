@@ -22,11 +22,14 @@ interface LoseLeadDialogProps {
   onOpenChange: (open: boolean) => void;
   leadId: string;
   pipelineId: string;
+  /** ia.vek v1.9.18: a perda foi gravada. */
+  aoPerder?: () => void;
 }
 
 const MAX_LEN = 500;
 
 export function LoseLeadDialog({
+  aoPerder,
   open,
   onOpenChange,
   leadId,
@@ -89,6 +92,7 @@ export function LoseLeadDialog({
     if (disabled) return;
     try {
       await mutation.mutateAsync({ leadId, lostReason: finalReason });
+      aoPerder?.();
       setReasonCode("");
       setOtherText("");
       onOpenChange(false);

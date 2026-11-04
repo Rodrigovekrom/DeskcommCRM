@@ -22,6 +22,8 @@ interface MoveArgs {
   wonReason?: string;
   /** ia.vek v1.9.12: valor final e data, na loja de carros. */
   venda?: VendaDaLoja;
+  /** ia.vek v1.9.18: por onde veio, para a auditoria. */
+  via?: "arrasto" | "botao" | "desfazer";
 }
 
 /**
@@ -88,6 +90,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
         ...(args.customFields ? { custom_fields: args.customFields } : {}),
         ...(args.wonReason !== undefined ? { won_reason: args.wonReason } : {}),
         ...(args.venda ? { venda: args.venda } : {}),
+        ...(args.via ? { via: args.via } : {}),
       });
     },
     // ia.vek v1.7.7: por PREFIXO (`setQueriesData`) — o mesmo funil pode estar

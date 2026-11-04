@@ -20,6 +20,8 @@ const flexibleTimestamp = z
   .refine((s) => !Number.isNaN(Date.parse(s)), "expected_updated_at deve ser um timestamp válido");
 
 export const moveLeadSchema = z.object({
+  /** ia.vek v1.9.18: por onde o movimento veio; vai à auditoria. */
+  via: z.enum(["arrasto", "botao", "desfazer"]).optional(),
   stage_id: z.string().uuid(),
   position_in_stage: z.number().finite(),
   expected_updated_at: flexibleTimestamp,
