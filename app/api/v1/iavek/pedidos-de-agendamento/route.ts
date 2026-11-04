@@ -23,7 +23,6 @@ import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
-import { ROLE_RANK } from "@/lib/auth/types";
 import { podePassarOLead } from "@/lib/iavek/sdr-marca-direto";
 import { roleAtLeast } from "@/lib/auth/types";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -195,7 +194,7 @@ async function sdrMarca(
   if (!negocio) {
     return fail("validation_failed", t("O cliente não tem negócio aberto para passar ao vendedor."), 422, { requestId });
   }
-  const gerencia = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager;
+  const gerencia = roleAtLeast(authz.org.role, "manager");
   if (!gerencia && !podePassarOLead(negocio, authz.user.id)) {
     return fail("forbidden_role", t("Este cliente está com outra pessoa da loja. Peça à gerência para passar."), 403, {
       requestId,

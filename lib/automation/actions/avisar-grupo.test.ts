@@ -25,7 +25,7 @@ function deps(o: { cfg?: typeof cfg | null; total?: number; ultimo?: Date | null
     enviados: async () => ({ total: o.total ?? 0, ultimo: o.ultimo ?? null }),
     numeroLiberaEm: async () => o.numero ?? null,
     enviar: async (_org, _cfg, texto) => {
-      if (o.falha) throw new Error("waha_fora");
+      if (o.falha) throw new Error("canal_fora");
       enviados.push(texto);
     },
   };
@@ -63,6 +63,6 @@ describe("avisar_grupo", () => {
   it("config da regra incompleta falha; falha de envio vira failed com o motivo", async () => {
     expect((await executarAvisoGrupo(ctx, { tipo: "x", texto: "y" }, deps({}).d)).status).toBe("failed");
     const r = await executarAvisoGrupo(ctx, { tipo: "observacao", texto: "y" }, deps({ falha: true }).d);
-    expect(r).toMatchObject({ status: "failed", error: "waha_fora" });
+    expect(r).toMatchObject({ status: "failed", error: "canal_fora" });
   });
 });
