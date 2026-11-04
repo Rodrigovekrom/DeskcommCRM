@@ -33,7 +33,16 @@ export function MoverParaColuna({ lead }: { lead: Lead }) {
   if (!ctx) return null;
   const parar = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
-    <div className="flex justify-end" onPointerDown={parar} onMouseDown={parar} onTouchStart={parar}>
+    // O menu abre em portal, mas o evento do React sobe pela árvore dos componentes: sem
+    // parar o clique e a tecla aqui, escolher uma coluna também abria o dossiê do cartão.
+    <div
+      className="flex justify-end"
+      onClick={parar}
+      onKeyDown={parar}
+      onPointerDown={parar}
+      onMouseDown={parar}
+      onTouchStart={parar}
+    >
       <DropdownMenu
         open={aberto}
         onOpenChange={(v) => {

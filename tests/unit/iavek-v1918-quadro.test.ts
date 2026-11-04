@@ -85,3 +85,11 @@ describe("v1.9.18: funções", () => {
     expect(primeiroEnvioAssume("analista_ficha", "agent")).toBe(false);
   });
 });
+
+describe("v1.9.18: o menu de mover não abre o cartão", () => {
+  it("o clique e a tecla param no invólucro do menu, que abre em portal", async () => {
+    const { readFileSync } = await import("node:fs");
+    const fonte = readFileSync("components/kanban/mover-no-quadro.tsx", "utf8");
+    expect(fonte).toMatch(/onClick=\{parar\}\s+onKeyDown=\{parar\}\s+onPointerDown=\{parar\}/);
+  });
+});
