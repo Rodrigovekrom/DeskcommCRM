@@ -1,4 +1,5 @@
 import { InterfaceRefresh } from "@/hooks/auth/InterfaceRefresh";
+import { MedidorDeTela } from "@/components/shell/MedidorDeTela";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { isMfaEnrolled, loadAuthUser, requiresMfa, resolveActiveOrg } from "@/lib/auth/server";
@@ -287,6 +288,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       */}
       <ProvedorDeCoresDasEtiquetas>
       <InterfaceRefresh userId={user.id} org={activeOrg} support={!!user.support} />
+      <MedidorDeTela />
       {/*
         O MARCADOR da marca da organização — o elemento cuja existência define o
         escopo `body:has([data-marca-org])` (lib/branding/css.ts).

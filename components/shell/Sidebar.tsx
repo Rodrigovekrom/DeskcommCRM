@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { LinkDoMenu } from "@/components/shell/LinkDoMenu";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -278,7 +278,7 @@ export function SidebarContent({
                     const Icon = item.icon;
                     return (
                       <li key={item.href}>
-                        <Link
+                        <LinkDoMenu
                           href={item.href}
                           title={collapsed ? t(item.label) : undefined}
                           aria-current={isActive ? "page" : undefined}
@@ -300,13 +300,13 @@ export function SidebarContent({
                           )}
                           {item.contador === "casos" && <ContadorDeCasos compacto={collapsed} />}
                           {item.contador === "fila" && <ContadorDaFila compacto={collapsed} />}
-                        </Link>
+                        </LinkDoMenu>
                       </li>
                     );
                   })}
                   {group.hub && (
                     <li>
-                      <Link
+                      <LinkDoMenu
                         href={group.hub.href}
                         title={collapsed ? t(group.hub.label) : undefined}
                         aria-current={pathname === group.hub.href ? "page" : undefined}
@@ -321,7 +321,7 @@ export function SidebarContent({
                       >
                         <ArrowRight size={18} aria-hidden />
                         {!collapsed && <span className="truncate">{t(group.hub.label)}</span>}
-                      </Link>
+                      </LinkDoMenu>
                     </li>
                   )}
                 </ul>
@@ -332,7 +332,7 @@ export function SidebarContent({
       </nav>
       <div className="border-t p-2">
         {rodape && (
-          <Link
+          <LinkDoMenu
             href={rodape.href}
             title={collapsed ? t(rodape.label) : undefined}
             aria-current={pathname.startsWith(rodape.href) ? "page" : undefined}
@@ -347,7 +347,7 @@ export function SidebarContent({
           >
             <Gear size={18} aria-hidden />
             {!collapsed && <span className="truncate">{t(rodape.label)}</span>}
-          </Link>
+          </LinkDoMenu>
         )}
         <VersionFooter collapsed={collapsed} onNavigate={onNavigate} />
         {showCollapseControl && (

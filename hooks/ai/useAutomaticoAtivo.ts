@@ -14,10 +14,13 @@ import { apiClient } from "@/lib/api/client";
  * uma leitura que não voltou seria a mesma mentira ao contrário, e quem consome
  * trata `undefined` como "não afirme nada".
  */
-export function useAutomaticoAtivo() {
+export function useAutomaticoAtivo(inicial?: boolean) {
   const podeConsultar = usePermission("ai.automatico.view");
   return useQuery({
     enabled: podeConsultar,
+    // ia.vek v1.9.16: o valor que a página já leu no servidor. Sem ele a lista da Fila
+    // saía duas vezes em toda abertura, porque a chave muda quando esta resposta chega.
+    ...(podeConsultar && inicial !== undefined ? { initialData: inicial } : {}),
     queryKey: ["ai", "automatico-ativo"],
     queryFn: async () => {
       const r = await apiClient.get<{ data: { ativo: boolean } }>(

@@ -243,7 +243,31 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
   );
 }
 
+/**
+ * ia.vek v1.9.16: as chamadas em andamento, só para a medição de tela
+ * (`components/shell/MedidorDeTela.tsx`): dizem o que uma tela presa está esperando.
+ */
+const emVoo = new Map<string, { caminho: string; desde: number }>();
+export function chamadasEmVoo(): ReadonlyArray<{ caminho: string; desde: number }> {
+  return [...emVoo.values()];
+}
+
 async function request<T>(
+  method: HttpMethod,
+  path: string,
+  body: unknown,
+  opts: RequestOpts = {},
+): Promise<T> {
+  const id = randomId();
+  emVoo.set(id, { caminho: path, desde: Date.now() });
+  try {
+    return await executar<T>(method, path, body, opts);
+  } finally {
+    emVoo.delete(id);
+  }
+}
+
+async function executar<T>(
   method: HttpMethod,
   path: string,
   body: unknown,

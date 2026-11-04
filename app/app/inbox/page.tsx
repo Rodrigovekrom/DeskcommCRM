@@ -6,6 +6,7 @@ import { InboxLayout } from "@/components/inbox/InboxLayout";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
 import { lerRascunho, type AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
+import { orgTemAutomatico } from "@/lib/ai/agents/org-tem-automatico";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Entrada de leads" };
@@ -45,9 +46,11 @@ export default async function InboxPage({
   // "não encontrado" por construção. Os três recusos (outra conversa, já usado,
   // vencido) viram aviso — a issue pede a conversa abrindo "sem texto e com
   // aviso", e silenciar faria o atendente achar que o texto nunca existiu.
+  const db = await createClient();
+  // ia.vek v1.9.16: lido aqui para a lista da Fila já nascer com a chave certa.
+  const automaticoInicial = await orgTemAutomatico(db, activeOrg.orgId);
   let avisoDeRascunho: AvisoDeRascunho | null = null;
   if (rascunho && id) {
-    const db = await createClient();
     avisoDeRascunho = {
       conversationId: id,
       leitura: await lerRascunho(db, {
@@ -57,5 +60,5 @@ export default async function InboxPage({
       }),
     };
   }
-  return <InboxLayout initialSelectedId={id ?? null} rascunho={avisoDeRascunho} />;
+  return <InboxLayout initialSelectedId={id ?? null} rascunho={avisoDeRascunho} automaticoInicial={automaticoInicial} />;
 }

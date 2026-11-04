@@ -160,12 +160,15 @@ interface InboxLayoutProps {
    * Escolher outra aba ali leva para a Entrada de leads, na aba escolhida.
    */
   abaFixa?: InboxTab;
+  /** ia.vek v1.9.16: se a empresa tem automático, já lido no servidor (`undefined`: não deu para saber). */
+  automaticoInicial?: boolean;
 }
 
 export function InboxLayout({
   initialSelectedId = null,
   rascunho = null,
   abaFixa,
+  automaticoInicial,
 }: InboxLayoutProps = {}) {
   const t = useT();
   const { activeOrg, user } = useAuth();
@@ -273,7 +276,7 @@ export function InboxLayout({
    * e completa quando a resposta chega; a janela é de ~200ms e o rótulo nunca
    * discorda do filtro, porque os dois usam a mesma convenção.
    */
-  const { data: automaticoDaOrg } = useAutomaticoAtivo();
+  const { data: automaticoDaOrg } = useAutomaticoAtivo(automaticoInicial);
   const composerRef = useRef<ComposerHandle | null>(null);
 
   const filters: ConversationsFilters = useMemo(

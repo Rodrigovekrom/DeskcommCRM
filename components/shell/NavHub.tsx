@@ -1,7 +1,7 @@
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
 import type { InterfaceSettings } from "@/lib/navigation/interface";
-import Link from "next/link";
+import { LinkDoMenu } from "@/components/shell/LinkDoMenu";
 
 import { Card } from "@/components/ui/card";
 import type { Role } from "@/lib/auth/types";
@@ -110,7 +110,7 @@ export function NavHub({
             {items.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href} className="block">
+                <LinkDoMenu key={item.href} href={item.href} className="block">
                   <Card className="flex h-full gap-3 p-4 transition-colors hover:border-border-strong">
                     <Icon
                       size={20}
@@ -125,7 +125,7 @@ export function NavHub({
                       </p>
                     </div>
                   </Card>
-                </Link>
+                </LinkDoMenu>
               );
             })}
           </div>
@@ -149,12 +149,12 @@ export function NavHub({
                 )}
               </p>
             </div>
-            <Link
+            <LinkDoMenu
               href="/app/extensions"
               className="text-xs font-medium text-accent underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-hidden"
             >
               {traduzir("Gerenciar extensões", locale)}
-            </Link>
+            </LinkDoMenu>
           </div>
 
           {extensionsUnavailable ? (
@@ -184,7 +184,7 @@ export function NavHub({
                   const Icon = EXTENSION_ICONS[contribution.icon];
                   const compact = guide.configuration.density === "compact";
                   return (
-                    <Link
+                    <LinkDoMenu
                       key={`${guide.installation_id}:${contribution.id}`}
                       href={`/app/extensions/${encodeURIComponent(guide.installation_id)}?card=${encodeURIComponent(contribution.id)}`}
                       data-testid={`extension-contribution-${guide.installation_id}-${contribution.id}`}
@@ -226,7 +226,7 @@ export function NavHub({
                           </p>
                         </div>
                       </Card>
-                    </Link>
+                    </LinkDoMenu>
                   );
                 }),
               )}

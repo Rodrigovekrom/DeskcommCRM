@@ -84,10 +84,10 @@ export function AuthProvider({
     [activeOrg, podeVerComo, verComo],
   );
 
-  useEffect(() => {
-    resetRealtimeAuthentication();
-    return resetRealtimeAuthentication;
-  }, [user.id, activeOrg?.orgId, user.support?.id, user.support?.access_mode]);
+  // ia.vek v1.9.16: só a limpeza. Zerar também na montagem cancelava o token que os
+  // canais filhos já tinham pedido: cada canal caía em erro, reconectava e fazia
+  // quem o escuta buscar tudo de novo, em toda abertura de tela.
+  useEffect(() => resetRealtimeAuthentication, [user.id, activeOrg?.orgId, user.support?.id, user.support?.access_mode]);
 
   // A organização que ESTA aba acha que é — a mesma das props, fixas durante a
   // vida do documento. Registrada para o `apiClient` carimbá-la em toda

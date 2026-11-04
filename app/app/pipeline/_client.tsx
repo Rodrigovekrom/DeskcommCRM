@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -282,8 +282,14 @@ function QuadroDoFunil({
         .then((r) => r.data),
   });
   const leads = useMemo(() => (data ? applyFilters(data.leads, filtros) : []), [data, filtros]);
+  // ia.vek v1.9.16: só quando o quadro RECARREGA. Na primeira carga o selo e o painel
+  // acabaram de ser pedidos, e pedir de novo só dobrava a abertura da tela.
+  const cargaAnterior = useRef<{ funil: string; em: number } | null>(null);
   useEffect(() => {
     if (!dataUpdatedAt) return;
+    const anterior = cargaAnterior.current;
+    cargaAnterior.current = { funil: pipelineId, em: dataUpdatedAt };
+    if (anterior?.funil !== pipelineId) return;
     void qcPadrao.invalidateQueries({ queryKey: ["iavek", "padrao", escopoDoPadrao, pipelineId] });
     aoAtualizar();
   }, [dataUpdatedAt, pipelineId, qcPadrao, escopoDoPadrao, aoAtualizar]);
@@ -350,8 +356,13 @@ function FaixaSemDono({ pipelineId, quadroAtualizadoEm }: { pipelineId: string; 
 
   // O tempo real chega pelo quadro (o mesmo canal do funil): quando o quadro
   // recarrega, a faixa acompanha — sem um segundo canal aberto por aba.
+  // ia.vek v1.9.16: a primeira carga do quadro não recarrega a faixa, que acabou de nascer.
+  const cargaAnterior = useRef<{ funil: string; em: number } | null>(null);
   useEffect(() => {
-    if (quadroAtualizadoEm) void qc.invalidateQueries({ queryKey: chave });
+    if (!quadroAtualizadoEm) return;
+    const anterior = cargaAnterior.current;
+    cargaAnterior.current = { funil: pipelineId, em: quadroAtualizadoEm };
+    if (anterior?.funil === pipelineId) void qc.invalidateQueries({ queryKey: chave });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId
   }, [quadroAtualizadoEm, pipelineId, qc]);
 

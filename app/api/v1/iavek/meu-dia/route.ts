@@ -34,6 +34,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { todasAsPaginas } from "@/lib/supabase/paginas";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
+import { criarTempos } from "@/lib/api/tempos-da-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,9 @@ async function conversasDos(
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
+  const tempos = criarTempos();
   const authz = await requireRole("viewer", { requestId, resource: "crm_leads" });
+  tempos.marcar("sessao");
   if (!authz.ok) return authz.response;
   const parsed = querySchema.safeParse(Object.fromEntries(new URL(req.url).searchParams));
   if (!parsed.success) return fail("validation_failed", "Função inválida.", 422, { requestId });
@@ -319,6 +322,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ── gerente ──────────────────────────────────────────────────────────────
     const desde30 = new Date(agora.getTime() - 30 * DIA).toISOString();
     const desde7 = new Date(agora.getTime() - 7 * DIA).toISOString();
+    tempos.marcar("antes");
     const [
       novosHoje,
       comPrazo,
@@ -411,6 +415,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         .order("updated_at", { ascending: false })
         .limit(300),
     ]);
+    tempos.marcar("consultas");
     const falha =
       novosHoje.error ??
       atrasadas.error ??
@@ -443,12 +448,14 @@ export async function GET(req: NextRequest): Promise<Response> {
       ...estourando.map((l) => l.contact_id),
       ...tarefasDaEquipe.map((t) => t.contact_id),
     ]);
+    tempos.marcar("conversas");
     const porPessoa = atrasosPorPessoa(atrasadas.data ?? []);
     const resumoDasTarefas = tarefasPorPessoa(tarefasDaEquipe, agora);
     const nomes = await nomesDosAtendentes([
       ...porPessoa.map((p) => p.user_id),
       ...resumoDasTarefas.map((p) => p.user_id),
     ]);
+    tempos.marcar("nomes");
     const nomeDe = (u: string | null) => (u ? (nomes.get(u) ?? null) : null);
     const comPessoa = abertasComPessoa.count ?? 0;
     // v1.7.6: as propostas que os vendedores deixaram aguardando a aprovação.
@@ -475,7 +482,8 @@ export async function GET(req: NextRequest): Promise<Response> {
       linhasAguardando.map((p) => p.aprovacao_pedida_por).filter((u): u is string => Boolean(u)),
     );
 
-    return ok(
+    tempos.marcar("propostas");
+    const resposta = ok(
       {
         funcao,
         gerente: {
@@ -537,6 +545,8 @@ export async function GET(req: NextRequest): Promise<Response> {
       },
       { requestId },
     );
+    resposta.headers.set("Server-Timing", tempos.cabecalho());
+    return resposta;
   } catch (e) {
     return fail("internal_error", e instanceof Error ? e.message : "Erro ao montar o dia.", 500, {
       requestId,
