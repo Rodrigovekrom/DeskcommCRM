@@ -2,6 +2,7 @@
 
 import { useValorVemDoEstoque } from "@/components/contacts/CampoDoCatalogo";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { useT } from "@/hooks/i18n/useT";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -68,6 +69,9 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
 
   // ia.vek v1.9.12: lead aberto com carro do estoque: o valor é o do carro.
   const valorDoEstoque = useValorVemDoEstoque(lead);
+  // ia.vek v1.9.19: depois de vendido, valor e data só pela correção de gerente e admin.
+  const { lojaDeCarros: naLojaDeCarros } = usePerfilDaEmpresa();
+  const vendaFechada = naLojaDeCarros && lead.status === "won";
 
   const form = useForm<FormShape>({
     defaultValues: {
@@ -163,7 +167,7 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
               id="valueReais"
               inputMode="decimal"
               placeholder="0,00"
-              readOnly={valorDoEstoque}
+              readOnly={valorDoEstoque || vendaFechada}
               {...form.register("valueReais")}
             />
             {valorDoEstoque && (

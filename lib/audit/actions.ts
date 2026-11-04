@@ -48,6 +48,7 @@ export const AUDIT_ACTIONS = [
   "lead.updated",
   "lead.deleted",
   "lead.moved",
+  "lead.venda_corrigida",
   "lead.won",
   "lead.lost",
   "lead.bulk_action",

@@ -1281,7 +1281,13 @@ export async function moveLeadHandler(
     // motivo da perda vira recusa de negócio, nunca 500.
     const recusa = recusaDeMotivoDaPerdaPeloBanco(updErr, ctx.idioma);
     if (recusa) {
-      throw new ApiError(422, recusa.codigo, undefined, ctx.requestId, recusa.mensagem);
+      throw new ApiError(
+        recusa.codigo === "venda_so_gerente" ? 403 : 422,
+        recusa.codigo,
+        undefined,
+        ctx.requestId,
+        recusa.mensagem,
+      );
     }
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
   }

@@ -201,7 +201,14 @@ export function recusaDeMotivoDaPerdaPeloBanco(
   erro: { code?: string | null; message?: string | null } | null | undefined,
   idioma?: Idioma | null,
 ): {
-  codigo: "lost_reason_required" | "lost_reason_invalid" | "iavek_campos_obrigatorios" | "venda_incompleta";
+  codigo:
+    | "lost_reason_required"
+    | "lost_reason_invalid"
+    | "iavek_campos_obrigatorios"
+    | "venda_incompleta"
+    | "venda_so_gerente"
+    | "venda_data_invalida"
+    | "iavek_agendado_sem_horario";
   mensagem: string;
   /** ia.vek v1.8.3: os rótulos do que falta, para a tela abrir a janela da trava. */
   faltam?: string[];
@@ -214,6 +221,27 @@ export function recusaDeMotivoDaPerdaPeloBanco(
     return {
       codigo: "venda_incompleta",
       mensagem: traduzir("Informe o valor final e a data da venda.", idioma ?? IDIOMA_PADRAO),
+    };
+  }
+
+  // ia.vek v1.9.19 (0606): as duas travas novas, antes da régua geral do PT422.
+  const idiomaDaRecusa = idioma ?? IDIOMA_PADRAO;
+  if (texto.startsWith("venda_so_gerente")) {
+    return {
+      codigo: "venda_so_gerente",
+      mensagem: traduzir("Só gerente e admin corrigem o valor e a data da venda.", idiomaDaRecusa),
+    };
+  }
+  if (texto.startsWith("venda_data_invalida")) {
+    return {
+      codigo: "venda_data_invalida",
+      mensagem: traduzir("A data da venda não pode estar no futuro.", idiomaDaRecusa),
+    };
+  }
+  if (texto.startsWith("agendado_sem_horario")) {
+    return {
+      codigo: "iavek_agendado_sem_horario",
+      mensagem: traduzir("Marque o dia e a hora antes de mover para Agendado.", idiomaDaRecusa),
     };
   }
 

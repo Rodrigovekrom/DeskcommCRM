@@ -8,7 +8,7 @@ import type { VendaDaLoja } from "@/lib/iavek/venda-da-loja";
 import type { Lead } from "@/lib/types/leads";
 import type { BoardData } from "@/lib/kanban/types";
 
-interface MoveArgs {
+export interface MoveArgs {
   leadId: string;
   stageId: string;
   positionInStage: number;
@@ -67,6 +67,8 @@ interface OpcoesDeMove {
    * opção, cai no toast de sempre.
    */
   onTravaDaLoja?: (trava: TravaDaLoja) => void;
+  /** ia.vek v1.9.19 (0606): mover para Agendado sem horário abre a janela de agendar. */
+  onAgendadoSemHorario?: (args: MoveArgs) => void;
 }
 
 /** O que a recusa da trava da loja devolve: o lead e os rótulos do que falta. */
@@ -151,6 +153,10 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
       // perguntar. O rollback acima já devolveu o card; o reenvio parte do
       // MESMO `expected_updated_at`, porque a recusa veio antes de qualquer
       // escrita — não há segundo carimbo para recolher.
+      if (err instanceof ApiError && err.code === "iavek_agendado_sem_horario" && opcoes.onAgendadoSemHorario) {
+        opcoes.onAgendadoSemHorario(args);
+        return;
+      }
       const faltam = (err instanceof ApiError ? err.details?.faltam : undefined) as string[] | undefined;
       if (
         err instanceof ApiError &&

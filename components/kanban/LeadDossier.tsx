@@ -13,6 +13,7 @@ import type { Lead } from "@/lib/types/leads";
 import { ContatoDoNegocio } from "./ContatoDoNegocio";
 import { ConversaNoDossie } from "./ConversaNoDossie";
 import { LeadFieldsForm } from "./LeadFieldsForm";
+import { CorrigirVenda } from "@/components/iavek/CorrigirVenda";
 import { ScoreSlot } from "./ScoreSlot";
 import { LeadTimeline } from "./LeadTimeline";
 import { PropostasDoNegocio } from "./PropostasDoNegocio";
@@ -201,6 +202,7 @@ export function LeadDossier({
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
             {t("Dados do negócio")}
           </h3>
+          <CorrigirVenda lead={lead} />
           <LeadFieldsForm lead={lead} pipelineId={pipelineId} fieldDefs={fieldDefs} />
         </div>
 

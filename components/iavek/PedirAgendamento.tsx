@@ -8,7 +8,7 @@
  * janela vira "Marcar agendamento", ele escolhe o VENDEDOR, e o compromisso
  * nasce confirmado — o vendedor é avisado no sino. Para os demais, igual.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -49,12 +49,19 @@ export function PedirAgendamento({
   contactId,
   conversationId,
   leadId,
+  abrirAgora,
+  aoFechar,
+  aoEnviar,
 }: {
   /** v1.9.18: o texto do botão. */
   rotulo?: string;
   contactId: string;
   conversationId?: string | null;
   leadId?: string | null;
+  /** v1.9.19: aberta por quem chama, sem o botão (mover para Agendado sem horário). */
+  abrirAgora?: boolean;
+  aoFechar?: () => void;
+  aoEnviar?: () => void;
 }) {
   const t = useT();
   const [aberto, setAberto] = useState(false);
@@ -117,6 +124,15 @@ export function PedirAgendamento({
     }
   }
 
+  // v1.9.19: quem chama abre a janela, sem o botão.
+  const abrirRef = useRef(abrir);
+  useEffect(() => {
+    abrirRef.current = abrir;
+  });
+  useEffect(() => {
+    if (abrirAgora) void abrirRef.current();
+  }, [abrirAgora]);
+
   async function enviar() {
     if (!valido) return;
     setEnviando(true);
@@ -136,6 +152,7 @@ export function PedirAgendamento({
           : t("Pedido enviado. O administrador confirma o agendamento."),
       );
       setAberto(false);
+      aoEnviar?.();
     } catch (e) {
       showApiError(e);
     } finally {
@@ -145,6 +162,7 @@ export function PedirAgendamento({
 
   return (
     <>
+      {abrirAgora === undefined && (
       <Button
         size="sm"
         variant="outline"
@@ -154,7 +172,14 @@ export function PedirAgendamento({
       >
         {rotulo ?? (marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento"))}
       </Button>
-      <Dialog open={aberto} onOpenChange={setAberto}>
+      )}
+      <Dialog
+        open={aberto}
+        onOpenChange={(v) => {
+          setAberto(v);
+          if (!v) aoFechar?.();
+        }}
+      >
         <DialogContent className={marcaDireto ? "max-h-[90vh] overflow-y-auto sm:max-w-xl" : "sm:max-w-md"}>
           <DialogHeader>
             <DialogTitle>{marcaDireto ? t("Marcar agendamento") : t("Pedir agendamento")}</DialogTitle>

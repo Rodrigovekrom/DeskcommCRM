@@ -9108,5 +9108,17 @@
   "sem dono": "no owner",
   "faltam": "missing",
   "Ver mais": "See more",
-  "Voltar à conversa": "Back to the conversation"
+  "Voltar à conversa": "Back to the conversation",
+  "Só gerente e admin corrigem o valor e a data da venda.": "Only managers and admins can correct the sale value and date.",
+  "A data da venda não pode estar no futuro.": "The sale date cannot be in the future.",
+  "Marque o dia e a hora antes de mover para Agendado.": "Set the day and time before moving to Scheduled.",
+  "{who} vendeu {carro}": "{who} sold {carro}",
+  "Alguém da equipe": "Someone on the team",
+  "um carro": "a car",
+  "{n} vendas novas na loja": "{n} new sales at the store",
+  "Venda corrigida.": "Sale corrected.",
+  "Corrigir valor e data da venda": "Correct sale value and date",
+  "Este lead não está vendido.": "This lead is not sold.",
+  "Falha ao corrigir a venda.": "Could not correct the sale.",
+  "Ok": "Ok"
 }

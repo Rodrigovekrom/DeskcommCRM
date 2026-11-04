@@ -25,6 +25,8 @@ interface VendaDialogProps {
   onOpenChange: (open: boolean) => void;
   /** O valor do lead hoje, sugerido como valor final. */
   valorSugeridoCents: number | null | undefined;
+  /** v1.9.19: ao corrigir uma venda, a data já gravada. */
+  dataSugerida?: string;
   onConfirmar: (venda: VendaDaLoja) => void;
   isPending?: boolean;
 }
@@ -33,7 +35,7 @@ function centsParaTexto(cents: number | null | undefined): string {
   return cents == null ? "" : (cents / 100).toFixed(2).replace(".", ",");
 }
 
-export function VendaDialog({ open, onOpenChange, valorSugeridoCents, onConfirmar, isPending = false }: VendaDialogProps) {
+export function VendaDialog({ open, onOpenChange, valorSugeridoCents, dataSugerida, onConfirmar, isPending = false }: VendaDialogProps) {
   const t = useT();
   const hoje = hojeNaLoja();
   const [valor, setValor] = useState("");
@@ -42,8 +44,8 @@ export function VendaDialog({ open, onOpenChange, valorSugeridoCents, onConfirma
   useEffect(() => {
     if (!open) return;
     setValor(centsParaTexto(valorSugeridoCents));
-    setData(hojeNaLoja());
-  }, [open, valorSugeridoCents]);
+    setData(dataSugerida ?? hojeNaLoja());
+  }, [open, valorSugeridoCents, dataSugerida]);
 
   const valorCents = parseReaisToCents(valor.trim());
   const valido = valorCents !== null && valorCents > 0 && data !== "" && data <= hoje;

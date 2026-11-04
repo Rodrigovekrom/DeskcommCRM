@@ -231,3 +231,8 @@ export function primeiroEnvioAssume(funcao: unknown, role: string | null | undef
   if (f === "vendedor" || f === "analista_ficha") return false;
   return f !== null || role === "admin" || role === "manager";
 }
+
+/** ia.vek v1.9.19: depois de vendido, só gerente e admin corrigem valor e data (0606). */
+export function corrigeVenda(funcao: unknown, papel: string | null | undefined): boolean {
+  return papel === "admin" || papel === "manager" || funcao === "gerente" || funcao === "apoio";
+}
