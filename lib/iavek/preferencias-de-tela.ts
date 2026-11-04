@@ -19,8 +19,8 @@ export type OrdemDoPipeline = OrdemDoQuadro;
 export const preferenciasDoPipelineSchema = z
   .object({
     ordem: z.enum(ORDENS_DO_PIPELINE).default(ORDEM_PADRAO),
-    // v1.9.18: a ordem gravada antes desta versão era só o padrão antigo; quem não tem a marca
-    // começa na nova ordem. Escolher de novo grava a marca.
+    // v1.9.18: "chegada" gravada antes desta versão era só o padrão antigo; sem a marca, começa na
+    // nova ordem. Escolher de novo grava a marca.
     v: z.literal(2).optional(),
     ocultas: z.array(z.uuid()).max(50).default([]),
     recolhidas: z.array(z.uuid()).max(50).default([]),
@@ -34,5 +34,5 @@ export const PIPELINE_PADRAO: PreferenciasDoPipeline = { ordem: ORDEM_PADRAO, oc
 export function lerPreferenciasDoPipeline(valor: unknown): PreferenciasDoPipeline {
   const lido = preferenciasDoPipelineSchema.safeParse(valor ?? {});
   if (!lido.success) return { ...PIPELINE_PADRAO };
-  return lido.data.v === 2 ? lido.data : { ...lido.data, ordem: ORDEM_PADRAO, v: 2 };
+  return lido.data.v === 2 || lido.data.ordem !== "chegada" ? lido.data : { ...lido.data, ordem: ORDEM_PADRAO };
 }

@@ -30,7 +30,7 @@ describe("as preferências não moram em interface_settings", () => {
 describe("o quadro respeita a vista", () => {
   const quadro = readFileSync(join(process.cwd(), "components/kanban/KanbanBoard.tsx"), "utf8");
   it("ordem por atividade recente, etapas ocultas fora e recolhidas como faixa", () => {
-    expect(quadro).toMatch(/ordem === "atividade"/);
+    expect(quadro).toMatch(/compararLeads\(/);
     expect(quadro).toMatch(/etapasOcultas\?\.has\(stage\.id\) \? null/);
     expect(quadro).toMatch(/data-etapa-recolhida/);
   });

@@ -258,9 +258,10 @@ export async function POST(req: NextRequest): Promise<Response> {
           .eq("id", organizationId)
           .maybeSingle();
         if (orgError) throw orgError;
-        const perfil = lerPerfilDaEmpresa(org?.settings);
+        // ia.vek v1.9.18: na loja, o primeiro envio assume a conversa sem dono, menos para o vendedor.
         let assumeNaLoja = false;
-        if (ehLojaDeCarros(perfil) && !perfil.modo_agendamento) {
+        const perfil = lerPerfilDaEmpresa(org?.settings);
+        if (!conversaFicaComQuemAtendeu(org?.settings) && org?.settings && ehLojaDeCarros(perfil) && !perfil.modo_agendamento) {
           const { data: vinculo } = await supabase
             .from("user_organizations")
             .select("role, interface_settings")

@@ -20,7 +20,16 @@ const rpc = vi.fn();
 /** O `settings` da organização, lido pela rota antes de assumir. */
 let settings: unknown = null;
 const from = vi.fn((tabela: string) => {
-  expect(tabela).toBe("organizations");
+    // ia.vek v1.9.18: na loja, a rota também lê o vínculo de quem envia.
+  if (tabela === "user_organizations") {
+    const vinculo = {
+      select: () => vinculo,
+      eq: () => vinculo,
+      is: () => vinculo,
+      maybeSingle: async () => ({ data: { role: "agent", interface_settings: null }, error: null }),
+    };
+    return vinculo;
+  }
   const cadeia = {
     select: () => cadeia,
     eq: (coluna: string, valor: string) => {

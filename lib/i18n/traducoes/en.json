@@ -9093,5 +9093,20 @@
   "Todos os leads da loja": "All the store's leads",
   "Sua carteira": "Your portfolio",
   "Parado há 1 dia": "Idle for 1 day",
-  "Parado há {dias} dias": "Idle for {dias} days"
+  "Parado há {dias} dias": "Idle for {dias} days",
+  "Agendar horário": "Schedule a time",
+  "dados": "fields",
+  "Dados do lead": "Lead details",
+  "Maior valor": "Highest value",
+  "sem resposta há": "no reply for",
+  "Última mensagem do lead": "Lead's last message",
+  "Parado há mais tempo": "Idle the longest",
+  "Tarefa mais atrasada": "Most overdue task",
+  "Movido para": "Moved to",
+  "Desfazer": "Undo",
+  "Mover para a coluna:": "Move to column:",
+  "sem dono": "no owner",
+  "faltam": "missing",
+  "Ver mais": "See more",
+  "Voltar à conversa": "Back to the conversation"
 }

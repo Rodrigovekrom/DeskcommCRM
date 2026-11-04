@@ -30,6 +30,7 @@ const capturado = vi.hoisted(() => ({
 }));
 
 vi.mock("@hello-pangea/dnd", () => ({
+  useKeyboardSensor: () => {},
   DragDropContext: ({
     onDragEnd,
     children,

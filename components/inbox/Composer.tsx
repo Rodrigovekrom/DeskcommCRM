@@ -15,8 +15,6 @@ import { AttachMenu } from "@/components/inbox/composer/AttachMenu";
 import { AttachmentPreviewDialog } from "@/components/inbox/composer/AttachmentPreviewDialog";
 import { ContactPickerDialog } from "@/components/inbox/composer/ContactPickerDialog";
 import { AudioRecorder } from "@/components/inbox/composer/AudioRecorder";
-import { useAuth } from "@/hooks/auth/AuthProvider";
-import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import { ReplyReviewPanel } from "@/components/inbox/composer/ReplyReviewPanel";
 import { EmojiButton } from "@/components/inbox/composer/EmojiButton";
 import {
@@ -70,6 +68,8 @@ function avisoDeRascunhoIndisponivel(motivo: MotivoDeRecusa, t: (texto: string) 
 }
 
 interface Props {
+  /** v1.9.18: a tela do vendedor fica sem a Assistência do agente. */
+  semAssistencia?: boolean;
   conversationId: string;
   initialDraft?: string;
   initialMode?: "reply" | "note";
@@ -112,6 +112,7 @@ interface Props {
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   {
     conversationId,
+    semAssistencia = false,
     initialDraft = "",
     initialMode = "reply",
     active = true,
@@ -217,8 +218,6 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   // send/createNote fora do disable: o texto some na hora do envio; travar o campo
   // até a API voltar impedia digitar a próxima mensagem com o campo ainda cheio.
   const isDisabled = disabled || !!blockedReason || upload.isPending;
-  // v1.9.18: a Assistência do agente sai da tela do vendedor.
-  const ehVendedor = funcaoDaTela(useAuth().activeOrg?.interface_settings?.funcao) === "vendedor";
   // A janela só alcança o que SAI. Em modo nota o composer segue liberado: a
   // nota interna nunca chega ao cliente, e é onde o atendente registra por que
   // a conversa esfriou — barrá-la tira exatamente o que ainda dá para fazer.
@@ -434,7 +433,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           mode === "note" && "border-warning/40 bg-warning-bg",
         )}
       >
-        {mode === "reply" && !ehVendedor && (
+        {mode === "reply" && !semAssistencia && (
           <ReplyReviewPanel conversationId={conversationId} disabled={isDisabled} />
         )}
         <TemplateMenu

@@ -303,6 +303,7 @@ function PainelDaConversa({
           currentContactId={conversa.contact_id}
           rascunho={null}
           initialDraft=""
+          semAssistencia={ehVendedor}
         />
       </div>
       <div
