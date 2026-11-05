@@ -31,6 +31,7 @@ import { avisoDeEtapaHandler } from "@/lib/leads/aviso-de-etapa.handler";
 import { avisoDeCasoAoSuporteHandler } from "@/lib/escalacao/aviso-ao-suporte.handler";
 import { avisoDePropostaNoWhatsAppHandler } from "@/lib/propostas/aviso-no-whatsapp.handler";
 import { registerHandler } from "@/lib/event-log/dispatcher";
+import { avisoDeAjudaHandler } from "@/lib/iavek/aviso-de-ajuda.handler";
 import { iavekNotaDoAtendimentoHandler } from "@/workers/iavek-nota-do-atendimento.handler";
 import { iavekConfirmacaoDaAgendaHandler } from "@/workers/iavek-confirmacao-da-agenda.handler";
 
@@ -92,5 +93,7 @@ export function ensureHandlersRegistered(): void {
   registerHandler(iavekNotaDoAtendimentoHandler);
   // ia.vek v1.9.2: a confirmação pelo WhatsApp do pré-agendado (só no modo agendamento).
   registerHandler(iavekConfirmacaoDaAgendaHandler);
+  // ia.vek v1.9.22: o aviso do grupo move o lead para Suporte IA e entrega ao guardião.
+  registerHandler(avisoDeAjudaHandler);
   _registered = true;
 }

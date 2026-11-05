@@ -111,6 +111,16 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
       if (n.dados.evento === "esteira_voltou") {
         return t("A esteira de leads voltou a rodar.");
       }
+      // v1.9.22: o aviso do grupo (Guardião Leads).
+      if (n.dados.evento === "aviso_de_ajuda_entregue") {
+        return t("Pediram ajuda: {nome} é seu agora.").replace("{nome}", String(n.dados.nome ?? t("um cliente")));
+      }
+      if (n.dados.evento === "aviso_de_ajuda_nao_reconhecido") {
+        return t("Aviso do grupo sem lead reconhecido: {nome}. O lead segue em IA Atendendo.").replace(
+          "{nome}",
+          String(n.dados.nome ?? t("sem nome")),
+        );
+      }
       // v1.9.20: o registro do pop-up de venda, sem cliente e sem valor.
       if (n.dados.evento === "venda") {
         return t("{who} vendeu {carro}")
