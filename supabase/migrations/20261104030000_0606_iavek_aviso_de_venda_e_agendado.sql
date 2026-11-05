@@ -6,6 +6,8 @@
 -- worker e chave de serviço seguem como antes.
 
 alter table public.notificacoes add column if not exists popup_visto_em timestamptz;
+-- A pessoa só atualiza colunas nomeadas nesta tabela (como `lida_em`).
+grant update (popup_visto_em) on public.notificacoes to authenticated;
 
 create index if not exists idx_notificacoes_popup_pendente
   on public.notificacoes (user_id, created_at desc)
@@ -54,8 +56,10 @@ $$;
 revoke execute on function public.fn_iavek_aviso_de_venda() from public, anon, authenticated;
 
 drop trigger if exists trg_iavek_aviso_de_venda on public.crm_leads;
+-- Sem "of status": quem muda o status ao entrar na etapa de venda é outro gatilho, e
+-- "update of" só olha as colunas escritas no próprio UPDATE.
 create trigger trg_iavek_aviso_de_venda
-  after update of status on public.crm_leads
+  after update on public.crm_leads
   for each row
   when (new.status = 'won' and old.status is distinct from 'won')
   execute function public.fn_iavek_aviso_de_venda();
@@ -68,9 +72,10 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if auth.uid() is null
-     or old.status <> 'won' or new.status <> 'won'
-     or (new.value_cents is not distinct from old.value_cents
+  -- Tirar de Vendido também conta: reabrir e vender de novo seria corrigir por fora.
+  if auth.uid() is null or old.status <> 'won'
+     or (new.status = 'won'
+         and new.value_cents is not distinct from old.value_cents
          and new.closed_at is not distinct from old.closed_at) then
     return new;
   end if;
@@ -82,6 +87,10 @@ begin
           or coalesce(public.fn_iavek_funcao_do_membro(new.organization_id, auth.uid()), '') in ('gerente', 'apoio')) then
     raise exception 'venda_so_gerente: só gerente e admin corrigem o valor e a data da venda'
       using errcode = 'PT403';
+  end if;
+  -- Gerente e admin podem reabrir; aí valor e data seguem as regras do lead aberto.
+  if new.status <> 'won' then
+    return new;
   end if;
   if coalesce(new.value_cents, 0) <= 0 or new.closed_at is null then
     raise exception 'venda_incompleta: informe o valor final e a data da venda';
@@ -97,7 +106,7 @@ revoke execute on function public.fn_iavek_venda_so_gerente_corrige() from publi
 
 drop trigger if exists trg_zz_iavek_venda_so_gerente_corrige on public.crm_leads;
 create trigger trg_zz_iavek_venda_so_gerente_corrige
-  before update of value_cents, closed_at on public.crm_leads
+  before update on public.crm_leads
   for each row
   execute function public.fn_iavek_venda_so_gerente_corrige();
 

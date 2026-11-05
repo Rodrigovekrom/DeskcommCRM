@@ -34,7 +34,7 @@ describe("0606 — venda e Agendado", () => {
   beforeAll(() => {
     seedGov();
     sql(`
-      update public.user_organizations set role='agent', interface_settings='{"funcao":"vendedor"}' where organization_id='${GOV_ORG}' and user_id='${GOV_AGENT_A}';
+      update public.user_organizations set role='agent', interface_settings=coalesce(interface_settings,'{}'::jsonb) || '{"funcao":"vendedor"}'::jsonb where organization_id='${GOV_ORG}' and user_id='${GOV_AGENT_A}';
       insert into public.catalog_products (id, organization_id, codigo, nome, preco_cents, moeda, origem)
         values ('${CARRO}', '${GOV_ORG}', 'ALT-0606', 'Carro da prova 0606', 8000000, 'BRL', 'altimus') on conflict (id) do nothing;
       insert into public.crm_pipelines (id, organization_id, name, slug) values ('${FUNIL}', '${GOV_ORG}', 'Funil 0606', 'funil-0606') on conflict (id) do nothing;
@@ -100,6 +100,17 @@ describe("0606 — venda e Agendado", () => {
     expect(um(`select value_cents from public.crm_leads where id='${LEAD}';`)).toBe("7000000");
   });
 
+  it("o vendedor dono não tira de Vendido; o gerente pode", () => {
+    expect(moverComo(GOV_AGENT_A, LEAD, ABERTA)).toMatch(/venda_so_gerente/);
+    expect(um(`select status from public.crm_leads where id='${LEAD}';`)).toBe("won");
+  });
+
+  it("a pessoa marca o pop-up como visto, só o dela", () => {
+    const id = um(`select id from public.notificacoes where user_id='${GOV_AGENT_A}' and dados->>'evento'='venda' limit 1;`);
+    expect(writeCountAs(GOV_AGENT_A, `update public.notificacoes set popup_visto_em=now() where id='${id}'`)).toBe(1);
+    expect(writeCountAs(GOV_MANAGER, `update public.notificacoes set popup_visto_em=now() where id='${id}'`)).toBe(0);
+  });
+
   it("gerente não põe data no futuro nem zera o valor", () => {
     for (const set of [`closed_at=now()+interval '2 days'`, `value_cents=0`]) {
       let erro = "";
@@ -110,5 +121,6 @@ describe("0606 — venda e Agendado", () => {
       }
       expect(erro).toMatch(/venda_data_invalida|venda_incompleta/);
     }
+    expect(moverComo(GOV_MANAGER, LEAD, ABERTA)).toBe("1");
   });
 });

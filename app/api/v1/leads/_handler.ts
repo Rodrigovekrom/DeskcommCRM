@@ -237,6 +237,19 @@ function recusaDaGuardaDoBanco(
   ctx: HandlerCtx,
   erro: { code?: string; message?: string } | null,
 ): ApiError | null {
+  // ia.vek v1.9.19 (0606): antes da régua geral do PT422, que falaria de responsável.
+  if (/^(venda_so_gerente|venda_data_invalida|agendado_sem_horario)/.test(erro?.message ?? "")) {
+    const recusa = recusaDeMotivoDaPerdaPeloBanco(erro, ctx.idioma);
+    if (recusa) {
+      return new ApiError(
+        recusa.codigo === "venda_so_gerente" ? 403 : 422,
+        recusa.codigo,
+        undefined,
+        ctx.requestId,
+        recusa.mensagem,
+      );
+    }
+  }
   // ia.vek v1.9.12 (0600): lead que nasceria vendido, sem valor e data.
   if (erro?.message?.startsWith("venda_incompleta")) {
     return new ApiError(

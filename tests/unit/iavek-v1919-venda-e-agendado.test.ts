@@ -45,6 +45,10 @@ describe("v1.9.19: o aviso e a tela", () => {
     expect(migration.match(/'loja_de_carros'\) <> 'loja_de_carros'/g)).toHaveLength(3);
     expect(migration).toMatch(/s\.slug = 'agendado-video'/);
   });
+  it("o gatilho do aviso não depende de status na lista do UPDATE, e a pessoa marca o visto", () => {
+    expect(migration).toMatch(/create trigger trg_iavek_aviso_de_venda\s+after update on public\.crm_leads/);
+    expect(migration).toMatch(/grant update \(popup_visto_em\) on public\.notificacoes to authenticated/);
+  });
   it("a migration está no baseline, antes da varredura", () => {
     const i = baseline.lastIndexOf("create or replace function public.fn_iavek_agendado_exige_horario");
     expect(i).toBeGreaterThan(0);
