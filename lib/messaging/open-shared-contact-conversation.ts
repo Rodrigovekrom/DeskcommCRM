@@ -35,6 +35,19 @@ async function findContactByPhoneVariants(
   return encontrarContatoPorTelefone(admin as never, orgId, rawPhone);
 }
 
+/** ia.vek v1.9.19.1: o contato que esta abertura alcançaria, sem criar nada. */
+export async function contatoExistenteDaAbertura(
+  admin: Admin,
+  orgId: string,
+  input: OpenSharedContactInput,
+): Promise<string | null> {
+  if (input.contact_id) return input.contact_id;
+  const phone = input.phone_number ? parseDialablePhone(input.phone_number) : null;
+  if (!phone) return null;
+  const existente = await findContactByPhoneVariants(admin, orgId, canonicalPhoneBR(phone));
+  return existente?.id ?? null;
+}
+
 async function resolveContactId(
   admin: Admin,
   orgId: string,

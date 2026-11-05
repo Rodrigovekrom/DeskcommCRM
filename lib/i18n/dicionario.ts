@@ -11961,6 +11961,8 @@ export const DICIONARIO: Traducoes = {
   "Movido para": { es: "Movido a" },
   "Mover para a coluna:": { es: "Mover a la columna:" },
   "O vendedor não move lead para a coluna da IA.": { es: "El vendedor no mueve leads a la columna de la IA." },
+  "O vendedor não exclui contato.": { es: "El vendedor no elimina contactos." },
+  "O vendedor não usa esta tela.": { es: "El vendedor no usa esta pantalla." },
   "{carro} saiu do estoque": { es: "{carro} salió del inventario" },
   "{n} carros saíram do estoque": { es: "{n} coches salieron del inventario" },
   "Um carro": { es: "Un coche" },

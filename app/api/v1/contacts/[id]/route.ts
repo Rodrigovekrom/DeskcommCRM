@@ -17,6 +17,7 @@ import { loadAuthUser } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { contactPatchSchemaDoPais, validateRequest } from "@/lib/schemas";
 import { perfilDaOrganizacao } from "@/lib/legal/perfil-do-pais";
+import { funcaoNaOrganizacao } from "@/lib/iavek/contato-no-alcance";
 import { createClient } from "@/lib/supabase/server";
 
 import { deleteContactHandler, getContactHandler, patchContactHandler } from "../_handler";
@@ -152,6 +153,10 @@ export async function DELETE(
   const activeOrg = authz.org;
 
   const supabase = await createClient();
+  // ia.vek v1.9.19.1: excluir contato não é da tela do vendedor.
+  if ((await funcaoNaOrganizacao(supabase, activeOrg.orgId, user.id)) === "vendedor") {
+    return fail("forbidden_role", traduzir("O vendedor não exclui contato.", user.idioma), 403, { requestId });
+  }
 
   try {
     await deleteContactHandler(

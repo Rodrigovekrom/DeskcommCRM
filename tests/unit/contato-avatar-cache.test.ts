@@ -65,6 +65,13 @@ vi.mock("@/lib/auth/server", () => ({
   orgAtivaSemPortao: async () => orgAtiva,
 }));
 
+// v1.9.19.1: a rota confere pela sessão se a pessoa enxerga o contato.
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => {
+    const c = { select: () => c, eq: () => c, maybeSingle: async () => ({ data: { id: "c" }, error: null }) };
+    return { from: () => c };
+  }),
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: () => ({ select: () => chain() }),

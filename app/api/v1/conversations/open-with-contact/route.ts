@@ -11,8 +11,9 @@ import { type NextRequest } from "next/server";
 import { resolveAuthDual, tetoDeEscritaDoToken } from "@/lib/api/auth-dual";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
-import { openSharedContactConversation } from "@/lib/messaging/open-shared-contact-conversation";
+import { contatoExistenteDaAbertura, openSharedContactConversation } from "@/lib/messaging/open-shared-contact-conversation";
 import { openConversationWithContactSchema, validateRequest } from "@/lib/schemas";
+import { contatoNoAlcance } from "@/lib/iavek/contato-no-alcance";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { IDIOMA_PADRAO } from "@/lib/i18n/idiomas";
@@ -57,7 +58,21 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   try {
     const admin = createAdminClient();
-    const result = await openSharedContactConversation(admin, authz.organizationId, input);
+    // ia.vek v1.9.19.1: abrir conversa exige enxergar o contato; a chave de serviço não confere.
+    const jaExiste = await contatoExistenteDaAbertura(admin, authz.organizationId, input);
+    if (jaExiste && !(await contatoNoAlcance(authz.supabase, authz.organizationId, jaExiste))) {
+      return fail("not_found", t("Contato não encontrado."), 404, { requestId });
+    }
+    const result = await openSharedContactConversation(admin, authz.organizationId, input)
+    // Contato novo aberto por uma pessoa fica registrado como criado por ela.
+    if (!jaExiste && authz.actor.type === "user") {
+      await admin
+        .from("contacts")
+        .update({ created_by_user_id: authz.actor.id })
+        .eq("id", result.contact_id)
+        .eq("organization_id", authz.organizationId)
+        .is("created_by_user_id", null);
+    };
     return ok(result, { requestId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "open_failed";

@@ -24,6 +24,7 @@ import {
   type ContatoParaDeduplicar,
 } from "@/lib/contacts/duplicados";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { funcaoNaOrganizacao } from "@/lib/iavek/contato-no-alcance";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,10 @@ export async function GET(): Promise<Response> {
   }
 
   const supabase = await createClient();
+  // ia.vek v1.9.19.1: a limpeza de duplicados não é da tela do vendedor.
+  if ((await funcaoNaOrganizacao(supabase, org.orgId, user.id)) === "vendedor") {
+    return fail("forbidden_role", traduzir("O vendedor não usa esta tela.", user.idioma), 403, { requestId });
+  }
   const { data, error } = await supabase
     .from("contacts")
     .select(

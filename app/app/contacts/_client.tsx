@@ -25,6 +25,7 @@ import { ImportContactsDialog } from "@/components/contacts/ImportContactsDialog
 import { TAG_DE_CLIENTE } from "@/lib/contacts/cliente";
 import { type ModoDeEtiqueta } from "@/lib/inbox/marcador-da-conversa";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import { MergeDialog } from "@/components/contacts/MergeDialog";
 import { EmptyContacts } from "@/components/empty";
 import type { ContactOrderBy } from "@/lib/schemas/contacts";
@@ -50,6 +51,9 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 
 export function ContactsListClient() {
   const t = useT();
+  const orgAtiva = useActiveOrg();
+  // v1.9.19.1: excluir, importar e duplicados saem da tela do vendedor.
+  const ehVendedor = funcaoDaTela(orgAtiva?.interface_settings?.funcao) === "vendedor";
   const clientesLigado = useActiveOrg()?.cliente_pela_agenda === true;
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -141,14 +145,18 @@ export function ContactsListClient() {
             descobre olhando a lista, e a barra lateral não precisa crescer para
             um trabalho que se faz de vez em quando.
           */}
-          <Button variant="outline" onClick={() => setDuplicadosOpen(true)}>
-            <UsersThree size={16} weight="bold" aria-hidden />
-            <span>{t("Duplicados")}</span>
-          </Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <UploadSimple size={16} weight="bold" aria-hidden />
-            <span>{t("Importar CSV")}</span>
-          </Button>
+          {!ehVendedor && (
+            <>
+              <Button variant="outline" onClick={() => setDuplicadosOpen(true)}>
+                <UsersThree size={16} weight="bold" aria-hidden />
+                <span>{t("Duplicados")}</span>
+              </Button>
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <UploadSimple size={16} weight="bold" aria-hidden />
+                <span>{t("Importar CSV")}</span>
+              </Button>
+            </>
+          )}
           <Button onClick={() => setCreateOpen(true)}>
             <Plus size={16} weight="bold" aria-hidden />
             <span>{t("Novo contato")}</span>

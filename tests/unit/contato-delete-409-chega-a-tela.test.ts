@@ -16,7 +16,13 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { mensagemDeBloqueioPorVinculo } from "@/hooks/contacts/useDeleteContact";
 
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({})) }));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => {
+    // v1.9.19.1: a rota lê a função de quem exclui antes de seguir.
+    const c = { select: () => c, eq: () => c, is: () => c, maybeSingle: async () => ({ data: null, error: null }) };
+    return { from: () => c };
+  }),
+}));
 vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: async () => null }));
 vi.mock("@/app/api/v1/contacts/_handler", () => ({
   deleteContactHandler: vi.fn(async () => {

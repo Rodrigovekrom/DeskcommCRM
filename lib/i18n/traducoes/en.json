@@ -9109,5 +9109,7 @@
   "faltam": "missing",
   "Ver mais": "See more",
   "Voltar à conversa": "Back to the conversation",
-  "O vendedor não move lead para a coluna da IA.": "Sellers cannot move leads to the AI column."
+  "O vendedor não move lead para a coluna da IA.": "Sellers cannot move leads to the AI column.",
+  "O vendedor não exclui contato.": "Sellers cannot delete contacts.",
+  "O vendedor não usa esta tela.": "Sellers do not use this screen."
 }

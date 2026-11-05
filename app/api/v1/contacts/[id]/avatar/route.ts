@@ -19,7 +19,9 @@ import type { NextRequest } from "next/server";
 import { fail } from "@/lib/api/wrappers";
 import { loadAuthUser } from "@/lib/auth/server";
 import { orgAtivaDaApi } from "@/lib/auth/require-role";
+import { contatoNoAlcance } from "@/lib/iavek/contato-no-alcance";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,11 @@ export async function GET(
   const activeOrg = ativa.org;
   if (!activeOrg) {
     return fail("no_active_org", "No active organization.", 403, { requestId });
+  }
+
+  // ia.vek v1.9.19.1: a foto segue o mesmo alcance do contato.
+  if (!(await contatoNoAlcance(await createClient(), activeOrg.orgId, id))) {
+    return fail("not_found", "Contato não encontrado.", 404, { requestId });
   }
 
   const admin = createAdminClient();

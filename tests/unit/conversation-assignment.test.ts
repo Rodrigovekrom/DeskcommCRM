@@ -243,7 +243,10 @@ describe("v1.9.19 — só troca o responsável quem enxerga a conversa", () => {
   ])("%s de conversa fora do alcance → 404, sem chamar a troca", async (rota, corpo) => {
     const state = stubState({ conversaVisivel: false });
     agentSession(state);
-    const { POST } = await import(`@/app/api/v1/conversations/[id]/${rota}/route`);
+    const { POST } =
+      rota === "claim"
+        ? await import("@/app/api/v1/conversations/[id]/claim/route")
+        : await import("@/app/api/v1/conversations/[id]/transfer/route");
     const res = await POST(postReq(rota, corpo), params);
     expect(res.status).toBe(404);
     expect(assignCall(state)).toBeUndefined();

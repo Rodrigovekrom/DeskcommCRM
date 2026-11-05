@@ -522,6 +522,16 @@ export async function createContactHandler(
           traduzir("Já existe um contato com este telefone.", ctx.idioma ?? "pt-BR"),
         );
       }
+      // ia.vek v1.9.19.1: o contato é de outra pessoa. Recusa clara, sem o id dele.
+      if (/uniq_contacts_org_phone/.test(insErr.message ?? "")) {
+        throw new ApiError(
+          409,
+          "contact_exists",
+          undefined,
+          ctx.requestId,
+          traduzir("Já existe um contato com este telefone.", ctx.idioma ?? "pt-BR"),
+        );
+      }
     }
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, insErr.message);
   }

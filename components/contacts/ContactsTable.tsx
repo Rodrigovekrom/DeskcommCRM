@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import { useDeleteContact, mensagemDeBloqueioPorVinculo } from "@/hooks/contacts/useDeleteContact";
 import type { ContactOrderBy } from "@/lib/schemas/contacts";
 import type { Contact } from "@/lib/types/contacts";
@@ -111,6 +112,7 @@ function SortableHead({
 export function ContactsTable({ contacts, orderBy, orderDir, onSort }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
+  const ehVendedor = funcaoDaTela(useActiveOrg()?.interface_settings?.funcao) === "vendedor";
   const clientesLigado = useActiveOrg()?.cliente_pela_agenda === true;
   const del = useDeleteContact();
   const [alvo, setAlvo] = useState<Contact | null>(null);
@@ -299,6 +301,7 @@ export function ContactsTable({ contacts, orderBy, orderDir, onSort }: Props) {
                     <ChatCircle size={16} weight="regular" aria-hidden />
                   </Button>
                 ) : null}
+                {!ehVendedor && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -309,6 +312,7 @@ export function ContactsTable({ contacts, orderBy, orderDir, onSort }: Props) {
                 >
                   <Trash size={16} weight="regular" aria-hidden />
                 </Button>
+                )}
               </div>
             </TableCell>
           </TableRow>
