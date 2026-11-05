@@ -70,6 +70,9 @@ function fakeSupabase(fila: Record<string, Resposta[]>, rpc: Resposta) {
         return builder;
       };
       builder.limit = () => devolve();
+      // v1.9.19.2: a rota lê por páginas.
+      builder.order = () => builder;
+      builder.range = () => devolve();
       builder.then = (
         ok?: (v: Resposta) => unknown,
         erro?: (e: unknown) => unknown,
@@ -257,7 +260,8 @@ describe("GET /api/v1/metrics/funil", () => {
       ["performed_at <", "2026-10-01T00:00:00.000Z"],
     ]);
     const leads = consultas.filter((c) => c.tabela === "crm_leads");
-    expect(leads).toHaveLength(2);
+    // v1.9.19.2: cada leitura vem por páginas; as duas primeiras são as dos dois filtros.
+    expect(leads.length).toBeGreaterThanOrEqual(2);
     expect(leads[0]?.filtros.map((f) => f[0])).toEqual([
       "organization_id",
       "created_at >=",
@@ -268,7 +272,7 @@ describe("GET /api/v1/metrics/funil", () => {
       "closed_at >=",
       "closed_at <",
     ]);
-    expect(consultas).toHaveLength(5);
+    expect(consultas).toHaveLength(8); // as 5 leituras + a página vazia de cada uma das 3 paginadas
   });
 
   it("conta a passagem gravada como { de, para } (agente, handoff, agenda)", async () => {

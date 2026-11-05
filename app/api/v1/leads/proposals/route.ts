@@ -20,6 +20,7 @@
  * pode ver.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import type { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
@@ -76,18 +77,26 @@ export async function GET(req: NextRequest): Promise<Response> {
   // ── PENDENTES ────────────────────────────────────────────────────────────
   const [{ data: estados, error: estadosErr }, { data: candidatos, error: candErr }] =
     await Promise.all([
-      supabase
-        .from("lead_state")
+      lerTudo((de, ate) =>
+        supabase
+          .from("lead_state")
         .select("contact_id, next_action, next_action_seq, updated_at")
         .eq("organization_id", orgId)
-        .not("next_action", "is", null),
-      supabase
-        .from("crm_leads")
+        .not("next_action", "is", null)
+          .order("contact_id")
+          .range(de, ate),
+      ),
+      lerTudo((de, ate) =>
+        supabase
+          .from("crm_leads")
         .select(
           "id, organization_id, pipeline_id, status, last_activity_at, created_at, contact_id",
         )
         .eq("organization_id", orgId)
-        .eq("status", "open"),
+        .eq("status", "open")
+          .order("id")
+          .range(de, ate),
+      ),
     ]);
   if (estadosErr) return fail("internal", estadosErr.message, 500, { requestId });
   if (candErr) return fail("internal", candErr.message, 500, { requestId });

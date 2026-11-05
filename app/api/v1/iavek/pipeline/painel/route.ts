@@ -13,6 +13,7 @@
  * Lê pela SESSÃO: a RLS decide o que cada um enxerga; a rota só recorta.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
@@ -75,21 +76,23 @@ export async function GET(req: Request): Promise<Response> {
   if (!funis) return ok({ contadores: vazio, com_tarefa: [] }, { requestId });
   const idsDosFunis = [funis.entrada, ...(funis.followup ? [funis.followup] : [])];
 
-  let consulta = supabase
-    .from("crm_leads")
-    .select("id, pipeline_id, stage_id, contact_id")
-    .eq("organization_id", orgId)
-    .eq("status", "open")
-    .in("pipeline_id", idsDosFunis)
-    .limit(TETO);
-  if (recorte.tipo === "carteira") {
-    consulta =
-      recorte.lado === "sdr"
-        ? consulta.or(`owner_user_id.eq.${eu},sdr_user_id.eq.${eu}`)
-        : consulta.eq("owner_user_id", eu);
-  }
+  const lerLeads = (de: number, ate: number) => {
+    const consulta = supabase
+      .from("crm_leads")
+      .select("id, pipeline_id, stage_id, contact_id")
+      .eq("organization_id", orgId)
+      .eq("status", "open")
+      .in("pipeline_id", idsDosFunis);
+    const recortada =
+      recorte.tipo === "carteira"
+        ? recorte.lado === "sdr"
+          ? consulta.or(`owner_user_id.eq.${eu},sdr_user_id.eq.${eu}`)
+          : consulta.eq("owner_user_id", eu)
+        : consulta;
+    return recortada.order("id").range(de, ate);
+  };
   const [{ data: linhas, error: erroLeads }, { data: funilDeEntrada }] = await Promise.all([
-    consulta,
+    lerTudo(lerLeads),
     supabase.from("crm_pipelines").select("settings").eq("id", funis.entrada).maybeSingle(),
   ]);
   if (erroLeads) return fail("internal_error", erroLeads.message, 500, { requestId });
@@ -115,19 +118,25 @@ export async function GET(req: Request): Promise<Response> {
         .in("lead_id", lote),
     ),
     recorte.tipo === "carteira"
-      ? supabase
-          .from("crm_tasks")
-          .select("id, lead_id, due_date")
-          .eq("organization_id", orgId)
-          .in("status", [...TAREFA_ABERTA])
-          .eq("assigned_to", eu)
-          .limit(TETO)
-      : supabase
-          .from("crm_tasks")
-          .select("id, lead_id, due_date")
-          .eq("organization_id", orgId)
-          .in("status", [...TAREFA_ABERTA])
-          .limit(TETO),
+      ? lerTudo((de, ate) =>
+          supabase
+            .from("crm_tasks")
+            .select("id, lead_id, due_date")
+            .eq("organization_id", orgId)
+            .in("status", [...TAREFA_ABERTA])
+            .eq("assigned_to", eu)
+            .order("id")
+            .range(de, ate),
+        )
+      : lerTudo((de, ate) =>
+          supabase
+            .from("crm_tasks")
+            .select("id, lead_id, due_date")
+            .eq("organization_id", orgId)
+            .in("status", [...TAREFA_ABERTA])
+            .order("id")
+            .range(de, ate),
+        ),
     visitasDeHoje(supabase, orgId, hoje, recorte.tipo === "carteira" ? { eu, contatos } : null),
   ]);
   if (tarefasDosLeads.error) return fail("internal_error", tarefasDosLeads.error.message, 500, { requestId });

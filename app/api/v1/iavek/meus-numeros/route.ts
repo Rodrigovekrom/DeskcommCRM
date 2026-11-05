@@ -7,6 +7,7 @@
  * O SDR vê os números de SDR; os demais, os de vendedor (`visaoDosNumeros`).
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import { type NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
@@ -126,7 +127,8 @@ export async function GET(req: NextRequest): Promise<Response> {
           .gte("sent_at", de)
           .lt("sent_at", ate),
       ),
-      db
+      lerTudo((p0, p1) =>
+        db
         .from("crm_leads")
         .select("value_cents")
         .eq("organization_id", orgId)
@@ -134,8 +136,11 @@ export async function GET(req: NextRequest): Promise<Response> {
         .eq("status", "won")
         .gte("closed_at", de)
         .lt("closed_at", ate)
-        .limit(5000),
-      db
+        .order("id")
+        .range(p0, p1),
+      ),
+      lerTudo((p0, p1) =>
+        db
         .from("crm_leads")
         .select("lost_reason")
         .eq("organization_id", orgId)
@@ -143,7 +148,9 @@ export async function GET(req: NextRequest): Promise<Response> {
         .eq("status", "lost")
         .gte("closed_at", de)
         .lt("closed_at", ate)
-        .limit(5000),
+        .order("id")
+        .range(p0, p1),
+      ),
     ]);
     if (ganhos.error) throw new Error(ganhos.error.message);
     if (perdidos.error) throw new Error(perdidos.error.message);

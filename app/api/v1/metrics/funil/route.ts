@@ -23,6 +23,7 @@
  * a contra-métrica vem `null` com a razão escrita — nunca some e nunca vira 0.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -43,7 +44,7 @@ export const dynamic = "force-dynamic";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 /** Teto da leitura: acima disso o relatório diz que está cortado, não mente. */
-const LIMITE = 5000;
+const LIMITE = 50_000;
 
 const querySchema = z.object({
   from: z.string().datetime({ offset: true }).optional(),
@@ -146,32 +147,41 @@ export async function GET(req: NextRequest): Promise<Response> {
   // predicados compostos.
   const [atividadesRes, criadosRes, encerradosRes, etapasRes, funisRes, atritoRes] =
     await Promise.all([
-      supabase
-        .from("crm_lead_activities")
-        .select("lead_id, payload, performed_at")
-        .eq("organization_id", orgId)
-        .eq("type", "stage_changed")
-        .gte("performed_at", de)
-        .lt("performed_at", ate)
-        .limit(LIMITE),
-      supabase
-        .from("crm_leads")
+      lerTudo((de2, ate2) =>
+        supabase
+          .from("crm_lead_activities")
+          .select("lead_id, payload, performed_at")
+          .eq("organization_id", orgId)
+          .eq("type", "stage_changed")
+          .gte("performed_at", de)
+          .lt("performed_at", ate)
+          .order("id")
+          .range(de2, ate2),
+      ),
+      lerTudo((de2, ate2) =>
+        supabase
+          .from("crm_leads")
         .select(
           "id, pipeline_id, stage_id, status, lost_reason, source, value_cents, currency, created_at, closed_at",
         )
         .eq("organization_id", orgId)
         .gte("created_at", de)
         .lt("created_at", ate)
-        .limit(LIMITE),
-      supabase
-        .from("crm_leads")
+          .order("id")
+          .range(de2, ate2),
+      ),
+      lerTudo((de2, ate2) =>
+        supabase
+          .from("crm_leads")
         .select(
           "id, pipeline_id, stage_id, status, lost_reason, source, value_cents, currency, created_at, closed_at",
         )
         .eq("organization_id", orgId)
         .gte("closed_at", de)
         .lt("closed_at", ate)
-        .limit(LIMITE),
+          .order("id")
+          .range(de2, ate2),
+      ),
       supabase
         .from("crm_stages")
         .select("id, name, pipeline_id, position")

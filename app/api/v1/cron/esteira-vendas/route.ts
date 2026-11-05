@@ -17,6 +17,7 @@ import { audit } from "@/lib/audit";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 import { configDaEsteira } from "@/lib/esteira/config";
 import { depsReaisDaEsteira } from "@/lib/esteira/deps-reais";
+import { esteiraFalhou, esteiraRodou } from "@/lib/esteira/aviso-de-parada";
 import { rodadaTeveEfeito, rodarEsteira, type ResumoDaRodada } from "@/lib/esteira/rodada";
 import { logger } from "@/lib/logger";
 import { idsDeOrgsParadas } from "@/lib/organizacao/operante";
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     try {
       const resumo = await rodarEsteira(cfg, depsReaisDaEsteira(admin, org.id, () => new Date()));
       resultados.push({ organization_id: org.id, ...resumo });
+      await esteiraRodou(admin, org.id);
       if (rodadaTeveEfeito(resumo)) {
         void audit({
           action: "esteira.rodada_executada",
@@ -62,6 +64,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       const erro = err instanceof Error ? err.message.slice(0, 200) : String(err);
       logger.error("esteira_rodada_falhou", { organization_id: org.id, error: erro });
       resultados.push({ organization_id: org.id, erro });
+      await esteiraFalhou(admin, org.id);
     }
   }
   return ok({ organizacoes: resultados }, { requestId });

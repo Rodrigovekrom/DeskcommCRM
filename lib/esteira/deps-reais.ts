@@ -17,7 +17,8 @@ import { createLogger } from "@/lib/agent-engine/obs/logger";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
 import { logger } from "@/lib/logger";
-import { todasAsPaginas } from "@/lib/supabase/paginas";
+import { buscaEmLotes } from "@/lib/supabase/em-lotes";
+import { lerTudo, todasAsPaginas } from "@/lib/supabase/paginas";
 import { nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
@@ -197,13 +198,17 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
 
     async comHandoff(leadIds) {
       if (leadIds.length === 0) return new Set();
-      const { data } = await admin
-        .from("crm_lead_activities")
-        .select("lead_id")
-        .eq("organization_id", orgId)
-        .eq("type", "handoff_triggered")
-        .in("lead_id", leadIds);
-      return new Set(((data ?? []) as Array<{ lead_id: string }>).map((r) => r.lead_id));
+      // v1.9.19.2: em lotes e conferindo o erro. Um erro aqui virava "ninguém tem" em silêncio.
+      const { data, error } = await buscaEmLotes(leadIds, (lote) =>
+        admin
+          .from("crm_lead_activities")
+          .select("lead_id")
+          .eq("organization_id", orgId)
+          .eq("type", "handoff_triggered")
+          .in("lead_id", lote),
+      );
+      if (error) throw new Error(error.message);
+      return new Set((data as Array<{ lead_id: string }>).map((r) => r.lead_id));
     },
 
     async clienteFalouDesde(lead, desde) {
@@ -262,13 +267,17 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
     async ligacoesJaCriadas(leadIds) {
       const mapa = new Map<string, Set<string>>();
       if (leadIds.length === 0) return mapa;
-      const { data } = await admin
-        .from("crm_tasks")
-        .select("lead_id, source_kind")
-        .eq("organization_id", orgId)
-        .like("source_kind", `${PREFIXO_DE_LIGACAO}%`)
-        .in("lead_id", leadIds);
-      for (const r of (data ?? []) as Array<{ lead_id: string; source_kind: string }>) {
+      // v1.9.19.2: um erro aqui viraria "nenhuma ligação criada", e a rodada repetiria ligações.
+      const { data, error } = await buscaEmLotes(leadIds, (lote) =>
+        admin
+          .from("crm_tasks")
+          .select("lead_id, source_kind")
+          .eq("organization_id", orgId)
+          .like("source_kind", `${PREFIXO_DE_LIGACAO}%`)
+          .in("lead_id", lote),
+      );
+      if (error) throw new Error(error.message);
+      for (const r of data as Array<{ lead_id: string; source_kind: string }>) {
         if (!mapa.has(r.lead_id)) mapa.set(r.lead_id, new Set());
         mapa.get(r.lead_id)!.add(r.source_kind);
       }
@@ -299,28 +308,36 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
     },
 
     async ligacoesVencidas(antesDe) {
-      const { data } = await admin
-        .from("crm_tasks")
-        .select("id, lead_id, contact_id, title, due_date, assigned_to")
-        .eq("organization_id", orgId)
-        .in("status", ["pending", "in_progress"])
-        .like("source_kind", `${PREFIXO_DE_LIGACAO}%`)
-        .not("lead_id", "is", null)
-        .lt("due_date", antesDe.toISOString())
-        .limit(500);
-      return (data ?? []) as LigacaoPendente[];
+      const { data, error } = await lerTudo((de, ate) =>
+        admin
+          .from("crm_tasks")
+          .select("id, lead_id, contact_id, title, due_date, assigned_to")
+          .eq("organization_id", orgId)
+          .in("status", ["pending", "in_progress"])
+          .like("source_kind", `${PREFIXO_DE_LIGACAO}%`)
+          .not("lead_id", "is", null)
+          .lt("due_date", antesDe.toISOString())
+          .order("id")
+          .range(de, ate),
+      );
+      if (error) throw new Error(error.message);
+      return data as LigacaoPendente[];
     },
 
     async cobrancasFeitas(tarefaIds) {
       const mapa = new Map<string, Set<number>>();
       if (tarefaIds.length === 0) return mapa;
-      const { data } = await admin
-        .from("crm_lead_activities")
-        .select("payload")
-        .eq("organization_id", orgId)
-        .eq("type", "esteira_ligacao_cobrada")
-        .in("source_id", tarefaIds);
-      for (const r of (data ?? []) as Array<{ payload: { task_id?: string; nivel?: number } | null }>) {
+      // v1.9.19.2: um corte ou erro aqui viraria "ninguém foi cobrado", e cobraria de novo.
+      const { data, error } = await buscaEmLotes(tarefaIds, (lote) =>
+        admin
+          .from("crm_lead_activities")
+          .select("payload")
+          .eq("organization_id", orgId)
+          .eq("type", "esteira_ligacao_cobrada")
+          .in("source_id", lote),
+      );
+      if (error) throw new Error(error.message);
+      for (const r of data as Array<{ payload: { task_id?: string; nivel?: number } | null }>) {
         const id = r.payload?.task_id;
         if (!id || typeof r.payload?.nivel !== "number") continue;
         if (!mapa.has(id)) mapa.set(id, new Set());

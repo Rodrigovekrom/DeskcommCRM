@@ -32,3 +32,23 @@ export async function todasAsPaginas<T>(
     if (todas.length > teto) throw new Error(`paginação passou do teto de ${teto} linhas`);
   }
 }
+
+/**
+ * ia.vek v1.9.19.2: o mesmo, no formato `{ data, error }` de uma consulta, para trocar sem
+ * mudar quem lê o resultado. Monte a consulta dentro da função: cada página é outra chamada,
+ * com `.order` em coluna única (senão linha repete ou some entre páginas).
+ */
+export async function lerTudo<T>(
+  pagina: (de: number, ate: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  opcoes: { porPagina?: number; teto?: number } = {},
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  try {
+    const data = await todasAsPaginas<T>(
+      (de, ate) => pagina(de, ate) as PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+      opcoes,
+    );
+    return { data, error: null };
+  } catch (e) {
+    return { data: [], error: { message: e instanceof Error ? e.message : "falha na leitura" } };
+  }
+}

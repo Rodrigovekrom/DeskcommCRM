@@ -104,6 +104,13 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
       return troca("A IA travou em {lead}: {reason}");
     // ia.vek v1.9.12: aviso a toda a loja, só com o carro (nunca lead nem cliente).
     case "aviso_da_loja":
+      // v1.9.19.2: a esteira parou de rodar; sem depender de ler registro.
+      if (n.dados.evento === "esteira_parada") {
+        return t("A esteira de leads parou. Passagens e ligações estão atrasando: avise o suporte.");
+      }
+      if (n.dados.evento === "esteira_voltou") {
+        return t("A esteira de leads voltou a rodar.");
+      }
       if (n.dados.evento === "carros_sairam") {
         return t("{n} carros saíram do estoque").replace("{n}", String(n.dados.quantidade ?? "—"));
       }

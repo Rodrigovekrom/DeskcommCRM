@@ -32,6 +32,7 @@
  * rotas com o crontab e fica VERMELHO se alguma rota ficar órfã dos dois lados.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import type { NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
@@ -55,10 +56,9 @@ async function handle(req: NextRequest): Promise<Response> {
 
   const admin = createAdminClient();
 
-  const { data: rows, error } = await admin
-    .from("crm_leads")
-    .select("organization_id")
-    .eq("status", "open");
+  const { data: rows, error } = await lerTudo((de, ate) =>
+    admin.from("crm_leads").select("organization_id").eq("status", "open").order("id").range(de, ate),
+  );
   if (error) {
     logger.error("[risk-watcher] query failed", { error: error.message, requestId });
     return fail("internal_error", "Failed to list organizations.", 500, { requestId });

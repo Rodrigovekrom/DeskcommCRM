@@ -29,6 +29,7 @@
  * gravado (migration 0426).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 import { ApiError } from "@/lib/api/types";
 
@@ -269,13 +270,17 @@ export async function carregarPrevisao(
       .eq("pipeline_id", pipelineId)
       .eq("is_archived", false)
       .order("position", { ascending: true }),
-    supabase
-      .from("crm_leads")
-      .select("id, stage_id, status, value_cents, currency, expected_close_date")
-      .eq("organization_id", organizationId)
-      .eq("pipeline_id", pipelineId)
-      .eq("status", "open")
-      .order("position_in_stage", { ascending: true }),
+    lerTudo((de, ate) =>
+      supabase
+        .from("crm_leads")
+        .select("id, stage_id, status, value_cents, currency, expected_close_date")
+        .eq("organization_id", organizationId)
+        .eq("pipeline_id", pipelineId)
+        .eq("status", "open")
+        .order("position_in_stage", { ascending: true })
+        .order("id")
+        .range(de, ate),
+    ),
     fonte === "ia_quando_houver"
       ? supabase
           .from("crm_lead_scores")

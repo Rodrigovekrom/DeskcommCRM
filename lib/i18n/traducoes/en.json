@@ -9111,5 +9111,7 @@
   "Voltar à conversa": "Back to the conversation",
   "O vendedor não move lead para a coluna da IA.": "Sellers cannot move leads to the AI column.",
   "O vendedor não exclui contato.": "Sellers cannot delete contacts.",
-  "O vendedor não usa esta tela.": "Sellers do not use this screen."
+  "O vendedor não usa esta tela.": "Sellers do not use this screen.",
+  "A esteira de leads parou. Passagens e ligações estão atrasando: avise o suporte.": "The lead pipeline stopped. Handoffs and calls are delayed: contact support.",
+  "A esteira de leads voltou a rodar.": "The lead pipeline is running again."
 }

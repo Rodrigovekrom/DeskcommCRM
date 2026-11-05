@@ -11963,6 +11963,8 @@ export const DICIONARIO: Traducoes = {
   "O vendedor não move lead para a coluna da IA.": { es: "El vendedor no mueve leads a la columna de la IA." },
   "O vendedor não exclui contato.": { es: "El vendedor no elimina contactos." },
   "O vendedor não usa esta tela.": { es: "El vendedor no usa esta pantalla." },
+  "A esteira de leads parou. Passagens e ligações estão atrasando: avise o suporte.": { es: "La cinta de leads se detuvo. Pases y llamadas se están atrasando: avise a soporte." },
+  "A esteira de leads voltou a rodar.": { es: "La cinta de leads volvió a funcionar." },
   "{carro} saiu do estoque": { es: "{carro} salió del inventario" },
   "{n} carros saíram do estoque": { es: "{n} coches salieron del inventario" },
   "Um carro": { es: "Un coche" },

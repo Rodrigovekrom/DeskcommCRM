@@ -18,6 +18,7 @@
  * antes do escritor.
  */
 import { ApiError } from "@/lib/api/types";
+import { lerTudo } from "@/lib/supabase/paginas";
 import { canonicalConversationTagsSchema } from "@/lib/schemas/settings";
 import type { DepsDaOperacao } from "@/lib/operacao/entradas-automaticas";
 
@@ -65,11 +66,14 @@ export async function listarMarcadores(
   // clone atualizar; a leitura é limitada e a org tem conversas na casa dos
   // milhares, não dos milhões. Se um dia doer, vira índice GIN + RPC — e o
   // contrato desta função não muda.
-  const { data: conversas, error: convErr } = await deps.supabase
-    .from("conversations")
-    .select("tags")
-    .eq("organization_id", deps.organizationId)
-    .limit(2000);
+  const { data: conversas, error: convErr } = await lerTudo((de, ate) =>
+    deps.supabase
+      .from("conversations")
+      .select("tags")
+      .eq("organization_id", deps.organizationId)
+      .order("id")
+      .range(de, ate),
+  );
   if (convErr) {
     throw new ApiError(500, "internal_error", undefined, deps.requestId, convErr.message);
   }

@@ -12,6 +12,7 @@
  * service-role query do projeto. Read-only ⇒ sem audit.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -25,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 /** Teto da leitura: acima disso o relatório diz que está cortado, não mente. */
-const LIMITE = 5000;
+const LIMITE = 50_000;
 
 const querySchema = z.object({
   from: z.string().datetime({ offset: true }).optional(),
@@ -65,15 +66,18 @@ export async function GET(req: NextRequest): Promise<Response> {
   const supabase = createAdminClient();
 
   const [perdas, funis, etapas] = await Promise.all([
-    supabase
-      .from("crm_leads")
+    lerTudo((de, ate) =>
+      supabase
+        .from("crm_leads")
       .select("lost_reason, lost_from_stage_id, value_cents, currency, pipeline_id")
       .eq("organization_id", activeOrg.orgId)
       .eq("status", "lost")
       .gte("closed_at", from.toISOString())
       .lt("closed_at", to.toISOString())
-      .order("closed_at", { ascending: false })
-      .limit(LIMITE),
+        .order("closed_at", { ascending: false })
+        .order("id")
+        .range(de, ate),
+    ),
     supabase.from("crm_pipelines").select("id, settings").eq("organization_id", activeOrg.orgId),
     supabase.from("crm_stages").select("id, name").eq("organization_id", activeOrg.orgId),
   ]);

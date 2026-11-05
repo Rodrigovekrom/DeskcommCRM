@@ -54,12 +54,15 @@ function clienteFake(
     const q: {
       select: () => typeof q;
       order: () => typeof q;
+      range: (de: number) => Promise<{ data: Linha[]; error: null }>;
       eq: (col: string, valor: unknown) => typeof q;
       maybeSingle: () => Promise<{ data: Linha | null; error: null }>;
       then: (ok?: (v: unknown) => unknown, erro?: (e: unknown) => unknown) => Promise<unknown>;
     } = {
       select: () => q,
       order: () => q,
+      // v1.9.19.2: a previsão lê por páginas; a segunda vem vazia.
+      range: async (de) => ({ data: de === 0 ? linhas : [], error: null }),
       eq: (col, valor) => {
         filtros.push([col, valor]);
         linhas = linhas.filter((l) => l[col] === valor);

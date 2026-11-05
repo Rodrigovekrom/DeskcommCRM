@@ -1,4 +1,5 @@
 import { protecaoAgendaSupabase } from "@/lib/agenda/protecao-followup";
+import { lerTudo } from "@/lib/supabase/paginas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { classifyRisk, resolveStageWindow, type RiskBucket } from "@/lib/leads/risk-radar";
@@ -105,11 +106,15 @@ async function coletaEClassifica(
   organizationId: string,
   now: Date,
 ): Promise<{ estados: EstadoCalculado[]; semRelogio: number }> {
-  const { data: leadRows, error: leadErr } = await admin
-    .from("crm_leads")
-    .select("id, stage_id, contact_id, last_activity_at, created_at")
-    .eq("organization_id", organizationId)
-    .eq("status", "open");
+  const { data: leadRows, error: leadErr } = await lerTudo((de, ate) =>
+    admin
+      .from("crm_leads")
+      .select("id, stage_id, contact_id, last_activity_at, created_at")
+      .eq("organization_id", organizationId)
+      .eq("status", "open")
+      .order("id")
+      .range(de, ate),
+  );
   if (leadErr) throw new Error(`seed de risco: ${leadErr.message}`);
   const leads = (leadRows ?? []) as LeadRow[];
 
