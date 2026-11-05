@@ -40,6 +40,16 @@ describe("v1.9.19.2: leitura sem corte", () => {
     expect((s.match(/lerTudo</g) ?? []).length).toBe(3);
     expect((s.match(/head: true/g) ?? []).length).toBe(2);
   });
+  it("nenhuma destas leituras volta a pedir mais que o teto do servidor", () => {
+    for (const r of [
+      "ai/usage", "ai/evolution", "audit/export", "contacts/duplicates", "iavek/meu-dia",
+      "iavek/obrigatorios/incompletos", "iavek/padrao/fora",
+    ]) {
+      const s = readFileSync(`app/api/v1/${r}/route.ts`, "utf8");
+      expect(s, r).toMatch(/lerTudo</);
+      expect(s, r).not.toMatch(/\.limit\((TETO_DE_VARREDURA|1000|10_000|50_000|100_000)/);
+    }
+  });
   it("o selo de campos pede em lotes, nunca a loja inteira numa URL", () => {
     const s = readFileSync("components/iavek/CamposObrigatorios.tsx", "utf8");
     expect(s).toMatch(/IDS_POR_PEDIDO = 100/);

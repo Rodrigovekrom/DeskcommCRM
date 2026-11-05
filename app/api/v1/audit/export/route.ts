@@ -4,6 +4,7 @@
  * Same filters as /api/v1/audit. No pagination — single shot. Use sparingly.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import type { NextRequest } from "next/server";
 
 import { fail } from "@/lib/api/wrappers";
@@ -11,6 +12,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { auditQuerySchema } from "@/lib/schemas/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
+
+const TETO_DE_LINHAS = 10_000;
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +66,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     )
     .eq("organization_id", activeOrg.orgId)
     .order("created_at", { ascending: false })
-    .limit(10_000);
+    .order("id", { ascending: false });
 
   if (q.actor_id) query = query.eq("actor_user_id", q.actor_id);
   if (q.action) query = query.ilike("action", `%${q.action}%`);
@@ -71,7 +74,12 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (q.from) query = query.gte("created_at", q.from);
   if (q.to) query = query.lte("created_at", q.to);
 
-  const { data, error } = await query;
+  // v1.9.19.2: o limite de 10 mil devolvia só 1000 (max_rows). Por páginas, até as 10 mil prometidas;
+  // acima disso o cabeçalho avisa que o arquivo é um recorte.
+  const { data, error } = await lerTudo<Record<string, unknown>>(
+    (de, ate) => query.range(de, ate),
+    { teto: TETO_DE_LINHAS, paraNoTeto: true },
+  );
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
   const rows = data ?? [];
@@ -98,6 +106,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
+      "X-Truncated": rows.length >= TETO_DE_LINHAS ? "true" : "false",
       "Content-Disposition": `attachment; filename="audit-${new Date().toISOString().slice(0, 10)}.csv"`,
       "X-Request-Id": requestId,
     },

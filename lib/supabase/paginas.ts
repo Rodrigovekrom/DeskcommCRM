@@ -18,7 +18,7 @@ export const LINHAS_POR_PAGINA = 1000;
 
 export async function todasAsPaginas<T>(
   pagina: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
-  opcoes: { porPagina?: number; teto?: number } = {},
+  opcoes: { porPagina?: number; teto?: number; paraNoTeto?: boolean } = {},
 ): Promise<T[]> {
   const porPagina = opcoes.porPagina ?? LINHAS_POR_PAGINA;
   const teto = opcoes.teto ?? 50_000;
@@ -29,6 +29,7 @@ export async function todasAsPaginas<T>(
     const linhas = data ?? [];
     if (linhas.length === 0) return todas;
     todas.push(...linhas);
+    if (todas.length >= teto && opcoes.paraNoTeto) return todas.slice(0, teto);
     if (todas.length > teto) throw new Error(`paginação passou do teto de ${teto} linhas`);
   }
 }
@@ -40,7 +41,7 @@ export async function todasAsPaginas<T>(
  */
 export async function lerTudo<T>(
   pagina: (de: number, ate: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
-  opcoes: { porPagina?: number; teto?: number } = {},
+  opcoes: { porPagina?: number; teto?: number; paraNoTeto?: boolean } = {},
 ): Promise<{ data: T[]; error: { message: string } | null }> {
   try {
     const data = await todasAsPaginas<T>(

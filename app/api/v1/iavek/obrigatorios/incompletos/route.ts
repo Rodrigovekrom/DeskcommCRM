@@ -6,6 +6,7 @@
  * texto de conversa. Interruptor desligado: lista vazia.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
@@ -24,13 +25,16 @@ export async function GET(): Promise<Response> {
   if (!lerConfigDosObrigatorios(org?.settings).ativo) return ok({ ativo: false, vendedores: [] }, { requestId });
 
   const supabase = await createClient();
-  const { data: leads, error } = await supabase
-    .from("crm_leads")
-    .select("id, title, owner_user_id")
-    .eq("organization_id", authz.org.orgId)
-    .eq("status", "open")
-    .not("owner_user_id", "is", null)
-    .limit(1000);
+  const { data: leads, error } = await lerTudo<{ id: string; title: string; owner_user_id: string }>((de, ate) =>
+    supabase
+      .from("crm_leads")
+      .select("id, title, owner_user_id")
+      .eq("organization_id", authz.org.orgId)
+      .eq("status", "open")
+      .not("owner_user_id", "is", null)
+      .order("id")
+      .range(de, ate),
+  );
   if (error) return fail("internal_error", error.message, 500, { requestId });
   const lista = (leads ?? []) as Array<{ id: string; title: string; owner_user_id: string }>;
   if (lista.length === 0) return ok({ ativo: true, vendedores: [] }, { requestId });

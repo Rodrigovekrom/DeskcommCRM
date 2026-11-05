@@ -14,6 +14,7 @@
  * quem funde é `manager`, e esse gate está na rota de POST /contacts/merge.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser } from "@/lib/auth/server";
@@ -60,7 +61,8 @@ export async function GET(): Promise<Response> {
   if ((await funcaoNaOrganizacao(supabase, org.orgId, user.id)) === "vendedor") {
     return fail("forbidden_role", traduzir("O vendedor não usa esta tela.", user.idioma), 403, { requestId });
   }
-  const { data, error } = await supabase
+  // v1.9.19.2: por páginas. `.limit` acima de 1000 parava em 1000 e `varreu_tudo` dizia que sim.
+  const { data, error } = await lerTudo<unknown>((de, ate) => supabase
     .from("contacts")
     .select(
       "id, name, display_name, email, email_normalized, phone_number, is_merged_into, is_anonymized, source_metadata, created_at, last_activity_at",
@@ -69,7 +71,8 @@ export async function GET(): Promise<Response> {
     .is("is_merged_into", null)
     .eq("is_anonymized", false)
     .order("created_at", { ascending: true })
-    .limit(TETO_DE_VARREDURA + 1);
+    .order("id", { ascending: true })
+    .range(de, ate), { teto: TETO_DE_VARREDURA + 1, paraNoTeto: true });
   if (error) {
     return fail("internal_error", error.message, 500, { requestId });
   }

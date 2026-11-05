@@ -38,7 +38,12 @@ function fakeDb(
     espiao.tabelas.push(tabela);
     const rows = porTabela[tabela] ?? [];
     let head = false;
+    let inicio = 0;
     const b: Record<string, unknown> = {};
+    b.range = (de: number) => {
+      inicio = de;
+      return b;
+    };
     for (const m of ['not', 'limit', 'in']) b[m] = () => b;
     b.order = (col: string) => {
       espiao.order.push([tabela, col]);
@@ -64,7 +69,7 @@ function fakeDb(
       resolve(
         erros[tabela]
           ? { data: null, count: null, error: { message: erros[tabela] } }
-          : { data: head ? null : rows, count: rows.length, error: null },
+          : { data: head ? null : inicio === 0 ? rows : [], count: rows.length, error: null },
       );
     return b;
   });

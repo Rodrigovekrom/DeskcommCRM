@@ -6,6 +6,7 @@
  * mensagem, nenhuma sugestão. Padrão desligado: lista vazia.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
@@ -25,13 +26,16 @@ export async function GET(): Promise<Response> {
   if (!padrao.ativo) return ok({ ativo: false, vendedores: [] }, { requestId });
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("crm_leads")
-    .select(COLUNAS_DO_LEAD_DO_PADRAO)
-    .eq("organization_id", authz.org.orgId)
-    .eq("status", "open")
-    .not("owner_user_id", "is", null)
-    .limit(1000);
+  const { data, error } = await lerTudo<unknown>((de, ate) =>
+    supabase
+      .from("crm_leads")
+      .select(COLUNAS_DO_LEAD_DO_PADRAO)
+      .eq("organization_id", authz.org.orgId)
+      .eq("status", "open")
+      .not("owner_user_id", "is", null)
+      .order("id")
+      .range(de, ate),
+  );
   if (error) return fail("internal_error", error.message, 500, { requestId });
   const leads = (data ?? []) as LeadDoPadrao[];
   const avaliados = await avaliarLeads(admin, authz.org.orgId, padrao, leads);

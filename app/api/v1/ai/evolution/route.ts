@@ -16,6 +16,7 @@
  * agregador) e a coerção de `numeric` para `number`.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -30,6 +31,13 @@ export const dynamic = "force-dynamic";
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 90;
 const ROW_CAP = 50_000;
+const TABELAS_COM_ID = new Set([
+  "llm_calls",
+  "ai_router_decisions",
+  "lead_state_transitions",
+  "org_memory_entries",
+  "skill_activations",
+]);
 
 const querySchema = z.object({
   from: z.string().regex(DAY_RE).optional(),
@@ -113,9 +121,15 @@ export async function GET(req: NextRequest): Promise<Response> {
     // está no predicado sai de graça nas duas tabelas quentes
     // (`idx_llm_calls_org_time`, `idx_ai_router_decisions_org_created`); nas
     // outras o volume é pequeno.
-    const { data, error } = await janela(tabela, colunas, colunaData)
-      .order(colunaData, { ascending: true })
-      .limit(ROW_CAP);
+    // v1.9.19.2: por páginas. `.limit(ROW_CAP)` parava em 1000 (max_rows) e o aviso de teto abaixo
+    // nunca disparava: o custo sub-relatava com cara de número exato.
+    const { data, error } = await lerTudo<T>(
+      (de, ate) => {
+        const q = janela(tabela, colunas, colunaData).order(colunaData, { ascending: true });
+        return (TABELAS_COM_ID.has(tabela) ? q.order("id", { ascending: true }) : q).range(de, ate);
+      },
+      { teto: ROW_CAP, paraNoTeto: true },
+    );
     if (error) {
       fonteFalhou(tabela, error);
       return [];

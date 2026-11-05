@@ -12,6 +12,7 @@
  * in depth and required by repo convention.
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
@@ -19,6 +20,8 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { aggregateUsage, type InvocationRow } from "@/lib/ai/usage/aggregate";
 import { traduzir } from "@/lib/i18n/dicionario";
+
+const TETO_DE_LINHAS = 100_000;
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +95,8 @@ export async function GET(req: NextRequest): Promise<Response> {
   // esquecesse mentia (foi assim que esta tela mostrou ZERO custo com o
   // dinheiro saindo). A 0130 fez o backfill; `ai_invocations` é histórico e
   // ninguém mais escreve nela.
+  // v1.9.19.2: o limite de 50 mil devolvia no máximo 1000 (max_rows), do mais velho ao mais novo: o
+  // fim do período sumia da tela, sem aviso. Por páginas; os filtros entram em `invQ`.
   let invQ = supabase
     .from("llm_calls")
     .select("created_at, purpose, cost_cents, input_tokens, output_tokens, latency_ms, agent_id")
@@ -99,7 +104,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     .gte("created_at", fromIso)
     .lte("created_at", toIso)
     .order("created_at", { ascending: true })
-    .limit(50_000);
+    .order("id", { ascending: true });
 
   // O filtro por agente continua existindo: a 0130 levou `agent_id` para
   // `llm_calls` justamente para a unificação não custar essa capacidade — é
@@ -107,7 +112,10 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (parsed.data.agent_id) invQ = invQ.eq("agent_id", parsed.data.agent_id);
   if (parsed.data.invocation_kind) invQ = invQ.eq("purpose", parsed.data.invocation_kind);
 
-  const { data: invRowsRaw, error: invErr } = await invQ;
+  const { data: invRowsRaw, error: invErr } = await lerTudo<unknown>(
+    (de, ate) => invQ.range(de, ate),
+    { teto: TETO_DE_LINHAS, paraNoTeto: true },
+  );
   if (invErr) {
     console.warn("[ai-usage] llm_calls query failed", { error: invErr.message });
     return fail("internal_error", "Erro ao agregar o uso de IA.", 500, { requestId });
@@ -127,14 +135,19 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   // ---- 2. inbound messages per day ----------------------------------------
   const dailyInbounds = new Map<string, number>();
-  const { data: inboundRows, error: inboundErr } = await supabase
-    .from("messages")
-    .select("created_at")
-    .eq("organization_id", activeOrg.orgId)
-    .eq("direction", "inbound")
-    .gte("created_at", fromIso)
-    .lte("created_at", toIso)
-    .limit(100_000);
+  const { data: inboundRows, error: inboundErr } = await lerTudo<unknown>(
+    (de, ate) =>
+      supabase
+        .from("messages")
+        .select("created_at")
+        .eq("organization_id", activeOrg.orgId)
+        .eq("direction", "inbound")
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso)
+        .order("id")
+        .range(de, ate),
+    { teto: TETO_DE_LINHAS, paraNoTeto: true },
+  );
   if (inboundErr) {
     console.warn("[ai-usage] inbound messages query failed", { error: inboundErr.message });
   } else {
@@ -146,14 +159,19 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   // ---- 3. handoffs per day (event_log: ai.handoff_triggered) --------------
   const dailyHandoffs = new Map<string, number>();
-  const { data: handoffRows, error: handoffErr } = await supabase
-    .from("event_log")
-    .select("created_at")
-    .eq("organization_id", activeOrg.orgId)
-    .eq("event_type", "ai.handoff_triggered")
-    .gte("created_at", fromIso)
-    .lte("created_at", toIso)
-    .limit(100_000);
+  const { data: handoffRows, error: handoffErr } = await lerTudo<unknown>(
+    (de, ate) =>
+      supabase
+        .from("event_log")
+        .select("created_at")
+        .eq("organization_id", activeOrg.orgId)
+        .eq("event_type", "ai.handoff_triggered")
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso)
+        .order("id")
+        .range(de, ate),
+    { teto: TETO_DE_LINHAS, paraNoTeto: true },
+  );
   if (handoffErr) {
     console.warn("[ai-usage] handoff events query failed", { error: handoffErr.message });
   } else {

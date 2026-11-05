@@ -10,6 +10,7 @@
  * `organizations.settings.iavek.meta_agendamentos_dia` (sem migration).
  */
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
@@ -377,13 +378,16 @@ export async function GET(req: NextRequest): Promise<Response> {
         .eq("organization_id", orgId)
         .eq("status", "won")
         .gte("closed_at", desde30),
-      supabase
-        .from("crm_leads")
-        .select("lost_reason")
-        .eq("organization_id", orgId)
-        .eq("status", "lost")
-        .gte("closed_at", desde30)
-        .limit(1000),
+      lerTudo<{ lost_reason: string | null }>((de, ate) =>
+        supabase
+          .from("crm_leads")
+          .select("lost_reason")
+          .eq("organization_id", orgId)
+          .eq("status", "lost")
+          .gte("closed_at", desde30)
+          .order("id")
+          .range(de, ate),
+      ),
       // Pacote de defeitos (D3): CONTAGEM no banco. Buscar as linhas e contar no
       // servidor parava no teto do PostgREST (max_rows) e o número mentia.
       supabase
