@@ -5,6 +5,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { randomUUID } from "node:crypto";
+import { lerTudo } from "@/lib/supabase/paginas";
+
+// v1.9.19.2: as contagens desta tela liam linhas e o PostgREST devolve no máximo 1000; com
+// dezenas de milhares de mensagens, o uso e o custo apareciam cortados, sem aviso. Contagem por
+// organização vai com `head`; o que precisa de linha (dia a dia, soma de custo) vai por páginas.
+const TETO_DE_LINHAS = 500_000;
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -136,37 +142,35 @@ export async function GET(req: NextRequest) {
   // ---- messages count per org ----
   const messagesCountMap = new Map<string, number>();
   if (orgIds.length > 0) {
-    let consulta = admin
-      .from("messages")
-      .select("organization_id")
-      .in("organization_id", orgIds)
-      .gte("created_at", startIso);
-    if (pessoais.length > 0) {
-      consulta = consulta.not("contact_id", "in", `(${pessoais.join(",")})`);
-    }
-    const { data: msgRows, error: msgErr } = await consulta;
-    if (!msgErr && msgRows) {
-      for (const row of msgRows) {
-        const oid = row.organization_id as string;
-        messagesCountMap.set(oid, (messagesCountMap.get(oid) ?? 0) + 1);
-      }
-    }
+    await Promise.all(
+      orgIds.map(async (oid) => {
+        let consulta = admin
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", oid)
+          .gte("created_at", startIso);
+        if (pessoais.length > 0) {
+          consulta = consulta.not("contact_id", "in", `(${pessoais.join(",")})`);
+        }
+        const { count, error } = await consulta;
+        if (!error) messagesCountMap.set(oid, count ?? 0);
+      }),
+    );
   }
 
   // ---- conversations count per org ----
   const convsCountMap = new Map<string, number>();
   if (orgIds.length > 0) {
-    const { data: convRows, error: convErr } = await admin
-      .from("conversations")
-      .select("organization_id")
-      .in("organization_id", orgIds)
-      .gte("created_at", startIso);
-    if (!convErr && convRows) {
-      for (const row of convRows) {
-        const oid = row.organization_id as string;
-        convsCountMap.set(oid, (convsCountMap.get(oid) ?? 0) + 1);
-      }
-    }
+    await Promise.all(
+      orgIds.map(async (oid) => {
+        const { count, error } = await admin
+          .from("conversations")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", oid)
+          .gte("created_at", startIso);
+        if (!error) convsCountMap.set(oid, count ?? 0);
+      }),
+    );
   }
 
   // ---- consumo de IA por org: `llm_calls`, a tabela única (migration 0130) ----
@@ -182,11 +186,17 @@ export async function GET(req: NextRequest) {
   const aiCostMap = new Map<string, number>();
 
   if (orgIds.length > 0) {
-    const { data: aiRows, error: aiErr } = await admin
-      .from("llm_calls")
-      .select("organization_id, input_tokens, output_tokens, cost_cents")
-      .in("organization_id", orgIds)
-      .gte("created_at", startIso);
+    const { data: aiRows, error: aiErr } = await lerTudo<Record<string, unknown>>(
+      (de, ate) =>
+        admin
+          .from("llm_calls")
+          .select("organization_id, input_tokens, output_tokens, cost_cents")
+          .in("organization_id", orgIds)
+          .gte("created_at", startIso)
+          .order("id")
+          .range(de, ate),
+      { teto: TETO_DE_LINHAS },
+    );
     if (!aiErr && aiRows) {
       for (const row of aiRows) {
         const oid = row.organization_id as string;
@@ -261,11 +271,17 @@ export async function GET(req: NextRequest) {
   const msgDayMap = new Map<string, number>();
   if (orgIds.length > 0) {
     const filterOrgIds = tenant_id ? [tenant_id] : orgIds;
-    const { data: msgDays, error: msgDayErr } = await admin
-      .from("messages")
-      .select("created_at")
-      .in("organization_id", filterOrgIds)
-      .gte("created_at", startIso);
+    const { data: msgDays, error: msgDayErr } = await lerTudo<Record<string, unknown>>(
+      (de, ate) =>
+        admin
+          .from("messages")
+          .select("created_at")
+          .in("organization_id", filterOrgIds)
+          .gte("created_at", startIso)
+          .order("id")
+          .range(de, ate),
+      { teto: TETO_DE_LINHAS },
+    );
     if (!msgDayErr && msgDays) {
       for (const row of msgDays) {
         const day = (row.created_at as string).slice(0, 10);
@@ -280,11 +296,17 @@ export async function GET(req: NextRequest) {
   if (orgIds.length > 0) {
     const filterOrgIds = tenant_id ? [tenant_id] : orgIds;
     // `llm_calls`, pelo mesmo motivo do bloco acima (migration 0130).
-    const { data: aiDays, error: aiDayErr } = await admin
-      .from("llm_calls")
-      .select("created_at, input_tokens, output_tokens, cost_cents")
-      .in("organization_id", filterOrgIds)
-      .gte("created_at", startIso);
+    const { data: aiDays, error: aiDayErr } = await lerTudo<Record<string, unknown>>(
+      (de, ate) =>
+        admin
+          .from("llm_calls")
+          .select("created_at, input_tokens, output_tokens, cost_cents")
+          .in("organization_id", filterOrgIds)
+          .gte("created_at", startIso)
+          .order("id")
+          .range(de, ate),
+      { teto: TETO_DE_LINHAS },
+    );
     if (!aiDayErr && aiDays) {
       for (const row of aiDays) {
         const day = (row.created_at as string).slice(0, 10);

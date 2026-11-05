@@ -34,6 +34,12 @@ describe("v1.9.19.2: leitura sem corte", () => {
   ])("%s lê por páginas", (f) => {
     expect(readFileSync(f, "utf8")).toMatch(/lerTudo\(/);
   });
+  it("o uso da plataforma não conta por linhas devolvidas", () => {
+    const s = readFileSync("app/api/v1/admin/usage/route.ts", "utf8");
+    expect(s).not.toMatch(/\.select\("organization_id"\)/);
+    expect((s.match(/lerTudo</g) ?? []).length).toBe(3);
+    expect((s.match(/head: true/g) ?? []).length).toBe(2);
+  });
   it("o selo de campos pede em lotes, nunca a loja inteira numa URL", () => {
     const s = readFileSync("components/iavek/CamposObrigatorios.tsx", "utf8");
     expect(s).toMatch(/IDS_POR_PEDIDO = 100/);
