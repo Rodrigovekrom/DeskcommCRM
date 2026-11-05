@@ -78,6 +78,9 @@ describe("campos obrigatórios ao mover", () => {
   });
 
   it("com o contexto e os campos da passagem, a pessoa move", () => {
+    // v1.9.19 (0606): Agendado também exige horário; aqui a pergunta é só a dos campos.
+    sql(`insert into public.iavek_pedidos_de_agendamento (organization_id, contact_id, lead_id, quando, status, pedido_por, origem)
+         values ('${GOV_ORG}', '${GOV_CONTACT_1}', '${LEAD}', now() + interval '1 day', 'pendente', '${GOV_AGENT_A}', 'pessoa');`);
     sql(`
       update public.crm_leads set
         custom_fields = '{"carro_interesse":"Onix 2022","cidade":"Sorocaba","forma_pagamento":"financiamento","entrada_reais":0,"tem_troca":false,"prazo_compra":"0_7"}'::jsonb where id = '${LEAD}';

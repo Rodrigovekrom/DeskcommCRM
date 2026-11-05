@@ -62,6 +62,8 @@ describe("0600 — o estoque manda no lead aberto", () => {
     const membros = Number(lastLine(sql(`select count(*) from public.user_organizations
       where organization_id = '${GOV_ORG}' and revoked_at is null and accepted_at is not null;`)));
     expect(membros).toBeGreaterThan(0);
+    // v1.9.19 (0606): a venda do teste anterior já levou o carimbo. Aqui, o ciclo novo.
+    sql(`update public.catalog_products set aviso_da_loja_em = null where id = '${CARRO}';`);
     expect(aviso("carro_saiu")).toBe(membros);
     expect(aviso("carro_saiu")).toBe(0);
     expect(aviso("carro_vendido")).toBe(0);

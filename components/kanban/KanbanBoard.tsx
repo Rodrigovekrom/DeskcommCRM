@@ -5,7 +5,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBoard } from "@/hooks/kanban/useBoard";
-import { useMoveCard, type RecusaDeCampos, type RetomadaPendente, type TravaDaLoja } from "@/hooks/kanban/useMoveCard";
+import { useMoveCard, type MoveArgs, type RecusaDeCampos, type RetomadaPendente, type TravaDaLoja } from "@/hooks/kanban/useMoveCard";
 import { useRenameStage } from "@/hooks/kanban/useRenameStage";
 import { CamposObrigatoriosDialog } from "./CamposObrigatoriosDialog";
 import { TravaDosCamposDialog } from "@/components/iavek/TravaDosCamposDialog";
@@ -21,6 +21,7 @@ import { LeadDossier } from "./LeadDossier";
 import { RetomarComoNovoNegocioDialog } from "./RetomarComoNovoNegocioDialog";
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { VendaDialog } from "./VendaDialog";
+import { PedirAgendamento } from "@/components/iavek/PedirAgendamento";
 import { toast } from "sonner";
 import { MoverNoQuadroContext, type ColunaDoMenu } from "./mover-no-quadro";
 import { useSensorDoArrasto } from "./sensor-do-arrasto";
@@ -156,10 +157,13 @@ export function KanbanBoard({
   // ia.vek v1.8.3: a trava da loja (0590) abre a janela do que falta.
   const [travaDaLoja, setTravaDaLoja] = useState<TravaDaLoja | null>(null);
   const [focarCampos, setFocarCampos] = useState(false);
+  // ia.vek v1.9.20 (0608): Agendado sem horário abre a janela de agendar; sem horário, não move.
+  const [agendarAntes, setAgendarAntes] = useState<MoveArgs | null>(null);
   const moveCard = useMoveCard(pipelineId, {
     onCamposFaltando: setRecusaDeCampos,
     onRetomada: setRetomada,
     onTravaDaLoja: setTravaDaLoja,
+    onAgendadoSemHorario: setAgendarAntes,
   });
   const { data: members } = useAssignableMembers(true);
   const ownerNames = useMemo(
@@ -357,6 +361,22 @@ export function KanbanBoard({
     },
     [moveCard, lojaDeCarros, avisarMovimento],
   );
+  // ia.vek v1.9.20: pediu ou marcou o horário, o movimento segue; fechar a janela não move.
+  const contatoDoAgendar = agendarAntes
+    ? (data?.leads.find((l) => l.id === agendarAntes.leadId)?.contact_id ?? null)
+    : null;
+  const concluirAgendar = useCallback(() => {
+    if (!agendarAntes) return;
+    const args = agendarAntes;
+    setAgendarAntes(null);
+    moveCard.mutate(args, {
+      onSuccess: () => {
+        const etapa = data?.stages.find((e) => e.id === args.stageId);
+        const lead = leadsAtuais.current.find((l) => l.id === args.leadId);
+        if (etapa && lead) avisarMovimento(lead, etapa);
+      },
+    });
+  }, [agendarAntes, moveCard, data, avisarMovimento]);
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
@@ -580,6 +600,16 @@ export function KanbanBoard({
           });
         }}
       />
+      {agendarAntes && contatoDoAgendar && (
+        <PedirAgendamento
+          key={agendarAntes.leadId}
+          abrirAgora
+          contactId={contatoDoAgendar}
+          leadId={agendarAntes.leadId}
+          aoFechar={() => setAgendarAntes(null)}
+          aoEnviar={concluirAgendar}
+        />
+      )}
       <VendaDialog
         open={vendaPendente !== null}
         onOpenChange={(aberto) => {

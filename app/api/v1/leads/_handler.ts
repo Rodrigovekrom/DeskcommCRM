@@ -247,6 +247,19 @@ function recusaDaGuardaDoBanco(
       traduzir("O vendedor não move lead para a coluna da IA.", ctx.idioma ?? "pt-BR"),
     );
   }
+  // ia.vek v1.9.20 (0608): antes da régua geral do PT422, que falaria de responsável.
+  if (/^(venda_so_gerente|venda_data_invalida|agendado_sem_horario)/.test(erro?.message ?? "")) {
+    const recusa = recusaDeMotivoDaPerdaPeloBanco(erro, ctx.idioma);
+    if (recusa) {
+      return new ApiError(
+        recusa.codigo === "venda_so_gerente" ? 403 : 422,
+        recusa.codigo,
+        undefined,
+        ctx.requestId,
+        recusa.mensagem,
+      );
+    }
+  }
   // ia.vek v1.9.12 (0600): lead que nasceria vendido, sem valor e data.
   if (erro?.message?.startsWith("venda_incompleta")) {
     return new ApiError(
@@ -1292,7 +1305,7 @@ export async function moveLeadHandler(
     const recusa = recusaDeMotivoDaPerdaPeloBanco(updErr, ctx.idioma);
     if (recusa) {
       throw new ApiError(
-        recusa.codigo === "vendedor_fora_da_coluna_da_ia" ? 403 : 422,
+        recusa.codigo === "vendedor_fora_da_coluna_da_ia" || recusa.codigo === "venda_so_gerente" ? 403 : 422,
         recusa.codigo,
         undefined,
         ctx.requestId,

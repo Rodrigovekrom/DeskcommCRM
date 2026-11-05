@@ -206,7 +206,10 @@ export function recusaDeMotivoDaPerdaPeloBanco(
     | "lost_reason_invalid"
     | "iavek_campos_obrigatorios"
     | "venda_incompleta"
-    | "vendedor_fora_da_coluna_da_ia";
+    | "vendedor_fora_da_coluna_da_ia"
+    | "venda_so_gerente"
+    | "venda_data_invalida"
+    | "iavek_agendado_sem_horario";
   mensagem: string;
   /** ia.vek v1.8.3: os rótulos do que falta, para a tela abrir a janela da trava. */
   faltam?: string[];
@@ -227,6 +230,26 @@ export function recusaDeMotivoDaPerdaPeloBanco(
     return {
       codigo: "vendedor_fora_da_coluna_da_ia",
       mensagem: traduzir("O vendedor não move lead para a coluna da IA.", idioma ?? IDIOMA_PADRAO),
+    };
+  }
+  // ia.vek v1.9.20 (0608): as travas novas, antes da régua geral do PT422.
+  const idiomaDaRecusa = idioma ?? IDIOMA_PADRAO;
+  if (texto.startsWith("venda_so_gerente")) {
+    return {
+      codigo: "venda_so_gerente",
+      mensagem: traduzir("Só gerente e admin corrigem o valor e a data da venda.", idiomaDaRecusa),
+    };
+  }
+  if (texto.startsWith("venda_data_invalida")) {
+    return {
+      codigo: "venda_data_invalida",
+      mensagem: traduzir("A data da venda não pode estar no futuro.", idiomaDaRecusa),
+    };
+  }
+  if (texto.startsWith("agendado_sem_horario")) {
+    return {
+      codigo: "iavek_agendado_sem_horario",
+      mensagem: traduzir("Marque o dia e a hora antes de mover para Agendado.", idiomaDaRecusa),
     };
   }
 

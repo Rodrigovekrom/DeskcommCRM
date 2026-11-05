@@ -239,3 +239,8 @@ export function primeiroEnvioAssume(funcao: unknown, role: string | null | undef
 export function abreFunisEEntrada(funcao: unknown): boolean {
   return funcaoDaTela(funcao) !== "vendedor";
 }
+
+/** ia.vek v1.9.20: depois de vendido, só gerente e admin corrigem valor e data (0608). */
+export function corrigeVenda(funcao: unknown, papel: string | null | undefined): boolean {
+  return papel === "admin" || papel === "manager" || funcao === "gerente" || funcao === "apoio";
+}
