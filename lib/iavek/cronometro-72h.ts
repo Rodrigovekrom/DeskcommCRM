@@ -36,6 +36,17 @@ export interface Cronometro {
   inicio: string;
   fim_em: string;
   horas: number;
+  /** v1.9.23: "Manter em negociação" segura a passagem até este instante (null = não segura). */
+  mantido_ate?: string | null;
+}
+
+/**
+ * ia.vek v1.9.23 (Rodrigo, 05/11): "Manter em negociação" segura o lead nas 72h por mais 72h
+ * corridas a partir do clique, renovável. Mora em `source_metadata.esteira_manter_ate`.
+ */
+export function manterAteDoLead(lead: { source_metadata?: Record<string, unknown> | null }): string | null {
+  const v = lead.source_metadata?.esteira_manter_ate;
+  return typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : null;
 }
 
 export type CorDoCronometro = "verde" | "ambar" | "vermelho";
@@ -61,10 +72,13 @@ export function cronometroDoLead(
   if (lead.stage_id && entrada.etapas_de_compromisso.includes(lead.stage_id)) return null;
   const inicio = new Date(nascimentoDoLead(lead)).getTime();
   if (Number.isNaN(inicio)) return null;
+  const mantido = manterAteDoLead(lead);
+  const fim = Math.max(inicio + entrada.horas * HORA, mantido ? Date.parse(mantido) : 0);
   return {
     inicio: new Date(inicio).toISOString(),
-    fim_em: new Date(inicio + entrada.horas * HORA).toISOString(),
+    fim_em: new Date(fim).toISOString(),
     horas: entrada.horas,
+    ...(mantido && Date.parse(mantido) > inicio + entrada.horas * HORA ? { mantido_ate: mantido } : {}),
   };
 }
 

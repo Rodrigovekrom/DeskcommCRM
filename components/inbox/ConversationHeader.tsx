@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
 import { ChannelLogo } from "@/components/inbox/ChannelLogo";
 import { Phone, ArrowRight, MagnifyingGlass } from "@/lib/ui/icons";
+import { BotaoManterEmNegociacao } from "./BotaoManterEmNegociacao";
 import { SeloCronometro72h } from "./SeloCronometro72h";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { funcaoDaTela } from "@/lib/iavek/funcoes";
@@ -236,6 +237,8 @@ export function ConversationHeader({
           />
           {/* ia.vek v1.5: as 72h do lead novo para agendar. */}
           {!conversation.is_group && <SeloCronometro72h contactId={conversation.contact_id} />}
+          {/* ia.vek v1.9.23: segura o lead nas 72h por mais 72h. */}
+          {!conversation.is_group && <BotaoManterEmNegociacao contactId={conversation.contact_id} />}
         </div>
 
         {/* QUEM ESTÁ NO COMANDO, com nome e por GEOMETRIA — disco cheio para

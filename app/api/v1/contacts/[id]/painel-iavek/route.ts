@@ -48,7 +48,7 @@ export async function GET(
     createAdminClient().from("organizations").select("settings").eq("id", orgId).maybeSingle(),
     supabase
       .from("crm_leads")
-      .select("id, title, status, pipeline_id, stage_id, created_at, updated_at, source_metadata")
+      .select("id, title, status, pipeline_id, stage_id, created_at, updated_at, source_metadata, owner_user_id, sdr_user_id")
       .eq("contact_id", contactId)
       .eq("organization_id", orgId)
       .eq("status", "open")
@@ -79,6 +79,13 @@ export async function GET(
     {
       lead: lead ? { id: lead.id, title: lead.title, pipeline_id: lead.pipeline_id } : null,
       cronometro: cronometroDoLead(lead, entrada),
+      // v1.9.23: quem pode segurar o lead nas 72h — o dono, o guardião, ou gerente e admin.
+      pode_manter:
+        Boolean(lead && cronometroDoLead(lead, entrada)) &&
+        (lead?.owner_user_id === authz.user.id ||
+          lead?.sdr_user_id === authz.user.id ||
+          authz.org.role === "manager" ||
+          authz.org.role === "admin"),
       proximo_passo: passos.data?.[0] ?? null,
     },
     { requestId },

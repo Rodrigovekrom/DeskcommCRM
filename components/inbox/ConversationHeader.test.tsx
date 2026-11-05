@@ -21,6 +21,7 @@ const startCall = vi.hoisted(() => vi.fn());
 // ia.vek v1.8.4: o selo da nota lê por react-query; aqui ele não é o assunto.
 vi.mock("@/components/iavek/NotaDoAtendimento", () => ({ SeloDaNota: () => null }));
 vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () => null }));
+vi.mock("@/components/inbox/BotaoManterEmNegociacao", () => ({ BotaoManterEmNegociacao: () => null }));
 // ia.vek v1.7.6: arquivar é de gerente e admin; o papel é trocável por caso.
 const papel = vi.hoisted(() => ({ role: "manager" as string }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({

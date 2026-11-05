@@ -301,6 +301,7 @@ export const AUDIT_ACTIONS = [
   "iavek.meta_agendamentos_changed",
   // ia.vek v1.7.7: o vendedor assumiu um lead sem dono pelo Pipeline.
   "iavek.lead_assumido",
+  "iavek.lead_mantido_em_negociacao",
   // ia.vek v1.7.7: rodízio de leads (configuração e distribuição dos sem dono).
   "iavek.rodizio_config_changed",
   "iavek.rodizio_distribuido",

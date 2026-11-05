@@ -154,6 +154,41 @@ describe("rodada", () => {
     expect(r.passados).toBe(1);
   });
 
+  it("v1.9.23: cliente que falou nas últimas 72h não passa; quem não falou passa", async () => {
+    const { deps, log } = montar({
+      entrada: [lead({ id: "falou", created_at: ha(80 * HORA) }), lead({ id: "calado", created_at: ha(80 * HORA) })],
+      falou: ["falou"],
+    });
+    const r = await rodarEsteira(cfg, deps);
+    expect(log.passados).toEqual(["calado"]);
+    expect(r.seguradosResposta).toBe(1);
+  });
+
+  it("v1.9.23: 'Manter em negociação' segura até a data; vencida, segue a regra", async () => {
+    const futuro = new Date(AGORA.getTime() + 10 * HORA).toISOString();
+    const passado = new Date(AGORA.getTime() - HORA).toISOString();
+    const { deps, log } = montar({
+      entrada: [
+        lead({ id: "mantido", created_at: ha(80 * HORA), manter_ate: futuro }),
+        lead({ id: "venceu", created_at: ha(80 * HORA), manter_ate: passado }),
+      ],
+    });
+    const r = await rodarEsteira(cfg, deps);
+    expect(log.passados).toEqual(["venceu"]);
+    expect(r.seguradosManter).toBe(1);
+  });
+
+  it("v1.9.23: a pergunta 'falou?' olha as últimas 72h corridas", async () => {
+    const pedidos: Date[] = [];
+    const { deps } = montar({ entrada: [lead({ id: "x", created_at: ha(100 * HORA) })] });
+    deps.clienteFalouDesde = async (_l, desde) => {
+      pedidos.push(desde);
+      return false;
+    };
+    await rodarEsteira(cfg, deps);
+    expect(pedidos.map((d) => AGORA.getTime() - d.getTime())).toEqual([72 * HORA]);
+  });
+
   it("L1 depois do handoff (1 h útil) e L2 com 48 h, sem repetir", async () => {
     const { deps, log } = montar({
       entrada: [

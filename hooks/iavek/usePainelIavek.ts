@@ -7,6 +7,8 @@ import type { Cronometro } from "@/lib/iavek/cronometro-72h";
 export interface PainelIavek {
   lead: { id: string; title: string; pipeline_id: string } | null;
   cronometro: Cronometro | null;
+  /** v1.9.23: o botão "Manter em negociação" aparece para quem pode. */
+  pode_manter?: boolean;
   proximo_passo: { id: string; title: string; due_date: string | null } | null;
 }
 

@@ -19,7 +19,7 @@ import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
 import { logger } from "@/lib/logger";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { lerTudo, todasAsPaginas } from "@/lib/supabase/paginas";
-import { nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
+import { manterAteDoLead, nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
 import { lerLeadDaPassagem, reativarLead } from "@/lib/iavek/passagem-servidor";
@@ -55,6 +55,7 @@ function paraLeadDaEsteira(r: LinhaDeLead): LeadDaEsteira {
     owner_user_id: r.owner_user_id,
     // D6: o mesmo relógio do cronômetro, da passagem e do Space.
     inicio: nascimentoDoLead(r),
+    manter_ate: manterAteDoLead(r),
   };
 }
 

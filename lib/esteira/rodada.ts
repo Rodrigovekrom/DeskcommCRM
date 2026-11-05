@@ -98,6 +98,8 @@ export interface LeadDaEsteira {
   owner_user_id: string | null;
   /** Nascimento no funil de entrada (no clone, vem do `source_metadata.esteira_inicio`). */
   inicio: string;
+  /** v1.9.23: "Manter em negociação" segura a passagem até aqui. */
+  manter_ate?: string | null;
 }
 
 export interface LigacaoPendente {
@@ -140,6 +142,9 @@ export interface DepsDaEsteira {
 export interface ResumoDaRodada {
   passados: number;
   falhasNaPassagem: number;
+  /** v1.9.23: venceram as 72h mas ficaram, pelo "Manter em negociação" ou por resposta recente. */
+  seguradosManter: number;
+  seguradosResposta: number;
   fasesMovidas: number;
   reengajados: number;
   ligacoesCriadas: number;
@@ -154,6 +159,8 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   const resumo: ResumoDaRodada = {
     passados: 0,
     falhasNaPassagem: 0,
+    seguradosManter: 0,
+    seguradosResposta: 0,
     fasesMovidas: 0,
     reengajados: 0,
     ligacoesCriadas: 0,
@@ -185,6 +192,16 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
     // D6: a idade conta do NASCIMENTO no ciclo (o mesmo relógio da tela), não da criação da linha.
     const idade = agora.getTime() - new Date(lead.inicio).getTime();
     if (idade >= entrada.horas * HORA) {
+      // v1.9.23 (Rodrigo, 05/11): duas exceções, nesta ordem. "Manter em negociação" segura
+      // até a data marcada; e o cliente que falou nas últimas `horas` (corridas) não passa.
+      if (lead.manter_ate && Date.parse(lead.manter_ate) > agora.getTime()) {
+        resumo.seguradosManter += 1;
+        continue;
+      }
+      if (await deps.clienteFalouDesde(lead, new Date(agora.getTime() - entrada.horas * HORA))) {
+        resumo.seguradosResposta += 1;
+        continue;
+      }
       const r = await deps.passarParaFollowup(lead, followup.fases[0]!.etapa_id);
       if (!r.ok) {
         resumo.falhasNaPassagem += 1;

@@ -40,7 +40,9 @@ export function SeloCronometro72h({
   const { texto, vencido } = textoDoRestante(restante);
   const rotulo = vencido
     ? t("72h vencidas há {tempo}").replace("{tempo}", texto)
-    : t("{tempo} para agendar").replace("{tempo}", texto);
+    : cronometro.mantido_ate
+      ? t("Mantido em negociação: {tempo}").replace("{tempo}", texto)
+      : t("{tempo} para agendar").replace("{tempo}", texto);
 
   return (
     <span
