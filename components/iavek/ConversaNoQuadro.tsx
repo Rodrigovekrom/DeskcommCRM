@@ -13,7 +13,9 @@ import { esperandoDesde, tempoDeEspera } from "@/lib/iavek/ordem-do-quadro";
 import { ChatThread } from "@/components/inbox/ChatThread";
 import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
 import { Composer, type ComposerHandle } from "@/components/inbox/Composer";
+import { BotaoManterEmNegociacao } from "@/components/inbox/BotaoManterEmNegociacao";
 import { ConversationHeader } from "@/components/inbox/ConversationHeader";
+import { SeloCronometro72h } from "@/components/inbox/SeloCronometro72h";
 import { JanelaFechadaAviso } from "@/components/inbox/JanelaFechadaAviso";
 import { NumeroForaDoAr } from "@/components/inbox/NumeroForaDoAr";
 import { useProximoPassoObrigatorio } from "@/components/inbox/ProximoPassoObrigatorio";
@@ -255,6 +257,13 @@ function PainelDaConversa({
           >
             {t("Assumir")}
           </Button>
+        )}
+        {/* v1.9.23: o relógio das 72h e o "Manter em negociação" à vista, sem abrir "Ações". */}
+        {!conversa.is_group && conversa.contacts?.id && (
+          <>
+            <SeloCronometro72h contactId={conversa.contacts.id} />
+            <BotaoManterEmNegociacao contactId={conversa.contacts.id} />
+          </>
         )}
         {ehVendedor && conversa.contacts?.id && (
           <PedirAgendamento rotulo={t("Agendar horário")} contactId={conversa.contacts.id} conversationId={conversa.id} leadId={lead.id} />
