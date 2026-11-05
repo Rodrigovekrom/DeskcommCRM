@@ -42,7 +42,9 @@ export function SeloCronometro72h({
     ? t("72h vencidas há {tempo}").replace("{tempo}", texto)
     : cronometro.mantido_ate
       ? t("Mantido em negociação: {tempo}").replace("{tempo}", texto)
-      : t("{tempo} para agendar").replace("{tempo}", texto);
+      : cronometro.respondeu_em
+        ? t("Cliente respondeu: {tempo}").replace("{tempo}", texto)
+        : t("{tempo} para agendar").replace("{tempo}", texto);
 
   return (
     <span

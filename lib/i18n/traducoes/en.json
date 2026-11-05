@@ -9119,6 +9119,7 @@
   "Guardião Leads": "Lead Guardian",
   "Manter em negociação": "Keep in negotiation",
   "Segura o lead por mais 72h antes de ir para o follow-up. Pode renovar.": "Holds the lead 72 more hours before follow-up. Can be renewed.",
+  "Cliente respondeu: {tempo}": "Customer replied: {tempo}",
   "Mantido em negociação: {tempo}": "Kept in negotiation: {tempo}",
   "Só o dono do lead, o guardião, o gerente ou o admin mantêm em negociação.": "Only the lead owner, the guardian, the manager or the admin can keep it in negotiation.",
   "Este lead não está nas 72h.": "This lead is not in the 72h window.",

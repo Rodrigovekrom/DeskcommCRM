@@ -19,6 +19,19 @@ describe("v1.9.23: o relógio mostra o 'Manter em negociação'", () => {
     expect(c.fim_em).toBe(ate);
     expect(c.mantido_ate).toBe(ate);
   });
+  it("cliente que respondeu depois do prazo: o relógio vai até 72h depois da resposta", () => {
+    const resposta = "2026-11-04T18:00:00.000Z";
+    const c = cronometroDoLead(base, ENTRADA, resposta)!;
+    expect(c.fim_em).toBe("2026-11-07T18:00:00.000Z");
+    expect(c.respondeu_em).toBe(resposta);
+  });
+  it("resposta de antes do ciclo não mexe no prazo; qualquer resposta dentro dele empurra, como na esteira", () => {
+    const dentro = cronometroDoLead(base, ENTRADA, "2026-11-01T13:00:00.000Z")!;
+    expect(dentro.fim_em).toBe("2026-11-04T13:00:00.000Z");
+    const c = cronometroDoLead(base, ENTRADA, "2026-10-31T12:00:00.000Z")!;
+    expect(Date.parse(c.fim_em) - Date.parse(c.inicio)).toBe(72 * HORA);
+    expect(c.respondeu_em).toBeUndefined();
+  });
   it("valor estranho é ignorado", () => {
     expect(manterAteDoLead({ source_metadata: { esteira_manter_ate: "ontem" } })).toBeNull();
   });

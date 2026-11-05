@@ -11970,6 +11970,7 @@ export const DICIONARIO: Traducoes = {
   "Guardião Leads": { es: "Guardián de Leads" },
   "Manter em negociação": { es: "Mantener en negociación" },
   "Segura o lead por mais 72h antes de ir para o follow-up. Pode renovar.": { es: "Retiene el lead 72h más antes de pasar al seguimiento. Se puede renovar." },
+  "Cliente respondeu: {tempo}": { es: "El cliente respondió: {tempo}" },
   "Mantido em negociação: {tempo}": { es: "Mantenido en negociación: {tempo}" },
   "Só o dono do lead, o guardião, o gerente ou o admin mantêm em negociação.": { es: "Solo el dueño del lead, el guardián, el gerente o el admin lo mantienen en negociación." },
   "Este lead não está nas 72h.": { es: "Este lead no está en las 72h." },

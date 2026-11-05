@@ -38,6 +38,8 @@ export interface Cronometro {
   horas: number;
   /** v1.9.23: "Manter em negociação" segura a passagem até este instante (null = não segura). */
   mantido_ate?: string | null;
+  /** v1.9.23: o cliente respondeu nas últimas `horas`; a esteira segura até `fim_em`. */
+  respondeu_em?: string;
 }
 
 /**
@@ -65,6 +67,8 @@ export function entradaDaEsteira(settings: unknown): EntradaDaEsteira | null {
 export function cronometroDoLead(
   lead: LeadDoCronometro | null,
   entrada: EntradaDaEsteira | null,
+  /** v1.9.23: a última mensagem do cliente; a mesma exceção da esteira (`rodada.ts`). */
+  ultimaRespostaDoCliente?: string | null,
 ): Cronometro | null {
   if (!lead || !entrada) return null;
   if (lead.status !== "open") return null;
@@ -72,13 +76,19 @@ export function cronometroDoLead(
   if (lead.stage_id && entrada.etapas_de_compromisso.includes(lead.stage_id)) return null;
   const inicio = new Date(nascimentoDoLead(lead)).getTime();
   if (Number.isNaN(inicio)) return null;
+  const prazo = inicio + entrada.horas * HORA;
   const mantido = manterAteDoLead(lead);
-  const fim = Math.max(inicio + entrada.horas * HORA, mantido ? Date.parse(mantido) : 0);
+  const mantidoMs = mantido ? Date.parse(mantido) : 0;
+  const resposta = ultimaRespostaDoCliente ? Date.parse(ultimaRespostaDoCliente) : NaN;
+  // A esteira só olha a resposta depois de vencido o prazo; antes disso, o prazo é o de sempre.
+  const respostaMs = Number.isNaN(resposta) ? 0 : resposta + entrada.horas * HORA;
+  const fim = Math.max(prazo, mantidoMs, respostaMs);
   return {
     inicio: new Date(inicio).toISOString(),
     fim_em: new Date(fim).toISOString(),
     horas: entrada.horas,
-    ...(mantido && Date.parse(mantido) > inicio + entrada.horas * HORA ? { mantido_ate: mantido } : {}),
+    ...(mantido && mantidoMs > prazo && mantidoMs >= respostaMs ? { mantido_ate: mantido } : {}),
+    ...(respostaMs > prazo && respostaMs > mantidoMs ? { respondeu_em: ultimaRespostaDoCliente! } : {}),
   };
 }
 

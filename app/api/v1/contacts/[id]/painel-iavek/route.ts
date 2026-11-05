@@ -44,7 +44,7 @@ export async function GET(
   if (erroContato) return fail("internal_error", erroContato.message, 500, { requestId });
   if (!contato) return fail("not_found", "Contato não encontrado.", 404, { requestId });
 
-  const [org, leads, passos] = await Promise.all([
+  const [org, leads, passos, resposta] = await Promise.all([
     createAdminClient().from("organizations").select("settings").eq("id", orgId).maybeSingle(),
     supabase
       .from("crm_leads")
@@ -63,11 +63,23 @@ export async function GET(
       .in("status", ["pending", "in_progress"])
       .order("due_date", { ascending: true, nullsFirst: false })
       .limit(1),
+    // v1.9.23: a última mensagem do cliente, para o relógio mostrar a exceção da esteira.
+    supabase
+      .from("messages")
+      .select("created_at, conversations!inner(is_group)")
+      .eq("organization_id", orgId)
+      .eq("contact_id", contactId)
+      .eq("direction", "inbound")
+      .eq("conversations.is_group", false)
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
   const falha = org.error ?? leads.error ?? passos.error;
   if (falha) return fail("internal_error", falha.message, 500, { requestId });
 
   const entrada = entradaDaEsteira(org.data?.settings ?? null);
+  // Sem a leitura, o relógio fica como antes: a resposta só ESTENDE o prazo, nunca o encurta.
+  const ultimaResposta = resposta.error ? null : ((resposta.data?.[0] as { created_at?: string } | undefined)?.created_at ?? null);
   const abertos = leads.data ?? [];
   // O lead do funil de entrada vem primeiro: é ele que tem o relógio.
   const lead =
@@ -78,7 +90,7 @@ export async function GET(
   return ok(
     {
       lead: lead ? { id: lead.id, title: lead.title, pipeline_id: lead.pipeline_id } : null,
-      cronometro: cronometroDoLead(lead, entrada),
+      cronometro: cronometroDoLead(lead, entrada, ultimaResposta),
       // v1.9.23: quem pode segurar o lead nas 72h — o dono, o guardião, ou gerente e admin.
       pode_manter:
         Boolean(lead && cronometroDoLead(lead, entrada)) &&
