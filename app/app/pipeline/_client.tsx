@@ -132,6 +132,10 @@ export function CarteiraClient({
         <FaixaSemDono pipelineId={entrada.id} quadroAtualizadoEm={painel.dataUpdatedAt} />
       )}
 
+      {activeOrg?.interface_settings?.funcao === "sdr" && visaoEfetiva !== "followup" && (
+        <FaixaDePedidosDeAjuda pipelineId={entrada.id} />
+      )}
+
       <AvisosDoCartaoContext.Provider value={painel.data ? { comTarefa } : null}>
         {funis.length === 1 ? (
           <QuadroDoFunil
@@ -345,6 +349,54 @@ function QuadroDoFunil({
         </PadraoNoCardContext.Provider>
       )}
     </div>
+  );
+}
+
+/** v1.9.21 (0609): quem pediu ajuda e não foi entregue. Só o guardião recebe a lista. */
+function FaixaDePedidosDeAjuda({ pipelineId }: { pipelineId: string }) {
+  const t = useT();
+  const idioma = useTagDeIdioma();
+  const qc = useQueryClient();
+  const chave = ["iavek", "faixa-de-ajuda"] as const;
+  const { data } = useQuery({
+    queryKey: chave,
+    queryFn: () =>
+      apiClient
+        .get<ApiSuccess<{ total: number; itens: Array<{ id: string; titulo: string; cliente: string | null; desde: string }> }>>(
+          "/api/v1/iavek/pipeline/faixa-de-ajuda",
+        )
+        .then((r) => r.data),
+    refetchInterval: 60_000,
+  });
+  const assumir = useMutation({
+    mutationFn: (leadId: string) => apiClient.post("/api/v1/iavek/pipeline/faixa-de-ajuda", { lead_id: leadId }),
+    onError: (erro) => showApiError(erro),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: chave });
+      void qc.invalidateQueries({ queryKey: ["board", pipelineId] });
+    },
+  });
+  const total = data?.total ?? 0;
+  if (!data || total === 0) return null;
+  const formatar = new Intl.DateTimeFormat(idioma, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return (
+    <section className="rounded-lg border border-accent/40 bg-accent/5 p-3" data-testid="faixa-de-ajuda">
+      <div className="mb-2 flex items-center gap-2">
+        <h2 className="text-sm font-semibold">{t("Pediram ajuda — sem dono")}</h2>
+        <span className="rounded-full bg-accent px-2 text-xs font-semibold text-accent-foreground">{total}</span>
+      </div>
+      <ul className="flex gap-2 overflow-x-auto pb-1">
+        {data.itens.map((l) => (
+          <li key={l.id} className="flex w-56 shrink-0 flex-col gap-1 rounded-md border bg-surface p-2 text-sm">
+            <span className="truncate font-medium">{l.cliente ?? l.titulo}</span>
+            <span className="text-xs text-muted-foreground">{formatar.format(new Date(l.desde))}</span>
+            <Button size="sm" disabled={assumir.isPending} onClick={() => assumir.mutate(l.id)} data-testid="assumir-da-faixa">
+              {t("Assumir")}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

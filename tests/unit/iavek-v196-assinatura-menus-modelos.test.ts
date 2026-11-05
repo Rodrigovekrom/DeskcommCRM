@@ -77,7 +77,7 @@ describe("v1.9.6 — assinatura: cabeçalho fixo por papel", () => {
 
 describe("v1.9.6 — nomes e menus do guardião e do Suporte IA", () => {
   it("só o texto muda: a chave segue 'sdr'", () => {
-    expect(ROTULO_DA_FUNCAO.sdr).toBe("Guardião");
+    expect(ROTULO_DA_FUNCAO.sdr).toBe("Guardião Leads");
     expect(ROTULO_DA_FUNCAO.suporte).toBe("Suporte IA");
   });
 

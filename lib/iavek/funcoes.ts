@@ -22,10 +22,13 @@ import { ROLE_RANK } from "@/lib/auth/types";
 export const FUNCOES = ["sdr", "suporte", "vendedor", "apoio", "gerente", "analista_ficha"] as const;
 export type Funcao = (typeof FUNCOES)[number];
 
-/** O que se ESCOLHE hoje (convite, Equipe, Ver como): sem o "apoio". */
+/**
+ * O que se ESCOLHE hoje (convite, Equipe, Ver como): sem o "apoio".
+ * v1.9.21 (Guardião Leads): função única; "suporte" sai da escolha e, como o "apoio",
+ * fica no vocabulário gravado para o vínculo antigo seguir funcionando até ser trocado.
+ */
 export const FUNCOES_DE_ESCOLHA = [
   "sdr",
-  "suporte",
   "vendedor",
   "gerente",
   "analista_ficha",
@@ -42,7 +45,7 @@ export function funcaoDaTela(v: unknown): Funcao | null {
 
 export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
   // v1.9.6 (Rodrigo, 30/10): só o TEXTO muda — a chave segue "sdr" (a 0579 compara 'sdr' exato).
-  sdr: "Guardião",
+  sdr: "Guardião Leads",
   suporte: "Suporte IA",
   vendedor: "Vendedor",
   apoio: "Gerente de apoio",
