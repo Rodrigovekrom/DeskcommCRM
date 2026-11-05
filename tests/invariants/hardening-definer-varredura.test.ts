@@ -67,6 +67,13 @@ const ANON_PERMITIDO: readonly Excecao[] = [];
  */
 const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
   {
+    fn: "fn_iavek_assumir_da_faixa(uuid)",
+    razao:
+      "ia.vek 0609: POST app/api/v1/iavek/pipeline/faixa-de-ajuda/route.ts usa a sessão. Definer porque, com o " +
+      "recorte ligado, a RLS não mostra o lead sem dono ao guardião. Confere a função sdr na organização do " +
+      "lead, a etapa Suporte IA e que não há dono; só grava a própria pessoa como dono.",
+  },
+  {
     fn: "fn_iavek_orientar_ia(uuid,uuid,text)",
     razao:
       "ia.vek 0601: POST app/api/v1/conversations/[id]/orientar-ia/route.ts usa a sessão. " +
