@@ -73,14 +73,15 @@ begin
   if v_dono_da_conversa is not null and v_dono_da_conversa <> v_eu then
     raise exception 'faixa_conversa_de_outro: a conversa deste cliente já é de outra pessoa' using errcode = 'PT409';
   end if;
-  if v_conversa is not null and v_dono_da_conversa is null then
-    perform * from public.fn_conversation_assign(v_lead.organization_id, v_conversa, v_eu, 'claim', null, true);
-  end if;
-
+  -- O lead primeiro: com ele na mão, a guarda de responsável (0606) já reconhece a conversa como
+  -- dele. Na ordem inversa ela recusa, porque com o recorte ligado a conversa sem dono está fora do alcance.
   update public.crm_leads
      set owner_user_id = v_eu, owner_agent_id = null, owner_kind = 'user', assigned_at = now()
    where id = p_lead
-     and (owner_user_id is null or owner_user_id = v_eu);
+     and owner_user_id is null;
+  if v_conversa is not null and v_dono_da_conversa is null then
+    perform * from public.fn_conversation_assign(v_lead.organization_id, v_conversa, v_eu, 'claim', null, true);
+  end if;
   return v_conversa;
 end;
 $$;
