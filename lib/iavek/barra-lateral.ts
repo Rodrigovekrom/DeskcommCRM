@@ -14,6 +14,8 @@ export const CAMPOS_SEMPRE_VISIVEIS = [
   "nome",
   "telefone",
   "carro_interesse",
+  // v1.9.24 (CRM-195): o carro que o anúncio de origem mostrava; não muda na conversa.
+  "carro_anuncio",
   "etapa",
   "vendedor",
   "guardiao",
@@ -26,7 +28,7 @@ export const CAMPOS_SEMPRE_VISIVEIS = [
 export type CampoDaBarra = (typeof CAMPOS_SEMPRE_VISIVEIS)[number];
 
 /** ia.vek v1.9.0: os campos que só existem na loja de carros. */
-export const CAMPOS_SO_DA_LOJA_DE_CARROS: readonly CampoDaBarra[] = ["carro_interesse", "forma_pagamento", "parcela_desejavel"];
+export const CAMPOS_SO_DA_LOJA_DE_CARROS: readonly CampoDaBarra[] = ["carro_interesse", "carro_anuncio", "forma_pagamento", "parcela_desejavel"];
 
 /** A lista da barra para o perfil da empresa: fora da loja de carros, sem carro, pagamento e parcela. */
 export function camposSempreVisiveis(lojaDeCarros: boolean): readonly CampoDaBarra[] {

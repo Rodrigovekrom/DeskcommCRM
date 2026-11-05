@@ -33,7 +33,7 @@ vi.mock("@/components/iavek/CamposObrigatorios", () => ({
   SeloIncompleto: () => null,
 }));
 vi.mock("@/components/contacts/CampoDoCatalogo", () => ({
-  useNomeDoCarro: () => "Onix 2020",
+  useNomeDoCarro: (v: unknown) => (v ? "Onix 2020" : null),
   useCatalogoDoCampo: () => ({ data: undefined }),
 }));
 

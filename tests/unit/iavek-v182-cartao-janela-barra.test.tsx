@@ -48,6 +48,7 @@ describe("v1.8.2 — barra lateral enxuta", () => {
       "nome",
       "telefone",
       "carro_interesse",
+      "carro_anuncio",
       "etapa",
       "vendedor",
       "guardiao",

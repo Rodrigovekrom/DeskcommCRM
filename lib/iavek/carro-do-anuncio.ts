@@ -92,3 +92,35 @@ export function textoDoAnuncio(sourceMetadata: unknown): string {
   const m = (sourceMetadata ?? {}) as Record<string, unknown>;
   return [m.ad_title, m.ad_body].filter((v): v is string => typeof v === "string" && v.trim() !== "").join(" \n ");
 }
+
+/** A chave do campo no lead (`custom_fields`), ao lado do `carro_interesse`. */
+export const CAMPO_CARRO_DO_ANUNCIO = "carro_anuncio";
+
+export interface LinhaDoRelatorio {
+  carro_id: string;
+  leads: number;
+  vendas: number;
+  valor_vendido_cents: number;
+}
+
+/**
+ * O relatório por carro anunciado: quantos leads cada carro trouxe, quantos compraram e
+ * quanto vendeu. Puro: a rota lê os leads e entrega aqui. Ordena por leads, depois vendas.
+ */
+export function relatorioPorCarroDoAnuncio(
+  leads: ReadonlyArray<{ custom_fields: unknown; status: string; value_cents: number | null }>,
+): LinhaDoRelatorio[] {
+  const por = new Map<string, LinhaDoRelatorio>();
+  for (const l of leads) {
+    const id = (l.custom_fields as Record<string, unknown> | null)?.[CAMPO_CARRO_DO_ANUNCIO];
+    if (typeof id !== "string" || !id.trim()) continue;
+    const linha = por.get(id) ?? { carro_id: id, leads: 0, vendas: 0, valor_vendido_cents: 0 };
+    linha.leads += 1;
+    if (l.status === "won") {
+      linha.vendas += 1;
+      linha.valor_vendido_cents += Math.max(0, l.value_cents ?? 0);
+    }
+    por.set(id, linha);
+  }
+  return [...por.values()].sort((a, b) => b.leads - a.leads || b.vendas - a.vendas || a.carro_id.localeCompare(b.carro_id));
+}

@@ -19,6 +19,7 @@ import { SecaoRecolhivel } from "@/components/inbox/SecaoRecolhivel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PedidosDeAgendamento } from "@/components/iavek/PedidosDeAgendamento";
+import { CarrosAnunciados } from "@/components/iavek/CarrosAnunciados";
 
 /**
  * ia.vek v1.6 (parte B): o "Meu dia" — a tela inicial de cada FUNÇÃO, com só o
@@ -660,6 +661,9 @@ function DiaDoGerente({ d }: { d: NonNullable<DadosDoDia["gerente"]> }) {
                 .replace("{bought}", String(Math.round((comprou / agendou) * 100)))}
             </p>
           )}
+        </Bloco>
+        <Bloco id="gerente-carros-anunciados" titulo={t("Carros anunciados (30 dias)")}>
+          <CarrosAnunciados />
         </Bloco>
         <Bloco id="gerente-perdas" titulo={t("Perdas por motivo (30 dias)")}>
           {d.perdas_30d.length === 0 ? (

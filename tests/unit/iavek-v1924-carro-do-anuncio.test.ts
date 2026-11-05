@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { acharCarroDoAnuncio, textoDoAnuncio, type CarroDoCatalogo } from "@/lib/iavek/carro-do-anuncio";
+import { acharCarroDoAnuncio, relatorioPorCarroDoAnuncio, textoDoAnuncio, type CarroDoCatalogo } from "@/lib/iavek/carro-do-anuncio";
 
 // Nomes no formato do Altimus (marca, modelo, versão, ano, cor, câmbio), inventados.
 const C: CarroDoCatalogo[] = [
@@ -40,5 +40,21 @@ describe("v1.9.24: o carro do anúncio", () => {
   it("lê título e corpo guardados no contato", () => {
     expect(textoDoAnuncio({ ad_title: "Onix", ad_body: "LT 2020", ad_source_url: "x" })).toBe("Onix \n LT 2020");
     expect(textoDoAnuncio(null)).toBe("");
+  });
+});
+
+describe("v1.9.24: o relatório por carro anunciado", () => {
+  it("conta leads, vendas e valor vendido por carro; ignora lead sem carro do anúncio", () => {
+    const r = relatorioPorCarroDoAnuncio([
+      { custom_fields: { carro_anuncio: "a" }, status: "open", value_cents: 100 },
+      { custom_fields: { carro_anuncio: "a" }, status: "won", value_cents: 5000000 },
+      { custom_fields: { carro_anuncio: "b" }, status: "lost", value_cents: 0 },
+      { custom_fields: { carro_interesse: "a" }, status: "won", value_cents: 9 },
+      { custom_fields: null, status: "won", value_cents: 9 },
+    ]);
+    expect(r).toEqual([
+      { carro_id: "a", leads: 2, vendas: 1, valor_vendido_cents: 5000000 },
+      { carro_id: "b", leads: 1, vendas: 0, valor_vendido_cents: 0 },
+    ]);
   });
 });

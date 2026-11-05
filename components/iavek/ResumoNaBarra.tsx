@@ -49,6 +49,7 @@ export function ResumoNaBarra({
   const campos = lead?.custom_fields ?? {};
   const texto = (k: string) => (typeof campos[k] === "string" && (campos[k] as string).trim() ? (campos[k] as string).trim() : null);
   const carro = useNomeDoCarro(campos.carro_interesse);
+  const carroDoAnuncio = useNomeDoCarro(campos.carro_anuncio);
   const parcela = typeof campos.parcela_desejavel === "number" ? campos.parcela_desejavel : Number(campos.parcela_desejavel);
   const tags = [...new Set([...(lead?.tags ?? []), ...tagsDoContato])];
 
@@ -57,6 +58,7 @@ export function ResumoNaBarra({
       case "nome": return t("Nome");
       case "telefone": return t("Telefone");
       case "carro_interesse": return t("Carro de interesse");
+      case "carro_anuncio": return t("Carro do anúncio");
       case "etapa": return t("Etapa do funil");
       case "vendedor": return t("Vendedor responsável");
       case "guardiao": return t("Guardião");
@@ -72,6 +74,7 @@ export function ResumoNaBarra({
       case "nome": return nome;
       case "telefone": return telefone ? phoneForDisplay(telefone) : null;
       case "carro_interesse": return carro;
+      case "carro_anuncio": return carroDoAnuncio;
       case "etapa": return lead?.etapa_nome ?? null;
       case "vendedor": return lead?.owner_kind === "ai" ? t("IA") : (lead?.owner_name ?? (lead ? t("Sem dono") : null));
       case "guardiao": return lead?.guardiao_name ?? null;
