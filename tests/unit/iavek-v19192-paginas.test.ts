@@ -34,6 +34,11 @@ describe("v1.9.19.2: leitura sem corte", () => {
   ])("%s lê por páginas", (f) => {
     expect(readFileSync(f, "utf8")).toMatch(/lerTudo\(/);
   });
+  it("o selo de campos pede em lotes, nunca a loja inteira numa URL", () => {
+    const s = readFileSync("components/iavek/CamposObrigatorios.tsx", "utf8");
+    expect(s).toMatch(/IDS_POR_PEDIDO = 100/);
+    expect(s).not.toMatch(/ids=\$\{chave\}/);
+  });
   it("a esteira não trata erro como 'ninguém cobrado' nem 'nenhuma ligação'", () => {
     const s = readFileSync("lib/esteira/deps-reais.ts", "utf8");
     expect(s.match(/buscaEmLotes\(/g)?.length).toBeGreaterThanOrEqual(3);

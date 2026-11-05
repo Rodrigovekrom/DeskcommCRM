@@ -19,6 +19,8 @@ interface RespostaDosLeads {
   leads: Record<string, string[]>;
 }
 
+export const IDS_POR_PEDIDO = 100;
+
 export function useCamposQueFaltam(ids: string[], versao = "") {
   const chave = [...ids].sort().join(",");
   return useQuery({
@@ -26,8 +28,24 @@ export function useCamposQueFaltam(ids: string[], versao = "") {
     queryKey: ["iavek", "obrigatorios", "leads", chave, versao],
     enabled: ids.length > 0,
     placeholderData: (anterior) => anterior,
-    queryFn: () =>
-      apiClient.get<ApiSuccess<RespostaDosLeads>>(`/api/v1/iavek/obrigatorios/leads?ids=${chave}`).then((r) => r.data),
+    queryFn: async () => {
+      // v1.9.19.2: em lotes. Todos os ids numa URL só passavam de 16 KB com cerca de 440 leads,
+      // e o pedido falhava: o selo sumia do quadro inteiro de quem vê a loja.
+      const ordenados = [...ids].sort();
+      const lotes: string[][] = [];
+      for (let i = 0; i < ordenados.length; i += IDS_POR_PEDIDO) lotes.push(ordenados.slice(i, i + IDS_POR_PEDIDO));
+      const respostas = await Promise.all(
+        lotes.map((lote) =>
+          apiClient
+            .get<ApiSuccess<RespostaDosLeads>>(`/api/v1/iavek/obrigatorios/leads?ids=${lote.join(",")}`)
+            .then((r) => r.data),
+        ),
+      );
+      return {
+        ...respostas[0]!,
+        leads: Object.assign({}, ...respostas.map((r) => r.leads)) as RespostaDosLeads["leads"],
+      };
+    },
   });
 }
 
