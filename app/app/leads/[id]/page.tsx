@@ -19,6 +19,8 @@
 import { notFound, redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { abreFunisEEntrada } from "@/lib/iavek/funcoes";
+import { destinoDoVendedor } from "@/lib/iavek/vendedor-fora-de-funis";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +35,11 @@ export default async function LeadPage({
   if (!activeOrg) notFound();
 
   const { id } = await params;
+  // ia.vek v1.9.25: o vendedor vai DIRETO ao Pipeline com a conversa aberta. Antes passava pelo
+  // funil, que o mandava ao Pipeline: duas idas ao servidor a mais (medido: ~1,4 s no canário).
+  if (!abreFunisEEntrada(activeOrg.interface_settings?.funcao)) {
+    redirect(await destinoDoVendedor(await createClient(), activeOrg.orgId, { leadId: id }));
+  }
 
   const supabase = await createClient();
   // A RLS enxerga TODAS as organizações do usuário (`fn_user_org_ids()`), então

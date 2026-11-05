@@ -444,19 +444,33 @@ async function withNextActions(
   };
 }
 
+/**
+ * ia.vek v1.9.25: junta, lead a lead, os campos que cada leitura acrescentou. Cada uma devolve a
+ * MESMA lista, na mesma ordem, com campos próprios; se alguma mudou o tamanho, é defeito.
+ */
+function juntarPorPosicao(base: Lead[], partes: Lead[][]): Lead[] {
+  for (const p of partes) {
+    if (p.length !== base.length) throw new Error("quadro: uma leitura mudou o número de cartões");
+  }
+  return base.map((lead, i) => Object.assign({}, lead, ...partes.map((p) => p[i])) as Lead);
+}
+
 export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const requestId = randomUUID();
   const { id: pipelineId } = await ctx.params;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: authErr,
-  } = await supabase.auth.getUser();
+  // v1.9.25: as duas perguntas de quem é correm juntas (eram duas idas ao servidor de login em fila).
+  const [
+    {
+      data: { user },
+      error: authErr,
+    },
+    authUser,
+  ] = await Promise.all([supabase.auth.getUser(), loadAuthUser()]);
   if (authErr || !user) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }
-  const authUser = await loadAuthUser();
   const t = (texto: string) => traduzir(texto, authUser?.idioma ?? "pt-BR");
   // ia.vek v1.7.7: `?escopo=carteira` é o Pipeline do vendedor — só os leads
   // de que ele é DONO. O corte acontece na consulta, e não no navegador: com o
@@ -527,63 +541,39 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
       (lado === null || idsVisiveis.has(l.stage_id)),
   );
 
-  const leadsWithOwner = await withOwnerAgents(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsVisiveis,
-  );
-  if (leadsWithOwner.error) {
-    return fail("internal_error", leadsWithOwner.error, 500, { requestId });
-  }
-
-  const { data: pipelinePadrao } = await supabase
-    .from("crm_pipelines")
-    .select("id")
-    .eq("organization_id", (pipeline as Pipeline).organization_id)
-    .eq("is_default", true)
-    .maybeSingle();
-
-  const leadsComAcao = await withNextActions(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsWithOwner.leads,
-    (pipelinePadrao as { id: string } | null)?.id ?? null,
-  );
-  if (leadsComAcao.error) {
-    return fail("internal_error", leadsComAcao.error, 500, { requestId });
-  }
-
-  const leadsComScore = await withScores(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComAcao.leads,
-  );
-  if (leadsComScore.error) {
-    return fail("internal_error", leadsComScore.error, 500, { requestId });
-  }
-
-  const leadsComConversa = await withConversas(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComScore.leads,
-  );
-  if (leadsComConversa.error) {
-    return fail("internal_error", leadsComConversa.error, 500, { requestId });
-  }
-
-  const leadsComMarcadores = await withMarcadoresDoContato(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-    leadsComConversa.leads,
-  );
-  if (leadsComMarcadores.error) {
-    return fail("internal_error", leadsComMarcadores.error, 500, { requestId });
-  }
+  // ia.vek v1.9.25: as cinco leituras que completam o cartão são INDEPENDENTES (cada uma junta
+  // campos próprios ao mesmo lead) e corriam uma depois da outra: cada ida ao banco somava. Agora
+  // correm juntas e o resultado é juntado por posição. Medido no canário: o quadro levava ~1,2 s.
+  const orgId = (pipeline as Pipeline).organization_id;
+  const [comDono, comAcao, comScore, comConversa, comMarcadores] = await Promise.all([
+    withOwnerAgents(supabase, orgId, leadsVisiveis),
+    supabase
+      .from("crm_pipelines")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("is_default", true)
+      .maybeSingle()
+      .then(({ data: padrao }) =>
+        withNextActions(supabase, orgId, leadsVisiveis, (padrao as { id: string } | null)?.id ?? null),
+      ),
+    withScores(supabase, orgId, leadsVisiveis),
+    withConversas(supabase, orgId, leadsVisiveis),
+    withMarcadoresDoContato(supabase, orgId, leadsVisiveis),
+  ]);
+  const erroDoQuadro = comDono.error ?? comAcao.error ?? comScore.error ?? comConversa.error ?? comMarcadores.error;
+  if (erroDoQuadro) return fail("internal_error", erroDoQuadro, 500, { requestId });
+  const leadsDoQuadro = juntarPorPosicao(leadsVisiveis, [
+    comDono.leads,
+    comAcao.leads,
+    comScore.leads,
+    comConversa.leads,
+    comMarcadores.leads,
+  ]);
 
   const board: BoardData = {
     pipeline: pipeline as Pipeline,
     stages: etapasVisiveis,
-    leads: leadsComMarcadores.leads,
+    leads: leadsDoQuadro,
   };
 
   return ok(board, { requestId });
