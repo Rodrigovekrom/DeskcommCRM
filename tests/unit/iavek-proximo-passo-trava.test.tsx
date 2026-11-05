@@ -22,7 +22,8 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn(async (_path: string, _body: unknown) => ({ data: { task: { id: "t1" } } })),
 }));
 
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { id: "eu" } }) }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useAuth: () => ({ user: { id: "eu" } }) }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/lib/api/client", () => ({

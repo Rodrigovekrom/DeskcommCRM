@@ -59,6 +59,7 @@ vi.mock("@/hooks/inbox/useResumeAiAttendance", () => ({
 // shell autenticado. Aqui só a largura importa: o discador fica fora da conta.
 vi.mock("@/components/voice/DialButton", () => ({ DialButton: () => null }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   usePermission: () => true,
   useAuth: () => ({ user: { id: "u-1" }, activeOrg: { orgId: "org-1", role: "manager" } }),
 }));

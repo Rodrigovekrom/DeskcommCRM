@@ -42,6 +42,7 @@ interface StubState {
   assignRows: Array<Record<string, unknown>>;
   rpcCalls: RpcCall[];
   targetMember: { role: string } | null;
+  conversaVisivel?: boolean;
 }
 
 const CONV_ROW = {
@@ -53,6 +54,15 @@ const CONV_ROW = {
 
 function makeSupabaseStub(state: StubState) {
   return {
+    // v1.9.19: a conferência de alcance que as rotas fazem antes de trocar.
+    from: () => {
+      const cadeia = {
+        select: () => cadeia,
+        eq: () => cadeia,
+        maybeSingle: async () => ({ data: state.conversaVisivel === false ? null : { id: CONV_ID }, error: null }),
+      };
+      return cadeia;
+    },
     rpc: async (fn: string, args: Record<string, unknown>) => {
       state.rpcCalls.push({ fn, args });
       if (fn === "fn_conversation_assign") return { data: state.assignRows, error: null };
@@ -223,6 +233,20 @@ describe("POST /transfer — reatribuição imediata (G1-06d)", () => {
     const { POST } = await import("@/app/api/v1/conversations/[id]/transfer/route");
     const res = await POST(postReq("transfer", { to_user_id: TARGET_ID }), params);
     expect(res.status).toBe(404);
+  });
+});
+
+describe("v1.9.19 — só troca o responsável quem enxerga a conversa", () => {
+  it.each([
+    ["claim", {}],
+    ["transfer", { to_user_id: TARGET_ID }],
+  ])("%s de conversa fora do alcance → 404, sem chamar a troca", async (rota, corpo) => {
+    const state = stubState({ conversaVisivel: false });
+    agentSession(state);
+    const { POST } = await import(`@/app/api/v1/conversations/[id]/${rota}/route`);
+    const res = await POST(postReq(rota, corpo), params);
+    expect(res.status).toBe(404);
+    expect(assignCall(state)).toBeUndefined();
   });
 });
 

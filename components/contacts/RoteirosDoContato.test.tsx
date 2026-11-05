@@ -6,7 +6,8 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const deps = vi.hoisted(() => ({ auth: vi.fn(), hook: vi.fn() }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: deps.auth }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useAuth: deps.auth }));
 vi.mock("@/hooks/contacts/useRoteirosDoContato", () => ({ useRoteirosDoContato: deps.hook }));
 
 import { RoteirosDoContato } from "./RoteirosDoContato";

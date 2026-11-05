@@ -1,5 +1,7 @@
 "use client";
 import { useT } from "@/hooks/i18n/useT";
+import { useFuncaoVistaOpcional } from "@/hooks/auth/AuthProvider";
+import { funcaoDaTela } from "@/lib/iavek/funcoes";
 import {
   forwardRef,
   useImperativeHandle,
@@ -68,8 +70,6 @@ function avisoDeRascunhoIndisponivel(motivo: MotivoDeRecusa, t: (texto: string) 
 }
 
 interface Props {
-  /** v1.9.18: a tela do vendedor fica sem a Assistência do agente. */
-  semAssistencia?: boolean;
   conversationId: string;
   initialDraft?: string;
   initialMode?: "reply" | "note";
@@ -112,7 +112,6 @@ interface Props {
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   {
     conversationId,
-    semAssistencia = false,
     initialDraft = "",
     initialMode = "reply",
     active = true,
@@ -129,6 +128,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   ref,
 ) {
   const t = useT();
+  // v1.9.19: a tela do vendedor fica sem a Assistência do agente, em qualquer lugar.
+  const semAssistencia = funcaoDaTela(useFuncaoVistaOpcional()) === "vendedor";
   const [text, setText] = useState(initialDraft);
   // O aviso some no primeiro ENVIO: depois do clique o rascunho foi usado, e
   // deixar a faixa prometendo texto que já saiu seria mentira de tela.

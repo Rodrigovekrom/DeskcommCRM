@@ -11960,6 +11960,7 @@ export const DICIONARIO: Traducoes = {
   "Tarefa mais atrasada": { es: "Tarea más atrasada" },
   "Movido para": { es: "Movido a" },
   "Mover para a coluna:": { es: "Mover a la columna:" },
+  "O vendedor não move lead para a coluna da IA.": { es: "El vendedor no mueve leads a la columna de la IA." },
   "{carro} saiu do estoque": { es: "{carro} salió del inventario" },
   "{n} carros saíram do estoque": { es: "{n} coches salieron del inventario" },
   "Um carro": { es: "Un coche" },

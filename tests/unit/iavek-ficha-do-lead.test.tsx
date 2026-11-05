@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ptBR } from "date-fns/locale";
 
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { id: "eu" } }) }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useAuth: () => ({ user: { id: "eu" } }) }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/hooks/i18n/useLocaleDeData", () => ({ useLocaleDeData: () => ptBR }));
 const painel = vi.hoisted(() => ({

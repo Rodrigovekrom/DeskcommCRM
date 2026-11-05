@@ -21,6 +21,7 @@ const authRef: { user: Pick<AuthUser, "is_platform_admin">; activeOrg: ActiveOrg
 };
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => authRef,
   usePermission: () => false,
 }));

@@ -21,6 +21,7 @@ vi.mock("@/hooks/kanban/useBulkAction", () => ({
   useBulkAction: () => ({ mutate, isPending: false }),
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useUser: () => ({ id: "u-1" }),
   // ia.vek v1.7.6: configuração só do admin — a barra em lote só aparece para admin.
   useActiveOrg: () => ({ orgId: "org-1", role: "admin" }),

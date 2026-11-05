@@ -59,6 +59,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   usePermission: () => true,
   useAuth: () => ({ user: { id: "u1" }, activeOrg: { id: "o1", role: "agent" } }),
 }));

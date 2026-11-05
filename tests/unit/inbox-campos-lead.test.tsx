@@ -191,6 +191,7 @@ describe("painel do inbox — o botão diz o que faz (issue #908)", () => {
 });
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ user: { support: null } }),
   useActiveOrg: () => ({ currency: "BRL", country: null }),
 }));

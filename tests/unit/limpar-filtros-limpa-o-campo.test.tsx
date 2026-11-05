@@ -38,6 +38,7 @@ vi.mock("@/hooks/channels/useChannelSessions", () => ({
   channelLabel: () => "",
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ activeOrg: { orgId: "org-1", role: "admin", visibility_mode: "all" } }),
 }));
 vi.mock("@/hooks/inbox/useConversationTags", () => ({

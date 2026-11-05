@@ -48,6 +48,7 @@ const servidor = {
 const URL_DA_CONTAGEM = "/api/v1/conversations/counts";
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ user: { id: "u-1", support: null }, activeOrg: orgRef.current }),
 }));
 // Só a listagem de números é dublada: `channelLabel` do módulo real é quem

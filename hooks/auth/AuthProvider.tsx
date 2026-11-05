@@ -168,6 +168,11 @@ export function AuthProvider({
   );
 }
 
+/** ia.vek v1.9.19: a função vista, sem exigir o provedor (componentes usados fora dele). */
+export function useFuncaoVistaOpcional(): unknown {
+  return useContext(Ctx)?.activeOrg?.interface_settings?.funcao ?? null;
+}
+
 export function useAuth(): AuthCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");

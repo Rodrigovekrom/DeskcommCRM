@@ -290,6 +290,17 @@ export function KanbanBoard({
   useEffect(() => {
     leadsAtuais.current = data?.leads ?? [];
   }, [data]);
+  // ia.vek v1.9.19: um link do Meu dia ou do dossiê chega aqui com ?abrir=<lead>.
+  const leadsDoQuadro = data?.leads;
+  useEffect(() => {
+    if (!leadsDoQuadro) return;
+    const url = new URL(window.location.href);
+    const alvo = url.searchParams.get("abrir");
+    if (!alvo || !leadsDoQuadro.some((l) => l.id === alvo)) return;
+    url.searchParams.delete("abrir");
+    window.history.replaceState(null, "", url.toString());
+    abrirConversaNoQuadro(alvo);
+  }, [leadsDoQuadro, abrirConversaNoQuadro]);
   const avisarMovimento = useCallback(
     (lead: Lead, destino: Stage) => {
       const origem = { stageId: lead.stage_id, posicao: lead.position_in_stage };

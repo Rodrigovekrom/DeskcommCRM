@@ -38,6 +38,7 @@ vi.mock("@/lib/api/client", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useActiveOrg: () => ({ orgId: "org-1", name: "Clínica", role: "admin", cliente_pela_agenda: false }),
   useAuth: () => ({ user: { id: "u-1", is_platform_admin: false }, activeOrg: null }),
 }));

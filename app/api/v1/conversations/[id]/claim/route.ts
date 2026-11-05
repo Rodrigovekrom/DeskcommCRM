@@ -60,6 +60,15 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     throw err;
   }
 
+  // ia.vek v1.9.19: só troca o responsável de uma conversa quem enxerga a conversa.
+  const { data: visivel } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", authz.org.orgId)
+    .maybeSingle();
+  if (!visivel) return fail("not_found", traduzir("Conversa não encontrada.", authz.user.idioma), 404, { requestId });
+
   // Optimistic lock (spec 04 §9.2): expected null/omitido = só assume se livre;
   // expected uuid = takeover consciente. UPDATE + evento na mesma transação.
   const { data, error } = await supabase.rpc("fn_conversation_assign", {

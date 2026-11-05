@@ -26,6 +26,7 @@ const activeOrgRef: { current: ActiveOrg | null } = { current: null };
 const canaisRef: { current: ChannelSession[] | undefined } = { current: [] };
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ activeOrg: activeOrgRef.current }),
 }));
 // Só a listagem é dublada: `channelLabel` do módulo real é o que resolve o rótulo

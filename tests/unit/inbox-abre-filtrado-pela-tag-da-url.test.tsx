@@ -38,6 +38,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({
     user: { id: "u-1", role: "admin" },
     activeOrg: { orgId: "00000000-0000-4000-8000-0000000000aa" },

@@ -71,6 +71,7 @@ export function ConversaNoQuadro({
   pipelineId: string;
   onFechar: () => void;
 }) {
+  const ehVendedor = funcaoDaTela(useAuth().activeOrg?.interface_settings?.funcao) === "vendedor";
   const t = useT();
   // A conversa que a gaveta mostra: a do quadro, ou a que acabou de ser iniciada
   // aqui, ou a outra que a aba "Número" do Transferir mandou abrir.
@@ -116,7 +117,7 @@ export function ConversaNoQuadro({
                 {t("sem resposta há")} {tempoDeEspera(agoraDaAbertura - espera)}
               </span>
             )}
-            {conversaId && (
+            {conversaId && !ehVendedor && (
               <>
                 {" · "}
                 <Link
@@ -303,7 +304,6 @@ function PainelDaConversa({
           currentContactId={conversa.contact_id}
           rascunho={null}
           initialDraft=""
-          semAssistencia={ehVendedor}
         />
       </div>
       <div

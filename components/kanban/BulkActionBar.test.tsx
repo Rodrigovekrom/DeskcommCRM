@@ -12,6 +12,7 @@ const papel = vi.hoisted(() => ({ role: "admin" }));
 vi.mock("@/lib/api/client", () => ({ apiClient: { get, post: vi.fn(), patch: vi.fn() } }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (chave: string) => chave }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useUser: () => ({ id: "u1", is_platform_admin: false }),
   useActiveOrg: () => ({ role: papel.role }),
 }));

@@ -21,6 +21,7 @@ const activeOrgRef: { current: ActiveOrg | null } = {
 };
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ activeOrg: activeOrgRef.current }),
 }));
 vi.mock("@/hooks/channels/useChannelSessions", () => ({

@@ -48,6 +48,7 @@ vi.mock("@/hooks/contacts/useContactList", () => ({
 }));
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useActiveOrg: () => ({ currency: "BRL", country: null }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

@@ -24,6 +24,7 @@ vi.mock("@/hooks/realtime/useRealtimeChannel", () => ({
 }));
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useActiveOrg: () => ({ orgId: "org-do-fio-alerta" }),
   usePermission: () => true,
 }));

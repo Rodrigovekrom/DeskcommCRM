@@ -15,6 +15,7 @@ import { NodeConfigPanel } from "./NodeConfigPanel";
 import { NODE_VISUALS } from "./nodes/nodeVisuals";
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   usePermission: () => false,
 }));
 // A lista de atribuição vem de uma rota; aqui o formulário só precisa de um

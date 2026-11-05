@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ activeOrg: mocks.org, user: mocks.user }),
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));

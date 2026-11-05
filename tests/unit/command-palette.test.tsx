@@ -19,7 +19,8 @@ const authRef: { user: Pick<AuthUser, "is_platform_admin">; activeOrg: ActiveOrg
   activeOrg: { orgId: "org-1", name: "Org", role: "admin" },
 };
 
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => authRef }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useAuth: () => authRef }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 function comoPapel(role: ActiveOrg["role"]) {

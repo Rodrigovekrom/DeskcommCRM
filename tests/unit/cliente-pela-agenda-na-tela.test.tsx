@@ -24,6 +24,7 @@ const ORG = { orgId: "org-1", name: "Clínica", role: "admin", cliente_pela_agen
 const USER = { id: "u-1", is_platform_admin: false, support: null };
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useActiveOrg: () => ({ ...ORG, cliente_pela_agenda: ligada }),
   useAuth: () => ({ user: USER, activeOrg: { ...ORG, cliente_pela_agenda: ligada } }),
 }));

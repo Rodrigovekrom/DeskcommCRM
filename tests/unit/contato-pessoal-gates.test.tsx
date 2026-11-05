@@ -27,6 +27,7 @@ const desmarcarMutate = vi.hoisted(() => vi.fn());
 vi.mock("@/components/iavek/NotaDoAtendimento", () => ({ SeloDaNota: () => null }));
 vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () => null }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({
     user: { id: "u1", support: null, is_platform_admin: false },
     activeOrg: { orgId: "org-1", role: papel.atual },

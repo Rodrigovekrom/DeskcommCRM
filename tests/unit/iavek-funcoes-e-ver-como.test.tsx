@@ -18,7 +18,8 @@ const auth = vi.hoisted(() => ({
   verComo: null as null | "sdr" | "vendedor" | "gerente",
   definirVerComo: vi.fn(),
 }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => auth }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useAuth: () => auth }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 import { SeloVerComo } from "@/components/shell/VerComo";
 

@@ -38,6 +38,7 @@ vi.mock("@/lib/api/client", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   usePermission: (chave: string) => permissao(chave),
 }));
 vi.mock("@/lib/clipboard", () => ({

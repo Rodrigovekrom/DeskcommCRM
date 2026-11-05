@@ -30,6 +30,7 @@ import type { ActiveOrg } from "@/lib/auth/types";
 
 const activeOrgRef: { current: ActiveOrg | null } = { current: null };
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ activeOrg: activeOrgRef.current }),
 }));
 vi.mock("@/hooks/channels/useChannelSessions", async (original) => {

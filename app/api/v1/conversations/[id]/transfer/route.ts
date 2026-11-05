@@ -57,6 +57,15 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     throw err;
   }
 
+  // ia.vek v1.9.19: só troca o responsável de uma conversa quem enxerga a conversa.
+  const { data: visivel } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  if (!visivel) return fail("not_found", t("Conversa não encontrada."), 404, { requestId });
+
   // Destino tem que ser membro ativo agent+ da MESMA org (a RLS de
   // user_organizations só mostra o próprio membership a um agent — por isso o
   // admin client, filtrado pela org resolvida acima).

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { abreFunisEEntrada } from "@/lib/iavek/funcoes";
+import { destinoDoVendedor } from "@/lib/iavek/vendedor-fora-de-funis";
 import Link from "next/link";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { InboxLayout } from "@/components/inbox/InboxLayout";
@@ -38,6 +40,10 @@ export default async function InboxPage({
         </Link>
       </div>
     );
+  }
+  // ia.vek v1.9.19: fora da tela do vendedor, inclusive pelo endereço.
+  if (!abreFunisEEntrada(activeOrg.interface_settings?.funcao)) {
+    redirect(await destinoDoVendedor(await createClient(), activeOrg.orgId, { conversaId: (await searchParams).id }));
   }
   const { id, rascunho } = await searchParams;
   // ?rascunho= é a ponta da caixa de entrada da issue #1611: o texto mora no

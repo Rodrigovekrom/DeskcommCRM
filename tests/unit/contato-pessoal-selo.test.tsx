@@ -24,6 +24,7 @@ import type { Contact } from "@/lib/types/contacts";
  */
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useActiveOrg: () => null,
   useAuth: () => ({ user: { id: "u-1", support: null }, activeOrg: null }),
 }));

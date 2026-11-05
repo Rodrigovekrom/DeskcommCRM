@@ -44,7 +44,8 @@ const canal = vi.hoisted(() => ({ onChange: null as ((p: unknown) => void) | nul
 vi.mock("sonner", () => ({ toast: toastFalso }));
 vi.mock("@/lib/notifications/emit", () => ({ emitNotification: vi.fn() }));
 vi.mock("@/lib/notifications/push_client", () => ({ syncPushSubscription: vi.fn() }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useActiveOrg: () => ({ orgId: "org-1" }) }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useActiveOrg: () => ({ orgId: "org-1" }) }));
 vi.mock("@/hooks/notifications/OpenConversationContext", () => ({
   getOpenConversationId: () => null,
 }));

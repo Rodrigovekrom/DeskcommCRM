@@ -26,6 +26,7 @@ vi.mock("@/lib/api/client", () => ({
   apiClient: { get: (...args: unknown[]) => get(...args), post: vi.fn(), patch: vi.fn() },
 }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ activeOrg: { orgId: "org-1" } }),
 }));
 

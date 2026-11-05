@@ -10,6 +10,7 @@ import { ProvedorDeCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas
 // teste irmão, `chip-de-etiqueta.test.tsx`): sem isto ele derruba com "useAuth
 // must be used inside <AuthProvider>" — erro certo para a tela, ruído aqui.
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ activeOrg: { orgId: "org-1" } }),
 }));
 

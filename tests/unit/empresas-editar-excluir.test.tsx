@@ -18,6 +18,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (texto: string) => texto }));
 const papel = vi.hoisted(() => ({ atual: "admin" }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({
     user: { id: "u-1", email: "dono@acme.com", is_platform_admin: false },
     activeOrg: { orgId: "11111111-1111-4111-8111-111111111111", name: "ACME", role: papel.atual },

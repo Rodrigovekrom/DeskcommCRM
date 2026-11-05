@@ -27,6 +27,7 @@ const permissao = vi.hoisted(() => vi.fn((_chave: string) => true));
 vi.mock("@/lib/api/client", () => ({ apiClient: { post, get, patch: vi.fn() } }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   usePermission: (chave: string) => permissao(chave),
 }));
 vi.mock("@/hooks/kanban/useUpdateLead", () => ({

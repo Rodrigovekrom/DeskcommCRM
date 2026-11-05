@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { abreFunisEEntrada } from "@/lib/iavek/funcoes";
+import { destinoDoVendedor } from "@/lib/iavek/vendedor-fora-de-funis";
 
 import { Kanban } from "@/lib/ui/icons";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -30,10 +32,18 @@ export const metadata: Metadata = { title: "Funis" };
  * atalho de platform admin, que as rotas não concedem por padrão): mostrar um
  * botão que o servidor recusaria seria prometer o que não se cumpre.
  */
-export default async function KanbanPickerPage() {
+export default async function KanbanPickerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lead?: string }>;
+}) {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
+  // ia.vek v1.9.19: fora da tela do vendedor, inclusive pelo endereço.
+  if (!abreFunisEEntrada(activeOrg.interface_settings?.funcao)) {
+    redirect(await destinoDoVendedor(await createClient(), activeOrg.orgId, { leadId: (await searchParams).lead }));
+  }
 
   const supabase = await createClient();
   const { data } = await supabase

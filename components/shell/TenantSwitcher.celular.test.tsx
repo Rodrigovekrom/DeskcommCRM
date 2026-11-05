@@ -15,6 +15,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useUser: () => ({
     organizations: [
       { organization_id: "a", organization_name: "Studio Mariana Castro" },

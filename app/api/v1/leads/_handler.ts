@@ -237,6 +237,16 @@ function recusaDaGuardaDoBanco(
   ctx: HandlerCtx,
   erro: { code?: string; message?: string } | null,
 ): ApiError | null {
+  // ia.vek v1.9.19 (0606): antes das réguas gerais de PT4xx.
+  if (erro?.message?.startsWith("vendedor_fora_da_coluna_da_ia")) {
+    return new ApiError(
+      403,
+      "vendedor_fora_da_coluna_da_ia",
+      undefined,
+      ctx.requestId,
+      traduzir("O vendedor não move lead para a coluna da IA.", ctx.idioma ?? "pt-BR"),
+    );
+  }
   // ia.vek v1.9.12 (0600): lead que nasceria vendido, sem valor e data.
   if (erro?.message?.startsWith("venda_incompleta")) {
     return new ApiError(
@@ -1281,7 +1291,13 @@ export async function moveLeadHandler(
     // motivo da perda vira recusa de negócio, nunca 500.
     const recusa = recusaDeMotivoDaPerdaPeloBanco(updErr, ctx.idioma);
     if (recusa) {
-      throw new ApiError(422, recusa.codigo, undefined, ctx.requestId, recusa.mensagem);
+      throw new ApiError(
+        recusa.codigo === "vendedor_fora_da_coluna_da_ia" ? 403 : 422,
+        recusa.codigo,
+        undefined,
+        ctx.requestId,
+        recusa.mensagem,
+      );
     }
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
   }

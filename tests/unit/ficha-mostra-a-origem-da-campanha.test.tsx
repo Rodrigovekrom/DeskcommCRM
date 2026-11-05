@@ -21,6 +21,7 @@ const ORG = { orgId: "org-1", name: "Loja", role: "admin", cliente_pela_agenda: 
 const USER = { id: "u-1", is_platform_admin: false, support: null };
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useActiveOrg: () => ORG,
   useAuth: () => ({ user: USER, activeOrg: ORG }),
 }));

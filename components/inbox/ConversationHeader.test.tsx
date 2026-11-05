@@ -24,6 +24,7 @@ vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () =
 // ia.vek v1.7.6: arquivar é de gerente e admin; o papel é trocável por caso.
 const papel = vi.hoisted(() => ({ role: "manager" as string }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ user: { id: "u1", support: null }, activeOrg: { role: papel.role } }),
 }));
 vi.mock("@/hooks/inbox/useClaimConversation", () => ({

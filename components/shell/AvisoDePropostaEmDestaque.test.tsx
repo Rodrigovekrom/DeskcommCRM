@@ -35,6 +35,7 @@ vi.mock("@/hooks/ai/useAgentInbox", () => ({ useAgentInbox: () => ({ data: caixa
 // arquivo mede — deixar a Central sempre liberada é o que separa "o cartão não
 // apareceu" de "a interface escondeu a Central".
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({
     user: { id: "user-1", is_platform_admin: false, support: null },
     activeOrg: { orgId: "org-1", name: "Imobiliária Rio", role: "agent" },

@@ -231,3 +231,11 @@ export function primeiroEnvioAssume(funcao: unknown, role: string | null | undef
   if (f === "vendedor" || f === "analista_ficha") return false;
   return f !== null || role === "admin" || role === "manager";
 }
+
+/**
+ * ia.vek v1.9.19: Funis e Entrada de leads não fazem parte da tela do vendedor, nem pelo
+ * endereço. O guardião e as demais funções seguem com elas.
+ */
+export function abreFunisEEntrada(funcao: unknown): boolean {
+  return funcaoDaTela(funcao) !== "vendedor";
+}

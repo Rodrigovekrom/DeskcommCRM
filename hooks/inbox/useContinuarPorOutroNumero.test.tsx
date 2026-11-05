@@ -25,7 +25,8 @@ vi.mock("@/lib/api/client", () => ({
 }));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("@/components/feedback/ApiErrorToast", () => ({ showApiError: (e: unknown) => showApiError(e) }));
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ user: { id: "eu" } }) }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useAuth: () => ({ user: { id: "eu" } }) }));
 
 import { useContinuarPorOutroNumero } from "./useContinuarPorOutroNumero";
 

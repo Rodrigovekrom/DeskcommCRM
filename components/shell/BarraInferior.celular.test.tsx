@@ -22,6 +22,7 @@ const estado = {
 };
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({
     user: { is_platform_admin: false, support: null },
     activeOrg: {

@@ -47,7 +47,8 @@ const org = {
   role: "admin",
 } as ActiveOrg;
 let contexto: { user: AuthUser; activeOrg: ActiveOrg | null } = { user: usuario, activeOrg: org };
-vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => contexto }));
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+ useAuth: () => contexto }));
 
 const PADRAO: Branding = { name: DEFAULT_APP_NAME, logoUrl: null, initial: "D" };
 

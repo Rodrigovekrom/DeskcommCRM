@@ -87,6 +87,7 @@ const org = {
 } as ActiveOrg;
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useAuth: () => ({ user: usuario, activeOrg: org }),
 }));
 

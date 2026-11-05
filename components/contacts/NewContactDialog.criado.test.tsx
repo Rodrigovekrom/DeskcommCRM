@@ -30,6 +30,7 @@ import type { Contact } from "@/lib/types/contacts";
 import { NewContactDialog } from "@/components/contacts/NewContactDialog";
 
 vi.mock("@/hooks/auth/AuthProvider", () => ({
+  useFuncaoVistaOpcional: () => null,
   useActiveOrg: () => ({ currency: "BRL", country: null }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
