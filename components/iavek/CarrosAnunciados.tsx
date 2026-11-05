@@ -38,7 +38,11 @@ export function CarrosAnunciados() {
       <tbody>
         {data.linhas.slice(0, 15).map((l) => (
           <tr key={l.carro_id} className="border-t border-border">
-            <td className="max-w-[14rem] truncate py-1.5">{nomeDoCarro(l.carro_id, catalogo) || t("Carro fora do catálogo")}</td>
+            <td className="max-w-[14rem] truncate py-1.5">{(() => {
+              // undefined = o catálogo ainda está chegando; "" = o carro não está mais nele.
+              const nome = nomeDoCarro(l.carro_id, catalogo);
+              return nome === undefined ? "…" : nome || t("Carro fora do catálogo");
+            })()}</td>
             <td className="py-1.5 text-right tabular-nums">{l.leads}</td>
             <td className="py-1.5 text-right tabular-nums">{l.vendas}</td>
             <td className="py-1.5 text-right tabular-nums">{formatCentsBRL(l.valor_vendido_cents)}</td>
