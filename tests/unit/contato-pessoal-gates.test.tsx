@@ -26,6 +26,7 @@ const desmarcarMutate = vi.hoisted(() => vi.fn());
 // ia.vek v1.8.4: o selo da nota lê por react-query; aqui ele não é o assunto.
 vi.mock("@/components/iavek/NotaDoAtendimento", () => ({ SeloDaNota: () => null }));
 vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () => null }));
+vi.mock("@/components/inbox/BotaoManterEmNegociacao", () => ({ BotaoManterEmNegociacao: () => null }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useFuncaoVistaOpcional: () => null,
   useAuth: () => ({
