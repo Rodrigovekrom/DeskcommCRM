@@ -62,7 +62,8 @@ describe("0606 — ajuste de permissões", () => {
     expect(comoPessoa(GOV_AGENT_A, m)).toMatch(/vendedor_fora_da_coluna_da_ia/);
     expect(lastLine(sql(`select stage_id from public.crm_leads where id='${LEAD}';`))).toBe(OUTRA);
     funcao(GOV_AGENT_A, "sdr");
-    expect(comoPessoa(GOV_AGENT_A, m)).toBe("1");
+    expect(comoPessoa(GOV_AGENT_A, m)).toMatch(/UPDATE 1|^1$/);
+    expect(lastLine(sql(`select stage_id from public.crm_leads where id='${LEAD}';`))).toBe(IA);
     funcao(GOV_AGENT_A, "vendedor");
   });
 });
