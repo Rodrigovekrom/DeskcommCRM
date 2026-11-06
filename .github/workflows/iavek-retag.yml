@@ -16,8 +16,8 @@ jobs:
   retag:
     runs-on: ubuntu-latest
     env:
-      ORIGEM: iavek-crm244-f4-busca-e93d9de
-      DESTINO: iavek-v1.9.31-pipeline-e93d9de
+      ORIGEM: iavek-carro-livre-ac154e9
+      DESTINO: iavek-v1.9.32-carro-livre-ac154e9
     steps:
       - uses: imjasonh/setup-crane@v0.4
       - name: Login no GHCR
