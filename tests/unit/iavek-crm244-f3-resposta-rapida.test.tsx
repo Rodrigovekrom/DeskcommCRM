@@ -51,3 +51,9 @@ describe("F: Enter insere sem enviar; criar é pessoal", () => {
     expect(ler("components/inbox/Composer.tsx")).toMatch(/onCriada=\{applyTemplate\}/);
   });
 });
+
+describe("F: a lista reabre num '/' novo depois de escolher", () => {
+  it("o texto que PASSA a começar com '/' desfaz o 'dispensado'", () => {
+    expect(ler("components/inbox/Composer.tsx")).toMatch(/if \(!resolveSlash\(e\.target\.value\)\.open \|\| !resolveSlash\(text\)\.open\) setMenuDismissed\(false\);/);
+  });
+});

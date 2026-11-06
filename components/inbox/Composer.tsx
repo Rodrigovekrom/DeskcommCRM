@@ -598,7 +598,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
               const pos = e.target.selectionStart ?? e.target.value.length;
               setCaret(pos);
               setMencaoIndice(0);
-              if (!resolveSlash(e.target.value).open) setMenuDismissed(false);
+              // A lista reabre quando o texto PASSA a começar com "/" (CRM-244 Fase 3): depois de
+              // escolher uma resposta, trocar o texto por um "/" novo tem de mostrar a lista de novo.
+              if (!resolveSlash(e.target.value).open || !resolveSlash(text).open) setMenuDismissed(false);
               setAtivo(0);
               // Sumiu o `@` (apagou, ou o Enter escolheu): o Esc de uma vez
               // não pode travar a lista da PRÓXIMA menção.
