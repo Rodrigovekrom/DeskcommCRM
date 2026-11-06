@@ -455,6 +455,18 @@ function juntarPorPosicao(base: Lead[], partes: Lead[][]): Lead[] {
   return base.map((lead, i) => Object.assign({}, lead, ...partes.map((p) => p[i])) as Lead);
 }
 
+/**
+ * ia.vek v1.9.26: `source_metadata` é registro interno do lead (de onde veio, para onde foi movido,
+ * de quem foi clonado). Nenhuma tela do quadro o lê (o relógio das 72h é calculado no servidor, no
+ * painel do contato), e ele ia em todo cartão. Sai da resposta; continua no banco, intacto.
+ */
+function semCamposInternos(leads: Lead[]): Lead[] {
+  return leads.map((lead) => {
+    const { source_metadata: _interno, ...resto } = lead as Lead & { source_metadata?: unknown };
+    return resto as Lead;
+  });
+}
+
 export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const requestId = randomUUID();
   const { id: pipelineId } = await ctx.params;
@@ -500,12 +512,19 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     return consultaDeLeads.order("position_in_stage").order("id").range(de, ate);
   };
 
+  // ia.vek v1.9.26: os contatos pessoais dependem só da organização do funil; são lidos assim que o
+  // funil chega, junto com as páginas de leads, e não depois delas (uma ida ao banco a menos em fila).
+  const leituraDoFunil = supabase.from("crm_pipelines").select("*").eq("id", pipelineId).maybeSingle();
+  const leituraDosPessoais = Promise.resolve(leituraDoFunil).then(({ data }) =>
+    data ? idsDeContatosPessoais(supabase, (data as Pipeline).organization_id) : ([] as string[]),
+  );
   const [
     { data: pipeline, error: pipelineErr },
     { data: stages, error: stagesErr },
     { leads, leadsErr },
+    pessoais,
   ] = await Promise.all([
-    supabase.from("crm_pipelines").select("*").eq("id", pipelineId).maybeSingle(),
+    leituraDoFunil,
     supabase
       .from("crm_stages")
       .select("*")
@@ -516,6 +535,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
       (lidos) => ({ leads: lidos, leadsErr: null as { message: string } | null }),
       (erro: unknown) => ({ leads: [] as Lead[], leadsErr: { message: erro instanceof Error ? erro.message : String(erro) } }),
     ),
+    leituraDosPessoais,
   ]);
 
   if (pipelineErr) return fail("internal_error", pipelineErr.message, 500, { requestId });
@@ -527,10 +547,6 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   // 8, decisão 2 — critério 4): o card não é listado e volta ao desmarcar, com
   // o histórico intacto. Filtro em memória sobre a lista já lida: o board não
   // pagina, então nada se perde por filtrar depois de ler. NUNCA `delete`.
-  const pessoais = await idsDeContatosPessoais(
-    supabase,
-    (pipeline as Pipeline).organization_id,
-  );
   // ia.vek v1.9.3: só as etapas do lado de quem pede (funil sem lados: todas).
   const lados = lerLados((pipeline as Pipeline).settings);
   const etapasVisiveis = etapasDoLado((stages ?? []) as Stage[], lados, lado);
@@ -573,7 +589,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const board: BoardData = {
     pipeline: pipeline as Pipeline,
     stages: etapasVisiveis,
-    leads: leadsDoQuadro,
+    leads: semCamposInternos(leadsDoQuadro),
   };
 
   return ok(board, { requestId });

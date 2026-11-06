@@ -5,6 +5,7 @@ import {
   type ModoDeEtiqueta,
   marcadoresEscolhidos,
 } from "@/lib/inbox/marcador-da-conversa";
+import { useDepoisDoQuadro } from "@/lib/iavek/vez-do-quadro";
 
 export interface ConversationCounts {
   /**
@@ -62,12 +63,13 @@ export function useConversationCounts(
   if (filtros.channel_session_id) qs.set("channel_session_id", filtros.channel_session_id);
   const sufixo = qs.toString();
 
+  const depoisDoQuadro = useDepoisDoQuadro(); // v1.9.26: espera o board na tela de quadro
   return useQuery({
     // ⚠️ OS FILTROS ENTRAM NA CHAVE. Sem isso o react-query devolveria a contagem
     // guardada para OUTRO conjunto de filtros, sem ir ao servidor — e o badge
     // voltaria a mentir, agora pelo cache. Seria o mesmo defeito por outra porta.
     queryKey: ["conversation-counts", orgId, sufixo],
-    enabled: !!orgId,
+    enabled: !!orgId && depoisDoQuadro,
     refetchInterval: 30_000,
     queryFn: () =>
       apiClient

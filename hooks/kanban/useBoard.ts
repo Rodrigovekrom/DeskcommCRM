@@ -7,6 +7,7 @@ import { aplicarConversaNoQuadro } from "@/lib/iavek/ordem-do-quadro";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
 import type { BoardData } from "@/lib/kanban/types";
+import { liberarDepoisDoQuadro } from "@/lib/iavek/vez-do-quadro";
 
 /**
  * Fetch board via API route (NOT direct supabase-js).
@@ -109,6 +110,11 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
     queryFn: () => fetchBoard(pipelineId as string, escopo, verComo),
     enabled: !!pipelineId && !esperar,
   });
+  // ia.vek v1.9.26: o board chegou (ou falhou): os pedidos que não desenham o cartão seguem.
+  const chegou = query.isSuccess || query.isError;
+  useEffect(() => {
+    if (chegou) liberarDepoisDoQuadro();
+  }, [chegou]);
 
   const onChange = useCallback(
     (payload: unknown) => {

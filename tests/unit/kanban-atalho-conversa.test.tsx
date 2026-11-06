@@ -134,7 +134,7 @@ describe("o elo que some sem barulho", () => {
       fonte,
       "o resultado de withConversas não entra na junção do quadro",
     ).toMatch(/juntarPorPosicao\(leadsVisiveis,\s*\[[\s\S]*?comConversa\.leads[\s\S]*?\]\)/);
-    expect(fonte, "a resposta não sai da junção").toMatch(/leads:\s*leadsDoQuadro/);
+    expect(fonte, "a resposta não sai da junção").toMatch(/leads:\s*semCamposInternos\(leadsDoQuadro\)/);
   });
 
   it("contato SEM conversa sai como `null`, não ausente — senão \"Abrir conversa\" nunca aparece (#1993)", () => {

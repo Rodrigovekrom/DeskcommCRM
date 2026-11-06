@@ -9,6 +9,7 @@ import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { Bell } from "@/lib/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useDepoisDoQuadro } from "@/lib/iavek/vez-do-quadro";
 
 /**
  * ia.vek v1.7: o sino PESSOAL — "o que aconteceu com os meus leads".
@@ -141,6 +142,7 @@ export function SinoPessoal() {
   const qc = useQueryClient();
   const { user, activeOrg } = useAuth();
   const [aberto, setAberto] = useState(false);
+  const depoisDoQuadro = useDepoisDoQuadro(); // v1.9.26: espera o board na tela de quadro
   const { data } = useQuery({
     queryKey: CHAVE,
     queryFn: () =>
@@ -149,7 +151,7 @@ export function SinoPessoal() {
           "/api/v1/iavek/notificacoes",
         )
         .then((r) => r.data),
-    enabled: Boolean(activeOrg),
+    enabled: Boolean(activeOrg) && depoisDoQuadro,
     refetchInterval: 120_000,
   });
   const recarregar = useCallback(() => void qc.invalidateQueries({ queryKey: CHAVE }), [qc]);

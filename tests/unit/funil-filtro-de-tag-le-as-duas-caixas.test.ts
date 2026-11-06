@@ -126,7 +126,7 @@ describe("os pontos de chamada — a regra só vale se quem a usa a chama", () =
       /withMarcadoresDoContato\(supabase, orgId, leadsVisiveis\)/,
     );
     expect(fonte, "o resultado de withMarcadoresDoContato não chega à resposta").toMatch(
-      /leads:\s*leadsDoQuadro/,
+      /leads:\s*semCamposInternos\(leadsDoQuadro\)/,
     );
   });
 

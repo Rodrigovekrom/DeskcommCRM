@@ -30,6 +30,7 @@
 import { useEffect } from "react";
 
 import { deveEmitirSinal, INTERVALO_DO_SINAL_SEGUNDOS } from "@/lib/atendimento/presenca";
+import { useDepoisDoQuadro } from "@/lib/iavek/vez-do-quadro";
 
 /** A rota do emissor. Uma só, e ela escreve uma coluna. */
 export const URL_DO_SINAL_DE_PRESENCA = "/api/v1/attendants/presence";
@@ -41,8 +42,9 @@ export const URL_DO_SINAL_DE_PRESENCA = "/api/v1/attendants/presence";
  * uma batida que só colhe 403 é ruído de rede em nome de ninguém.
  */
 export function useSinalDePresenca(ativo: boolean): void {
+  const depoisDoQuadro = useDepoisDoQuadro(); // v1.9.26: espera o board na tela de quadro
   useEffect(() => {
-    if (!ativo) return;
+    if (!ativo || !depoisDoQuadro) return;
 
     let ultimoEnvioEm: Date | null = null;
     let parado = false;
@@ -86,5 +88,5 @@ export function useSinalDePresenca(ativo: boolean): void {
       window.clearInterval(tique);
       document.removeEventListener("visibilitychange", aoVoltar);
     };
-  }, [ativo]);
+  }, [ativo, depoisDoQuadro]);
 }

@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useT } from "@/hooks/i18n/useT";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { apiClient } from "@/lib/api/client";
+import { useDepoisDoQuadro } from "@/lib/iavek/vez-do-quadro";
 
 interface Aviso {
   id: string;
@@ -30,10 +31,11 @@ export function AvisoDeVenda() {
   const [visiveis, setVisiveis] = useState<Aviso[]>([]);
   const jaMostrados = useRef(new Set<string>());
   const ligado = Boolean(activeOrg) && !user.support;
+  const depoisDoQuadro = useDepoisDoQuadro(); // v1.9.26: espera o board na tela de quadro
 
   const { data } = useQuery({
     queryKey: CHAVE,
-    enabled: ligado,
+    enabled: ligado && depoisDoQuadro,
     queryFn: () =>
       apiClient
         .get<{ data: { avisos: Aviso[] } }>("/api/v1/iavek/notificacoes/avisos-de-venda")

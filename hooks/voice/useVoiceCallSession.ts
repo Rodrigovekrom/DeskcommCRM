@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { randomId } from "@/lib/random-id";
 import { float32ToInt16LE, int16LEToFloat32 } from "@/lib/wacalls/pcm";
+import { useDepoisDoQuadro } from "@/lib/iavek/vez-do-quadro";
 
 export type VoiceCallStatus = "starting" | "ringing" | "connected" | "ended";
 
@@ -356,8 +357,10 @@ export function useVoiceCallSession(remoteAudioRef: RefObject<HTMLAudioElement |
   // Carrega a chamada em andamento no boot (refresh de página no meio de uma
   // ligação não pode perder o painel — é exatamente o tipo de "sumiu sem
   // explicação" que a doutrina de UI proíbe).
+  // ia.vek v1.9.26: na tela de quadro, o boot espera o board (teto de 4 s): o board passa primeiro.
+  const depoisDoQuadro = useDepoisDoQuadro();
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId || !depoisDoQuadro) return;
     let cancelado = false;
     // Recarregou no meio da ligação: a marca desta aba diz QUAL ligação é a
     // dela. Sem isso o boot adotava a mais recente da organização — de um
@@ -385,7 +388,7 @@ export function useVoiceCallSession(remoteAudioRef: RefObject<HTMLAudioElement |
     return () => {
       cancelado = true;
     };
-  }, [orgId]);
+  }, [orgId, depoisDoQuadro]);
 
   /**
    * Confere a ligação desta tela com o servidor.
