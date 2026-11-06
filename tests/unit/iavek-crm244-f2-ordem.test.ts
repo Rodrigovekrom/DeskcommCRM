@@ -121,3 +121,11 @@ describe("cartão reatribuído: a conversa vai junto (correção da Fase 2, Maes
     expect(ler("lib/iavek/passar-a-conversa.ts")).toMatch(/p_reason: "transfer"/);
   });
 });
+
+describe("lote 'Atribuir': a conversa vai junto, igual ao cartão (Maestro 06/11)", () => {
+  it("usa a mesma regra, só para os leads gravados, e falhar não desfaz a troca", () => {
+    const lote = ler("app/api/v1/leads/bulk/route.ts");
+    expect(lote).toMatch(/if \(!gravados\.has\(row\.id\) \|\| !row\.contact_id\) continue;/);
+    expect(lote).toMatch(/try \{\s*await conversaSegueODono\(admin,/);
+  });
+});

@@ -14,6 +14,8 @@ import { type NextRequest } from "next/server";
 import { audit, isServiceRoleConfigured } from "@/lib/audit";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
+import { logger } from "@/lib/logger";
+import { conversaSegueODono } from "@/lib/iavek/conversa-segue-o-dono";
 import { requireRole } from "@/lib/auth/require-role";
 import { recusaEtiquetaNova } from "@/lib/iavek/etiquetas";
 import { resolveOwnerPatch } from "@/lib/leads/owner-patch";
@@ -458,6 +460,30 @@ export async function POST(req: NextRequest): Promise<Response> {
         .select("id");
       if (error) return fail("internal_error", error.message, 500, { requestId });
       updatedCount = data?.length ?? 0;
+      // ia.vek CRM-244 (Fase 2): a conversa de cada lead vai junto para o novo dono, igual ao cartão
+      // (só a que está com OUTRA pessoa; a da IA ou sem ninguém fica). Falhar não desfaz a troca.
+      const novoDono = owner.patch.owner_user_id;
+      if (novoDono) {
+        const gravados = new Set(((data ?? []) as Array<{ id: string }>).map((r) => r.id));
+        const admin = createAdminClient();
+        for (const row of visible) {
+          if (!gravados.has(row.id) || !row.contact_id) continue;
+          try {
+            await conversaSegueODono(admin, {
+              orgId: organizationId,
+              contactId: row.contact_id as string,
+              novoDono,
+              actor: { type: "user", id: user.id },
+            });
+          } catch (erro) {
+            logger.warn("conversa_nao_foi_com_o_dono", {
+              organization_id: organizationId,
+              lead_id: row.id,
+              error: erro instanceof Error ? erro.message.slice(0, 200) : String(erro),
+            });
+          }
+        }
+      }
       break;
     }
     case "tag": {
