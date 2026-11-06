@@ -92,7 +92,9 @@ describe("v1.9.4 — a conversa vai junto com o lead", () => {
     const r = ler("app/api/v1/iavek/passagem/route.ts");
     expect(r.match(/await passarAConversa\(admin,/g)).toHaveLength(3);
     expect(ler("app/api/v1/iavek/pedidos-de-agendamento/route.ts")).toContain("await passarAConversa(admin, {");
-    expect(ler("lib/iavek/passagem-servidor.ts")).toContain('p_reason: "transfer",');
+    // CRM-244 Fase 2: `passarAConversa` mora em arquivo próprio (o handler de leads também a usa).
+    expect(ler("lib/iavek/passar-a-conversa.ts")).toContain('p_reason: "transfer",');
+    expect(ler("lib/iavek/passagem-servidor.ts")).toContain('import { passarAConversa } from "@/lib/iavek/passar-a-conversa";');
   });
 
   it("o aviso de quem recebe converte só o aviso MAIS RECENTE do gatilho (sem aviso em dobro)", () => {

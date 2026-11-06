@@ -16,6 +16,8 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { resolveOwnerPatch, type OwnerPatch, type OwnerPatchInput } from "@/lib/leads/owner-patch";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
 import { listaLegivel } from "@/lib/leads/activity-vocabulary";
+import { conversaSegueODono } from "@/lib/iavek/conversa-segue-o-dono";
+import { logger } from "@/lib/logger";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 import { camposAlterados } from "@/lib/leads/campos-alterados";
 import { valoresAntesDepois } from "@/lib/leads/valores-audit";
@@ -1098,6 +1100,24 @@ export async function updateLeadHandler(
         erro: atividadeDono.error,
         requestId: ctx.requestId,
       });
+    }
+    // ia.vek CRM-244 (Fase 2): a conversa vai junto para o novo dono (a mesma transferência da
+    // conversa). Falhar aqui não desfaz a troca do responsável: fica no log.
+    if (ownerPatch.owner_user_id) {
+      try {
+        await conversaSegueODono(createAdminClient(), {
+          orgId: existing.organization_id as string,
+          contactId: (updated as { contact_id?: string | null }).contact_id ?? null,
+          novoDono: ownerPatch.owner_user_id,
+          actor: ctx.actor,
+        });
+      } catch (erro) {
+        logger.warn("conversa_nao_foi_com_o_dono", {
+          organization_id: existing.organization_id,
+          lead_id: leadId,
+          error: erro instanceof Error ? erro.message.slice(0, 200) : String(erro),
+        });
+      }
     }
   }
 

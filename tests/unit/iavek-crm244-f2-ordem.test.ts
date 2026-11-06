@@ -106,3 +106,18 @@ describe("cabeçalho: sem resposta por vendedor", () => {
     expect(Object.fromEntries(r)).toEqual({ v1: 2, v2: 1 });
   });
 });
+
+describe("cartão reatribuído: a conversa vai junto (correção da Fase 2, Maestro 06/11)", () => {
+  it("só segue quando está com OUTRA pessoa (a da IA ou sem ninguém fica: a transferência silenciaria a IA)", async () => {
+    const { conversaSegue } = await import("@/lib/iavek/conversa-segue-o-dono");
+    expect(conversaSegue("vendedor-antigo", "vendedor-novo")).toBe(true);
+    expect(conversaSegue("vendedor-novo", "vendedor-novo")).toBe(false);
+    expect(conversaSegue(null, "vendedor-novo")).toBe(false);
+  });
+  it("a troca do responsável usa a MESMA regra da passagem (passarAConversa), sem ciclo de import", () => {
+    expect(ler("app/api/v1/leads/_handler.ts")).toMatch(/if \(ownerPatch\.owner_user_id\) \{\s*try \{\s*await conversaSegueODono\(createAdminClient\(\)/);
+    expect(ler("lib/iavek/conversa-segue-o-dono.ts")).toMatch(/import \{ passarAConversa \} from "@\/lib\/iavek\/passar-a-conversa";/);
+    expect(ler("lib/iavek/passar-a-conversa.ts")).not.toMatch(/leads\/_handler/);
+    expect(ler("lib/iavek/passar-a-conversa.ts")).toMatch(/p_reason: "transfer"/);
+  });
+});
