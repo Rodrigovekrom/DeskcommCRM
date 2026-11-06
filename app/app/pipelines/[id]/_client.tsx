@@ -37,6 +37,7 @@ import { ROLE_RANK, type Role } from "@/lib/auth/types";
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
 import { usePreCarregarRespostas } from "@/hooks/inbox/useMessageTemplates";
 import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
+import { ResultadoDaBusca, useNomeDoCarroDaBusca } from "@/components/iavek/BuscaDoQuadro";
 
 export function PipelinePageClient({
   pipelineId,
@@ -81,7 +82,9 @@ export function PipelinePageClient({
     const settings = data?.pipeline.settings;
     return (motivo: string) => categoriaDoMotivo(motivo, settings);
   }, [data?.pipeline.settings]);
-  const filteredLeads = data ? applyFilters(data.leads, filters, { categoriaDo }) : [];
+  // CRM-244 (Fase 4): a busca acha por nome, telefone e carro (o catálogo só é lido quando há busca).
+  const nomeDoCarro = useNomeDoCarroDaBusca(Boolean(filters.search?.trim()));
+  const filteredLeads = data ? applyFilters(data.leads, filters, { categoriaDo, nomeDoCarro }) : [];
   // NÃO é a conta do FilterBar: o seletor de filtro lista as três caixas
   // (`marcadoresDoCard`: negócio, contato e conversa), e esta lista, a da tag em
   // lote, só `lead.tags` — é lá que a ação em lote grava (#852). O `useMemo` é o
@@ -162,6 +165,9 @@ export function PipelinePageClient({
         />
       )}
       {ehGerente && <SeletorDeVendedor filters={filters} onChange={setFilters} />}
+      {filters.search?.trim() && data && (
+        <ResultadoDaBusca encontrados={filteredLeads.length} onLimpar={() => setFilters({ ...filters, search: undefined })} />
+      )}
       {data && <VistaDoPipeline etapas={data.stages} prefs={prefs} gravar={gravar} />}
       {data && <SemRespostaPorVendedor leads={filteredLeads} stages={data.stages} />}
       <FilterBar
@@ -185,6 +191,7 @@ export function PipelinePageClient({
           pipelineId={pipelineId}
           stages={data.stages}
           leads={filteredLeads}
+          leadsDosTotais={data.leads}
           pulses={pulses}
           pipeline={data.pipeline}
           selectedIds={selectedIds}

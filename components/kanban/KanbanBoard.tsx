@@ -66,6 +66,11 @@ interface KanbanBoardProps {
    */
   ordem?: "posicao" | OrdemDoQuadro;
   /**
+   * CRM-244 (Fase 4): os leads de onde saem os TOTAIS em R$ de cada coluna — o funil inteiro,
+   * mesmo com busca ou filtro na tela. Ausente: os da própria tela, como antes.
+   */
+  leadsDosTotais?: Lead[];
+  /**
    * ia.vek v1.7.9 — só VISUALIZAÇÃO, por pessoa: etapas que não aparecem e
    * etapas recolhidas (uma faixa estreita com nome e contagem). Não muda dado.
    */
@@ -134,6 +139,7 @@ export function KanbanBoard({
   leadInicial,
   podeRenomearEtapa = false,
   ordem = "posicao",
+  leadsDosTotais,
   etapasOcultas,
   etapasRecolhidas,
   onAbrirEtapa,
@@ -549,6 +555,7 @@ export function KanbanBoard({
             stage={stage}
             nivel={nivelDaEtapa(indice, data.stages.length)}
             leads={grouped.get(stage.id) ?? []}
+            leadsDoTotal={leadsDosTotais?.filter((l) => l.stage_id === stage.id)}
             blocoSemResposta={ordem === "ultima_mensagem"}
             pipelineId={pipelineId}
             ownerNames={ownerNames}

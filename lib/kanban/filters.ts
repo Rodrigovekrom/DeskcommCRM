@@ -149,7 +149,32 @@ export function filtersToParams(f: LeadFilters): string {
  * Sem contexto, filtrar por categoria não acha nada — que é o comportamento
  * honesto: sem configuração não há o que agrupar.
  */
+const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const semDdi = (d: string) => (d.startsWith("55") && d.length >= 12 ? d.slice(2) : d);
+
+/**
+ * ia.vek CRM-244 (Fase 4, teste G): a busca acha o card pelo NOME (título), pelo TELEFONE do
+ * contato e pelo CARRO de interesse, sem diferença de acento nem de maiúscula ("jose" acha
+ * "José"). Telefone compara só os dígitos (3 ou mais), com ou sem o 55 do Brasil.
+ */
+export function casaBusca(
+  l: Pick<Lead, "title" | "description" | "contact_phone">,
+  termo: string,
+  nomeDoCarro?: (l: never) => string | null | undefined,
+): boolean {
+  const t = semAcento(termo.trim());
+  if (!t) return true;
+  const carro = nomeDoCarro?.(l as never) ?? "";
+  if (semAcento(`${l.title} ${l.description ?? ""} ${carro}`).includes(t)) return true;
+  const digitos = termo.replace(/\D/g, "");
+  if (digitos.length < 3) return false;
+  const tel = (l.contact_phone ?? "").replace(/\D/g, "");
+  return tel.length > 0 && (tel.includes(digitos) || semDdi(tel).includes(semDdi(digitos)));
+}
+
 export interface ContextoDosFiltros {
+  /** ia.vek CRM-244 (Fase 4): o nome do carro de interesse do lead, para a busca. */
+  nomeDoCarro?: (l: Lead) => string | null | undefined;
   categoriaDo?: (motivo: string) => string | undefined;
 }
 
@@ -213,11 +238,7 @@ export function applyFilters(
     // no contato ou na conversa sem casar card nenhum. O E/OU mora em
     // `passaMarcador`, lá em cima.
     if (!passaMarcador(l)) return false;
-    if (
-      search &&
-      !`${l.title} ${l.description ?? ""}`.toLowerCase().includes(search)
-    )
-      return false;
+    if (search && !casaBusca(l, search, contexto?.nomeDoCarro)) return false;
     // O LIMITE DE VALOR SÓ SE COMPARA COM A MOEDA EM QUE FOI ESCRITO (#1531).
     // Um negócio de 5.000,00 € não "passa" nem "reprova" um mínimo de
     // 1.000,00 R$: responder exigiria converter, e converter é o que a issue

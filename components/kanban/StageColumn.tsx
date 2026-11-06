@@ -42,6 +42,8 @@ interface StageColumnProps {
   nivel?: number;
   /** CRM-244: a lista já vem com o bloco SEM RESPOSTA no topo; a coluna só o rotula. */
   blocoSemResposta?: boolean;
+  /** CRM-244 (Fase 4): de onde saem os totais em R$ (o funil inteiro). Ausente: os cartões da coluna. */
+  leadsDoTotal?: Lead[];
 }
 
 /** ia.vek v1.9.18: uma coluna desenha aos poucos; centenas de cartões travavam a tela. */
@@ -63,6 +65,7 @@ export function StageColumn({
   onRenomear,
   nivel = 0,
   blocoSemResposta = false,
+  leadsDoTotal,
 }: StageColumnProps) {
   const t = useT();
   const esperando = blocoSemResposta
@@ -80,7 +83,8 @@ export function StageColumn({
   // `currency` NULL conta como `MOEDA_PADRAO`, porque é o que o card mostra
   // (`KanbanCard`): o total não pode discordar do card que está logo abaixo.
   const moedaDoLead = (l: Lead) => l.currency ?? MOEDA_PADRAO;
-  const totais = somaPorMoeda(leads, (l) => l.value_cents, moedaDoLead);
+  const baseDoTotal = leadsDoTotal ?? leads;
+  const totais = somaPorMoeda(baseDoTotal, (l) => l.value_cents, moedaDoLead);
   // A ordem: primeiro a moeda com MAIS NEGÓCIOS COM VALOR na coluna (empate em
   // ordem alfabética), depois as demais em ordem alfabética. Conta negócios, não
   // soma valores — "mais valor" compararia centavos de moedas diferentes, o
@@ -95,7 +99,7 @@ export function StageColumn({
   // em `ActiveOrg`, e daí page → `PipelinePageClient` → `KanbanBoard` → uma prop
   // aqui que substitui `primeira`.
   const primeira = [
-    ...somaPorMoeda(leads, (l) => (l.value_cents == null ? null : 1), moedaDoLead),
+    ...somaPorMoeda(baseDoTotal, (l) => (l.value_cents == null ? null : 1), moedaDoLead),
   ].sort(([ma, na], [mb, nb]) => nb - na || ma.localeCompare(mb))[0]?.[0];
   // A faixa aparece quando alguma moeda soma mais de zero — o `total > 0` de
   // antes, por moeda. Coluna sem valor nenhum não mostra "R$ 0,00".
@@ -114,7 +118,7 @@ export function StageColumn({
     probDaColuna === null
       ? null
       : somaPorMoeda(
-          leads,
+          baseDoTotal,
           (l) => (l.value_cents == null ? null : Math.round((l.value_cents * probDaColuna) / 100)),
           moedaDoLead,
         );

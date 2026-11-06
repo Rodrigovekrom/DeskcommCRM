@@ -57,6 +57,12 @@ export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps
   const { data: agents } = useAssignableAgents(true);
   const [searchInput, setSearchInput] = useState(filters.search ?? "");
 
+  // CRM-244 (Fase 4): a busca limpa de fora (o "Limpar busca" do quadro) esvazia o campo também.
+  useEffect(() => {
+    if ((filters.search ?? "") !== searchInput) setSearchInput(filters.search ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search]);
+
   // Debounce search 250ms
   useEffect(() => {
     const t = setTimeout(() => {
@@ -192,7 +198,7 @@ export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2">
       <Input
         type="search"
-        placeholder={t("Buscar por título…")}
+        placeholder={t("Buscar por nome, telefone ou carro…")}
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
         className="h-9 w-full sm:w-64"

@@ -58,6 +58,7 @@ vi.mock("@/components/iavek/VistaDoPipeline", () => ({
   VistaDoPipeline: () => null,
 }));
 vi.mock("@/components/iavek/SemRespostaPorVendedor", () => ({ SemRespostaPorVendedor: () => null }));
+vi.mock("@/components/iavek/BuscaDoQuadro", () => ({ ResultadoDaBusca: () => null, useNomeDoCarroDaBusca: () => () => null }));
 vi.mock("@/hooks/inbox/useMessageTemplates", () => ({ usePreCarregarRespostas: () => undefined, useMessageTemplates: () => ({ data: [] }) }));
 vi.mock("@/components/kanban/NewLeadDialog", () => ({ NewLeadDialog: () => null }));
 /**

@@ -10,6 +10,7 @@ import { DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCa
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
 import { usePreCarregarRespostas } from "@/hooks/inbox/useMessageTemplates";
 import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
+import { BuscaDoQuadro, useNomeDoCarroDaBusca } from "@/components/iavek/BuscaDoQuadro";
 import { PadraoNoCardContext, type AvaliacaoDoLead } from "@/components/iavek/PadraoDoLead";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
@@ -108,6 +109,10 @@ export function CarteiraClient({
   // para a visão da loja, no MESMO filtro de responsável. Os contadores não
   // mudam com ele (são fixos, da loja).
   const [filtros, setFiltros] = useState<LeadFilters>({ owner: "any" });
+  // CRM-244 (Fase 4): cada parte do quadro diz quantos a busca achou; a soma vira "N encontrados".
+  const [achados, setAchados] = useState<Record<string, number>>({});
+  const aoAchar = useCallback((funilId: string, n: number) => setAchados((a) => (a[funilId] === n ? a : { ...a, [funilId]: n })), []);
+  const encontrados = funis.reduce((soma, f) => soma + (achados[f.id] ?? 0), 0);
 
   return (
     <div
@@ -129,6 +134,7 @@ export function CarteiraClient({
       <ContadoresDoPipeline contadores={painel.data?.contadores ?? null} />
 
       {recorte === "loja" && <SeletorDeVendedor filters={filtros} onChange={setFiltros} />}
+      <BuscaDoQuadro valor={filtros.search ?? ""} onChange={(v) => setFiltros((f) => ({ ...f, search: v }))} encontrados={encontrados} />
 
       {/* v1.9.18: o vendedor nunca vê a faixa de sem dono nem o Assumir. */}
       {recorte === "carteira" && !ehVendedor && visaoEfetiva !== "followup" && (
@@ -150,6 +156,7 @@ export function CarteiraClient({
             prefs={prefs}
             gravar={gravar}
             aoAtualizar={painel.recarregar}
+            aoAchar={aoAchar}
           />
         ) : (
           <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto" data-testid="visao-todos">
@@ -166,6 +173,7 @@ export function CarteiraClient({
                   prefs={prefs}
                   gravar={gravar}
                   aoAtualizar={painel.recarregar}
+                  aoAchar={aoAchar}
                   comTitulo
                 />
               </section>
@@ -265,6 +273,7 @@ function QuadroDoFunil({
   prefs,
   gravar,
   aoAtualizar,
+  aoAchar,
   comTitulo = false,
 }: {
   funil: FunilDaTela & { rotulo: string };
@@ -273,6 +282,7 @@ function QuadroDoFunil({
   prefs: ReturnType<typeof usePreferenciasDoPipeline>["prefs"];
   gravar: ReturnType<typeof usePreferenciasDoPipeline>["gravar"];
   aoAtualizar: () => void;
+  aoAchar?: (funilId: string, n: number) => void;
   comTitulo?: boolean;
 }) {
   const t = useT();
@@ -298,7 +308,12 @@ function QuadroDoFunil({
         )
         .then((r) => r.data),
   });
-  const leads = useMemo(() => (data ? applyFilters(data.leads, filtros) : []), [data, filtros]);
+  // CRM-244 (Fase 4): a busca acha por nome, telefone e carro (o catálogo só é lido quando há busca).
+  const nomeDoCarro = useNomeDoCarroDaBusca(Boolean(filtros.search?.trim()));
+  const leads = useMemo(() => (data ? applyFilters(data.leads, filtros, { nomeDoCarro }) : []), [data, filtros, nomeDoCarro]);
+  useEffect(() => {
+    aoAchar?.(pipelineId, leads.length);
+  }, [aoAchar, pipelineId, leads.length]);
   // ia.vek v1.9.16: só quando o quadro RECARREGA. Na primeira carga o selo e o painel
   // acabaram de ser pedidos, e pedir de novo só dobrava a abertura da tela.
   const cargaAnterior = useRef<{ funil: string; em: number } | null>(null);
@@ -342,6 +357,7 @@ function QuadroDoFunil({
             pipelineId={pipelineId}
             stages={data.stages}
             leads={leads}
+            leadsDosTotais={data.leads}
             pulses={pulses}
             pipeline={data.pipeline}
             ordem={prefs.ordem}
