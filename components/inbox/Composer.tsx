@@ -25,7 +25,8 @@ import {
   resolverMencao,
   type OpcaoDeMencao,
 } from "@/components/inbox/composer/MentionMenu";
-import { resolveSlash, TemplateMenu } from "@/components/inbox/composer/TemplateMenu";
+import { filtrarRespostas, resolveSlash, TemplateMenu } from "@/components/inbox/composer/TemplateMenu";
+import { CriarRespostaRapida } from "@/components/inbox/composer/CriarRespostaRapida";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useCreateNote } from "@/hooks/inbox/useCreateNote";
 import { useMessageTemplates, type MessageTemplate } from "@/hooks/inbox/useMessageTemplates";
@@ -202,6 +203,11 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   const templates = useMessageTemplates();
   const slash = resolveSlash(text);
   const menuOpen = mode === "reply" && slash.open && !menuDismissed;
+  // ia.vek CRM-244 (Fase 3): setas escolhem, Enter insere o destacado SEM enviar; e criar pelo "/".
+  const respostasFiltradas = filtrarRespostas(templates.data ?? [], slash.query);
+  const [ativo, setAtivo] = useState(0);
+  const [criandoResposta, setCriandoResposta] = useState<string | null>(null);
+  const ativoValido = respostasFiltradas.length ? Math.min(ativo, respostasFiltradas.length - 1) : 0;
 
   // SÓ em nota: a menção é assunto interno, e uma menção no campo de resposta
   // sairia para o cliente como texto solto. A query roda enquanto a lista está
@@ -381,6 +387,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
       setMenuDismissed(true);
       return;
     }
+    if (menuOpen && (e.key === "ArrowDown" || e.key === "ArrowUp") && respostasFiltradas.length > 0) {
+      e.preventDefault();
+      const n = respostasFiltradas.length;
+      setAtivo((i) => (e.key === "ArrowDown" ? (Math.min(i, n - 1) + 1) % n : (Math.min(i, n - 1) - 1 + n) % n));
+      return;
+    }
     // A lista de menções come as teclas ANTES do Enter salvar — a mesma lei
     // do slash-menu: com o menu aberto, Enter escolhe, não envia.
     if (mencaoAberta) {
@@ -413,7 +425,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (menuOpen) return; // deixa o Enter pro menu; não envia /query como mensagem
+      // Com o menu aberto, Enter INSERE a resposta destacada e não envia (CRM-244, teste F).
+      if (menuOpen) {
+        const escolhida = respostasFiltradas[ativoValido];
+        if (escolhida) applyTemplate(escolhida);
+        return;
+      }
       handleSubmit();
     }
   }
@@ -443,7 +460,17 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           templates={templates.data ?? []}
           onPick={applyTemplate}
           onClose={() => setMenuDismissed(true)}
+          ativo={ativoValido}
+          onCriar={() => setCriandoResposta(slash.query)}
         />
+        {criandoResposta !== null && (
+          <CriarRespostaRapida
+            open
+            atalhoInicial={criandoResposta}
+            onOpenChange={(aberto) => !aberto && setCriandoResposta(null)}
+            onCriada={applyTemplate}
+          />
+        )}
         {/* A LISTA DE ATENDENTES (#2372) — só em nota, só enquanto o `@` está
             aberto. O MESMO canto do slash-menu, que só existe em resposta: os
             dois nunca aparecem juntos. */}
@@ -572,6 +599,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
               setCaret(pos);
               setMencaoIndice(0);
               if (!resolveSlash(e.target.value).open) setMenuDismissed(false);
+              setAtivo(0);
               // Sumiu o `@` (apagou, ou o Enter escolheu): o Esc de uma vez
               // não pode travar a lista da PRÓXIMA menção.
               if (!resolverMencao(e.target.value, pos)) setMencaoDispensada(false);
