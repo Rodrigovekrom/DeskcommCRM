@@ -120,25 +120,21 @@ describe("o elo que some sem barulho", () => {
     const fonte = readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8");
     expect(fonte, "falta withConversas").toContain("withConversas");
     expect(fonte, "withConversas não foi chamada").toMatch(
-      /leadsComConversa\s*=\s*await withConversas/,
+      /withConversas\(supabase,\s*orgId,\s*leadsVisiveis\)/,
     );
     // Chamar e não USAR o resultado é o defeito de verdade: a função roda, o
     // custo se paga, e a resposta sai sem a conversa. A primeira versão deste
     // caso só olhava a chamada e o sabote passou.
     //
-    // A resposta não sai mais direto de `withConversas`: a cadeia é
-    // withConversas → withMarcadoresDoContato → resposta. Exigir o texto
-    // `leads: leadsComConversa.leads` reprovava quem acrescentava uma etapa
-    // CERTA depois dela; o que importa é o resultado dela alimentar a próxima,
-    // e a resposta sair da última.
+    // ia.vek v1.9.25: as leituras do cartão correm juntas (Promise.all) e o
+    // resultado de cada uma é juntado por posição. O que importa continua o
+    // mesmo: o resultado de withConversas entra na junção, e a resposta sai
+    // da junção.
     expect(
       fonte,
-      "o resultado de withConversas não alimenta withMarcadoresDoContato (cadeia: withConversas → withMarcadoresDoContato → resposta)",
-    ).toMatch(/withMarcadoresDoContato\(\s*supabase,[\s\S]*?leadsComConversa\.leads/);
-    expect(
-      fonte,
-      "a resposta não sai da última etapa (cadeia: withConversas → withMarcadoresDoContato → resposta)",
-    ).toMatch(/leads:\s*leadsComMarcadores\.leads/);
+      "o resultado de withConversas não entra na junção do quadro",
+    ).toMatch(/juntarPorPosicao\(leadsVisiveis,\s*\[[\s\S]*?comConversa\.leads[\s\S]*?\]\)/);
+    expect(fonte, "a resposta não sai da junção").toMatch(/leads:\s*leadsDoQuadro/);
   });
 
   it("contato SEM conversa sai como `null`, não ausente — senão \"Abrir conversa\" nunca aparece (#1993)", () => {
