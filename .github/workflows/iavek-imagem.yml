@@ -19,7 +19,7 @@ name: iavek-imagem
 
 on:
   push:
-    branches: ["iavek/**"]
+    branches: ["iavek/**", "!iavek/retag-**"]
   workflow_dispatch: {}
 
 concurrency:

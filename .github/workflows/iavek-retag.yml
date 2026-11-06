@@ -1,0 +1,38 @@
+name: iavek-retag
+
+# ia.vek (06/11): dá um nome NOVO a imagens que JÁ existem — o MESMO digest, sem rebuild. O
+# trocar-producao.sh só aceita tags 'iavek-v<versão>-<sha7>'; a v1.9.31 saiu como
+# 'iavek-crm244-f4-busca-e93d9de'. `crane tag` cria a tag nova apontando para o manifesto que já
+# está no registro; o job confere que origem e destino têm o mesmo digest, e falha se não tiverem.
+on:
+  push:
+    branches: ["iavek/retag-**"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    env:
+      ORIGEM: iavek-crm244-f4-busca-e93d9de
+      DESTINO: iavek-v1.9.31-pipeline-e93d9de
+    steps:
+      - uses: imjasonh/setup-crane@v0.4
+      - name: Login no GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Retag (mesmo digest) e conferência
+        run: |
+          set -euo pipefail
+          dono="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          ok=1
+          for r in iavek-crm iavek-crm-worker iavek-crm-scheduler; do
+            img="ghcr.io/${dono}/${r}"
+            antes="$(crane digest "${img}:${ORIGEM}")"
+            crane tag "${img}:${ORIGEM}" "${DESTINO}"
+            depois="$(crane digest "${img}:${DESTINO}")"
+            echo "${r}: origem ${ORIGEM} = ${antes} | destino ${DESTINO} = ${depois}"
+            [ "${antes}" = "${depois}" ] || ok=0
+          done
+          [ "${ok}" = 1 ] && echo "OK: os 3 digests batem." || { echo "ERRO: digest diferente."; exit 1; }
