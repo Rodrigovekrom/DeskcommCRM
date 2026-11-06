@@ -45,10 +45,10 @@ describe("quem troca o responsável", () => {
 });
 
 describe("a lista não fecha no meio da busca", () => {
-  it("fica aberta enquanto o campo de busca tem o foco (o quadro que se mexe não a fecha)", () => {
+  it("só fecha por ação de quem usa (o quadro que se mexe sob o mouse não a fecha)", () => {
     const fonte = ler("components/kanban/KanbanCardActions.tsx");
     expect(fonte).toMatch(/open=\{listaAberta\}/);
-    expect(fonte).toMatch(/else if \(document\.activeElement !== campoDeBusca\.current\) fecharLista\(\);/);
+    expect(fonte).toMatch(/onOpenChange=\{\(aberto\) => \{\s*if \(aberto\) setListaAberta\(true\);\s*\}\}/);
     // e fecha por Esc e quando o menu inteiro fecha
     expect(fonte).toMatch(/if \(e\.key === "Escape"\) fecharLista\(\);/);
     expect(fonte).toMatch(/<DropdownMenu onOpenChange=\{\(aberto\) => !aberto && fecharLista\(\)\}>/);

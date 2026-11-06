@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import {
   DropdownMenu,
@@ -72,11 +72,9 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
   const { data: agents } = useAssignableAgents(podeTrocarResponsavel);
   // ia.vek CRM-244 (Fase 1): busca por nome na lista do responsável.
   const [busca, setBusca] = useState("");
-  // A lista fica aberta enquanto o campo de busca tem o foco. Sem isto, o quadro que se mexe sob o
-  // mouse parado (o selo "Incompleto" chega depois, em lotes, e empurra os cartões) tirava o
-  // ponteiro do item "Responsável" e o Radix fechava a lista no meio da digitação (medido no canário).
+  // A lista é controlada aqui. Sem isto, o quadro que se mexe sob o mouse parado (o selo
+  // "Incompleto" chega depois, em lotes, e empurra os cartões) fechava a lista no meio da busca.
   const [listaAberta, setListaAberta] = useState(false);
-  const campoDeBusca = useRef<HTMLInputElement>(null);
   const fecharLista = () => {
     setListaAberta(false);
     setBusca("");
@@ -150,9 +148,12 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
           {podeTrocarResponsavel && (
             <DropdownMenuSub
               open={listaAberta}
+              // Abre pelo Radix (clique ou ponteiro); fecha SÓ por ação de quem usa: Esc, escolher
+              // alguém ou fechar o menu. O "ponteiro saiu do item" não fecha: quando o quadro desce
+              // sob o mouse parado, o ponteiro cai em outro item, que toma o foco do campo, e a lista
+              // fechava no meio da busca (medido no canário duas vezes).
               onOpenChange={(aberto) => {
                 if (aberto) setListaAberta(true);
-                else if (document.activeElement !== campoDeBusca.current) fecharLista();
               }}
             >
               <DropdownMenuSubTrigger data-testid="menu-responsavel">
@@ -161,7 +162,6 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
               <DropdownMenuSubContent className="max-h-[60vh] overflow-y-auto">
                 <div className="sticky top-0 z-10 bg-popover p-1">
                   <input
-                    ref={campoDeBusca}
                     type="search"
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
