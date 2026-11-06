@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import {
   DropdownMenu,
@@ -72,6 +72,15 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
   const { data: agents } = useAssignableAgents(podeTrocarResponsavel);
   // ia.vek CRM-244 (Fase 1): busca por nome na lista do responsável.
   const [busca, setBusca] = useState("");
+  // A lista fica aberta enquanto o campo de busca tem o foco. Sem isto, o quadro que se mexe sob o
+  // mouse parado (o selo "Incompleto" chega depois, em lotes, e empurra os cartões) tirava o
+  // ponteiro do item "Responsável" e o Radix fechava a lista no meio da digitação (medido no canário).
+  const [listaAberta, setListaAberta] = useState(false);
+  const campoDeBusca = useRef<HTMLInputElement>(null);
+  const fecharLista = () => {
+    setListaAberta(false);
+    setBusca("");
+  };
   const casa = (nome: string | null | undefined) => contemONome(nome, busca);
   const membrosVistos = (members ?? []).filter((m) => casa(m.full_name));
   const agentesVistos = (agents ?? []).filter((a) => casa(a.name));
@@ -112,7 +121,7 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
       positivo de que clicar no CARD continua abrindo o dossiê.
     */
     <span className="contents" onClick={(e) => e.stopPropagation()}>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={(aberto) => !aberto && fecharLista()}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -139,20 +148,28 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
             <PencilSimple size={14} className="mr-2" /> {t("Editar")}
           </DropdownMenuItem>
           {podeTrocarResponsavel && (
-            <DropdownMenuSub onOpenChange={(aberto) => !aberto && setBusca("")}>
+            <DropdownMenuSub
+              open={listaAberta}
+              onOpenChange={(aberto) => {
+                if (aberto) setListaAberta(true);
+                else if (document.activeElement !== campoDeBusca.current) fecharLista();
+              }}
+            >
               <DropdownMenuSubTrigger data-testid="menu-responsavel">
                 <Users size={14} className="mr-2" /> {t("Responsável")}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-[60vh] overflow-y-auto">
                 <div className="sticky top-0 z-10 bg-popover p-1">
                   <input
+                    ref={campoDeBusca}
                     type="search"
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
                     // O menu do Radix usa as teclas para navegar e para a busca por letra:
                     // aqui a tecla é do campo (só Esc e as setas seguem para o menu).
                     onKeyDown={(e) => {
-                      if (!["Escape", "ArrowDown", "ArrowUp"].includes(e.key)) e.stopPropagation();
+                      if (e.key === "Escape") fecharLista();
+                      else if (!["ArrowDown", "ArrowUp"].includes(e.key)) e.stopPropagation();
                     }}
                     placeholder={t("Buscar por nome")}
                     aria-label={t("Buscar responsável por nome")}

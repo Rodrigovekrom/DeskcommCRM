@@ -44,6 +44,17 @@ describe("quem troca o responsável", () => {
   });
 });
 
+describe("a lista não fecha no meio da busca", () => {
+  it("fica aberta enquanto o campo de busca tem o foco (o quadro que se mexe não a fecha)", () => {
+    const fonte = ler("components/kanban/KanbanCardActions.tsx");
+    expect(fonte).toMatch(/open=\{listaAberta\}/);
+    expect(fonte).toMatch(/else if \(document\.activeElement !== campoDeBusca\.current\) fecharLista\(\);/);
+    // e fecha por Esc e quando o menu inteiro fecha
+    expect(fonte).toMatch(/if \(e\.key === "Escape"\) fecharLista\(\);/);
+    expect(fonte).toMatch(/<DropdownMenu onOpenChange=\{\(aberto\) => !aberto && fecharLista\(\)\}>/);
+  });
+});
+
 describe("busca por nome na lista", () => {
   it("sem diferença de maiúscula nem acento; vazio mostra todos", () => {
     expect(contemONome("José da Silva", "jose")).toBe(true);
