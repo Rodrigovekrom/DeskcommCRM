@@ -197,6 +197,42 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       }
     },
 
+    async perderSemRetorno(lead, motivo) {
+      // CRM-141: a etapa de perda do funil DO lead (uma só por funil, `uniq_crm_stages_pipeline_lost`),
+      // pelo mesmo escritor de etapa da tela, com o motivo na mesma escrita.
+      try {
+        const { data: atual, error: e1 } = await admin
+          .from("crm_stages")
+          .select("pipeline_id")
+          .eq("organization_id", orgId)
+          .eq("id", lead.stage_id)
+          .maybeSingle();
+        if (e1 || !atual) throw new Error(e1?.message ?? "etapa_atual_nao_achada");
+        const { data: perda, error: e2 } = await admin
+          .from("crm_stages")
+          .select("id")
+          .eq("organization_id", orgId)
+          .eq("pipeline_id", (atual as { pipeline_id: string }).pipeline_id)
+          .eq("is_lost", true)
+          .eq("is_archived", false)
+          .maybeSingle();
+        if (e2 || !perda) throw new Error(e2?.message ?? "funil_sem_etapa_de_perda");
+        await moveLeadHandler(admin, ctx, lead.id, {
+          to_stage_id: (perda as { id: string }).id,
+          reason: "Esteira: terminou todas as fases do follow-up sem retorno",
+          lost_reason: motivo,
+        });
+        return true;
+      } catch (err) {
+        logger.warn("esteira_sem_retorno_falhou", {
+          organization_id: orgId,
+          lead_id: lead.id,
+          error: err instanceof Error ? err.message.slice(0, 200) : String(err),
+        });
+        return false;
+      }
+    },
+
     async comHandoff(leadIds) {
       if (leadIds.length === 0) return new Set();
       // v1.9.19.2: em lotes e conferindo o erro. Um erro aqui virava "ninguém tem" em silêncio.

@@ -6,6 +6,9 @@ import {
   HORA,
   diaDeVida,
   faseDoDia,
+  contagemSemRetorno,
+  entraNoSemRetorno,
+  fimDaUltimaFase,
   ligacaoDoFollowupDevida,
   rodarEsteira,
   sourceKindDaLigacao,
@@ -60,6 +63,7 @@ function montar(o: {
   vencidas?: LigacaoPendente[];
   cobradas?: Record<string, number[]>;
   falhaNaPassagem?: boolean;
+  falhaNaPerda?: boolean;
 }) {
   const log = {
     passados: [] as string[],
@@ -67,6 +71,7 @@ function montar(o: {
     criadas: [] as Array<[string, CodigoDeLigacao, Date]>,
     cobrancas: [] as Array<[string, number, string]>,
     reengajos: [] as string[],
+    perdidos: [] as Array<[string, string]>,
   };
   const deps: DepsDaEsteira = {
     agora: () => AGORA,
@@ -90,6 +95,11 @@ function montar(o: {
       new Map(ids.map((i) => [i, new Set((o.ligacoes?.[i] ?? []).map((c) => sourceKindDaLigacao(c as CodigoDeLigacao)))])),
     criarLigacao: async (l, c, v) => {
       log.criadas.push([l.id, c, v]);
+      return true;
+    },
+    perderSemRetorno: async (l, motivo) => {
+      if (o.falhaNaPerda) return false;
+      log.perdidos.push([l.id, motivo]);
       return true;
     },
     ligacoesVencidas: async () => o.vencidas ?? [],
@@ -265,5 +275,71 @@ describe("rodada", () => {
       ["sexta", 1, "manager"],
       ["longe", 2, "admin"],
     ]);
+  });
+});
+
+describe("CRM-141: terminou o follow-up sem retorno vira Perdido", () => {
+  // Última fase vai até o dia 90: termina 90 dias depois do nascimento.
+  const ligada = (desde: Date): ConfigDaEsteira => ({ ...cfg, semRetorno: { desde: desde.toISOString(), motivo: "no_response" } });
+  const naUltima = (id: string, diasDeVida: number) => lead({ id, stage_id: F61, created_at: ha(diasDeVida * DIA), inicio: ha(diasDeVida * DIA) });
+
+  it("desligada (padrão): ninguém é perdido, fica na última fase como antes", async () => {
+    const { deps, log } = montar({ followup: [naUltima("velho", 120)] });
+    const r = await rodarEsteira(cfg, deps);
+    expect(log.perdidos).toEqual([]);
+    expect(r.perdidosSemRetorno).toBe(0);
+  });
+
+  it("fim da última fase = início + ate_dia da última; entra só quem terminou DEPOIS de ligar", () => {
+    const f = cfg.funis!.followup.fases;
+    const inicio = new Date(AGORA.getTime() - 91 * DIA);
+    expect(fimDaUltimaFase(f, inicio).getTime()).toBe(inicio.getTime() + 90 * DIA);
+    expect(entraNoSemRetorno(f, inicio, AGORA, new Date(AGORA.getTime() - 2 * DIA))).toBe(true); // terminou ontem, ligada anteontem
+    expect(entraNoSemRetorno(f, inicio, AGORA, new Date(AGORA.getTime() - 12 * HORA))).toBe(false); // terminou antes de ligar
+    expect(entraNoSemRetorno(f, new Date(AGORA.getTime() - 89 * DIA), AGORA, new Date(0))).toBe(false); // ainda no dia 90
+  });
+
+  it("ligada: quem terminou depois vira Perdido com o motivo; quem terminou antes e quem ainda está na fase, não", async () => {
+    const desde = new Date(AGORA.getTime() - 5 * DIA);
+    const { deps, log } = montar({
+      followup: [naUltima("terminou-depois", 92), naUltima("terminou-antes", 100), naUltima("ainda-no-dia-80", 79)],
+    });
+    const r = await rodarEsteira(ligada(desde), deps);
+    expect(log.perdidos).toEqual([["terminou-depois", "no_response"]]);
+    expect(r.perdidosSemRetorno).toBe(1);
+    // perdido não ganha ligação nem movimento de fase
+    expect(log.criadas.filter(([id]) => id === "terminou-depois")).toEqual([]);
+    expect(log.movidos.filter(([id]) => id === "terminou-depois")).toEqual([]);
+  });
+
+  it("quem voltou a falar vai para Reengajou, nunca para Perdido", async () => {
+    const { deps, log } = montar({ followup: [naUltima("falou", 92)], falou: ["falou"] });
+    await rodarEsteira(ligada(new Date(AGORA.getTime() - 5 * DIA)), deps);
+    expect(log.perdidos).toEqual([]);
+    expect(log.reengajos).toEqual(["falou"]);
+  });
+
+  it("coluna que não é fase (Reengajou) não é tocada", async () => {
+    const voltou = lead({ id: "voltou", stage_id: VOLTOU, created_at: ha(92 * DIA), inicio: ha(92 * DIA) });
+    const { deps, log } = montar({ followup: [voltou] });
+    await rodarEsteira(ligada(new Date(AGORA.getTime() - 5 * DIA)), deps);
+    expect(log.perdidos).toEqual([]);
+  });
+
+  it("falha ao perder é contada e a rodada segue", async () => {
+    const { deps } = montar({ followup: [naUltima("x", 92)], falhaNaPerda: true });
+    const r = await rodarEsteira(ligada(new Date(AGORA.getTime() - 5 * DIA)), deps);
+    expect(r.falhasSemRetorno).toBe(1);
+    expect(r.perdidosSemRetorno).toBe(0);
+  });
+
+  it("contagem antes de ligar: os que vão entrar e os que já terminaram (ficam de fora)", () => {
+    const f = cfg.funis!.followup.fases;
+    const c = contagemSemRetorno(
+      f,
+      [naUltima("a", 100), naUltima("b", 91), naUltima("c", 40), lead({ id: "d", stage_id: VOLTOU, inicio: ha(100 * DIA) })],
+      AGORA,
+    );
+    expect(c).toEqual({ vaoEntrar: 1, jaTerminaram: 2 });
   });
 });

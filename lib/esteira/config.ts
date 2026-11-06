@@ -50,11 +50,26 @@ export const funilDeFollowupSchema = z.strictObject({
   etapa_reengajou: uuid,
 });
 
+/**
+ * CRM-141 (Rodrigo, 06/11/2026): lead que passou por TODAS as fases do follow-up sem
+ * voltar a falar vira Perdido. Só vale para quem TERMINA a última fase a partir de
+ * `desde` (o instante em que a regra foi ligada): quem já tinha terminado antes fica
+ * como está. Ausente = desligada.
+ */
+export const semRetornoSchema = z.strictObject({
+  desde: z.string().datetime({ offset: true }),
+  /** O motivo gravado na perda; precisa estar no vocabulário do funil de follow-up. */
+  motivo: z.string().trim().min(1).max(80).default("no_response"),
+});
+export type SemRetorno = z.infer<typeof semRetornoSchema>;
+
 export const esteiraSettingsSchema = z.strictObject({
   /** Desligada por padrão: só roda quando os dois funis estão declarados e `ativa` é true. */
   ativa: z.boolean().optional(),
   entrada: funilDeEntradaSchema.optional(),
   followup: funilDeFollowupSchema.optional(),
+  /** CRM-141: perder quem terminou o follow-up sem retorno. */
+  perder_sem_retorno: semRetornoSchema.optional(),
   /** Quem recebe a 2ª cobrança (1 dia útil). Padrão: admin. */
   escalada_nivel2: destinatarioSchema.optional(),
   horario_comercial: z
@@ -87,6 +102,8 @@ export interface ConfigDaEsteira {
   /** Presente só quando a esteira está ATIVA e os dois funis declarados. */
   funis: { entrada: z.infer<typeof funilDeEntradaSchema>; followup: z.infer<typeof funilDeFollowupSchema> } | null;
   horario: HorarioComercial;
+  /** CRM-141: ligada só com `desde`; null = desligada. */
+  semRetorno: SemRetorno | null;
   escaladaNivel2: Destinatario;
   escalada: Destinatario;
   relatorioSemanal: Destinatario;
@@ -98,6 +115,7 @@ export interface ConfigDaEsteira {
 export const PADRAO_DA_ESTEIRA: ConfigDaEsteira = {
   funis: null,
   horario: HORARIO_PADRAO,
+  semRetorno: null,
   escaladaNivel2: { tipo: "papel", papel: "admin" },
   escalada: { tipo: "papel", papel: "manager" },
   relatorioSemanal: { tipo: "papel", papel: "manager" },
@@ -113,6 +131,7 @@ export function configDaEsteira(settings: unknown): ConfigDaEsteira {
   const e = r.data;
   return {
     funis: e.ativa === true && e.entrada && e.followup ? { entrada: e.entrada, followup: e.followup } : null,
+    semRetorno: e.perder_sem_retorno ?? null,
     escaladaNivel2: e.escalada_nivel2 ?? PADRAO_DA_ESTEIRA.escaladaNivel2,
     horario: e.horario_comercial
       ? { fuso: e.horario_comercial.fuso, dias: e.horario_comercial.dias as HorarioComercial["dias"] }

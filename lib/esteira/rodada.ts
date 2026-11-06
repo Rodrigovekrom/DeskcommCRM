@@ -15,6 +15,10 @@
  *  4. LIGAÇÕES L1–L7. L1 em até 1 h útil depois do handoff de quem não tem
  *     compromisso; L2 com 48 h; L3 na passagem (dia 3); L4 dia 11; L5 dia 31;
  *     L6 dia 61; L7 dia 85. Uma de cada por negócio, nunca repetida.
+ *  4b. SEM RETORNO (CRM-141, Rodrigo 06/11). Com `perder_sem_retorno` ligado, o lead
+ *     que terminou a ÚLTIMA fase sem voltar a falar vira Perdido (motivo configurado,
+ *     padrão `no_response`). Só quem termina a última fase depois de a regra ser
+ *     ligada; quem já tinha terminado antes fica como está.
  *  5. COBRANÇA. Ligação vencida há `escaladaHoras` úteis cobra o destinatário da
  *     escalada (papel ou usuário, configurável); há `escaladaHorasNivel2`, o
  *     segundo nível. Cada nível uma vez por tarefa.
@@ -90,6 +94,44 @@ export function ligacaoDoFollowupDevida(dia: number): CodigoDeLigacao | null {
   return devida;
 }
 
+/** CRM-141: o instante em que o lead TERMINA a última fase (o fim do dia `ate_dia` dela). */
+export function fimDaUltimaFase(fases: ReadonlyArray<{ ate_dia: number }>, inicio: Date): Date {
+  return new Date(inicio.getTime() + fases[fases.length - 1]!.ate_dia * DIA);
+}
+
+/** CRM-141: já terminou a última fase, e terminou a partir de `desde` (o dia em que a regra foi ligada). */
+export function entraNoSemRetorno(
+  fases: ReadonlyArray<{ ate_dia: number }>,
+  inicio: Date,
+  agora: Date,
+  desde: Date,
+): boolean {
+  const fim = fimDaUltimaFase(fases, inicio).getTime();
+  return fim <= agora.getTime() && fim >= desde.getTime();
+}
+
+/**
+ * CRM-141: a contagem que se mostra ANTES de ligar a regra, para os leads abertos nas
+ * fases do follow-up (quem está em "Reengajou" ou fora das fases não conta).
+ *  - `jaTerminaram`: já passaram da última fase; ligando agora, ficam DE FORA.
+ *  - `vaoEntrar`: ainda não terminaram; viram Perdido quando terminarem, se não voltarem a falar.
+ */
+export function contagemSemRetorno(
+  fases: ReadonlyArray<{ ate_dia: number; etapa_id: string }>,
+  leads: ReadonlyArray<Pick<LeadDaEsteira, "stage_id" | "inicio">>,
+  ligarEm: Date,
+): { vaoEntrar: number; jaTerminaram: number } {
+  const ids = new Set(fases.map((f) => f.etapa_id));
+  let vaoEntrar = 0;
+  let jaTerminaram = 0;
+  for (const l of leads) {
+    if (!ids.has(l.stage_id)) continue;
+    if (fimDaUltimaFase(fases, new Date(l.inicio)).getTime() < ligarEm.getTime()) jaTerminaram += 1;
+    else vaoEntrar += 1;
+  }
+  return { vaoEntrar, jaTerminaram };
+}
+
 export interface LeadDaEsteira {
   id: string;
   contact_id: string | null;
@@ -132,6 +174,8 @@ export interface DepsDaEsteira {
   reativar?(lead: LeadDaEsteira): Promise<LeadDaEsteira | null>;
   /** `source_kind` das ligações que cada negócio já teve (qualquer status). */
   ligacoesJaCriadas(leadIds: string[]): Promise<Map<string, Set<string>>>;
+  /** CRM-141: leva o lead para a etapa de perda do funil dele, com o motivo. */
+  perderSemRetorno(lead: LeadDaEsteira, motivo: string): Promise<boolean>;
   criarLigacao(lead: LeadDaEsteira, codigo: CodigoDeLigacao, venceEm: Date): Promise<boolean>;
   ligacoesVencidas(antesDe: Date): Promise<LigacaoPendente[]>;
   /** Níveis de cobrança já feitos por tarefa. */
@@ -147,12 +191,19 @@ export interface ResumoDaRodada {
   seguradosResposta: number;
   fasesMovidas: number;
   reengajados: number;
+  /** CRM-141: viraram Perdido sem retorno, e as tentativas que falharam. */
+  perdidosSemRetorno: number;
+  falhasSemRetorno: number;
   ligacoesCriadas: number;
   cobrancas: number;
 }
 
 export function rodadaTeveEfeito(r: ResumoDaRodada): boolean {
-  return r.passados + r.falhasNaPassagem + r.fasesMovidas + r.reengajados + r.ligacoesCriadas + r.cobrancas > 0;
+  return (
+    r.passados + r.falhasNaPassagem + r.fasesMovidas + r.reengajados + r.perdidosSemRetorno + r.falhasSemRetorno +
+      r.ligacoesCriadas + r.cobrancas >
+    0
+  );
 }
 
 export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): Promise<ResumoDaRodada> {
@@ -163,6 +214,8 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
     seguradosResposta: 0,
     fasesMovidas: 0,
     reengajados: 0,
+    perdidosSemRetorno: 0,
+    falhasSemRetorno: 0,
     ligacoesCriadas: 0,
     cobrancas: 0,
   };
@@ -219,6 +272,7 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   // ── 2, 3 e 4 (L4–L7, quente): funil de follow-up ────────────────────────────
   const fases = new Set(followup.fases.map((f) => f.etapa_id));
   const indiceDaFase = new Map(followup.fases.map((f, i) => [f.etapa_id, i]));
+  const semRetornoDesde = cfg.semRetorno ? new Date(cfg.semRetorno.desde) : null;
   const noFollowup = await deps.leadsAbertos(followup.pipeline_id);
   const criadasFollowup = await deps.ligacoesJaCriadas(noFollowup.map((l) => l.id));
   for (const lead of noFollowup) {
@@ -235,6 +289,12 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
           // Sinal quente: uma por reengajamento (a pendente anterior, se houver, basta).
           await criar(novo ?? lead, "quente", undefined);
         }
+        continue;
+      }
+      // CRM-141: terminou a última fase sem voltar a falar (o "falou?" acima já respondeu não).
+      if (cfg.semRetorno && semRetornoDesde && entraNoSemRetorno(followup.fases, new Date(lead.inicio), agora, semRetornoDesde)) {
+        if (await deps.perderSemRetorno(lead, cfg.semRetorno.motivo)) resumo.perdidosSemRetorno += 1;
+        else resumo.falhasSemRetorno += 1;
         continue;
       }
       const alvo = faseDoDia(followup.fases, diaDeVida(new Date(lead.inicio), agora));
