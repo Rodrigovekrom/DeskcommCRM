@@ -244,11 +244,13 @@ export function abreFunisEEntrada(funcao: unknown): boolean {
 }
 
 /**
- * ia.vek CRM-244 (Fase 1, decisão do Rodrigo, 06/11): trocar o responsável é de guardião,
- * gerente e admin. O vendedor não vê a opção e o servidor recusa.
+ * ia.vek CRM-244 (Fase 1, decisão do Rodrigo, 06/11): trocar o responsável é SÓ de guardião,
+ * gerente e admin (o admin é o vínculo sem função: a interface de sempre). Vendedor, Suporte IA
+ * e Analista de ficha não veem a opção e o servidor recusa (confirmado pelo Maestro, 06/11).
  */
 export function trocaResponsavel(funcao: unknown): boolean {
-  return funcaoDaTela(funcao) !== "vendedor";
+  const f = funcaoDaTela(funcao);
+  return f === null || f === "sdr" || f === "gerente";
 }
 
 /** ia.vek v1.9.20: depois de vendido, só gerente e admin corrigem valor e data (0608). */
