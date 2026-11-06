@@ -48,6 +48,7 @@
  * imobiliária e um infoprodutor montam funis diferentes, e nenhum nome de funil
  * aparece neste arquivo.
  */
+import { gravarCarroDoAnuncio } from "@/lib/iavek/carro-do-anuncio-servidor";
 import { etapaDeEntrada } from "@/lib/leads/etapa-de-entrada";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { marcaDaOrigem, origemDeCampanhaDaConversa } from "@/lib/campanhas/origem-do-lead";
@@ -428,6 +429,20 @@ export async function garantirLeadDaConversa(
       organization_id: organizationId,
       lead_id: lead.id as string,
       error: registro.error?.slice(0, 120),
+    });
+  }
+
+  // ia.vek CRM-229: o lead que nasceu de um anúncio ganha o CARRO DO ANÚNCIO (o carro do
+  // catálogo que o anúncio mostrava), quando a resposta é única. Antes do `lead.created`, para o
+  // evento já ver o campo. Nunca derruba o nascimento: o card existe e é o que importa.
+  try {
+    const desfecho = await gravarCarroDoAnuncio(db, organizationId, lead.id as string, contato?.source_metadata);
+    if (desfecho === "erro") logger.warn("nascimento-do-lead: carro do anúncio não gravado", { organization_id: organizationId, lead_id: lead.id as string });
+  } catch (err) {
+    logger.warn("nascimento-do-lead: carro do anúncio falhou", {
+      organization_id: organizationId,
+      lead_id: lead.id as string,
+      error: err instanceof Error ? err.message.slice(0, 120) : String(err),
     });
   }
 
