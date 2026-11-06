@@ -1,6 +1,6 @@
 "use client";
 import { Droppable } from "@hello-pangea/dnd";
-import { useRef, useState, type CSSProperties } from "react";
+import { Fragment, useRef, useState, type CSSProperties } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
 import type { Lead } from "@/lib/types/leads";
@@ -8,6 +8,7 @@ import type { Stage } from "@/lib/kanban/types";
 import { buildCardInput } from "@/lib/kanban/card-state";
 import { intervaloDaColuna } from "@/lib/kanban/selecao";
 import { formatSomaPorMoeda, formatValorDoNegocio, MOEDA_PADRAO, somaPorMoeda } from "@/lib/money";
+import { esperandoDesde } from "@/lib/iavek/ordem-do-quadro";
 import { KanbanCard, type GestoDeSelecao } from "./KanbanCard";
 
 interface StageColumnProps {
@@ -39,6 +40,8 @@ interface StageColumnProps {
   onRenomear?: (nome: string) => void;
   /** 0 (primeira etapa) a 1 (última): o tom do fundo da coluna (`nivelDaEtapa`). */
   nivel?: number;
+  /** CRM-244: a lista já vem com o bloco SEM RESPOSTA no topo; a coluna só o rotula. */
+  blocoSemResposta?: boolean;
 }
 
 /** ia.vek v1.9.18: uma coluna desenha aos poucos; centenas de cartões travavam a tela. */
@@ -59,8 +62,12 @@ export function StageColumn({
   podeRenomear = false,
   onRenomear,
   nivel = 0,
+  blocoSemResposta = false,
 }: StageColumnProps) {
   const t = useT();
+  const esperando = blocoSemResposta
+    ? new Set(leads.filter((l) => esperandoDesde(l, stage.name) !== null).map((l) => l.id))
+    : new Set<string>();
   const [limite, setLimite] = useState(CARTOES_POR_VEZ);
   // O TOTAL É POR MOEDA (#1531). Antes ele somava todos os `value_cents` e
   // escrevia o resultado na moeda do primeiro negócio: R$ 5.000 e 5.000 € saíam
@@ -249,6 +256,17 @@ export function StageColumn({
             )}
           >
             {leads.slice(0, limite).map((lead, idx) => (
+              <Fragment key={lead.id}>
+              {esperando.size > 0 && idx === 0 && esperando.has(lead.id) && (
+                <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400" data-testid="bloco-sem-resposta">
+                  {t("Sem resposta")} · {esperando.size}
+                </p>
+              )}
+              {idx > 0 && esperando.has(leads[idx - 1]!.id) && !esperando.has(lead.id) && (
+                <p className="border-t border-border px-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted" data-testid="bloco-respondidos">
+                  {t("Respondidos")}
+                </p>
+              )}
               <KanbanCard
                 key={lead.id}
                 card={buildCardInput(lead, {
@@ -267,6 +285,7 @@ export function StageColumn({
                 onSelect={aoSelecionar}
                 onOpen={onOpen}
               />
+              </Fragment>
             ))}
             {provided.placeholder}
             {leads.length > limite && (

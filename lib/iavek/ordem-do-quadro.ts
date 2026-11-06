@@ -75,6 +75,18 @@ export function compararLeads(
   }
 }
 
+/**
+ * CRM-244 (Fase 2, teste B): na ordem "Última mensagem do lead", o bloco SEM RESPOSTA vem no topo
+ * da coluna (lead cuja última mensagem é dele e nenhuma PESSOA respondeu depois; a IA não conta).
+ * Separação estável: dentro de cada bloco, a ordem que já veio.
+ */
+export function semRespostaPrimeiro<T extends Pick<Lead, "status" | "conversa">>(lista: T[], nomeDaEtapa: string | null | undefined): T[] {
+  const sem: T[] = [];
+  const resto: T[] = [];
+  for (const l of lista) (esperandoDesde(l, nomeDaEtapa) !== null ? sem : resto).push(l);
+  return sem.length === 0 || resto.length === 0 ? lista : [...sem, ...resto];
+}
+
 /** Ordem congelada (arrastando, ou com o menu de mover aberto): novos no fim, ninguém pula. */
 export function manterOrdem<T extends { id: string }>(lista: T[], anterior: readonly string[] | undefined): T[] {
   if (!anterior) return lista;
@@ -99,9 +111,19 @@ export function aplicarConversaNoQuadro<L extends Pick<Lead, "contact_id" | "con
   const novos = leads.map((l) => {
     if (l.contact_id !== c.contact_id) return l;
     mudou = true;
+    // CRM-244 (Fase 2): mensagem nova do cliente soma 1 às não lidas de quem olha; resposta de
+    // pessoa zera. A leitura exata volta na próxima carga do quadro.
+    const antes = l.conversa;
+    const entrouNova = !!c.last_inbound_at && Date.parse(c.last_inbound_at) > Date.parse(antes?.last_inbound_at ?? "1970-01-01");
+    const respondeu =
+      !!c.ultima_resposta_humana_em &&
+      Date.parse(c.ultima_resposta_humana_em) > Date.parse(antes?.ultima_resposta_humana_em ?? "1970-01-01");
+    const nao_lidas = respondeu ? 0 : (antes?.nao_lidas ?? 0) + (entrouNova ? 1 : 0);
     return {
       ...l,
       conversa: {
+        nao_lidas,
+        ja_vi: respondeu || entrouNova ? false : antes?.ja_vi,
         id: c.id,
         preview: c.last_message_preview ?? l.conversa?.preview ?? null,
         last_message_at: c.last_message_at ?? l.conversa?.last_message_at ?? null,

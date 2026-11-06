@@ -8,6 +8,7 @@ import { AvisosDoCartaoContext } from "@/components/iavek/AvisosDoCartao";
 import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
 import { DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
+import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
 import { PadraoNoCardContext, type AvaliacaoDoLead } from "@/components/iavek/PadraoDoLead";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
@@ -322,6 +323,7 @@ function QuadroDoFunil({
           </p>
         )}
         {data && <VistaDoPipeline etapas={data.stages} prefs={prefs} gravar={gravar} />}
+        {data && <SemRespostaPorVendedor leads={leads} stages={data.stages} />}
       </div>
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm">

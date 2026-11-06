@@ -27,7 +27,7 @@ import { MoverNoQuadroContext, type ColunaDoMenu } from "./mover-no-quadro";
 import { useSensorDoArrasto } from "./sensor-do-arrasto";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
-import { compararLeads, ehColunaDaIa, manterOrdem, type OrdemDoQuadro } from "@/lib/iavek/ordem-do-quadro";
+import { compararLeads, ehColunaDaIa, manterOrdem, semRespostaPrimeiro, type OrdemDoQuadro } from "@/lib/iavek/ordem-do-quadro";
 import { LoseLeadDialog } from "./LoseLeadDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { ConversaNoQuadro, ConversaNoQuadroContext } from "@/components/iavek/ConversaNoQuadro";
@@ -95,8 +95,10 @@ function groupLeadsByStage(
     if (ordem === "posicao") list.sort((a, b) => a.position_in_stage - b.position_in_stage);
     // ia.vek v1.9.18: na coluna da IA, por chegada; ainda não há sinal de "pediu um humano".
     else list.sort(compararLeads(ehColunaDaIa(nomes.get(stageId)) ? "chegada" : ordem, vencimentos));
+    // CRM-244 (teste B): na ordem padrão, o bloco SEM RESPOSTA vai para o topo da coluna.
+    const ordenada = ordem === "ultima_mensagem" ? semRespostaPrimeiro(list, nomes.get(stageId)) : list;
     const anterior = congelada?.get(stageId);
-    if (anterior) map.set(stageId, manterOrdem(list, anterior));
+    map.set(stageId, anterior ? manterOrdem(ordenada, anterior) : ordenada);
   }
   return map;
 }
@@ -259,11 +261,23 @@ export function KanbanBoard({
     if (!data) return null;
     return groupLeadsByStage(data.stages, data.leads, ordem, vencimentos, ordemCongelada);
   }, [data, ordem, vencimentos, ordemCongelada]);
+  // CRM-244 (Fase 2): com o cartão aberto (dossiê ou conversa) a ordem também não muda; a nova
+  // ordem entra ao fechar. Soltar um arraste com o cartão aberto não descongela.
+  const cartaoAberto = Boolean(dossieId || conversaDoLeadId);
   const congelar = useCallback(
-    (sim: boolean) =>
-      setOrdemCongelada(sim && grouped ? new Map([...grouped].map(([id, l]) => [id, l.map((x) => x.id)])) : null),
-    [grouped],
+    (sim: boolean) => {
+      if (!sim && cartaoAberto) return;
+      setOrdemCongelada(sim && grouped ? new Map([...grouped].map(([id, l]) => [id, l.map((x) => x.id)])) : null);
+    },
+    [grouped, cartaoAberto],
   );
+  // Só a ABERTURA e o FECHAMENTO mudam o congelamento (com `congelar` nas dependências, cada
+  // dado novo tiraria outra foto e a tela entraria em laço).
+  useEffect(() => {
+    if (cartaoAberto) congelar(true);
+    else setOrdemCongelada(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartaoAberto]);
 
   // Um conjunto por vez, e não um card por vez: o board recebe o resultado do
   // gesto já resolvido pela coluna (um card, um intervalo, a etapa inteira). A
@@ -535,6 +549,7 @@ export function KanbanBoard({
             stage={stage}
             nivel={nivelDaEtapa(indice, data.stages.length)}
             leads={grouped.get(stage.id) ?? []}
+            blocoSemResposta={ordem === "ultima_mensagem"}
             pipelineId={pipelineId}
             ownerNames={ownerNames}
             coolingIds={coolingIds}

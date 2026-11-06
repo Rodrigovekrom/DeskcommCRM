@@ -1,5 +1,6 @@
 "use client";
 
+import { useNomesDaEquipe } from "@/components/iavek/NomesDaEquipe";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { format } from "date-fns";
 import { useT } from "@/hooks/i18n/useT";
@@ -76,6 +77,7 @@ export function MessageBubble({
   onOcultar,
   onRestaurar,
 }: Props) {
+  const nomeDaEquipe = useNomesDaEquipe();
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState(message.body ?? "");
   const [apagando, setApagando] = useState(false);
@@ -188,9 +190,10 @@ export function MessageBubble({
       // qualquer uma, o rótulo cai para "Atendente" — que continua dizendo o
       // que `sent_via` de fato garante (um humano, pelo CRM) sem afirmar uma
       // identidade que o dado não sustenta.
-      return viewerUserId != null && message.sent_by_user_id === viewerUserId
-        ? "Você"
-        : "Atendente";
+      // ia.vek CRM-244 (Fase 2, teste J): de outra pessoa, o NOME de quem respondeu (a lista da
+      // equipe que o quadro já carrega); sem o nome, segue "Atendente".
+      if (viewerUserId != null && message.sent_by_user_id === viewerUserId) return "Você";
+      return (message.sent_by_user_id && nomeDaEquipe.get(message.sent_by_user_id)?.trim()) || "Atendente";
     }
     return null;
   })();

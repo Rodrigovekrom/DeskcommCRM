@@ -34,6 +34,8 @@ import type { LeadFilters } from "@/lib/kanban/filters";
 import { applyFilters, filtersFromParams, filtersToParams } from "@/lib/kanban/filters";
 import { categoriaDoMotivo } from "@/lib/leads/motivos-de-perda-do-funil";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
+import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
+import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
 
 export function PipelinePageClient({
   pipelineId,
@@ -61,6 +63,9 @@ export function PipelinePageClient({
   // vendedor no topo. A função é a VISTA (inclui o "Ver como").
   const ehGerente = funcaoDaTela(useActiveOrg()?.interface_settings?.funcao) === "gerente";
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // CRM-244 (decisão 2): a ordem "Última mensagem do lead" é o padrão também aqui, e a vista
+  // (ordem, colunas) é a MESMA de cada pessoa no Pipeline; as outras ordens seguem como opção.
+  const { prefs, gravar } = usePreferenciasDoPipeline();
   const [newOpen, setNewOpen] = useState(false);
 
   /**
@@ -154,6 +159,8 @@ export function PipelinePageClient({
         />
       )}
       {ehGerente && <SeletorDeVendedor filters={filters} onChange={setFilters} />}
+      {data && <VistaDoPipeline etapas={data.stages} prefs={prefs} gravar={gravar} />}
+      {data && <SemRespostaPorVendedor leads={filteredLeads} stages={data.stages} />}
       <FilterBar
         filters={filters}
         onChange={setFilters}
@@ -181,6 +188,10 @@ export function PipelinePageClient({
           onSelectionChange={setSelectedIds}
           leadInicial={searchParams.get("lead")}
           podeRenomearEtapa={ROLE_RANK[role] >= ROLE_RANK.admin}
+          ordem={prefs.ordem}
+          etapasOcultas={new Set(prefs.ocultas)}
+          etapasRecolhidas={new Set(prefs.recolhidas)}
+          onAbrirEtapa={(id) => gravar({ ...prefs, recolhidas: prefs.recolhidas.filter((x) => x !== id) })}
         />
         </CartaoIavekContext.Provider>
       )}

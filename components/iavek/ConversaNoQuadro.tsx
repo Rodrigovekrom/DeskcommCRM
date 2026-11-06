@@ -27,6 +27,8 @@ import { useT } from "@/hooks/i18n/useT";
 import { isNotFound } from "@/hooks/inbox/useConversation";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { useMarkAsRead } from "@/hooks/inbox/useMarkAsRead";
+import { marcarAbertura, useAberturaDaConversa } from "@/hooks/iavek/useAberturaDaConversa";
+import { NomesDaEquipeProvider } from "@/components/iavek/NomesDaEquipe";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 import { apiClient } from "@/lib/api/client";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
@@ -185,6 +187,8 @@ function PainelDaConversa({
   const faltam = useContext(IncompletosNoCardContext)?.[lead.id] ?? [];
 
   useMarkAsRead(conversa?.id ?? null, conversa?.unread_count_for_assignee ?? 0);
+  // CRM-244 (Fase 2): a leitura DESTA pessoa (não zera a de mais ninguém).
+  useAberturaDaConversa(conversa?.id ?? null);
 
   // Mensagem nova na conversa (tempo real do ChatThread) atualiza também o
   // cartão: a prévia e o "sem ler" do quadro moram em ["board", …].
@@ -194,7 +198,8 @@ function PainelDaConversa({
       const k = ev.query.queryKey;
       if (ev.type !== "updated" || k[0] !== "messages" || k[1] !== conversaId) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void qc.invalidateQueries({ queryKey: ["board"] }), 800);
+      // Com a gaveta aberta, o que chega é lido por quem está olhando (CRM-244).
+      timer = setTimeout(() => void marcarAbertura(qc, conversaId), 800);
     });
     return () => {
       desfazer();
@@ -227,6 +232,7 @@ function PainelDaConversa({
   const blockedReason = motivoDoContato(conversa.contacts, t);
 
   return (
+    <NomesDaEquipeProvider>
     <OpenConversationProvider conversationId={conversa.id}>
       {/* v1.8.2: a conversa à esquerda e a barra lateral enxuta à direita (a
           MESMA da Entrada). No celular a barra abre por "Ficha", no lugar da conversa. */}
@@ -329,6 +335,7 @@ function PainelDaConversa({
       </div>
       {dialogo}
     </OpenConversationProvider>
+    </NomesDaEquipeProvider>
   );
 }
 

@@ -52,6 +52,12 @@ vi.mock("@/hooks/kanban/useBoard", () => ({
   }),
 }));
 vi.mock("@/components/kanban/FilterBar", () => ({ FilterBar: () => null }));
+// CRM-244 (Fase 2): a página do funil usa a vista de cada pessoa (ordem padrão), que lê a API.
+vi.mock("@/components/iavek/VistaDoPipeline", () => ({
+  usePreferenciasDoPipeline: () => ({ prefs: { ordem: "ultima_mensagem", ocultas: [], recolhidas: [] }, gravar: () => undefined }),
+  VistaDoPipeline: () => null,
+}));
+vi.mock("@/components/iavek/SemRespostaPorVendedor", () => ({ SemRespostaPorVendedor: () => null }));
 vi.mock("@/components/kanban/NewLeadDialog", () => ({ NewLeadDialog: () => null }));
 /**
  * O quadro é substituído por um dublê que SELECIONA um card: a barra em lote só

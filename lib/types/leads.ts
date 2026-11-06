@@ -83,6 +83,12 @@ export interface Lead {
     /** v1.9.18: a última mensagem do lead e a última resposta de uma pessoa pelo sistema. */
     last_inbound_at?: string | null;
     ultima_resposta_humana_em?: string | null;
+    /**
+     * CRM-244 (Fase 2): as não lidas DE QUEM ESTÁ OLHANDO (vem só para a conversa que espera
+     * resposta de pessoa) e o "já vi" do admin. Ausente = 0 / não.
+     */
+    nao_lidas?: number;
+    ja_vi?: boolean;
   } | null;
   score?: {
     probability: number;

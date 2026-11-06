@@ -39,6 +39,8 @@ export type ActivityType =
    * Quem trocou e quando vêm da própria atividade (autor e horário); de quem para quem, no motivo.
    */
   | "owner_changed"
+  /** ia.vek CRM-244 (Fase 2): quem abriu a conversa e quando (1 linha por pessoa a cada 30 min). */
+  | "conversation_viewed"
   | "lead_cooled"
   | "lead_reactivated"
   | "reactivation_accepted"
@@ -237,6 +239,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   // continuidade, e o dossiê teria mostrado só metade da vida do lead.
   lead_edited: "Dados do negócio alterados",
   owner_changed: "Trocou o responsável",
+  conversation_viewed: "Abriu a conversa",
   // O NEGÓCIO ESFRIANDO É ACONTECIMENTO, não telemetria: é o sistema dizendo
   // "ninguém falou com esta pessoa dentro do prazo deste estágio". Sem linha na
   // timeline, o card mudaria de cor e o dossiê não teria explicação — e o

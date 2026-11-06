@@ -17,6 +17,7 @@ import { type NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { loadAuthUser } from "@/lib/auth/server";
+import { leiturasDoQuadro } from "@/lib/iavek/leitura-da-conversa";
 import { traduzir } from "@/lib/i18n/dicionario";
 import {
   roteiaProximasAcoes,
@@ -578,13 +579,24 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   ]);
   const erroDoQuadro = comDono.error ?? comAcao.error ?? comScore.error ?? comConversa.error ?? comMarcadores.error;
   if (erroDoQuadro) return fail("internal_error", erroDoQuadro, 500, { requestId });
-  const leadsDoQuadro = juntarPorPosicao(leadsVisiveis, [
+  const juntos = juntarPorPosicao(leadsVisiveis, [
     comDono.leads,
     comAcao.leads,
     comScore.leads,
     comConversa.leads,
     comMarcadores.leads,
   ]);
+
+  // CRM-244 (Fase 2): as não lidas DE QUEM PEDE e, para o admin, o "já vi". Só as conversas que
+  // esperam resposta de pessoa vão ao banco (lib/iavek/leitura-da-conversa.ts).
+  const ehAdmin = authUser?.organizations.find((o) => o.organization_id === orgId)?.role === "admin";
+  const nomes = new Map(etapasVisiveis.map((st) => [st.id, st.name] as const));
+  const leituras = await leiturasDoQuadro(supabase, orgId, user.id, ehAdmin, juntos, (id) => nomes.get(id));
+  if (leituras.error) return fail("internal_error", leituras.error, 500, { requestId });
+  const leadsDoQuadro = juntos.map((l) => {
+    const lido = leituras.porLead.get(l.id);
+    return lido && l.conversa ? { ...l, conversa: { ...l.conversa, ...lido } } : l;
+  });
 
   const board: BoardData = {
     pipeline: pipeline as Pipeline,
