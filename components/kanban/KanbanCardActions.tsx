@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import {
   DropdownMenu,
@@ -75,6 +75,12 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
   // A lista é controlada aqui. Sem isto, o quadro que se mexe sob o mouse parado (o selo
   // "Incompleto" chega depois, em lotes, e empurra os cartões) fechava a lista no meio da busca.
   const [listaAberta, setListaAberta] = useState(false);
+  // Quando foi a última tecla dentro do menu: o pedido de fechar que vem do TECLADO (Esc, seta para a
+  // esquerda) é aceito; o que vem do ponteiro (o quadro desceu sob o mouse) não.
+  const ultimaTecla = useRef(0);
+  const marcarTecla = () => {
+    ultimaTecla.current = Date.now();
+  };
   const fecharLista = () => {
     setListaAberta(false);
     setBusca("");
@@ -136,6 +142,7 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
+          onKeyDownCapture={marcarTecla}
           onClick={(e) => e.stopPropagation()}
         >
           <DropdownMenuItem
@@ -154,12 +161,13 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
               // fechava no meio da busca (medido no canário duas vezes).
               onOpenChange={(aberto) => {
                 if (aberto) setListaAberta(true);
+                else if (Date.now() - ultimaTecla.current < 500) fecharLista();
               }}
             >
               <DropdownMenuSubTrigger data-testid="menu-responsavel">
                 <Users size={14} className="mr-2" /> {t("Responsável")}
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-[60vh] overflow-y-auto">
+              <DropdownMenuSubContent className="max-h-[60vh] overflow-y-auto" onKeyDownCapture={marcarTecla}>
                 <div className="sticky top-0 z-10 bg-popover p-1">
                   <input
                     type="search"

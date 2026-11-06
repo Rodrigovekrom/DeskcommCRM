@@ -48,7 +48,9 @@ describe("a lista não fecha no meio da busca", () => {
   it("só fecha por ação de quem usa (o quadro que se mexe sob o mouse não a fecha)", () => {
     const fonte = ler("components/kanban/KanbanCardActions.tsx");
     expect(fonte).toMatch(/open=\{listaAberta\}/);
-    expect(fonte).toMatch(/onOpenChange=\{\(aberto\) => \{\s*if \(aberto\) setListaAberta\(true\);\s*\}\}/);
+    expect(fonte).toMatch(/if \(aberto\) setListaAberta\(true\);\s*else if \(Date\.now\(\) - ultimaTecla\.current < 500\) fecharLista\(\);/);
+    // a tecla é marcada no menu e na lista
+    expect(fonte.match(/onKeyDownCapture=\{marcarTecla\}/g)?.length).toBe(2);
     // e fecha por Esc e quando o menu inteiro fecha
     expect(fonte).toMatch(/if \(e\.key === "Escape"\) fecharLista\(\);/);
     expect(fonte).toMatch(/<DropdownMenu onOpenChange=\{\(aberto\) => !aberto && fecharLista\(\)\}>/);
