@@ -16017,7 +16017,7 @@ create policy calendar_appointments_select on public.calendar_appointments
     (organization_id in (select public.fn_user_org_ids())) or public.fn_is_platform_admin()
   );
 -- calendar_appointments_write: a definição FINAL mora no bloco da migration
--- 0594 (ia.vek v1.9.1, modo agendamento), mais abaixo — ela faz o drop e cria.
+-- 0613 (ia.vek, agenda da loja para toda a equipe), mais abaixo — ela faz o drop e cria.
 revoke all on public.calendar_appointments from anon;
 
 -- ─── as exceções: a agenda é de quem a vive ───────────────────────────────
@@ -47079,22 +47079,8 @@ $$;
 revoke execute on function public.fn_iavek_modo_agendamento(uuid) from public, anon;
 grant execute on function public.fn_iavek_modo_agendamento(uuid) to authenticated, service_role;
 
-drop policy if exists calendar_appointments_write on public.calendar_appointments;
-create policy calendar_appointments_write on public.calendar_appointments
-  using (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and (public.fn_role_at_least(organization_id, 'admin')
-             or (public.fn_role_at_least(organization_id, 'manager')
-                 and public.fn_iavek_modo_agendamento(organization_id))))
-  )
-  with check (
-    public.fn_is_platform_admin_full()
-    or ((organization_id in (select public.fn_user_org_ids()))
-        and (public.fn_role_at_least(organization_id, 'admin')
-             or (public.fn_role_at_least(organization_id, 'manager')
-                 and public.fn_iavek_modo_agendamento(organization_id))))
-  );
+-- calendar_appointments_write: a 0594 a criava aqui; a definição FINAL (que já inclui a regra da 0594)
+-- mora no bloco da 0613, mais abaixo, que faz o drop e cria.
 
 create or replace function public.fn_iavek_agenda_sem_duplo()
 returns trigger
