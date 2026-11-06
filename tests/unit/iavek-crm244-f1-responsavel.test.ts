@@ -16,13 +16,16 @@ import { contemONome } from "@/components/kanban/KanbanCardActions";
 const ler = (p: string) => readFileSync(p, "utf8");
 
 describe("quem troca o responsável", () => {
-  it("guardião, gerente, gerente de apoio e quem não tem função trocam; o vendedor não", () => {
+  it("guardião, gerente, gerente de apoio e quem não tem função trocam; vendedor, Suporte IA e Analista de ficha não", () => {
     expect(trocaResponsavel("sdr")).toBe(true);
     expect(trocaResponsavel("gerente")).toBe(true);
     expect(trocaResponsavel("apoio")).toBe(true);
     expect(trocaResponsavel(null)).toBe(true);
     expect(trocaResponsavel(undefined)).toBe(true);
     expect(trocaResponsavel("vendedor")).toBe(false);
+    expect(trocaResponsavel("suporte")).toBe(false);
+    expect(trocaResponsavel("analista_ficha")).toBe(false);
+    expect(trocaResponsavel("valor-desconhecido")).toBe(true); // vira "sem função", como no resto da tela
   });
 
   it("a tela esconde a opção pela função VISTA (o Ver como vendedor mostra o que o vendedor vê)", () => {
