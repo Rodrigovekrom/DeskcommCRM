@@ -27,9 +27,13 @@ import { z } from "zod";
 export const TIPOS_DE_PASSAGEM = ["agendamento", "negociar", "devolver", "trocar_vendedor", "reativar"] as const;
 export type TipoDePassagem = (typeof TIPOS_DE_PASSAGEM)[number];
 
-/** Os 7 campos do handoff SDR → loja (registrados no cofre da Fenômenos). */
+/**
+ * Os 7 campos do handoff SDR → loja (registrados no cofre da Fenômenos). O formulário mostra todos;
+ * a passagem COBRA só os obrigatórios. 0612 (Rodrigo, 06/11): o carro de interesse deixa de ser
+ * obrigatório (vira texto livre com sugestão do estoque); os outros seguem.
+ */
 export const CAMPOS_DA_PASSAGEM = [
-  { chave: "carro_interesse", rotulo: "Carro de interesse" },
+  { chave: "carro_interesse", rotulo: "Carro de interesse", opcional: true },
   { chave: "cidade", rotulo: "Cidade / região" },
   { chave: "forma_pagamento", rotulo: "Forma de pagamento" },
   { chave: "entrada_reais", rotulo: "Entrada (R$; 0 = sem entrada)" },
@@ -79,7 +83,7 @@ const preenchido = (v: unknown): boolean => {
 /** Os campos do negócio que faltam para passar (a troca pede modelo e ano). */
 export function camposQueFaltam(campos: Record<string, unknown> | null | undefined): string[] {
   const c = campos ?? {};
-  const faltam: string[] = CAMPOS_DA_PASSAGEM.filter((x) => !preenchido(c[x.chave])).map((x) => x.rotulo);
+  const faltam: string[] = CAMPOS_DA_PASSAGEM.filter((x) => !("opcional" in x && x.opcional) && !preenchido(c[x.chave])).map((x) => x.rotulo);
   // A tela antiga grava o booleano às vezes como texto ("true").
   const temTroca = c.tem_troca === true || c.tem_troca === "true";
   if (temTroca && (!preenchido(c.troca_modelo) || !preenchido(c.troca_ano))) faltam.push(ROTULO_DA_TROCA);

@@ -11,6 +11,10 @@ import { Button } from "@/components/ui/button";
 import { X } from "@/lib/ui/icons";
 
 /**
+ * ia.vek 0612 (Rodrigo, 06/11): o carro vira TEXTO LIVRE COM SUGESTÃO DO ESTOQUE. Escolher uma
+ * sugestão grava o `id` do produto (e o selo, o preço do Altimus e o nome no aviso de venda seguem
+ * valendo); Enter ou "Usar o texto" grava só o que foi digitado, que aparece como foi escrito.
+ *
  * ia.vek v1.5: o campo do funil do tipo `catalog_product` — o CARRO DE
  * INTERESSE ligado ao catálogo. Grava no `custom_fields` só o `id` do produto;
  * nome, marca e preço vêm do catálogo na hora de mostrar (o preço muda com o
@@ -105,7 +109,8 @@ export function CampoDoCatalogo({
 }: {
   id: string;
   valor: unknown;
-  onChange: (produtoId: string | null) => void;
+  /** O `id` do produto (sugestão escolhida) ou o TEXTO digitado; null limpa. */
+  onChange: (valor: string | null) => void;
   disabled?: boolean;
 }) {
   const t = useT();
@@ -118,6 +123,14 @@ export function CampoDoCatalogo({
     [produtos, valor],
   );
   const opcoes = useMemo(() => filtrarCatalogo(produtos ?? [], termo), [produtos, termo]);
+  const textoLivre = typeof valor === "string" && valor.trim() !== "" && !PARECE_ID.test(valor.trim()) ? valor.trim() : null;
+  const usarTexto = () => {
+    const v = termo.trim();
+    if (!v) return;
+    onChange(v);
+    setTermo("");
+    setAberto(false);
+  };
 
   if (typeof valor === "string" && valor && !aberto) {
     return (
@@ -127,7 +140,7 @@ export function CampoDoCatalogo({
       >
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">
-            {escolhido ? escolhido.nome : produtos ? t("Carro fora do catálogo") : t("Carregando…")}
+            {escolhido ? escolhido.nome : textoLivre ?? (produtos ? t("Carro fora do catálogo") : t("Carregando…"))}
           </div>
           {escolhido && (
             <div className="truncate text-xs text-muted-foreground">
@@ -144,7 +157,10 @@ export function CampoDoCatalogo({
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-xs"
-              onClick={() => setAberto(true)}
+              onClick={() => {
+                setTermo(textoLivre ?? "");
+                setAberto(true);
+              }}
             >
               {t("Trocar")}
             </Button>
@@ -171,18 +187,35 @@ export function CampoDoCatalogo({
         value={termo}
         autoFocus={aberto}
         disabled={disabled}
-        placeholder={t("Buscar no catálogo (modelo, marca ou código)…")}
+        placeholder={t("Modelo e ano (sugestões do estoque)…")}
         onChange={(e) => setTermo(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Escape") setAberto(false);
+          if (e.key === "Enter") {
+            e.preventDefault();
+            usarTexto();
+          }
         }}
+        data-testid="carro-texto"
       />
       {isError && <p className="text-xs text-error-fg">{t("Não consegui ler o catálogo.")}</p>}
       {!disabled && (termo.trim() !== "" || aberto) && (
         <ul className="max-h-56 overflow-y-auto rounded-md border border-border" role="listbox">
+          {termo.trim() !== "" && (
+            <li>
+              <button
+                type="button"
+                className="flex w-full items-center px-2 py-1.5 text-left text-sm hover:bg-surface-elevated"
+                onClick={usarTexto}
+                data-testid="usar-texto-do-carro"
+              >
+                {t("Usar o texto")}: <span className="ml-1 font-medium">“{termo.trim()}”</span>
+              </button>
+            </li>
+          )}
           {opcoes.length === 0 ? (
             <li className="px-2 py-1.5 text-xs text-muted-foreground">
-              {t("Nenhum carro encontrado.")}
+              {t("Nenhum carro do estoque com esse nome.")}
             </li>
           ) : (
             opcoes.map((p) => (
@@ -191,6 +224,7 @@ export function CampoDoCatalogo({
                   type="button"
                   role="option"
                   aria-selected={p.id === valor}
+                  data-testid="sugestao-do-estoque"
                   className="flex w-full flex-col items-start px-2 py-1.5 text-left text-sm hover:bg-surface-elevated"
                   onClick={() => {
                     onChange(p.id);

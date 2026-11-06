@@ -31,7 +31,9 @@ describe("v1.9.4 — os campos da passagem (a trava)", () => {
   });
 
   it("aponta o que falta, e a troca pede modelo e ano", () => {
-    expect(camposQueFaltam({})).toHaveLength(6);
+    // 0612 (Rodrigo, 06/11): o carro de interesse deixou de ser obrigatório; os outros 5 seguem.
+    expect(camposQueFaltam({})).toHaveLength(5);
+    expect(camposQueFaltam({})).not.toContain("Carro de interesse");
     expect(camposQueFaltam({ ...completos, tem_troca: true })).toEqual(["Troca: modelo e ano"]);
     expect(camposQueFaltam({ ...completos, tem_troca: "true", troca_modelo: "Gol", troca_ano: 2015 })).toEqual([]);
     expect(camposQueFaltam({ ...completos, cidade: "  " })).toEqual(["Cidade / região"]);

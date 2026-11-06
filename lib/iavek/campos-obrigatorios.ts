@@ -14,7 +14,7 @@ import { z } from "zod";
 // v1.9.4b (0597): a MESMA lista da passagem do lead (lib/iavek/passagem.ts).
 export const CAMPOS_OBRIGATORIOS = [
   "Contexto do atendimento",
-  "Carro de interesse",
+  // 0612 (Rodrigo, 06/11): "Carro de interesse" saiu — não é mais obrigatório.
   "Cidade / região",
   "Forma de pagamento",
   "Entrada (R$; 0 = sem entrada)",

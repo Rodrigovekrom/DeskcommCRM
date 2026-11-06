@@ -22,7 +22,6 @@ function useOndePreencher(): (item: string) => string | null {
   // v1.9.4b (0597): os rótulos da passagem do lead.
   const DICAS: Record<string, string> = {
     "Contexto do atendimento": t("Escreva na Descrição do lead (20 letras ou mais), deixe uma nota interna na conversa ou passe o lead com o contexto."),
-    "Carro de interesse": t("Escolha o carro do catálogo em Carro de interesse, na ficha do lead."),
     "Cidade / região": t("Preencha Cidade / região, na ficha do lead."),
     "Forma de pagamento": t("Escolha a Forma de pagamento, na ficha do lead."),
     "Entrada (R$; 0 = sem entrada)": t("Preencha Entrada (R$) na ficha do lead; sem entrada, escreva 0."),
