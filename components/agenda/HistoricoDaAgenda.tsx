@@ -101,6 +101,7 @@ export function HistoricoDaAgenda({
   onCancelar,
   onRealizado,
   onFaltou,
+  concluiAntesDoInicio = false,
   onConfirmar,
   className,
 }: {
@@ -124,6 +125,8 @@ export function HistoricoDaAgenda({
    */
   onRealizado?: (id: string) => void;
   onFaltou?: (id: string) => void;
+  /** ia.vek 0613: na loja, Realizado/Faltou também nos próximos (dá para concluir antes do início). */
+  concluiAntesDoInicio?: boolean;
   /**
    * O MESMO defeito da Decisão 17, na transição de cima: `pending → confirmed`
    * tem rota (`PATCH` aceita `status: "confirmed"`), tem regra (`lib/agenda/laco.ts`)
@@ -301,7 +304,7 @@ export function HistoricoDaAgenda({
                         </Button>
                       </>
                     )}
-                    {aba === "passados" &&
+                    {(aba === "passados" || concluiAntesDoInicio) &&
                       a.situacao !== "completed" &&
                       a.situacao !== "no_show" && (
                         // Decisão 17. Só enquanto o desfecho NÃO foi registrado:

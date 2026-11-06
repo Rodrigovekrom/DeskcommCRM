@@ -12,6 +12,7 @@
  * a 'pendente'): dois cliques não criam dois compromissos. Se a criação falhar,
  * o pedido volta a pendente.
  */
+import { modoAgendamentoDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
@@ -113,7 +114,10 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     return ok(data, { requestId });
   }
 
-  if (!ehAdmin) {
+  // ia.vek 0613 (CRM-255/257): na LOJA qualquer pessoa da equipe confirma ou recusa; no modo
+  // agendamento (clínica) segue só o admin.
+  const agendaLivre = !(await modoAgendamentoDaOrg(orgId));
+  if (!ehAdmin && !agendaLivre) {
     return fail(
       "forbidden_role",
       t("Só o administrador confirma ou recusa pedidos de agendamento."),
@@ -189,7 +193,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   try {
     compromisso = await marcarAgendamentoHandler(
       await createClient(),
-      { organization_id: orgId, actor: { type: "user", id: authz.user.id }, requestId },
+      { organization_id: orgId, actor: { type: "user", id: authz.user.id, role: authz.org.role }, requestId, iavekAgendaLivre: agendaLivre },
       {
         event_type_id: eventTypeId,
         starts_at: new Date(inicio).toISOString(),

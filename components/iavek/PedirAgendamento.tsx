@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
-import { CONTEXTO_MINIMO, type CamposDaPassagem } from "@/lib/iavek/passagem";
+import { type CamposDaPassagem } from "@/lib/iavek/passagem";
 import { CamposDaPassagemForm, camposIniciais, camposParaEnviar } from "@/components/iavek/CamposDaPassagemForm";
 
 interface Vendedor {
@@ -100,7 +100,9 @@ export function PedirAgendamento({
     Number.isFinite(alvo) &&
     alvo > abertoEm &&
     (!marcaDireto ||
-      (Boolean(vendedorId) && (Boolean(tipoId) || tipos.length <= 1) && contexto.trim().length >= CONTEXTO_MINIMO));
+      // ia.vek 0613 (CRM-255/257): marcar direto pede só o lead, o dia e a hora (o vendedor também);
+      // o tipo, os campos e o contexto são opcionais (sem tipo, vale o primeiro ativo).
+      Boolean(vendedorId));
 
   async function abrir() {
     const agora = Date.now();

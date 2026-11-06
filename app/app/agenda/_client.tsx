@@ -1103,6 +1103,8 @@ export function AgendaClient({
         melhor. A ocupação continua inteira onde ela serve.
       */}
       <HistoricoDaAgenda
+        // ia.vek 0613: na loja (sem modo agendamento) dá para concluir antes do início.
+        concluiAntesDoInicio={!modo_agendamento}
         agendamentos={agendamentosAcionaveis}
         pessoas={pessoas}
         agora={new Date()}

@@ -103,6 +103,11 @@ export interface HandlerCtx {
    */
   iavekTrocaResponsavel?: boolean;
   /**
+   * ia.vek 0613 (CRM-255/257): a organização é LOJA (sem modo agendamento) e a agenda vale para toda a
+   * equipe: o colega pode mexer e dá para concluir antes do início. A rota da agenda decide; ausente = regra antiga.
+   */
+  iavekAgendaLivre?: boolean;
+  /**
    * Autoria "em nome de" (#1613): a PESSOA por cuja decisão o token envia.
    *
    * Vive no CTX, e não no input, de propósito: o mesmo input atravessa as tools

@@ -46,11 +46,12 @@ describe("v1.9.1 — a recusa do banco vira 409 só quando é o duplo", () => {
 });
 
 describe("v1.9.1 — quem marca", () => {
-  it("a rota: piso gerente, e fora do modo quem não é admin recebe a MESMA recusa de antes", () => {
+  // 0613 (Rodrigo, 06/11): fora do modo (a loja) toda a equipe marca; NO modo (clínica) segue gerente em diante.
+  it("a rota: no modo, piso gerente; fora do modo (loja), toda a equipe", () => {
     const r = ler("app/api/v1/agenda/agendamentos/route.ts");
-    expect(r).toMatch(/role: "manager",/);
-    expect(r).toContain("!(await modoAgendamentoDaOrg(authz.organizationId))");
-    expect(r).toContain('fail("forbidden_role", "Permissão insuficiente. Requer role >= admin.", 403, { requestId })');
+    expect(r).toMatch(/role: "agent",/);
+    expect(r).toContain("const modoAgendamento = await modoAgendamentoDaOrg(authz.organizationId);");
+    expect(r).toContain('fail("forbidden_role", "Permissão insuficiente. Requer role >= manager.", 403, { requestId })');
   });
   it("a barra da conversa: no modo, o gerente marca direto; fora dele, pede", () => {
     const f = ler("components/inbox/CRMSidePanel.tsx");

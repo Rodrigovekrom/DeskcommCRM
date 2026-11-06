@@ -345,7 +345,7 @@ async function despachar<T>(
   schema: z.ZodType<T>,
   handler: (
     supabase: Awaited<ReturnType<typeof createClient>>,
-    ctx: { organization_id: string; actor: Actor; requestId: string; idempotencyKey?: string },
+    ctx: { organization_id: string; actor: Actor; requestId: string; idempotencyKey?: string; iavekAgendaLivre?: boolean },
     input: T,
   ) => Promise<Record<string, unknown>>,
   status: 200 | 201,
@@ -356,11 +356,10 @@ async function despachar<T>(
   const authz = await resolveAuthDual(req, {
     requestId,
     resource: "agenda",
-    // ia.vek v1.7.6: a agenda da loja é mexida só pelo admin (criar, remarcar,
-    // cancelar). SDR e vendedor fazem PEDIDO (/api/v1/iavek/pedidos-de-agendamento).
-    // v1.9.1: o piso aqui é gerente; logo abaixo, fora do MODO AGENDAMENTO,
-    // quem não é admin recebe a MESMA recusa de antes.
-    role: "manager",
+    // ia.vek 0613 (CRM-255/257, Rodrigo 06/11: "todos consigam agendar"): o piso é a EQUIPE (agent).
+    // Na LOJA (sem modo agendamento) qualquer pessoa cria, remarca, cancela e conclui; no modo
+    // agendamento (clínica) segue a regra da v1.9.1 — gerente em diante —, cobrada logo abaixo.
+    role: "agent",
     scope: "mcp:write",
     // O MESMO papel das tools MCP de escrita na agenda (`lib/mcp/tools/
     // agendamento.ts`, `requiresRole: "ai_operator"`), que chamam estes mesmos
@@ -371,15 +370,11 @@ async function despachar<T>(
     tokenRole: "ai_operator",
   });
   if (!authz.ok) return authz.response;
-  // ia.vek v1.9.1: no modo agendamento (clínica), a recepção (gerente) marca,
-  // remarca e cancela. Fora dele (a loja), continua só o admin — a mesma
-  // resposta que o piso `admin` dava. O banco cobra o mesmo (0594).
-  if (
-    authz.actor.type === "user" &&
-    !roleAtLeast(authz.actor.role, "admin") &&
-    !(await modoAgendamentoDaOrg(authz.organizationId))
-  ) {
-    return fail("forbidden_role", "Permissão insuficiente. Requer role >= admin.", 403, { requestId });
+  // ia.vek v1.9.1: no modo agendamento (clínica), a recepção (gerente) marca, remarca e cancela — como
+  // antes. ia.vek 0613: na LOJA, toda a equipe. O banco cobra o mesmo (RLS da 0613).
+  const modoAgendamento = await modoAgendamentoDaOrg(authz.organizationId);
+  if (authz.actor.type === "user" && modoAgendamento && !roleAtLeast(authz.actor.role, "manager")) {
+    return fail("forbidden_role", "Permissão insuficiente. Requer role >= manager.", 403, { requestId });
   }
   // `idioma` só vem no ramo de sessão (`resolveAuthDual`); o ramo de token não
   // tem preferência de idioma de pessoa nenhuma — degrada para o padrão.
@@ -411,6 +406,7 @@ async function despachar<T>(
         organization_id: organizationId,
         actor,
         requestId,
+        iavekAgendaLivre: !modoAgendamento,
         ...(idempotencyKey !== null ? { idempotencyKey } : {}),
       },
       parsed.data,

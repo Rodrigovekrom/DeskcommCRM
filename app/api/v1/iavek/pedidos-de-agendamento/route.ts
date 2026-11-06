@@ -36,10 +36,7 @@ import {
 import { sdrMarcaDireto, vendedoresDaLoja } from "@/lib/iavek/sdr-marca-direto";
 import {
   CAMPOS_DA_PASSAGEM,
-  CONTEXTO_MINIMO,
-  ROTULO_DO_CONTEXTO,
   camposDaPassagemSchema,
-  camposQueFaltam,
   type CamposDaPassagem,
 } from "@/lib/iavek/passagem";
 import {
@@ -178,7 +175,8 @@ async function sdrMarca(
   if (!(await vendedoresDaLoja(admin, orgId)).some((v) => v.id === vendedorId)) {
     return fail("validation_failed", t("Escolha um vendedor da loja."), 422, { requestId });
   }
-  const eventTypeId = input.event_type_id ?? (await tipoUnicoAtivo(admin, orgId));
+  // ia.vek 0613: sem tipo escolhido, vale o único ativo ou, havendo vários, o primeiro ativo.
+  const eventTypeId = input.event_type_id ?? (await tipoUnicoAtivo(admin, orgId)) ?? (await primeiroTipoAtivo(admin, orgId));
   if (!eventTypeId) {
     return fail("validation_failed", t("Escolha o tipo de agendamento."), 422, { requestId });
   }
@@ -200,15 +198,9 @@ async function sdrMarca(
       requestId,
     });
   }
+  // ia.vek 0613 (CRM-255/257): marcar pede só o lead, o dia e a hora. Os campos que vierem seguem
+  // gravados no negócio; o que faltar NÃO trava mais o agendamento.
   const campos = (await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields;
-  const faltam = camposQueFaltam(campos);
-  if ((passagem.contexto ?? "").length < CONTEXTO_MINIMO) faltam.push(ROTULO_DO_CONTEXTO);
-  if (faltam.length > 0) {
-    return fail("validation_failed", `${t("Faltam campos para passar o lead")}: ${faltam.map(t).join(", ")}`, 422, {
-      requestId,
-      details: { faltam },
-    });
-  }
 
   const r = await gravarPedidoDeAgendamento(admin, {
     orgId,
@@ -398,6 +390,19 @@ async function passarOLeadAoVendedor(
 }
 
 /** Sem tipo escolhido: o único tipo ativo da empresa, se houver um só. */
+/** ia.vek 0613: o primeiro tipo ativo (o mais antigo), quando há vários e ninguém escolheu. */
+async function primeiroTipoAtivo(admin: ReturnType<typeof createAdminClient>, orgId: string): Promise<string | null> {
+  const { data } = await admin
+    .from("calendar_event_types")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
 async function tipoUnicoAtivo(
   admin: ReturnType<typeof createAdminClient>,
   orgId: string,

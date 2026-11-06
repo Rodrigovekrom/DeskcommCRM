@@ -235,6 +235,8 @@ async function exigeDonoDoCompromisso(
   ctx: HandlerCtx,
   atual: Record<string, unknown>,
 ): Promise<void> {
+  // ia.vek 0613: na loja, qualquer pessoa da equipe mexe na agenda do colega.
+  if (ctx.iavekAgendaLivre) return;
   const ehDono = ctx.actor.type === "user" && atual.owner_user_id === ctx.actor.id;
   if (!aOpcaoPodeRecortar(ctx.actor, ehDono)) return;
   const ligada = await colegasPodemMexerNaAgenda(supabase, ctx);
@@ -348,7 +350,7 @@ async function executarCriacaoDeAgendamento(
   // o banco cobra a mesma regra na alteração e no cancelamento.
   const ehDonoDoQueVaiNascer = ctx.actor.type === "user" && donoId === ctx.actor.id;
   // ia.vek v1.9.3: o SDR da loja marca para o vendedor escolhido (conferido na rota).
-  if (!ctx.iavekSdrMarcaParaVendedor && aOpcaoPodeRecortar(ctx.actor, ehDonoDoQueVaiNascer)) {
+  if (!ctx.iavekSdrMarcaParaVendedor && !ctx.iavekAgendaLivre && aOpcaoPodeRecortar(ctx.actor, ehDonoDoQueVaiNascer)) {
     const agendaDosColegasLigada = await colegasPodemMexerNaAgenda(supabase, ctx);
     if (recusaMudancaNaAgendaAlheia(ctx.actor, agendaDosColegasLigada, ehDonoDoQueVaiNascer)) {
       throw new ApiError(403, "appointment_do_colega", undefined, ctx.requestId, RECUSA_DO_COLEGA);
@@ -593,7 +595,9 @@ export async function alterarAgendamentoHandler(
     // A guarda é AQUI, no handler, e não na ferramenta: a regra não é sobre quem
     // chama. Recusa de negócio com o código do repo — a tool a traduz em resposta
     // ao modelo, sem derrubar o turno.
+    // ia.vek 0613: na loja dá para concluir antes do início (a clínica segue como antes).
     if (
+      !ctx.iavekAgendaLivre &&
       (input.status === "completed" || input.status === "no_show") &&
       new Date(atual.starts_at as string).getTime() > Date.now()
     ) {

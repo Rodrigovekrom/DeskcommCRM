@@ -80,10 +80,11 @@ describe("v1.9.4 — quem troca o vendedor", () => {
 });
 
 describe("v1.9.4 — a marcação do SDR passa pela trava", () => {
-  it("só marca com os 7 campos e o contexto; o lead vai para Agendado e o resumo fica gravado", () => {
+  // 0613 (Rodrigo, 06/11): o Marcar agendamento pede só lead, dia e hora; os campos que vierem seguem gravados.
+  it("marca sem cobrar os campos; o lead vai para Agendado e o resumo fica gravado", () => {
     const r = ler("app/api/v1/iavek/pedidos-de-agendamento/route.ts");
-    expect(r).toContain("const faltam = camposQueFaltam(campos);");
-    expect(r).toContain("if ((passagem.contexto ?? \"\").length < CONTEXTO_MINIMO) faltam.push(ROTULO_DO_CONTEXTO);");
+    expect(r).not.toContain("const faltam = camposQueFaltam(campos);");
+    expect(r).toContain("const campos = (await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields;");
     expect(r).toContain('await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");');
     expect(r).toContain('tipo: "agendamento",');
   });

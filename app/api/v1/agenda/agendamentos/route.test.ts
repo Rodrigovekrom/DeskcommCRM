@@ -29,7 +29,8 @@ vi.mock("@/lib/impersonate/support", () => ({ requireSupportWrite: vi.fn(async (
 // ia.vek v1.9.1: fora do modo agendamento, só o admin escreve na agenda. Os casos
 // de sessão daqui medem a fiação da rota (client de cookie, actor de usuário),
 // então rodam no modo; o caso "fora do modo" está logo abaixo.
-const modo = vi.hoisted(() => ({ ligado: true }));
+// ia.vek 0613: o padrão do teste é a LOJA (sem modo agendamento), onde toda a equipe marca.
+const modo = vi.hoisted(() => ({ ligado: false }));
 vi.mock("@/lib/iavek/perfil-da-empresa-servidor", () => ({ modoAgendamentoDaOrg: vi.fn(async () => modo.ligado) }));
 vi.mock("./_handler", () => ({
   marcarAgendamentoHandler: vi.fn(async () => ({ id: "ag-1", status: "pending" })),
@@ -101,9 +102,9 @@ describe("POST /api/v1/agenda/agendamentos — sessão de navegador", () => {
     });
   });
 
-  it("ia.vek v1.9.1: fora do modo agendamento, quem não é admin leva a MESMA recusa de antes", async () => {
+  it("ia.vek 0613: NO modo agendamento (clínica), o atendente segue recusado (gerente em diante)", async () => {
     sessaoOk();
-    modo.ligado = false;
+    modo.ligado = true;
     try {
       const { POST } = await import("./route");
       const res = await POST(postReq());
@@ -111,8 +112,16 @@ describe("POST /api/v1/agenda/agendamentos — sessão de navegador", () => {
       expect((await res.json()).error.code).toBe("forbidden_role");
       expect(marcarAgendamentoHandler).not.toHaveBeenCalled();
     } finally {
-      modo.ligado = true;
+      modo.ligado = false;
     }
+  });
+
+  it("ia.vek 0613: na LOJA (sem modo), o atendente marca e o handler recebe a agenda livre", async () => {
+    sessaoOk();
+    const { POST } = await import("./route");
+    const res = await POST(postReq());
+    expect(res.status).toBe(201);
+    expect(vi.mocked(marcarAgendamentoHandler).mock.calls[0]?.[1]).toMatchObject({ iavekAgendaLivre: true });
   });
 
   it("sem sessão e sem Bearer → 401, repassa a resposta de requireRole", async () => {
