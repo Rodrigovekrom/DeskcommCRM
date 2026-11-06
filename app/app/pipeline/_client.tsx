@@ -8,6 +8,7 @@ import { AvisosDoCartaoContext } from "@/components/iavek/AvisosDoCartao";
 import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
 import { DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
+import { usePreCarregarRespostas } from "@/hooks/inbox/useMessageTemplates";
 import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
 import { PadraoNoCardContext, type AvaliacaoDoLead } from "@/components/iavek/PadraoDoLead";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
@@ -99,6 +100,8 @@ export function CarteiraClient({
 
   // v1.7.9: a vista de cada um (ordem, colunas recolhidas/ocultas) — 0587.
   const { prefs, gravar } = usePreferenciasDoPipeline();
+  // CRM-244 (Fase 3): as respostas do "/" prontas antes de abrir a conversa.
+  usePreCarregarRespostas();
   const painel = usePainelDoPipeline(verComo, verComoPronto);
   const comTarefa = useMemo(() => new Set(painel.data?.com_tarefa ?? []), [painel.data]);
   // A gerência já escolhia o vendedor no quadro dela (v1.7.5): o mesmo seletor vem

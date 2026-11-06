@@ -35,6 +35,7 @@ import { applyFilters, filtersFromParams, filtersToParams } from "@/lib/kanban/f
 import { categoriaDoMotivo } from "@/lib/leads/motivos-de-perda-do-funil";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
+import { usePreCarregarRespostas } from "@/hooks/inbox/useMessageTemplates";
 import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
 
 export function PipelinePageClient({
@@ -66,6 +67,8 @@ export function PipelinePageClient({
   // CRM-244 (decisão 2): a ordem "Última mensagem do lead" é o padrão também aqui, e a vista
   // (ordem, colunas) é a MESMA de cada pessoa no Pipeline; as outras ordens seguem como opção.
   const { prefs, gravar } = usePreferenciasDoPipeline();
+  // CRM-244 (Fase 3): as respostas do "/" prontas antes de abrir a conversa.
+  usePreCarregarRespostas();
   const [newOpen, setNewOpen] = useState(false);
 
   /**

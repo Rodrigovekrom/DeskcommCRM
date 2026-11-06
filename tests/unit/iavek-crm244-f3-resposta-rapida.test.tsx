@@ -57,3 +57,12 @@ describe("F: a lista reabre num '/' novo depois de escolher", () => {
     expect(ler("components/inbox/Composer.tsx")).toMatch(/if \(!resolveSlash\(e\.target\.value\)\.open \|\| !resolveSlash\(text\)\.open\) setMenuDismissed\(false\);/);
   });
 });
+
+describe("F: a lista do '/' já vem pronta (meta < 1 s por clique)", () => {
+  it("o Pipeline e a tela do funil pré-carregam as respostas depois do quadro, com a mesma chave", () => {
+    for (const p of ["app/app/pipeline/_client.tsx", "app/app/pipelines/[id]/_client.tsx"]) expect(ler(p)).toMatch(/usePreCarregarRespostas\(\);/);
+    const h = ler("hooks/inbox/useMessageTemplates.ts");
+    expect(h).toMatch(/useQuery\(\{ \.\.\.RESPOSTAS, enabled: depoisDoQuadro, retry: false \}\)/);
+    expect(h).toMatch(/staleTime: 10 \* 60_000/);
+  });
+});

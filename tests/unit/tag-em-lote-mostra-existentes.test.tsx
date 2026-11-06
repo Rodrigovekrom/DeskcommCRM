@@ -58,6 +58,7 @@ vi.mock("@/components/iavek/VistaDoPipeline", () => ({
   VistaDoPipeline: () => null,
 }));
 vi.mock("@/components/iavek/SemRespostaPorVendedor", () => ({ SemRespostaPorVendedor: () => null }));
+vi.mock("@/hooks/inbox/useMessageTemplates", () => ({ usePreCarregarRespostas: () => undefined, useMessageTemplates: () => ({ data: [] }) }));
 vi.mock("@/components/kanban/NewLeadDialog", () => ({ NewLeadDialog: () => null }));
 /**
  * O quadro é substituído por um dublê que SELECIONA um card: a barra em lote só
