@@ -16,6 +16,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { resolveOwnerPatch, type OwnerPatch, type OwnerPatchInput } from "@/lib/leads/owner-patch";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
 import { listaLegivel } from "@/lib/leads/activity-vocabulary";
+import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 import { camposAlterados } from "@/lib/leads/campos-alterados";
 import { valoresAntesDepois } from "@/lib/leads/valores-audit";
 import { RECUSA_DE_TROCA_DE_FUNIL } from "@/lib/leads/clonar-para-funil";
@@ -782,6 +783,43 @@ export async function createLeadHandler(
 // update
 // ---------------------------------------------------------------------------
 
+/** ia.vek CRM-244 (Fase 1): "De Fulano para Beltrano", com os nomes da equipe e dos agentes. */
+async function textoDaTroca(
+  supabase: SB,
+  orgId: string,
+  de: { user: string | null; agent: string | null },
+  para: { user: string | null; agent: string | null },
+): Promise<string> {
+  // A troca JÁ foi gravada quando isto roda: não achar o nome nunca derruba a resposta.
+  try {
+    return await nomesDaTroca(supabase, orgId, de, para);
+  } catch {
+    return "Responsável trocado";
+  }
+}
+
+async function nomesDaTroca(
+  supabase: SB,
+  orgId: string,
+  de: { user: string | null; agent: string | null },
+  para: { user: string | null; agent: string | null },
+): Promise<string> {
+  const pessoas = [de.user, para.user].filter((x): x is string => Boolean(x));
+  const agentes = [de.agent, para.agent].filter((x): x is string => Boolean(x));
+  const [nomes, { data: linhasDosAgentes }] = await Promise.all([
+    pessoas.length ? nomesDosAtendentes(pessoas) : Promise.resolve(new Map<string, string>()),
+    agentes.length
+      ? supabase.from("ai_agents").select("id, name").eq("organization_id", orgId).in("id", agentes)
+      : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
+  ]);
+  const dosAgentes = new Map(
+    ((linhasDosAgentes ?? []) as { id: string; name: string | null }[]).map((a) => [a.id, a.name ?? "agente"]),
+  );
+  const nome = (d: { user: string | null; agent: string | null }) =>
+    d.user ? (nomes.get(d.user) ?? "alguém da equipe") : d.agent ? (dosAgentes.get(d.agent) ?? "agente") : "sem responsável";
+  return `De ${nome(de)} para ${nome(para)}`;
+}
+
 export async function updateLeadHandler(
   supabase: SB,
   ctx: HandlerCtx,
@@ -847,6 +885,25 @@ export async function updateLeadHandler(
     input,
     (existing.owner_user_id as string | null) ?? null,
   );
+  // ia.vek CRM-244 (Fase 1): o dono MUDA quando o par (pessoa, agente) difere do que está gravado.
+  // Reenviar o mesmo dono (o formulário do dossiê manda o form inteiro) não é troca.
+  const donoAntes = {
+    user: (existing.owner_user_id as string | null) ?? null,
+    agent: ((existing as { owner_agent_id?: string | null }).owner_agent_id as string | null) ?? null,
+  };
+  const trocouDono = Boolean(
+    ownerPatch &&
+      (ownerPatch.owner_user_id !== donoAntes.user || ownerPatch.owner_agent_id !== donoAntes.agent),
+  );
+  if (trocouDono && ctx.iavekTrocaResponsavel === false) {
+    throw new ApiError(
+      403,
+      "responsavel_so_gestao",
+      undefined,
+      ctx.requestId,
+      traduzir("Só o guardião, o gerente e o admin trocam o responsável.", ctx.idioma ?? "pt-BR"),
+    );
+  }
   if (ownerPatch) {
     Object.assign(patch, ownerPatch);
     if (ownerPatch.owner_user_id !== null || ownerPatch.owner_agent_id !== null) {
@@ -947,6 +1004,10 @@ export async function updateLeadHandler(
     camposDaAuditoria.custom_fields = { ...anteriores, ...input.custom_fields };
   }
   const fields = camposAlterados(camposDaAuditoria, existing as Record<string, unknown>);
+  // ia.vek CRM-244 (Fase 1): a troca de responsável tem linha própria no histórico; o "Dados do
+  // negócio alterados" fica só com os outros campos (e não aparece se só o dono mudou).
+  const camposDoDono = new Set(["owner_user_id", "owner_agent_id", "owner_kind", "assigned_at"]);
+  const camposEditados = fields.filter((f) => !camposDoDono.has(f));
 
   // A EDIÇÃO HUMANA ENTRA NA TIMELINE (wave 6). Antes disto, mexer num campo
   // era invisível: a IA deixava rastro e o humano não — meia continuidade
@@ -960,7 +1021,7 @@ export async function updateLeadHandler(
   // dossie e clicar Salvar geraria "Dados do negocio alterados" com a lista
   // vazia — ruido na timeline exatamente na superficie que promete contar a
   // vida do negocio.
-  const atividadeEdicao = fields.length === 0 ? { ok: true as const } : await emitLeadActivity(supabase, {
+  const atividadeEdicao = camposEditados.length === 0 ? { ok: true as const } : await emitLeadActivity(supabase, {
     organizationId: existing.organization_id,
     leadId,
     contactId: (updated as { contact_id?: string | null }).contact_id ?? null,
@@ -993,8 +1054,8 @@ export async function updateLeadHandler(
     // NÃO confunda com a atividade de autorização vencida (wave 4), que mostra
     // antes-e-depois DE PROPÓSITO: lá o texto é a proposta do PRÓPRIO AGENTE,
     // escrita por máquina. A origem do texto é que decide, não a forma da frase.
-    reason: `Alterou ${listaLegivel(fields)}`,
-    payload: { fields },
+    reason: `Alterou ${listaLegivel(camposEditados)}`,
+    payload: { fields: camposEditados },
   });
   if (!atividadeEdicao.ok) {
     // Rastro de mutação já ocorrida: falha BAIXO, mas contada (ver
@@ -1007,6 +1068,37 @@ export async function updateLeadHandler(
       erro: atividadeEdicao.error,
       requestId: ctx.requestId,
     });
+  }
+
+  if (trocouDono && ownerPatch) {
+    const atividadeDono = await emitLeadActivity(supabase, {
+      organizationId: existing.organization_id,
+      leadId,
+      contactId: (updated as { contact_id?: string | null }).contact_id ?? null,
+      type: "owner_changed",
+      sourceModule: "crm",
+      sourceId: leadId,
+      actor: ctx.actor,
+      // Nomes da EQUIPE (quem atende), nunca do cliente: o §9 proíbe PII do cliente no reason.
+      reason: await textoDaTroca(supabase, existing.organization_id as string, donoAntes, {
+        user: ownerPatch.owner_user_id,
+        agent: ownerPatch.owner_agent_id,
+      }),
+      payload: {
+        de: { owner_user_id: donoAntes.user, owner_agent_id: donoAntes.agent },
+        para: { owner_user_id: ownerPatch.owner_user_id, owner_agent_id: ownerPatch.owner_agent_id },
+      },
+    });
+    if (!atividadeDono.ok) {
+      await registraFalhaDeAtividade(supabase, {
+        organizationId: existing.organization_id,
+        leadId,
+        tipo: "owner_changed",
+        origem: "leads/_handler.updateLeadHandler",
+        erro: atividadeDono.error,
+        requestId: ctx.requestId,
+      });
+    }
   }
 
   await supabase

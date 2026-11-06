@@ -97,6 +97,12 @@ export interface HandlerCtx {
    */
   iavekSdrMarcaParaVendedor?: true;
   /**
+   * ia.vek CRM-244 (Fase 1, decisão do Rodrigo, 06/11): trocar o responsável é de guardião,
+   * gerente e admin. `false` só quando a rota conferiu no banco que quem pede pela TELA é
+   * vendedor; ausente, nada muda (token de integração, MCP, demais funções). Nunca vem do corpo.
+   */
+  iavekTrocaResponsavel?: boolean;
+  /**
    * Autoria "em nome de" (#1613): a PESSOA por cuja decisão o token envia.
    *
    * Vive no CTX, e não no input, de propósito: o mesmo input atravessa as tools

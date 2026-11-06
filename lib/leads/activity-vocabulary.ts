@@ -33,6 +33,12 @@ export type ActivityType =
   | "next_action_approved"
   | "next_action_dismissed"
   | "lead_edited"
+  /**
+   * ia.vek CRM-244 (Fase 1): a troca de responsável ganha linha própria. Antes ela caía em
+   * "Dados do negócio alterados", e quem lia o histórico não via que o lead mudou de mãos.
+   * Quem trocou e quando vêm da própria atividade (autor e horário); de quem para quem, no motivo.
+   */
+  | "owner_changed"
   | "lead_cooled"
   | "lead_reactivated"
   | "reactivation_accepted"
@@ -230,6 +236,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   // Não era "falta um emissor" — era meia continuidade vendida como
   // continuidade, e o dossiê teria mostrado só metade da vida do lead.
   lead_edited: "Dados do negócio alterados",
+  owner_changed: "Trocou o responsável",
   // O NEGÓCIO ESFRIANDO É ACONTECIMENTO, não telemetria: é o sistema dizendo
   // "ninguém falou com esta pessoa dentro do prazo deste estágio". Sem linha na
   // timeline, o card mudaria de cor e o dossiê não teria explicação — e o

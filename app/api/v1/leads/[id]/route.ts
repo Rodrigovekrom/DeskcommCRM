@@ -19,6 +19,8 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { updateLeadSchema, validateRequest } from "@/lib/schemas";
 
 import { updateLeadHandler } from "../_handler";
+import { trocaResponsavel } from "@/lib/iavek/funcoes";
+import { funcaoNaOrganizacao } from "@/lib/iavek/contato-no-alcance";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +73,14 @@ export async function PATCH(
     if (etiquetaNova) return etiquetaNova;
   }
 
+  // ia.vek CRM-244 (Fase 1): pela TELA, o vendedor não troca o responsável. A função é lida no
+  // banco (nunca do corpo) e só quando o pedido mexe no dono; o handler recusa se o dono MUDAR.
+  const mexeNoDono = "owner_user_id" in input || "owner_agent_id" in input;
+  const iavekTrocaResponsavel =
+    authz.via === "session" && mexeNoDono && actor.type === "user"
+      ? trocaResponsavel(await funcaoNaOrganizacao(supabase, organizationId, actor.id))
+      : undefined;
+
   try {
     const updated = await updateLeadHandler(
       supabase,
@@ -79,6 +89,7 @@ export async function PATCH(
         actor,
         requestId,
         idioma,
+        ...(iavekTrocaResponsavel === false ? { iavekTrocaResponsavel } : {}),
       },
       leadId,
       input,

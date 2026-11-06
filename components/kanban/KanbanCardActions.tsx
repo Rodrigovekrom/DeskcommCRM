@@ -28,7 +28,8 @@ import { useBulkAction } from "@/hooks/kanban/useBulkAction";
 import { usePropostaEnviadaDoLead } from "@/hooks/kanban/usePropostaEnviadaDoLead";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAssignableAgents } from "@/hooks/kanban/useAssignableAgents";
-import { usePermission } from "@/hooks/auth/AuthProvider";
+import { useFuncaoVistaOpcional, usePermission } from "@/hooks/auth/AuthProvider";
+import { trocaResponsavel } from "@/lib/iavek/funcoes";
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { LoseLeadDialog } from "./LoseLeadDialog";
 import { VendaDialog } from "./VendaDialog";
@@ -61,9 +62,19 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
   // spec 13 §4: escrita no funil é agent+ — viewer não reatribui (a rota
   // PATCH também recusa; aqui é só não oferecer o que seria negado).
   const canAssign = usePermission("pipeline.move_card");
-  const { data: members } = useAssignableMembers(canAssign);
+  // ia.vek CRM-244 (Fase 1, decisão do Rodrigo): trocar o responsável é de guardião, gerente e
+  // admin. O vendedor não vê a opção (o PATCH também recusa: `responsavel_so_gestao`). Lê a
+  // função VISTA, para o "Ver como vendedor" mostrar o que o vendedor vê.
+  const funcaoVista = useFuncaoVistaOpcional();
+  const podeTrocarResponsavel = canAssign && trocaResponsavel(funcaoVista);
+  const { data: members } = useAssignableMembers(podeTrocarResponsavel);
   // A rota já devolve só agente ativo e não arquivado — é o picker.
-  const { data: agents } = useAssignableAgents(canAssign);
+  const { data: agents } = useAssignableAgents(podeTrocarResponsavel);
+  // ia.vek CRM-244 (Fase 1): busca por nome na lista do responsável.
+  const [busca, setBusca] = useState("");
+  const casa = (nome: string | null | undefined) => contemONome(nome, busca);
+  const membrosVistos = (members ?? []).filter((m) => casa(m.full_name));
+  const agentesVistos = (agents ?? []).filter((a) => casa(a.name));
 
   const reassignToUser = (ownerUserId: string | null) => {
     if (ownerUserId === lead.owner_user_id) return;
@@ -127,12 +138,29 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
           >
             <PencilSimple size={14} className="mr-2" /> {t("Editar")}
           </DropdownMenuItem>
-          {canAssign && (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
+          {podeTrocarResponsavel && (
+            <DropdownMenuSub onOpenChange={(aberto) => !aberto && setBusca("")}>
+              <DropdownMenuSubTrigger data-testid="menu-responsavel">
                 <Users size={14} className="mr-2" /> {t("Responsável")}
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
+              <DropdownMenuSubContent className="max-h-[60vh] overflow-y-auto">
+                <div className="sticky top-0 z-10 bg-popover p-1">
+                  <input
+                    type="search"
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    // O menu do Radix usa as teclas para navegar e para a busca por letra:
+                    // aqui a tecla é do campo (só Esc e as setas seguem para o menu).
+                    onKeyDown={(e) => {
+                      if (!["Escape", "ArrowDown", "ArrowUp"].includes(e.key)) e.stopPropagation();
+                    }}
+                    placeholder={t("Buscar por nome")}
+                    aria-label={t("Buscar responsável por nome")}
+                    data-testid="busca-responsavel"
+                    className="h-8 w-full rounded-md border border-border bg-surface px-2 text-sm outline-hidden focus:border-accent"
+                    autoFocus
+                  />
+                </div>
                 <DropdownMenuItem
                   disabled={
                     editMutation.isPending ||
@@ -142,8 +170,8 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
                 >
                   {t("Sem responsável")}
                 </DropdownMenuItem>
-                {(members ?? []).length > 0 && <DropdownMenuSeparator />}
-                {(members ?? []).map((m) => (
+                {membrosVistos.length > 0 && <DropdownMenuSeparator />}
+                {membrosVistos.map((m) => (
                   <DropdownMenuItem
                     key={m.user_id}
                     disabled={editMutation.isPending || m.user_id === lead.owner_user_id}
@@ -152,8 +180,8 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
                     {m.full_name ?? t("Sem nome")}
                   </DropdownMenuItem>
                 ))}
-                {(agents ?? []).length > 0 && <DropdownMenuSeparator />}
-                {(agents ?? []).map((a) => (
+                {agentesVistos.length > 0 && <DropdownMenuSeparator />}
+                {agentesVistos.map((a) => (
                   <DropdownMenuItem
                     key={a.agent_id}
                     disabled={editMutation.isPending || a.agent_id === lead.owner_agent_id}
@@ -167,6 +195,9 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
                     )}
                   </DropdownMenuItem>
                 ))}
+                {busca.trim() !== "" && membrosVistos.length === 0 && agentesVistos.length === 0 && (
+                  <p className="px-2 py-1.5 text-xs text-text-muted">{t("Ninguém com esse nome.")}</p>
+                )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           )}
@@ -299,4 +330,11 @@ export function KanbanCardActions({ lead, pipelineId }: KanbanCardActionsProps) 
       />
     </span>
   );
+}
+
+/** ia.vek CRM-244: busca por nome sem diferença de maiúscula nem acento ("jose" acha "José"). */
+export function contemONome(nome: string | null | undefined, busca: string): boolean {
+  const limpo = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const b = limpo(busca);
+  return b === "" || limpo(nome ?? "").includes(b);
 }
