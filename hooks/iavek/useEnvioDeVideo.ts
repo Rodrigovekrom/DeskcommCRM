@@ -8,6 +8,7 @@
 import { useCallback, useState } from "react";
 
 import { VIDEO_MAX_ENTRADA_BYTES } from "@/lib/iavek/video/encolher-video";
+import { randomId } from "@/lib/random-id";
 
 export interface VideoEmPreparo {
   id: string;
@@ -27,7 +28,7 @@ export function useEnvioDeVideo(conversationId: string, enviar: Envio) {
 
   const enviarVideo = useCallback(
     async (file: File, legenda: string) => {
-      const id = crypto.randomUUID();
+      const id = randomId();
       setItens((xs) => [...xs, { id, nome: file.name, estado: "enviando" }]);
       const falhou = (motivo: string) => mudar(id, { estado: "falhou", motivo });
       if (file.size > VIDEO_MAX_ENTRADA_BYTES) return falhou("Vídeo acima de 300 MB.");
