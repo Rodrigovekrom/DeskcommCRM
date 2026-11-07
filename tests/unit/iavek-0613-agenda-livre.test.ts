@@ -61,3 +61,16 @@ describe("banco (0613, última definição do baseline)", () => {
     expect(ultima(b, "fn_appointment_stamp")).toContain("appointment_contact_scope");
   });
 });
+
+describe("CRM-255/257: na loja, tipo sem responsável não trava ninguém", () => {
+  it("criar: sem responsável escolhido nem padrão, fica na agenda de quem marca (só na agenda livre)", () => {
+    const h = readFileSync("app/api/v1/agenda/agendamentos/_handler.ts", "utf8");
+    expect(h).toMatch(/tipo\.default_owner_user_id \?\?\s*\(ctx\.iavekAgendaLivre && ctx\.actor\.type === "user" \? ctx\.actor\.id : null\)/);
+  });
+  it("horários: a mesma regra, e a clínica segue sem responsável = sem agenda", () => {
+    const r = readFileSync("app/api/v1/agenda/horarios-livres/route.ts", "utf8");
+    expect(r).toContain("donoSeFaltar: (await modoAgendamentoDaOrg(activeOrg.orgId)) ? null : authz.user.id");
+    const c = readFileSync("lib/agenda/consulta.ts", "utf8");
+    expect(c).toContain("params.ownerUserId ?? tipo.default_owner_user_id ?? params.donoSeFaltar ?? null");
+  });
+});

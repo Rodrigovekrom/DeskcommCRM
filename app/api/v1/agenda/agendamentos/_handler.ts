@@ -319,7 +319,12 @@ async function executarCriacaoDeAgendamento(
     throw new ApiError(422, "agenda_tipo_desativado", undefined, ctx.requestId, `"${tipo.name}" está desativado.`);
   }
 
-  const donoId = input.owner_user_id ?? tipo.default_owner_user_id;
+  // ia.vek CRM-255/257: na loja (agenda livre) o tipo sem responsável não trava ninguém — o compromisso fica
+  // na agenda de quem está marcando. Na clínica (modo agendamento) segue a regra de sempre.
+  const donoId =
+    input.owner_user_id ??
+    tipo.default_owner_user_id ??
+    (ctx.iavekAgendaLivre && ctx.actor.type === "user" ? ctx.actor.id : null);
   if (!donoId) {
     throw new ApiError(
       422,
