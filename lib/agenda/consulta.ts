@@ -108,6 +108,8 @@ export interface ParametrosDaConsulta {
   eventTypeSlug?: string | null;
   /** Ausente = o responsável padrão do tipo. */
   ownerUserId?: string | null;
+  /** ia.vek (loja): quem fica com a agenda quando nem o pedido nem o tipo dizem o responsável. */
+  donoSeFaltar?: string | null;
   de: Date;
   ate: Date;
   /** INJETADO, como em `horariosLivres`. Relógio lido aqui dentro é o defeito que `janela-do-canal.ts` documenta. */
@@ -223,7 +225,7 @@ export async function horariosLivresDaOrg(
     };
   }
 
-  const donoId = params.ownerUserId ?? tipo.default_owner_user_id;
+  const donoId = params.ownerUserId ?? tipo.default_owner_user_id ?? params.donoSeFaltar ?? null;
   if (!donoId) {
     // Sem dono não há jornada, e sem jornada não há horário. Lista vazia aqui
     // faria a tela dizer "nenhum horário disponível" para uma configuração

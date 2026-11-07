@@ -45,6 +45,7 @@ import {
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { modoAgendamentoDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 const querySchema = z.object({
@@ -98,6 +99,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     eventTypeId: parsed.data.event_type_id,
     eventTypeSlug: null,
     ownerUserId: parsed.data.owner_user_id ?? null,
+    // ia.vek CRM-255/257: na loja, o tipo sem responsável mostra a agenda de quem está marcando — a mesma
+    // regra que a criação aplica (`_handler.ts`). Na clínica segue sem responsável = sem agenda.
+    donoSeFaltar: (await modoAgendamentoDaOrg(activeOrg.orgId)) ? null : authz.user.id,
     de,
     ate,
     agora: new Date(),
