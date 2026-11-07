@@ -7,7 +7,7 @@
  */
 import { useCallback, useState } from "react";
 
-import { VIDEO_MAX_ENTRADA_BYTES } from "@/lib/iavek/video/encolher-video";
+import { VIDEO_MAX_ENTRADA_BYTES } from "@/lib/iavek/video/limites";
 import { randomId } from "@/lib/random-id";
 
 export interface VideoEmPreparo {

@@ -81,3 +81,11 @@ describe("CRM-258: o proxy deixa de fora SÓ o envio de vídeo", () => {
     expect(re.test("/app/inbox")).toBe(true);
   });
 });
+
+describe("CRM-258: o código de servidor do vídeo nunca vai ao navegador", () => {
+  it("o hook da tela importa só os limites (sem node:child_process)", () => {
+    const hook = readFileSync("hooks/iavek/useEnvioDeVideo.ts", "utf8");
+    expect(hook).not.toMatch(/video\/(encolher-video|fila-do-video)/);
+    expect(readFileSync("lib/iavek/video/limites.ts", "utf8")).not.toMatch(/from "node:/);
+  });
+});

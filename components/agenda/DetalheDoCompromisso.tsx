@@ -11,6 +11,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { rotuloDoLocal } from "@/lib/agenda/locais";
+import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 
 type Detalhe = {
   meeting?: MeetingDetail | null;
@@ -62,6 +63,8 @@ export function DetalheDoCompromisso({
   onClose: () => void;
   podeEditar?: boolean;
 }) {
+  // ia.vek CRM-255/257: na loja (sem modo agendamento) dá para concluir antes do horário, como na Agenda.
+  const { modo_agendamento } = usePerfilDaEmpresa();
   const t = useT();
   const tagDoIdioma = useTagDeIdioma();
   const qc = useQueryClient();
@@ -312,7 +315,7 @@ export function DetalheDoCompromisso({
                       disabled={
                         mutation.isPending ||
                         staleDraft ||
-                        Date.parse(a.starts_at) > query.dataUpdatedAt ||
+                        (modo_agendamento && Date.parse(a.starts_at) > query.dataUpdatedAt) ||
                         a.status === status
                       }
                     >

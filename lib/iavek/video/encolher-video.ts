@@ -8,16 +8,20 @@
  */
 import { spawn } from "node:child_process";
 
-/** O que se pode escolher para enviar (vídeo bruto do celular). */
-export const VIDEO_MAX_ENTRADA_BYTES = 300 * 1024 * 1024;
-/** Até aqui vai como VÍDEO (toca na conversa); acima, como documento. */
-export const VIDEO_MAX_SEGUNDOS_COMO_VIDEO = 180;
-/** O WhatsApp aceita vídeo como mídia até ~16 MB; acima disso, documento. */
-export const VIDEO_MAX_BYTES_COMO_VIDEO = 16 * 1024 * 1024;
-/** O bucket guarda até 50 MB: o encolhido que passar disso não é guardado. */
-export const VIDEO_MAX_BYTES_GUARDADO = 50 * 1024 * 1024;
-/** Tempo máximo de uma conversão (um vídeo de 300 MB num servidor ocupado). */
-export const VIDEO_TETO_DA_CONVERSAO_MS = 10 * 60_000;
+import {
+  VIDEO_MAX_BYTES_COMO_VIDEO,
+  VIDEO_MAX_BYTES_GUARDADO,
+  VIDEO_MAX_SEGUNDOS_COMO_VIDEO,
+  VIDEO_TETO_DA_CONVERSAO_MS,
+} from "./limites";
+
+export {
+  VIDEO_MAX_BYTES_COMO_VIDEO,
+  VIDEO_MAX_BYTES_GUARDADO,
+  VIDEO_MAX_ENTRADA_BYTES,
+  VIDEO_MAX_SEGUNDOS_COMO_VIDEO,
+  VIDEO_TETO_DA_CONVERSAO_MS,
+} from "./limites";
 
 export type ComoEnviar = { tipo: "video" | "document" } | { tipo: "longo_demais" };
 

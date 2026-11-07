@@ -74,3 +74,11 @@ describe("CRM-255/257: na loja, tipo sem responsável não trava ninguém", () =
     expect(c).toContain("params.ownerUserId ?? tipo.default_owner_user_id ?? params.donoSeFaltar ?? null");
   });
 });
+
+describe("CRM-255/257: a Central também conclui antes do início, na loja", () => {
+  it("Compareceu/Faltou só esperam o horário quando há modo agendamento (clínica)", () => {
+    const d = readFileSync("components/agenda/DetalheDoCompromisso.tsx", "utf8");
+    expect(d).toContain("(modo_agendamento && Date.parse(a.starts_at) > query.dataUpdatedAt) ||");
+    expect(d).not.toMatch(/^\s*Date\.parse\(a\.starts_at\) > query\.dataUpdatedAt \|\|/m);
+  });
+});
