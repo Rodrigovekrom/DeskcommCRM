@@ -46384,13 +46384,9 @@ grant execute on function public.fn_iavek_rodizio_distribuir(uuid, uuid, boolean
 -- 1b. O analista ainda precisa da LINHA da própria organização (nome, status,
 -- configuração — nada de cliente): sem ela o app trata a loja como suspensa.
 -- Policy estreita, só para o vínculo do próprio usuário com a função analista.
-drop policy if exists orgs_select_analista_de_ficha on public.organizations;
-create policy orgs_select_analista_de_ficha on public.organizations
-  for select using (
-    id in (select uo.organization_id from public.user_organizations uo
-            where uo.user_id = auth.uid() and uo.revoked_at is null
-              and uo.interface_settings->>'funcao' = 'analista_ficha')
-  );
+-- orgs_select_analista_de_ficha: a 0586 a criava aqui com subconsulta em
+-- user_organizations; a definição FINAL (mesma regra, via função security definer,
+-- sem o custo da RLS) mora no bloco da 0614, mais abaixo, que faz o drop e cria.
 
 -- 2. As fichas.
 create table if not exists public.iavek_fichas (
