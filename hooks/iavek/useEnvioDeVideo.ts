@@ -49,13 +49,19 @@ export function useEnvioDeVideo(conversationId: string, enviar: Envio) {
           if (!e.ok) return falhou(ej?.error?.message ?? "Não deu para preparar o vídeo.");
           if (ej?.data?.estado === "falhou") return falhou(ej.data.motivo ?? "Não deu para preparar o vídeo.");
           if (ej?.data?.estado === "pronto" && ej.data.storage_path && ej.data.kind) {
-            await enviar({
-              type: ej.data.kind,
-              ...(legenda ? { body: legenda } : {}),
-              media_storage_path: ej.data.storage_path,
-              media_mime: ej.data.media_mime ?? "video/mp4",
-              media_size_bytes: ej.data.media_size_bytes ?? 0,
-            });
+            try {
+              await enviar({
+                type: ej.data.kind,
+                ...(legenda ? { body: legenda } : {}),
+                media_storage_path: ej.data.storage_path,
+                media_mime: ej.data.media_mime ?? "video/mp4",
+                media_size_bytes: ej.data.media_size_bytes ?? 0,
+              });
+            } catch (err) {
+              // O vídeo ficou pronto; quem recusou foi o envio (ex.: WhatsApp desconectado). Diz o motivo dele.
+              const m = err instanceof Error && err.message ? err.message : "";
+              return falhou(m ? `O vídeo ficou pronto, mas o envio não saiu: ${m}` : "O vídeo ficou pronto, mas o envio não saiu.");
+            }
             tirar(id);
             return;
           }
