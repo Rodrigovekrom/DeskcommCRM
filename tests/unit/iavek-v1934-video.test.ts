@@ -31,17 +31,22 @@ describe("CRM-258: vídeo ou documento", () => {
 
 describe("CRM-258: como encolhe", () => {
   const a = argumentosDoFfmpeg("in", "out.mp4").join(" ");
-  it("720p sem aumentar vídeo menor, ~0,9 Mbit/s, H.264 + AAC, faststart, 2 núcleos", () => {
+  it("720p sem aumentar vídeo menor, ~0,9 Mbit/s, H.264 + AAC, faststart, UM núcleo (v1.9.35)", () => {
     expect(a).toContain("scale=-2:'min(720,ih)'");
     expect(a).toContain("-b:v 900k");
     expect(a).toContain("-c:v libx264");
     expect(a).toContain("-c:a aac");
     expect(a).toContain("+faststart");
-    expect(a).toContain("-threads 2");
+    // v1.9.35: um núcleo para decodificar, filtrar e codificar — nunca mais de 1 em lugar nenhum.
+    expect(a).toMatch(/^-nostdin -y -threads 1 -i in -filter_threads 1 /);
+    expect(a.match(/-threads (\d+)/g)).toEqual(["-threads 1", "-threads 1"]);
   });
   it("o ffmpeg roda com prioridade baixa (nice) para não disputar a CPU com a equipe", () => {
     const fonte = readFileSync("lib/iavek/video/encolher-video.ts", "utf8");
-    expect(fonte).toMatch(/rodar\("nice", \["-n", "10", "ffmpeg"/);
+    // v1.9.35: a MENOR prioridade (19), no ffmpeg e no ffprobe.
+    expect(fonte).toMatch(/rodar\("nice", \["-n", "19", "ffmpeg"/);
+    expect(fonte).toMatch(/rodar\("nice", \["-n", "19", "ffprobe"/);
+    expect(fonte).not.toMatch(/"-n", "(?!19")\d+"/);
   });
   it("todo erro vira um motivo legível", () => {
     for (const e of ["nao_e_video", "conversao_demorou_demais", "ffmpeg_exit_1: x", "ffmpeg_indisponivel: x", "upload", "outra"]) {

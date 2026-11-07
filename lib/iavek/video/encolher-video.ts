@@ -3,8 +3,10 @@
  * Decisões: 720p; até 3 min vai como vídeo, acima (ou se não couber) vai como documento; até 300 MB para
  * escolher o arquivo. Só a versão encolhida fica guardada; o original temporário é apagado.
  *
- * O ffmpeg roda com prioridade BAIXA (`nice -n 10`) e no máximo 2 núcleos: a conversão não pode disputar a
- * CPU com a equipe usando o CRM. O ffmpeg já está na imagem do app (Dockerfile).
+ * O ffmpeg roda com a MENOR prioridade (`nice -n 19`) e em UM núcleo só (decodificar, filtrar e codificar):
+ * num servidor de 2 núcleos sobra sempre um inteiro para as telas da equipe. v1.9.35: era nice 10 e
+ * `-threads 2`, e uma conversão tomava o servidor inteiro (pico de 96% de CPU no TESTE). O ffmpeg já está na
+ * imagem do app (Dockerfile).
  */
 import { spawn } from "node:child_process";
 
@@ -38,13 +40,14 @@ export function comoEnviar(duracaoSegundos: number, bytesEncolhido: number): Com
  */
 export function argumentosDoFfmpeg(entrada: string, saida: string): string[] {
   return [
-    "-nostdin", "-y", "-i", entrada,
+    "-nostdin", "-y", "-threads", "1", "-i", entrada,
+    "-filter_threads", "1",
     "-vf", "scale=-2:'min(720,ih)'",
     "-c:v", "libx264", "-preset", "veryfast", "-b:v", "900k", "-maxrate", "1000k", "-bufsize", "2000k",
     "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "64k", "-ac", "2",
     "-movflags", "+faststart",
-    "-threads", "2",
+    "-threads", "1",
     saida,
   ];
 }
@@ -68,12 +71,12 @@ function rodar(cmd: string, args: string[], tetoMs: number): Promise<string> {
 
 /** Duração (s) e se há faixa de vídeo — o ffprobe confere que o arquivo é MESMO vídeo (não só o mime). */
 export async function lerVideo(caminho: string): Promise<{ duracao: number; temVideo: boolean }> {
-  const out = await rodar("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=codec_type", "-of", "json", caminho], 60_000);
+  const out = await rodar("nice", ["-n", "19", "ffprobe","-v", "error", "-show_entries", "format=duration:stream=codec_type", "-of", "json", caminho], 60_000);
   const j = JSON.parse(out || "{}") as { format?: { duration?: string }; streams?: Array<{ codec_type?: string }> };
   return { duracao: Number(j.format?.duration ?? 0), temVideo: (j.streams ?? []).some((s) => s.codec_type === "video") };
 }
 
 /** Encolhe `entrada` em `saida`, com prioridade baixa. */
 export async function encolher(entrada: string, saida: string): Promise<void> {
-  await rodar("nice", ["-n", "10", "ffmpeg", ...argumentosDoFfmpeg(entrada, saida)], VIDEO_TETO_DA_CONVERSAO_MS);
+  await rodar("nice", ["-n", "19", "ffmpeg", ...argumentosDoFfmpeg(entrada, saida)], VIDEO_TETO_DA_CONVERSAO_MS);
 }
