@@ -363,14 +363,20 @@ export async function carregaRadarDeRisco(
     // 414/400, e o radar inteiro vira 500 justamente para quem tem mais
     // demandas abertas — quem mais precisa dele. Não medido contra o proxy
     // deste produto; o lote existe para a pergunta não precisar ser feita.
-    for (let i = 0; i < idsDeLead.length; i += IDS_POR_CONSULTA) {
-      const fatia = idsDeLead.slice(i, i + IDS_POR_CONSULTA);
-      const { data: deArquivado, error: deArquivadoErr } = await admin
-        .from("crm_leads")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .in("id", fatia)
-        .in("pipeline_id", funisArquivados);
+    // ia.vek v1.9.36 (CRM-260): os lotes vão EM PARALELO (eram um depois do outro); o resultado é o mesmo.
+    const fatias: string[][] = [];
+    for (let i = 0; i < idsDeLead.length; i += IDS_POR_CONSULTA) fatias.push(idsDeLead.slice(i, i + IDS_POR_CONSULTA));
+    const respostas = await Promise.all(
+      fatias.map((fatia) =>
+        admin
+          .from("crm_leads")
+          .select("id")
+          .eq("organization_id", organizationId)
+          .in("id", fatia)
+          .in("pipeline_id", funisArquivados),
+      ),
+    );
+    for (const { data: deArquivado, error: deArquivadoErr } of respostas) {
       if (deArquivadoErr) throw new Error(`radar_demandas_funil_failed: ${deArquivadoErr.message}`);
       for (const l of deArquivado ?? []) fora.add(l.id as string);
     }

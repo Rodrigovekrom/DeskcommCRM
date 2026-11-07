@@ -48709,6 +48709,32 @@ begin
  return new;
 end; $$;
 
+-- ---- a policy do analista de ficha sem o custo em todo pedido (migration 0614) ----
+-- Corpo e porquê: a migration 0614 (CRM-260). A regra é a mesma da 0586 (bloco "Passar Ficha", mais acima);
+-- só o vínculo passa a ser lido por função security definer, sem a RLS de user_organizations a cada linha.
+-- ENTRA ANTES DA VARREDURA anon, como toda função nova do apêndice.
+create or replace function public.fn_iavek_orgs_onde_sou_analista()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select uo.organization_id
+    from public.user_organizations uo
+   where uo.user_id = auth.uid()
+     and uo.revoked_at is null
+     and uo.interface_settings->>'funcao' = 'analista_ficha';
+$$;
+revoke execute on function public.fn_iavek_orgs_onde_sou_analista() from public, anon;
+grant execute on function public.fn_iavek_orgs_onde_sou_analista() to authenticated, service_role;
+
+drop policy if exists orgs_select_analista_de_ficha on public.organizations;
+create policy orgs_select_analista_de_ficha on public.organizations
+  for select using (
+    id in (select public.fn_iavek_orgs_onde_sou_analista())
+  );
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

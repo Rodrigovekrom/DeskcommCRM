@@ -68,6 +68,8 @@ function indisponivel(agora: Date): ProtecaoAgenda {
 }
 /** Contatos por consulta: cabe na URL do PostgREST com folga (uuid = 36 caracteres). */
 export const LOTE_DE_CONTATOS = 100;
+/** Compromissos por página de cada lote. */
+export const POR_PAGINA = 500;
 
 export async function protecaoAgendaSupabase(
   db: SupabaseClient,
@@ -77,36 +79,48 @@ export async function protecaoAgendaSupabase(
 ): Promise<Map<string, ProtecaoAgenda>> {
   if (!contatos.length) return new Map();
   try {
-    const appointments: CompromissoProtetor[] = [];
     // ia.vek v1.9.5: os contatos vão em LOTES. A lista inteira num `in(...)`
     // estoura o tamanho da URL do PostgREST numa loja com centenas de leads
     // (medido na Fenômenos: o radar de risco falhava em toda rodada com
     // `risk_agenda_indisponivel`).
-    for (let i = 0; i < contatos.length; i += LOTE_DE_CONTATOS) {
-      const lote = contatos.slice(i, i + LOTE_DE_CONTATOS);
-      let after: string | undefined;
-      // Keyset estável: uma resposta bem-sucedida pode ter sido truncada pelo
-      // max_rows do PostgREST. Só página VAZIA prova que a leitura terminou.
-      for (;;) {
-        let query = db
-          .from("calendar_appointments")
-          .select("id,contact_id,revision,starts_at,ends_at,status")
-          .eq("organization_id", org)
-          .in("contact_id", lote)
-          .in("status", ["pending", "confirmed"])
-          .order("id", { ascending: true })
-          .limit(500);
-        if (after) query = query.gt("id", after);
-        const page = await query;
-        if (page.error) throw page.error;
-        if (!page.data?.length) break;
-        const last = page.data[page.data.length - 1]!.id;
-        if (after && last <= after) throw new Error("agenda_page_did_not_advance");
-        appointments.push(...page.data);
-        after = last;
-      }
-    }
-    const organization = await db.from("organizations").select("settings").eq("id", org).single();
+    // ia.vek v1.9.36 (CRM-260): os lotes vão EM PARALELO, junto com a configuração da organização — antes,
+    // cada lote esperava o anterior (500 contatos = até ~10 idas em série; o radar levava ~10 s). A leitura
+    // de cada lote continua indo até a página vazia: o resultado é o mesmo, só o tempo encolhe.
+    const lotes: string[][] = [];
+    for (let i = 0; i < contatos.length; i += LOTE_DE_CONTATOS)
+      lotes.push(contatos.slice(i, i + LOTE_DE_CONTATOS));
+    const [organization, porLote] = await Promise.all([
+      db.from("organizations").select("settings").eq("id", org).single(),
+      Promise.all(
+        lotes.map(async (lote) => {
+          const doLote: CompromissoProtetor[] = [];
+          let after: string | undefined;
+          // Keyset estável: uma resposta bem-sucedida pode ter sido truncada pelo
+          // max_rows do PostgREST. Só página VAZIA prova que a leitura terminou
+          // (tests/unit/agenda-paginacao.test.ts) — num lote SEM compromisso, a 1ª página já é a vazia.
+          for (;;) {
+            let query = db
+              .from("calendar_appointments")
+              .select("id,contact_id,revision,starts_at,ends_at,status")
+              .eq("organization_id", org)
+              .in("contact_id", lote)
+              .in("status", ["pending", "confirmed"])
+              .order("id", { ascending: true })
+              .limit(POR_PAGINA);
+            if (after) query = query.gt("id", after);
+            const page = await query;
+            if (page.error) throw page.error;
+            if (!page.data?.length) break;
+            const last = page.data[page.data.length - 1]!.id;
+            if (after && last <= after) throw new Error("agenda_page_did_not_advance");
+            doLote.push(...page.data);
+            after = last;
+          }
+          return doLote;
+        }),
+      ),
+    ]);
+    const appointments: CompromissoProtetor[] = porLote.flat();
     if (organization.error) throw organization.error;
     return new Map(
       contatos.map((id) => [
