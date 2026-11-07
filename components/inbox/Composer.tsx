@@ -32,6 +32,7 @@ import { useCreateNote } from "@/hooks/inbox/useCreateNote";
 import { useMessageTemplates, type MessageTemplate } from "@/hooks/inbox/useMessageTemplates";
 import { X } from "lucide-react";
 import { useSendMessage } from "@/hooks/inbox/useSendMessage";
+import { useEnvioDeVideo } from "@/hooks/iavek/useEnvioDeVideo";
 import { useUploadMedia, type DestinoDoUpload } from "@/hooks/inbox/useUploadMedia";
 import { imagemDoClipboard } from "@/lib/inbox/clipboard-image";
 import { interpolateTemplate } from "@/lib/inbox/template-vars";
@@ -198,6 +199,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   }, [conversationId, semRascunhoInicial, disabled]);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const send = useSendMessage();
+  // ia.vek CRM-258: vídeo sobe à parte (até 300 MB), o servidor encolhe e só então envia.
+  const video = useEnvioDeVideo(conversationId, (p) => send.mutateAsync({ conversation_id: conversationId, ...p }));
   const upload = useUploadMedia();
   const createNote = useCreateNote();
   const templates = useMessageTemplates();
@@ -656,6 +659,32 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           )}
         </div>
       </div>
+      {video.itens.length > 0 ? (
+        <ul className="flex flex-col gap-1 px-3 pb-2" data-testid="videos-em-preparo">
+          {video.itens.map((v) => (
+            <li
+              key={v.id}
+              data-testid={v.estado === "falhou" ? "video-falhou" : "video-enviando"}
+              className={
+                v.estado === "falhou"
+                  ? "flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 text-xs text-destructive"
+                  : "flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1 text-xs text-muted-foreground"
+              }
+            >
+              <span className="truncate">
+                {v.estado === "falhou"
+                  ? `${t("Vídeo não enviado")} (${v.nome}): ${v.motivo ?? ""}`
+                  : `${t("Enviando vídeo")} ${v.nome}… ${t("preparando para o WhatsApp")}`}
+              </span>
+              {v.estado === "falhou" ? (
+                <button type="button" className="shrink-0 underline" onClick={() => video.tirar(v.id)}>
+                  {t("Fechar")}
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <AttachmentPreviewDialog
         file={pendingFile}
         sending={upload.isPending || send.isPending || createNote.isPending}
@@ -676,6 +705,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           // nota é tratada pelo onError do próprio hook, e o diálogo fica aberto
           // nos dois casos).
           const destino: DestinoDoUpload = pendingEm === "note" ? "nota" : "mensagem";
+          if (destino === "mensagem" && pendingFile.type.startsWith("video/")) {
+            // Não espera: o encolhimento leva de segundos a minutos e a conversa segue livre.
+            void video.enviarVideo(pendingFile, caption);
+            setPendingFile(null);
+            return;
+          }
           try {
             const uploaded = await upload.mutateAsync({ conversationId, file: pendingFile, destino });
             if (destino === "nota") {

@@ -8,6 +8,8 @@ export interface OutboundMedia {
   mime: string;
   filename?: string | null;
   caption?: string | null;
+  /** ia.vek CRM-258: o vídeo JÁ veio encolhido do servidor (MP4 H.264): o WAHA não refaz o ffmpeg. */
+  jaConvertido?: boolean;
 }
 
 export interface WahaSendPlan {
@@ -25,7 +27,7 @@ export function wahaSendPlanFor(kind: string, media: OutboundMedia): WahaSendPla
     case "video":
       return {
         endpoint: "sendVideo",
-        payload: { file, convert: true, ...(media.caption ? { caption: media.caption } : {}) },
+        payload: { file, convert: !media.jaConvertido, ...(media.caption ? { caption: media.caption } : {}) },
       };
     case "audio":
       return { endpoint: "sendVoice", payload: { file, convert: true } };

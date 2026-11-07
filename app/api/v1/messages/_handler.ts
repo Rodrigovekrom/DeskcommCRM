@@ -1101,6 +1101,9 @@ export async function sendMessageHandler(
           throw new Error(`storage_sign_failed: ${signErr?.message ?? "no_url"}`);
         }
         const filename = input.media_storage_path.split("/").pop() ?? undefined;
+        // ia.vek CRM-258: o vídeo encolhido no servidor (caminho que só a fila de vídeo gera) já é MP4
+        // pronto — o WAHA não refaz a conversão, e a espera de 30 s deixa de ser o gargalo.
+        const jaConvertido = (filename ?? "").startsWith("encolhido-");
         await checkBoundary();
         ({ externalId } = await adapter.send({
           beforeSend: checkBoundary,
@@ -1114,6 +1117,7 @@ export async function sendMessageHandler(
             mime: input.media_mime ?? "application/octet-stream",
             filename,
             caption: corpoDoCanal(input.body ?? null),
+            ...(jaConvertido ? { jaConvertido: true } : {}),
           },
           // O id que a PLATAFORMA conhece, lido da linha citada agora — não uma
           // cópia guardada no envio, que poderia divergir da linha.

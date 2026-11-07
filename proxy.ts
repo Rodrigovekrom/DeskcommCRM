@@ -158,6 +158,8 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Run on all paths except static assets / Next internals.
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
+    // ia.vek CRM-258: o envio de VÍDEO (até 300 MB) fica fora — o proxy guarda o corpo na memória e o corta
+    // em 10 MB (`proxyClientMaxBodySize`). A rota confere login, papel e suporte sozinha (resolveAuthDual).
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|api/v1/conversations/[^/]+/media/video$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
   ],
 };
