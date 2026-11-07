@@ -70,7 +70,7 @@ describe("CRM-258: envio já convertido", () => {
 describe("CRM-258: o proxy deixa de fora SÓ o envio de vídeo", () => {
   const fonte = readFileSync("proxy.ts", "utf8");
   const m = fonte.match(/matcher: \[\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*"([^"]+)"/);
-  const re = new RegExp(`^${m![1].replace(/\\\\/g, "\\")}$`);
+  const re = new RegExp(`^${m![1]!.replace(/\\\\/g, "\\")}$`);
   it("o envio de vídeo não passa pelo proxy (que cortaria o corpo em 10 MB)", () => {
     expect(re.test("/api/v1/conversations/abc-123/media/video")).toBe(false);
   });
