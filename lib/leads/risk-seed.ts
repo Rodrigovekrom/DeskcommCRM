@@ -1,4 +1,5 @@
 import { protecaoAgendaSupabase } from "@/lib/agenda/protecao-followup";
+import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { lerTudo } from "@/lib/supabase/paginas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -137,15 +138,22 @@ async function coletaEClassifica(
   const contactIds = [...new Set(leads.map((l) => l.contact_id).filter((c): c is string => !!c))];
   const followupPorContato = new Set<string>();
   if (contactIds.length > 0) {
-    const { data: jobs } = await admin
-      .from("cron_jobs")
-      .select("contact_id")
-      .eq("organization_id", organizationId)
-      .eq("kind", "at")
-      .eq("enabled", true)
-      .gt("next_run_at", now.toISOString())
-      .in("contact_id", contactIds);
-    for (const j of (jobs ?? []) as Array<{ contact_id: string }>) {
+    // ia.vek v1.9.37 (CRM-260): em LOTES de 100. Com os ~838 contatos da Fenômenos num `.in()` só, a
+    // resposta estourava o cabeçalho do Node, o erro era engolido e quem tinha follow-up agendado caía
+    // como crítico em vez de "em voo". Agora a falha derruba a rodada (como a da agenda, logo abaixo):
+    // um estado errado gravado é pior que uma rodada adiada.
+    const { data: jobs, error: jobsErr } = await buscaEmLotes<{ contact_id: string }>(contactIds, (lote) =>
+      admin
+        .from("cron_jobs")
+        .select("contact_id")
+        .eq("organization_id", organizationId)
+        .eq("kind", "at")
+        .eq("enabled", true)
+        .gt("next_run_at", now.toISOString())
+        .in("contact_id", lote),
+    );
+    if (jobsErr) throw new Error(`seed de risco (follow-ups): ${jobsErr.message}`);
+    for (const j of jobs) {
       followupPorContato.add(j.contact_id);
     }
   }

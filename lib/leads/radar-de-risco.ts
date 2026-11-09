@@ -18,6 +18,8 @@ import type { Role } from "@/lib/auth/types";
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeDoContato, type ContatoNomeavel } from "@/lib/contacts/rotulo-do-contato";
+import { logger } from "@/lib/logger";
+import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 
 import {
   classifyRisk,
@@ -238,26 +240,41 @@ export async function carregaRadarDeRisco(
   const nameByContact = new Map<string, string | null>();
 
   if (contactIds.length > 0) {
+    // ia.vek v1.9.37 (CRM-260): as três listas vão EM LOTES de 100 (`buscaEmLotes`). Com ~500 contatos
+    // num `.in()` só, o cabeçalho `Content-Location` da resposta passava de 16 KB, o Node recusava
+    // (`UND_ERR_HEADERS_OVERFLOW`), o cliente repetia 3 vezes (~7,7 s) e o erro era engolido: o radar
+    // de quem vê mais de ~350 leads (gerente, guardião) saía SEM nome e SEM link da conversa.
     const [followups, convs, contacts] = await Promise.all([
-      admin
-        .from("cron_jobs")
-        .select("contact_id, next_run_at")
-        .eq("organization_id", organizationId)
-        .eq("kind", "at")
-        .eq("enabled", true)
-        .gt("next_run_at", nowIso)
-        .in("contact_id", contactIds),
-      admin
-        .from("conversations")
-        .select("id, contact_id, assignee_kind")
-        .eq("organization_id", organizationId)
-        .in("contact_id", contactIds),
-      admin
-        .from("contacts")
-        .select("id, name, display_name")
-        .eq("organization_id", organizationId)
-        .in("id", contactIds),
+      buscaEmLotes<{ contact_id: string; next_run_at: string }>(contactIds, (lote) =>
+        admin
+          .from("cron_jobs")
+          .select("contact_id, next_run_at")
+          .eq("organization_id", organizationId)
+          .eq("kind", "at")
+          .eq("enabled", true)
+          .gt("next_run_at", nowIso)
+          .in("contact_id", lote),
+      ),
+      buscaEmLotes<{ id: string; contact_id: string; assignee_kind: "user" | "ai" | null }>(contactIds, (lote) =>
+        admin
+          .from("conversations")
+          .select("id, contact_id, assignee_kind")
+          .eq("organization_id", organizationId)
+          .in("contact_id", lote),
+      ),
+      buscaEmLotes<ContatoNomeavel & { id: string }>(contactIds, (lote) =>
+        admin
+          .from("contacts")
+          .select("id, name, display_name")
+          .eq("organization_id", organizationId)
+          .in("id", lote),
+      ),
     ]);
+    // O follow-up decide a CLASSIFICAÇÃO ("em voo" × crítico): sem ele o radar mentiria, então falha alto.
+    if (followups.error) throw new Error(`radar_followups_failed: ${followups.error.message}`);
+    // Nome e conversa são exibição: o radar segue, mas o defeito fica no log (antes era `?? []` calado).
+    if (convs.error) logger.warn("radar: conversas não lidas", { organization_id: organizationId, contatos: contactIds.length, error: convs.error.message.slice(0, 160) });
+    if (contacts.error) logger.warn("radar: nomes não lidos", { organization_id: organizationId, contatos: contactIds.length, error: contacts.error.message.slice(0, 160) });
 
     for (const f of followups.data ?? []) {
       const prev = followupByContact.get(f.contact_id);

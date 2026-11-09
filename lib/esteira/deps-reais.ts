@@ -23,6 +23,7 @@ import { manterAteDoLead, nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
 import { lerLeadDaPassagem, reativarLead } from "@/lib/iavek/passagem-servidor";
+import { gravarCarroDoAnuncio, registrarDesfechoDoCarro } from "@/lib/iavek/carro-do-anuncio-servidor";
 
 import { usuariosDoDestinatario, type Destinatario } from "./config";
 import {
@@ -134,6 +135,30 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         });
       }
       if (guardiao) clone.owner_user_id = guardiao;
+
+      // ia.vek v1.9.37 (CRM-229): o clone também procura o CARRO DO ANÚNCIO. Ele copia os campos do
+      // original, e o original que nasceu antes da v1.9.32 não tinha carro: 29 dos 40 leads de anúncio
+      // sem carro eram clones assim (medido em 07/11). Nunca pisa num carro já gravado e nunca
+      // derruba a passagem: o lead já está no Follow-up e é o que importa.
+      if (lead.contact_id) {
+        try {
+          const { data: contato } = await admin
+            .from("contacts")
+            .select("source_metadata")
+            .eq("organization_id", orgId)
+            .eq("id", lead.contact_id)
+            .maybeSingle();
+          const desfecho = await gravarCarroDoAnuncio(
+            admin,
+            orgId,
+            clone.id,
+            (contato as { source_metadata?: unknown } | null)?.source_metadata,
+          );
+          registrarDesfechoDoCarro("clone_da_esteira", orgId, clone.id, desfecho);
+        } catch (err) {
+          registrarDesfechoDoCarro("clone_da_esteira", orgId, clone.id, "erro", err);
+        }
+      }
 
       // A conversa passa para a equipe (SDR): o MESMO handoff da IA — silencia,
       // cancela os follow-ups automáticos e abre o aviso crítico na Central.

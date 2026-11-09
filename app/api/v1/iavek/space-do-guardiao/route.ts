@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
 import { horasDoCiclo, nascimentoDoLead } from "@/lib/iavek/passagem-servidor";
@@ -88,18 +89,21 @@ export async function GET(): Promise<Response> {
     const etapas = [...new Set(leads.map((l) => l.stage_id).filter((x): x is string => Boolean(x)))];
     const donos = [...new Set(leads.map((l) => l.owner_user_id).filter((x): x is string => Boolean(x) && x !== eu))];
     const [rc, rconv, re, nomes] = await Promise.all([
-      contatos.length
-        ? db.from("contacts").select("id, name, display_name").eq("organization_id", orgId).in("id", contatos)
-        : Promise.resolve({ data: [], error: null }),
-      contatos.length
-        ? db
-            .from("conversations")
-            .select("id, contact_id, last_message_at")
-            .eq("organization_id", orgId)
-            .eq("is_group", false)
-            .in("contact_id", contatos)
-            .order("last_message_at", { ascending: false, nullsFirst: false })
-        : Promise.resolve({ data: [], error: null }),
+      // ia.vek v1.9.37 (CRM-260): contatos e conversas em LOTES de 100. Com ~350 contatos num `.in()` só
+      // a resposta estoura o cabeçalho do Node e a tela INTEIRA da guardiã caía com 500. A ordem por
+      // `last_message_at` vale dentro de cada contato (cada contato cai num lote só): é a que importa.
+      buscaEmLotes(contatos, (lote) =>
+        db.from("contacts").select("id, name, display_name").eq("organization_id", orgId).in("id", lote),
+      ),
+      buscaEmLotes(contatos, (lote) =>
+        db
+          .from("conversations")
+          .select("id, contact_id, last_message_at")
+          .eq("organization_id", orgId)
+          .eq("is_group", false)
+          .in("contact_id", lote)
+          .order("last_message_at", { ascending: false, nullsFirst: false }),
+      ),
       etapas.length
         ? db.from("crm_stages").select("id, name").in("id", etapas)
         : Promise.resolve({ data: [], error: null }),

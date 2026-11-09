@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { acharCarroDoAnuncio, CAMPO_CARRO_DO_ANUNCIO, textoDoAnuncio, type CarroDoCatalogo } from "@/lib/iavek/carro-do-anuncio";
+import { logger } from "@/lib/logger";
 import { lerTudo } from "@/lib/supabase/paginas";
 
 export type DesfechoDoCarroDoAnuncio = "gravou" | "sem_anuncio" | "nenhum" | "empate" | "ja_tinha" | "erro";
@@ -40,4 +41,29 @@ export async function gravarCarroDoAnuncio(
     .eq("organization_id", orgId)
     .eq("id", leadId);
   return e3 ? "erro" : "gravou";
+}
+
+/**
+ * ia.vek v1.9.37 (CRM-229): TODO desfecho do casador fica no log, não só o erro. Em 07/11, 4 leads
+ * ficaram sem carro sem causa medível porque só o "erro" era registrado (e o log se perdeu no
+ * reinício). Com a origem e o desfecho, "por que este lead não tem carro?" vira uma busca no log.
+ * `sem_anuncio` é a maioria dos leads e não diz nada: fica fora, para o log não virar ruído.
+ */
+export function registrarDesfechoDoCarro(
+  origem: "nascimento" | "clone_da_esteira",
+  orgId: string,
+  leadId: string,
+  desfecho: DesfechoDoCarroDoAnuncio,
+  err?: unknown,
+): void {
+  if (desfecho === "sem_anuncio") return;
+  const ctx = {
+    organization_id: orgId,
+    lead_id: leadId,
+    origem,
+    desfecho,
+    ...(err === undefined ? {} : { error: err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120) }),
+  };
+  if (desfecho === "erro") logger.warn("carro do anúncio: não gravado", ctx);
+  else logger.info("carro do anúncio: casador", ctx);
 }

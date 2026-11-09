@@ -48,7 +48,7 @@
  * imobiliária e um infoprodutor montam funis diferentes, e nenhum nome de funil
  * aparece neste arquivo.
  */
-import { gravarCarroDoAnuncio } from "@/lib/iavek/carro-do-anuncio-servidor";
+import { gravarCarroDoAnuncio, registrarDesfechoDoCarro } from "@/lib/iavek/carro-do-anuncio-servidor";
 import { etapaDeEntrada } from "@/lib/leads/etapa-de-entrada";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { marcaDaOrigem, origemDeCampanhaDaConversa } from "@/lib/campanhas/origem-do-lead";
@@ -437,13 +437,9 @@ export async function garantirLeadDaConversa(
   // evento já ver o campo. Nunca derruba o nascimento: o card existe e é o que importa.
   try {
     const desfecho = await gravarCarroDoAnuncio(db, organizationId, lead.id as string, contato?.source_metadata);
-    if (desfecho === "erro") logger.warn("nascimento-do-lead: carro do anúncio não gravado", { organization_id: organizationId, lead_id: lead.id as string });
+    registrarDesfechoDoCarro("nascimento", organizationId, lead.id as string, desfecho);
   } catch (err) {
-    logger.warn("nascimento-do-lead: carro do anúncio falhou", {
-      organization_id: organizationId,
-      lead_id: lead.id as string,
-      error: err instanceof Error ? err.message.slice(0, 120) : String(err),
-    });
+    registrarDesfechoDoCarro("nascimento", organizationId, lead.id as string, "erro", err);
   }
 
   // O mesmo fato que o cadastro manual já emitia (`createLeadHandler`). Sem
