@@ -26,7 +26,7 @@
  * Tudo atrás de `Deps`: a regra é testável sem banco, e o cron só liga os fios.
  */
 import type { ConfigDaEsteira, Destinatario } from "./config";
-import { horasUteisEntre, somarHorasUteis } from "./horas-uteis";
+import { horasUteisEntre, inicioDoDiaLocal, somarHorasUteis } from "./horas-uteis";
 
 export const HORA = 3_600_000;
 export const DIA = 24 * HORA;
@@ -142,6 +142,15 @@ export interface LeadDaEsteira {
   inicio: string;
   /** v1.9.23: "Manter em negociação" segura a passagem até aqui. */
   manter_ate?: string | null;
+  /** v1.9.41: clone do LOTE ANTIGO com "só L3": a L4 de recuperação não nasce. */
+  lote_antigo_so_l3?: boolean;
+}
+
+/** v1.9.41: o que a passagem do lote antigo leva junto. */
+export interface PassagemDoLoteAntigo {
+  /** O dono do rodízio (vale só se o lead não tiver guardião). */
+  dono: string;
+  soL3: boolean;
 }
 
 export interface LigacaoPendente {
@@ -157,7 +166,13 @@ export interface DepsDaEsteira {
   agora(): Date;
   leadsAbertos(pipelineId: string): Promise<LeadDaEsteira[]>;
   /** Clona para o follow-up (etapa dada), grava `esteira_inicio` e passa a conversa para humano. */
-  passarParaFollowup(lead: LeadDaEsteira, etapaId: string): Promise<{ ok: true; lead: LeadDaEsteira } | { ok: false; erro: string }>;
+  passarParaFollowup(
+    lead: LeadDaEsteira,
+    etapaId: string,
+    loteAntigo?: PassagemDoLoteAntigo,
+  ): Promise<{ ok: true; lead: LeadDaEsteira } | { ok: false; erro: string }>;
+  /** v1.9.41: quantos do lote antigo já passaram a partir de `desde` (a meia-noite local de hoje). */
+  passadosDoLoteAntigoDesde?(desde: Date): Promise<number>;
   mover(lead: LeadDaEsteira, etapaId: string): Promise<boolean>;
   /** Negócios (entre os dados) que já tiveram handoff para humano. */
   comHandoff(leadIds: string[]): Promise<Set<string>>;
@@ -186,6 +201,8 @@ export interface DepsDaEsteira {
 export interface ResumoDaRodada {
   passados: number;
   falhasNaPassagem: number;
+  /** v1.9.41: quantos dos `passados` vieram do lote antigo. */
+  passadosLoteAntigo: number;
   /** v1.9.23: venceram as 72h mas ficaram, pelo "Manter em negociação" ou por resposta recente. */
   seguradosManter: number;
   seguradosResposta: number;
@@ -210,6 +227,7 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   const resumo: ResumoDaRodada = {
     passados: 0,
     falhasNaPassagem: 0,
+    passadosLoteAntigo: 0,
     seguradosManter: 0,
     seguradosResposta: 0,
     fasesMovidas: 0,
@@ -236,7 +254,8 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   // ── 1 e 4 (L1, L2, L3): funil de entrada ────────────────────────────────────
   // v1.9.4: lead nascido antes de `desde` (o dia em que a esteira foi ligada) não é tocado.
   const desde = entrada.desde ? Date.parse(entrada.desde) : null;
-  const naEntrada = (await deps.leadsAbertos(entrada.pipeline_id)).filter(
+  const todosNaEntrada = await deps.leadsAbertos(entrada.pipeline_id);
+  const naEntrada = todosNaEntrada.filter(
     (l) => !compromisso.has(l.stage_id) && (desde === null || Date.parse(l.created_at) >= desde),
   );
   const criadasEntrada = await deps.ligacoesJaCriadas(naEntrada.map((l) => l.id));
@@ -267,6 +286,50 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
     const jaTem = criadasEntrada.get(lead.id) ?? new Set<string>();
     if (handoffs.has(lead.id)) await criar(lead, "L1", jaTem);
     if (idade >= 48 * HORA) await criar(lead, "L2", jaTem);
+  }
+
+  // ── 1b. LOTE ANTIGO (v1.9.41): os nascidos antes de `desde`, aos poucos e com dono ─────
+  const lote = entrada.lote_antigo;
+  if (lote?.ativo && desde !== null && lote.donos.length > 0 && deps.passadosDoLoteAntigoDesde) {
+    const aPartirDe = lote.a_partir_de ? Date.parse(lote.a_partir_de) : null;
+    const jaHoje = await deps.passadosDoLoteAntigoDesde(inicioDoDiaLocal(agora, cfg.horario.fuso));
+    let cota = lote.por_dia - jaHoje;
+    if (cota > 0) {
+      const antigos = todosNaEntrada
+        .filter(
+          (l) =>
+            !compromisso.has(l.stage_id) &&
+            Date.parse(l.created_at) < desde &&
+            (aPartirDe === null || Date.parse(l.created_at) >= aPartirDe),
+        )
+        // Do mais antigo para o mais novo; o id desempata (a ordem não muda entre rodadas).
+        .sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio) || a.id.localeCompare(b.id));
+      let i = 0;
+      for (const lead of antigos) {
+        if (cota <= 0) break;
+        if (agora.getTime() - new Date(lead.inicio).getTime() < entrada.horas * HORA) continue;
+        // As mesmas exceções do lote novo: "Manter em negociação" e cliente que falou nas últimas `horas`.
+        if (lead.manter_ate && Date.parse(lead.manter_ate) > agora.getTime()) {
+          resumo.seguradosManter += 1;
+          continue;
+        }
+        if (await deps.clienteFalouDesde(lead, new Date(agora.getTime() - entrada.horas * HORA))) {
+          resumo.seguradosResposta += 1;
+          continue;
+        }
+        const dono = lote.donos[(jaHoje + i) % lote.donos.length]!;
+        const r = await deps.passarParaFollowup(lead, followup.fases[0]!.etapa_id, { dono, soL3: lote.so_l3 });
+        if (!r.ok) {
+          resumo.falhasNaPassagem += 1;
+          continue;
+        }
+        i += 1;
+        cota -= 1;
+        resumo.passados += 1;
+        resumo.passadosLoteAntigo += 1;
+        await criar(r.lead, "L3", new Set());
+      }
+    }
   }
 
   // ── 2, 3 e 4 (L4–L7, quente): funil de follow-up ────────────────────────────
@@ -303,7 +366,8 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
       }
     }
     const devida = ligacaoDoFollowupDevida(diaDeVida(new Date(lead.inicio), agora));
-    if (devida && devida !== "L3") await criar(lead, devida, jaTem);
+    // v1.9.41: lote antigo com "só L3": a L4 (de recuperação, já vencida pela idade) não nasce.
+    if (devida && devida !== "L3" && !(devida === "L4" && lead.lote_antigo_so_l3)) await criar(lead, devida, jaTem);
   }
 
   // ── 5: cobrança de ligação vencida ──────────────────────────────────────────

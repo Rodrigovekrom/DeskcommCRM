@@ -87,6 +87,12 @@ export function instanteLocal(ano: number, mes: number, dia: number, hhmm: strin
   return new Date(t);
 }
 
+/** ia.vek v1.9.41: a meia-noite (00:00) do dia local de `instante`, no fuso dado. */
+export function inicioDoDiaLocal(instante: Date, fuso: string): Date {
+  const p = partesLocais(instante, fuso);
+  return instanteLocal(p.ano, p.mes, p.dia, "00:00", fuso);
+}
+
 function janelaDoDia(instante: Date, h: HorarioComercial): { inicio: Date; fim: Date } | null {
   const p = partesLocais(instante, h.fuso);
   const j = h.dias[p.diaDaSemana as 0];

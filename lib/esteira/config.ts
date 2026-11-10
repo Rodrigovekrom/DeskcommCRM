@@ -37,6 +37,25 @@ export const funilDeEntradaSchema = z.strictObject({
    * mandar todos de uma vez para o follow-up (com aviso e ligação para cada um).
    */
   desde: z.string().datetime({ offset: true }).optional(),
+  /**
+   * ia.vek v1.9.41 (Maestro, 10/11): o LOTE ANTIGO, os leads nascidos ANTES de `desde`, que a v1.9.4 deixou
+   * de fora. Ligado, eles passam para o follow-up AOS POUCOS (`por_dia`, do mais antigo para o mais
+   * novo), cada um já com DONO (rodízio entre `donos`), para não jogar centenas de ligações sem
+   * responsável na equipe de uma vez. Desligado (o padrão), nada muda.
+   */
+  lote_antigo: z
+    .strictObject({
+      ativo: z.boolean().default(false),
+      /** Quantos passam por dia (dia do fuso do horário comercial). */
+      por_dia: z.number().int().min(1).max(500),
+      /** Quem recebe, em rodízio. Sem ninguém, o lote não anda (nunca passa lead sem dono). */
+      donos: z.array(uuid).min(1).max(50),
+      /** Só a L3 na passagem: a L4 de recuperação (já vencida pela idade) não nasce. */
+      so_l3: z.boolean().default(false),
+      /** Opcional: nascidos antes disto ficam de fora até do lote antigo. */
+      a_partir_de: z.string().datetime({ offset: true }).optional(),
+    })
+    .optional(),
 });
 
 /** O funil de follow-up: fases por dia de vida do lead, e a coluna de quem voltou. */

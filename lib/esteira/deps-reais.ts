@@ -57,7 +57,14 @@ function paraLeadDaEsteira(r: LinhaDeLead): LeadDaEsteira {
     // D6: o mesmo relógio do cronômetro, da passagem e do Space.
     inicio: nascimentoDoLead(r),
     manter_ate: manterAteDoLead(r),
+    lote_antigo_so_l3: loteAntigoDoLead(r)?.so_l3 === true,
   };
+}
+
+/** v1.9.41: a marca do lote antigo no clone (`source_metadata.esteira_lote_antigo`). */
+function loteAntigoDoLead(r: Pick<LinhaDeLead, "source_metadata">): { em?: unknown; so_l3?: unknown } | null {
+  const v = r.source_metadata?.esteira_lote_antigo;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as { em?: unknown; so_l3?: unknown }) : null;
 }
 
 const URGENTES: ReadonlySet<CodigoDeLigacao> = new Set(["L1", "quente"]);
@@ -91,7 +98,18 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       return linhas.map(paraLeadDaEsteira);
     },
 
-    async passarParaFollowup(lead, etapaId) {
+    async passadosDoLoteAntigoDesde(desde) {
+      // Clones do follow-up marcados a partir de `desde` (a marca é ISO em UTC, então comparar texto vale).
+      const { count, error } = await admin
+        .from("crm_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .gte("source_metadata->esteira_lote_antigo->>em", desde.toISOString());
+      if (error) throw new Error(error.message);
+      return count ?? 0;
+    },
+
+    async passarParaFollowup(lead, etapaId, loteAntigo) {
       const { data: etapa } = await admin
         .from("crm_stages")
         .select("pipeline_id")
@@ -108,7 +126,12 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         return { ok: false, erro: r.code };
       }
       const clone = r.clone as LinhaDeLead & { sdr_user_id?: string | null };
-      const metadata = { ...(clone.source_metadata ?? {}), esteira_inicio: lead.inicio };
+      const metadata = {
+        ...(clone.source_metadata ?? {}),
+        esteira_inicio: lead.inicio,
+        // v1.9.41: a marca do lote antigo (a cota do dia conta por ela; o "só L3" mora aqui).
+        ...(loteAntigo ? { esteira_lote_antigo: { em: agora().toISOString(), so_l3: loteAntigo.soL3 } } : {}),
+      };
       // v1.9.4 (Rodrigo, 27/10): no follow-up o dono é o GUARDIÃO (o SDR), não o
       // vendedor que estava com o lead. O clone herda o guardião (gatilho 0579).
       const { data: comGuardiao, error: erroDoGuardiao } = await admin
@@ -117,7 +140,9 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         .eq("organization_id", orgId)
         .eq("id", clone.id)
         .maybeSingle();
-      const guardiao = (comGuardiao as { sdr_user_id: string | null } | null)?.sdr_user_id ?? null;
+      // v1.9.41: no lote antigo, sem guardião, o dono é o do rodízio (nunca fica sem dono).
+      const guardiao =
+        (comGuardiao as { sdr_user_id: string | null } | null)?.sdr_user_id ?? loteAntigo?.dono ?? null;
       const { error: erroDoClone } = await admin
         .from("crm_leads")
         .update({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PADRAO_DA_ESTEIRA, type ConfigDaEsteira } from "./config";
+import { PADRAO_DA_ESTEIRA, configDaEsteira, type ConfigDaEsteira } from "./config";
 import { instanteLocal } from "./horas-uteis";
 import {
   DIA,
@@ -64,9 +64,12 @@ function montar(o: {
   cobradas?: Record<string, number[]>;
   falhaNaPassagem?: boolean;
   falhaNaPerda?: boolean;
+  /** v1.9.41: quantos do lote antigo já passaram hoje. */
+  loteHoje?: number;
 }) {
   const log = {
     passados: [] as string[],
+    loteAntigo: [] as Array<[string, string, boolean]>,
     movidos: [] as Array<[string, string]>,
     criadas: [] as Array<[string, CodigoDeLigacao, Date]>,
     cobrancas: [] as Array<[string, number, string]>,
@@ -76,9 +79,11 @@ function montar(o: {
   const deps: DepsDaEsteira = {
     agora: () => AGORA,
     leadsAbertos: async (pid) => (pid === E ? (o.entrada ?? []) : (o.followup ?? [])),
-    passarParaFollowup: async (l, etapa) => {
+    passadosDoLoteAntigoDesde: async () => o.loteHoje ?? 0,
+    passarParaFollowup: async (l, etapa, lote) => {
       if (o.falhaNaPassagem) return { ok: false, erro: "x" };
       log.passados.push(l.id);
+      if (lote) log.loteAntigo.push([l.id, lote.dono, lote.soL3]);
       return { ok: true, lead: { ...l, id: l.id + "-fu", stage_id: etapa, created_at: AGORA.toISOString(), inicio: l.created_at } };
     },
     mover: async (l, etapa) => {
@@ -341,5 +346,82 @@ describe("CRM-141: terminou o follow-up sem retorno vira Perdido", () => {
       AGORA,
     );
     expect(c).toEqual({ vaoEntrar: 1, jaTerminaram: 2 });
+  });
+});
+
+describe("v1.9.41: o LOTE ANTIGO (nascidos antes de `desde`)", () => {
+  const DESDE = ha(5 * DIA);
+  const A = "00000000-0000-4000-8000-0000000000a1";
+  const B = "00000000-0000-4000-8000-0000000000b2";
+  const comLote = (lote: Record<string, unknown> | undefined): ConfigDaEsteira => ({
+    ...cfg,
+    funis: { ...cfg.funis!, entrada: { ...cfg.funis!.entrada, desde: DESDE, ...(lote ? { lote_antigo: lote as never } : {}) } },
+  });
+  // Três antigos (nascidos antes de DESDE) e um novo vencido.
+  const antigos = [
+    lead({ id: "velho-3", created_at: ha(8 * DIA) }),
+    lead({ id: "velho-1", created_at: ha(20 * DIA) }),
+    lead({ id: "velho-2", created_at: ha(12 * DIA) }),
+  ];
+  const novo = lead({ id: "novo", created_at: ha(4 * DIA) });
+
+  it("desligado (o padrão) ou sem lote: os antigos não são tocados, como na v1.9.4", async () => {
+    for (const c of [comLote(undefined), comLote({ ativo: false, por_dia: 50, donos: [A], so_l3: false })]) {
+      const { deps, log } = montar({ entrada: [...antigos, novo] });
+      const r = await rodarEsteira(c, deps);
+      expect(log.passados).toEqual(["novo"]);
+      expect(r.passadosLoteAntigo).toBe(0);
+    }
+  });
+
+  it("ligado: passa até `por_dia`, do mais antigo para o mais novo, com dono em rodízio", async () => {
+    const { deps, log } = montar({ entrada: [...antigos, novo] });
+    const r = await rodarEsteira(comLote({ ativo: true, por_dia: 2, donos: [A, B], so_l3: false }), deps);
+    expect(log.passados).toEqual(["novo", "velho-1", "velho-2"]);
+    expect(log.loteAntigo).toEqual([
+      ["velho-1", A, false],
+      ["velho-2", B, false],
+    ]);
+    expect(r.passadosLoteAntigo).toBe(2);
+    // L3 na passagem para cada um (o novo e os dois antigos).
+    expect(log.criadas.filter(([, c]) => c === "L3").map(([id]) => id)).toEqual(["novo-fu", "velho-1-fu", "velho-2-fu"]);
+  });
+
+  it("a cota é do DIA: o que já passou hoje conta, e o rodízio continua de onde parou", async () => {
+    const { deps, log } = montar({ entrada: antigos, loteHoje: 1 });
+    await rodarEsteira(comLote({ ativo: true, por_dia: 2, donos: [A, B], so_l3: false }), deps);
+    expect(log.loteAntigo).toEqual([["velho-1", B, false]]);
+    const cheia = montar({ entrada: antigos, loteHoje: 2 });
+    await rodarEsteira(comLote({ ativo: true, por_dia: 2, donos: [A, B], so_l3: false }), cheia.deps);
+    expect(cheia.log.passados).toEqual([]);
+  });
+
+  it("as exceções valem: cliente que falou nas últimas 72h fica, e o próximo entra no lugar", async () => {
+    const { deps, log } = montar({ entrada: antigos, falou: ["velho-1"] });
+    const r = await rodarEsteira(comLote({ ativo: true, por_dia: 1, donos: [A], so_l3: false }), deps);
+    expect(log.passados).toEqual(["velho-2"]);
+    expect(r.seguradosResposta).toBe(1);
+  });
+
+  it("`a_partir_de` deixa de fora os mais antigos ainda", async () => {
+    const { deps, log } = montar({ entrada: antigos });
+    await rodarEsteira(comLote({ ativo: true, por_dia: 10, donos: [A], so_l3: false, a_partir_de: ha(15 * DIA) }), deps);
+    expect(log.passados).toEqual(["velho-2", "velho-3"]);
+  });
+
+  it("só L3: o clone do lote antigo não ganha a L4 de recuperação; sem a marca, ganha", async () => {
+    const clone = (soL3: boolean) =>
+      lead({ id: soL3 ? "so-l3" : "normal", stage_id: F11, created_at: ha(1 * HORA), inicio: ha(20 * DIA), lote_antigo_so_l3: soL3 });
+    const { deps, log } = montar({ followup: [clone(true), clone(false)] });
+    await rodarEsteira(comLote(undefined), deps);
+    expect(log.criadas.filter(([, c]) => c === "L4").map(([id]) => id)).toEqual(["normal"]);
+  });
+
+  it("a configuração: desligada por padrão e nunca sem dono", () => {
+    const base = { ativa: true, entrada: { pipeline_id: E, desde: DESDE }, followup: cfg.funis!.followup };
+    const ler = (lote: unknown) => configDaEsteira({ esteira: { ...base, entrada: { ...base.entrada, lote_antigo: lote } } });
+    expect(ler({ por_dia: 50, donos: [A] }).funis?.entrada.lote_antigo).toMatchObject({ ativo: false, so_l3: false });
+    // Lista de donos vazia derruba a configuração inteira (cai no padrão desligado).
+    expect(ler({ ativo: true, por_dia: 50, donos: [] }).funis).toBeNull();
   });
 });
