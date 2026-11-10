@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { membrosComPapel } from "@/lib/iavek/avisos-da-proposta";
-import { configDoGuardiaoLeads, lerAvisoDeAjuda, type ResultadoDoAviso } from "@/lib/iavek/aviso-de-ajuda";
+import { configDoGuardiaoLeads, lerAvisoDeAjuda, remetenteQueAvisa, type ResultadoDoAviso } from "@/lib/iavek/aviso-de-ajuda";
 import { logger } from "@/lib/logger";
 import { lerRemetenteDeGrupo } from "@/lib/messaging/remetente-de-grupo";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -57,10 +57,19 @@ export async function tratarAvisoDeAjuda(db: SupabaseClient, row: EventRow): Pro
     .maybeSingle();
   if (eMsg) return r("error", eMsg.message);
   if (!msg) return r("skipped", "mensagem_sumiu");
-  if (lerRemetenteDeGrupo(msg.metadata)?.phone !== cfg.numero_que_avisa) {
+  const remetente = lerRemetenteDeGrupo(msg.metadata);
+  const casou = remetenteQueAvisa(remetente, cfg);
+  const leitura = lerAvisoDeAjuda(msg.body as string | null);
+  if (!casou) {
+    // ia.vek v1.9.40 (CRM-241): o aviso chegou SEM telefone (só o lid) e a loja ainda não tem o lid de
+    // quem avisa. Nada se move; o detalhe guarda o lid para a equipe conferir e gravar em
+    // numero_que_avisa_lid. Só quando o texto É um aviso, para não juntar o lid de todo participante.
+    if (remetente && !remetente.phone && remetente.lid && !cfg.numero_que_avisa_lid && leitura.tipo === "aviso") {
+      logger.info("aviso_de_ajuda_remetente_so_lid", { organization_id: orgId, lid: remetente.lid });
+      return r("skipped", `remetente_so_lid:${remetente.lid}`);
+    }
     return r("skipped", "remetente_nao_autorizado");
   }
-  const leitura = lerAvisoDeAjuda(msg.body as string | null);
   if (leitura.tipo === "nao_e_aviso") return r("skipped", "nao_e_aviso");
 
   const { data, error } = await db.rpc("fn_iavek_aviso_de_ajuda", {
@@ -81,7 +90,7 @@ export async function tratarAvisoDeAjuda(db: SupabaseClient, row: EventRow): Pro
   } else if (resultado === "entregue" && linha?.user_id) {
     await avisar(db, orgId, [linha.user_id], { evento: "aviso_de_ajuda_entregue", nome: leitura.nome, lead_id: linha.lead_id });
   }
-  logger.info("aviso_de_ajuda", { organization_id: orgId, resultado, metodo: linha?.metodo ?? null });
+  logger.info("aviso_de_ajuda", { organization_id: orgId, resultado, metodo: linha?.metodo ?? null, remetente_por: casou });
   return r("ok", `${resultado}${linha?.metodo ? `:${linha.metodo}` : ""}`);
 }
 

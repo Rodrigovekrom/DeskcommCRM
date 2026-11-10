@@ -52,6 +52,12 @@ export const configDoGuardiaoLeadsSchema = z.object({
   }),
   /** O número que manda o aviso, "+55…". Mensagem de outra pessoa do grupo não move lead. */
   numero_que_avisa: z.string().regex(/^\+\d{10,15}$/),
+  /**
+   * ia.vek v1.9.40 (CRM-241, caso reserva): o LID de quem avisa, só dígitos. Vale SÓ quando a mensagem
+   * do grupo chega sem telefone (participante @lid sem o `participantAlt`). Com telefone, vale o
+   * telefone, como sempre. Opcional: sem ele, nada muda.
+   */
+  numero_que_avisa_lid: z.string().regex(/^\d{5,40}$/).optional(),
 });
 export type ConfigDoGuardiaoLeads = z.infer<typeof configDoGuardiaoLeadsSchema>;
 
@@ -60,6 +66,20 @@ export function configDoGuardiaoLeads(settings: unknown): ConfigDoGuardiaoLeads 
   const bruto = (settings as { iavek?: { guardiao_leads?: unknown } } | null)?.iavek?.guardiao_leads;
   const r = configDoGuardiaoLeadsSchema.safeParse(bruto);
   return r.success ? r.data : null;
+}
+
+/**
+ * Quem mandou a mensagem do grupo é quem avisa? Com TELEFONE, compara só o telefone (o comportamento
+ * de sempre). Sem telefone, compara o lid, se a loja tiver o lid de quem avisa. Devolve COMO casou.
+ */
+export function remetenteQueAvisa(
+  remetente: { phone: string | null; lid: string | null } | null | undefined,
+  cfg: Pick<ConfigDoGuardiaoLeads, "numero_que_avisa" | "numero_que_avisa_lid">,
+): "telefone" | "lid" | null {
+  if (!remetente) return null;
+  if (remetente.phone) return remetente.phone === cfg.numero_que_avisa ? "telefone" : null;
+  if (remetente.lid && cfg.numero_que_avisa_lid && remetente.lid === cfg.numero_que_avisa_lid) return "lid";
+  return null;
 }
 
 export const RESULTADOS_DO_AVISO = ["entregue", "sem_guardiao", "ja_tem_dono", "ambiguo", "nao_reconhecido"] as const;
