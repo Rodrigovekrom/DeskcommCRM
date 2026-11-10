@@ -11630,6 +11630,10 @@ export const DICIONARIO: Traducoes = {
     es: "Lo que el equipo necesita recordar en este horario",
   },
   "Aparece na descrição do compromisso.": { es: "Aparece en la descripción de la cita." },
+  "Em branco, vale o nome do tipo": { es: "En blanco, vale el nombre del tipo" },
+  "Já vem com o nome do tipo. Escreva outro, se quiser.": {
+    es: "Ya viene con el nombre del tipo. Escribe otro, si quieres.",
+  },
 
   // ─── Tarefas (extraídas do PR #418) ───
   "Tarefas": { es: "Tareas" },

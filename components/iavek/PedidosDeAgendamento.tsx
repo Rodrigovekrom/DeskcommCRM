@@ -24,6 +24,8 @@ export interface PedidoDaLista {
   quando: string;
   event_type_id: string | null;
   observacao: string | null;
+  /** v1.9.38: título próprio (nulo nos pedidos antigos e em quem não escreveu). */
+  titulo?: string | null;
   origem: "pessoa" | "ia";
   status: "pendente" | "confirmado" | "recusado" | "cancelado";
   motivo_da_recusa: string | null;
@@ -162,6 +164,11 @@ function LinhaDoPedido({
             {quandoLegivel(pedido.quando, idioma)}
             {pedido.pedido_por_nome ? ` · ${t("pedido por")} ${pedido.pedido_por_nome}` : ""}
           </div>
+          {pedido.titulo && (
+            <div className="text-xs font-medium" data-testid="pedido-titulo-na-lista">
+              {pedido.titulo}
+            </div>
+          )}
           {pedido.observacao && <div className="text-xs">{pedido.observacao}</div>}
           {!podeDecidir && (
             <div className="text-xs text-muted-foreground">

@@ -31,6 +31,7 @@ import { avisarVendedorDoAgendamento } from "@/lib/iavek/avisos-da-proposta";
 import {
   gravarPedidoDeAgendamento,
   pedidoDeAgendamentoSchema,
+  tituloDoCompromisso,
   type PedidoGravado,
 } from "@/lib/iavek/pedidos-de-agendamento";
 import { sdrMarcaDireto, vendedoresDaLoja } from "@/lib/iavek/sdr-marca-direto";
@@ -74,7 +75,7 @@ export async function GET(): Promise<Response> {
   let consulta = supabase
     .from("iavek_pedidos_de_agendamento")
     .select(
-      "id, contact_id, lead_id, conversation_id, quando, event_type_id, observacao, origem, pedido_por, status, decidido_em, motivo_da_recusa, appointment_id, created_at, contacts(name, display_name, phone_number)",
+      "id, contact_id, lead_id, conversation_id, quando, event_type_id, observacao, titulo, origem, pedido_por, status, decidido_em, motivo_da_recusa, appointment_id, created_at, contacts(name, display_name, phone_number)",
     )
     .eq("organization_id", orgId)
     .or(`status.eq.pendente,created_at.gte.${desde}`)
@@ -248,6 +249,7 @@ async function sdrMarca(
         ...(pedido.conversation_id ? { conversation_id: pedido.conversation_id } : {}),
         owner_user_id: vendedorId,
         ...(pedido.observacao ? { description: pedido.observacao } : {}),
+        ...tituloDoCompromisso(pedido),
       },
     );
   } catch (erro) {

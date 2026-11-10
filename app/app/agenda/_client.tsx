@@ -205,6 +205,13 @@ export function AgendaClient({
   // `null` = ainda não mexeu: o campo mostra o local do TIPO. String (mesmo
   // vazia) = a pessoa editou, e o tipo novo não pode devolver o que ela apagou.
   const [enderecoEditado, setEnderecoEditado] = React.useState<string | null>(null);
+  /**
+   * ia.vek v1.9.38 (CRM-256): o TÍTULO do compromisso, livre. Nasce com o nome do
+   * tipo — quem não mexe marca exatamente como antes — e quem quer escreve o que
+   * quiser ("pode criar do jeito que quiser", Rodrigo, 10/11). Mesmo desenho do
+   * endereço: `null` = segue o tipo; texto = o que a pessoa digitou.
+   */
+  const [tituloEditado, setTituloEditado] = React.useState<string | null>(null);
   const [observacao, setObservacao] = React.useState("");
   const marcar = useMarcarAgendamento();
   const remarcar = useRemarcarAgendamento();
@@ -259,6 +266,7 @@ export function AgendaClient({
     [busca, caminho],
   );
   const endereco = enderecoEditado ?? tipo?.localDetalhes ?? "";
+  const titulo = tituloEditado ?? tipo?.nome ?? "";
   const [visao, setVisao] = React.useState<VisaoDaAgenda>("semana");
   /**
    * No CELULAR a agenda abre no DIA, não na semana.
@@ -677,6 +685,7 @@ export function AgendaClient({
             // cliente — convite para a pessoa errada, sem ninguém ter pedido.
             setEmailConvidado("");
             setEnderecoEditado(null);
+            setTituloEditado(null);
             setObservacao("");
             // E o próprio cliente, que é o pior dos quatro a sobrar: medido numa
             // instalação real em 2026-09-12, "Novo agendamento" abriu com um
@@ -777,6 +786,7 @@ export function AgendaClient({
                         // Tipo novo, local novo — senão a Sala 2 do tipo anterior
                         // viaja para um atendimento online que não tem sala.
                         setEnderecoEditado(null);
+                        setTituloEditado(null);
                       }}
                       className={cn(
                         "rounded-full border px-3 py-1 text-xs transition-colors duration-fast",
@@ -838,6 +848,23 @@ export function AgendaClient({
             </div>
             {!remarcandoId ? (
               <>
+                <div>
+                  <label className="block" htmlFor="titulo-do-compromisso">
+                    {t("Título")}
+                  </label>
+                  <input
+                    id="titulo-do-compromisso"
+                    data-testid="titulo-do-compromisso"
+                    value={titulo}
+                    maxLength={200}
+                    onChange={(e) => setTituloEditado(e.target.value)}
+                    className="mt-1 w-full rounded-md border bg-surface p-2 outline-hidden"
+                    aria-describedby="ajuda-do-titulo"
+                  />
+                  <p id="ajuda-do-titulo" className="mt-1 text-xs text-text-muted">
+                    {t("Já vem com o nome do tipo. Escreva outro, se quiser.")}
+                  </p>
+                </div>
                 <EnderecoDaMarcacao value={endereco} onChange={setEnderecoEditado} />
                 <div>
                   <label className="block" htmlFor="observacao-do-compromisso">
@@ -951,6 +978,7 @@ export function AgendaClient({
                         setMarcando(false);
                         setEmailConvidado("");
                         setEnderecoEditado(null);
+                        setTituloEditado(null);
                         setObservacao("");
                         return r;
                       });
@@ -958,6 +986,9 @@ export function AgendaClient({
                   return marcar
                     .mutateAsync({
                       event_type_id: tipo.id,
+                      // Em branco fica FORA do corpo: o servidor usa o nome do tipo
+                      // (`input.title ?? tipo.name`), o mesmo de antes do campo existir.
+                      title: titulo.trim() || undefined,
                       contact_id: contactId || undefined,
                       conversation_id: conversationId || undefined,
                       starts_at: instante,
@@ -968,6 +999,7 @@ export function AgendaClient({
                     .then((r) => {
                       setEmailConvidado("");
                       setEnderecoEditado(null);
+                      setTituloEditado(null);
                       setObservacao("");
                       // Guardado para o fechamento saber para onde levar a grade.
                       setMarcadoEm(instante);

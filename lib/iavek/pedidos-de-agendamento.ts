@@ -29,9 +29,24 @@ export const pedidoDeAgendamentoSchema = z
     quando: z.string().datetime({ offset: true }),
     event_type_id: z.string().uuid().optional(),
     observacao: z.string().trim().max(1000).optional(),
+    // v1.9.38 (CRM-256): título próprio do compromisso. Ausente = o nome do tipo, como sempre foi.
+    titulo: z.string().trim().min(1).max(200).optional(),
   })
   .strict();
 export type PedidoDeAgendamentoInput = z.infer<typeof pedidoDeAgendamentoSchema>;
+
+/**
+ * v1.9.38 (CRM-256): o título que o compromisso leva quando o pedido vira agendamento.
+ *
+ * Com título próprio, vai ESSE; sem (pedido de antes da 0615, ou quem não mexeu no campo), não manda
+ * nada, e o `marcarAgendamentoHandler` usa o nome do tipo (`input.title ?? tipo.name`), exatamente
+ * como antes. Os dois caminhos que transformam pedido em compromisso (o SDR que marca direto e o
+ * admin que confirma) usam esta função, e só ela.
+ */
+export function tituloDoCompromisso(pedido: { titulo?: string | null }): { title?: string } {
+  const titulo = pedido.titulo?.trim();
+  return titulo ? { title: titulo } : {};
+}
 
 /** "Dia e hora desejados" precisa estar no futuro e a no máximo 180 dias. */
 export function quandoValido(quando: string, agora = Date.now()): boolean {
@@ -55,6 +70,8 @@ export interface PedidoGravado {
   quando: string;
   event_type_id: string | null;
   observacao: string | null;
+  /** v1.9.38 (0615). `null` nos pedidos de antes da coluna e em quem não escreveu título. */
+  titulo?: string | null;
   origem: "pessoa" | "ia";
   pedido_por: string | null;
   status: StatusDoPedido;
@@ -133,6 +150,7 @@ export async function gravarPedidoDeAgendamento(
       quando: new Date(input.quando).toISOString(),
       event_type_id: input.event_type_id ?? null,
       observacao: input.observacao?.length ? input.observacao : null,
+      titulo: input.titulo?.length ? input.titulo : null,
       origem: args.origem,
       pedido_por: args.pedidoPor,
       pedido_por_agente: args.pedidoPorAgente ?? null,

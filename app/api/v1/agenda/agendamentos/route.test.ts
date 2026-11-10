@@ -102,6 +102,20 @@ describe("POST /api/v1/agenda/agendamentos — sessão de navegador", () => {
     });
   });
 
+  it("ia.vek v1.9.38 (CRM-256): o TÍTULO próprio chega ao handler como veio; sem título, nada é inventado", async () => {
+    sessaoOk();
+    const { POST } = await import("./route");
+    const res = await POST(postReq({ ...BODY, title: "Test drive do Corolla na casa do cliente" }));
+    expect(res.status).toBe(201);
+    expect(vi.mocked(marcarAgendamentoHandler).mock.calls[0]?.[2]).toMatchObject({
+      title: "Test drive do Corolla na casa do cliente",
+    });
+
+    vi.mocked(marcarAgendamentoHandler).mockClear();
+    await POST(postReq());
+    expect(vi.mocked(marcarAgendamentoHandler).mock.calls[0]?.[2]).not.toHaveProperty("title");
+  });
+
   it("ia.vek 0613: NO modo agendamento (clínica), o atendente segue recusado (gerente em diante)", async () => {
     sessaoOk();
     modo.ligado = true;

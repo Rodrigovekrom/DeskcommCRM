@@ -25,7 +25,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { roleAtLeast } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { avisarSobrePedidoDeAgendamento } from "@/lib/iavek/avisos-da-proposta";
-import { podeDecidir, type PedidoGravado } from "@/lib/iavek/pedidos-de-agendamento";
+import { podeDecidir, tituloDoCompromisso, type PedidoGravado } from "@/lib/iavek/pedidos-de-agendamento";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -201,6 +201,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
         ...(pedido.conversation_id ? { conversation_id: pedido.conversation_id } : {}),
         ...(responsavel ? { owner_user_id: responsavel } : {}),
         ...(pedido.observacao ? { description: pedido.observacao } : {}),
+        ...tituloDoCompromisso(pedido),
       },
     );
   } catch (erro) {

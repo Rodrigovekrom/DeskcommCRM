@@ -69,6 +69,9 @@ export function PedirAgendamento({
   const [abertoEm, setAbertoEm] = useState(0);
   const [tipoId, setTipoId] = useState("");
   const [observacao, setObservacao] = useState("");
+  // v1.9.38 (CRM-256): título livre. `null` = segue o nome do tipo escolhido; texto = o que a pessoa
+  // escreveu. Em branco, o compromisso nasce com o nome do tipo, como sempre.
+  const [tituloEditado, setTituloEditado] = useState<string | null>(null);
   const [tipos, setTipos] = useState<TipoDeAtendimento[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [marcaDireto, setMarcaDireto] = useState(false);
@@ -95,6 +98,7 @@ export function PedirAgendamento({
     };
   }, []);
 
+  const titulo = tituloEditado ?? tipos.find((x) => x.id === tipoId)?.name ?? "";
   const alvo = quando ? new Date(quando).getTime() : NaN;
   const valido =
     Number.isFinite(alvo) &&
@@ -109,6 +113,7 @@ export function PedirAgendamento({
     setAbertoEm(agora);
     setQuando(paraCampoLocal(new Date(agora + 24 * 3600_000)));
     setObservacao("");
+    setTituloEditado(null);
     setVendedorId("");
     setContexto("");
     setAberto(true);
@@ -146,6 +151,7 @@ export function PedirAgendamento({
         quando: new Date(quando).toISOString(),
         ...(tipoId ? { event_type_id: tipoId } : {}),
         ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
+        ...(titulo.trim() ? { titulo: titulo.trim() } : {}),
         ...(marcaDireto ? { vendedor_id: vendedorId, campos: camposParaEnviar(campos), contexto: contexto.trim() } : {}),
       });
       toast.success(
@@ -229,7 +235,11 @@ export function PedirAgendamento({
                 <select
                   id="pedido-tipo"
                   value={tipoId}
-                  onChange={(e) => setTipoId(e.target.value)}
+                  onChange={(e) => {
+                    setTipoId(e.target.value);
+                    // Tipo novo, título novo: quem não escreveu nada segue o nome do tipo.
+                    setTituloEditado(null);
+                  }}
                   className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
                 >
                   <option value="">
@@ -243,6 +253,17 @@ export function PedirAgendamento({
                 </select>
               </div>
             )}
+            <div className="space-y-1">
+              <Label htmlFor="pedido-titulo">{t("Título")}</Label>
+              <Input
+                id="pedido-titulo"
+                data-testid="pedido-titulo"
+                value={titulo}
+                maxLength={200}
+                onChange={(e) => setTituloEditado(e.target.value)}
+                placeholder={t("Em branco, vale o nome do tipo")}
+              />
+            </div>
             {marcaDireto && (
               <div className="space-y-1 rounded-md border border-border p-2">
                 <p className="text-xs font-medium">{t("Para o vendedor (obrigatório)")}</p>

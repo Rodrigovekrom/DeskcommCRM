@@ -50964,6 +50964,24 @@ revoke all on table public.iavek_pedidos_de_agendamento from anon, authenticated
 grant select on table public.iavek_pedidos_de_agendamento to authenticated;
 grant all on table public.iavek_pedidos_de_agendamento to service_role;
 
+-- ---- ia.vek: título próprio do pedido de agendamento (migration 0615) ----
+-- Ver o cabeçalho de supabase/migrations/20261110120000_0615_iavek_titulo_do_pedido_de_agendamento.sql.
+alter table public.iavek_pedidos_de_agendamento add column if not exists titulo text;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'iavek_pedidos_titulo_tamanho'
+       and conrelid = 'public.iavek_pedidos_de_agendamento'::regclass
+  ) then
+    alter table public.iavek_pedidos_de_agendamento
+      add constraint iavek_pedidos_titulo_tamanho check (titulo is null or length(titulo) between 1 and 200);
+  end if;
+end
+$$;
+comment on column public.iavek_pedidos_de_agendamento.titulo is
+  'ia.vek v1.9.38 (CRM-256): título próprio do compromisso que o pedido vira. Nulo = o nome do tipo.';
+
 
 
 notify pgrst, 'reload schema';
