@@ -11634,6 +11634,13 @@ export const DICIONARIO: Traducoes = {
   "Já vem com o nome do tipo. Escreva outro, se quiser.": {
     es: "Ya viene con el nombre del tipo. Escribe otro, si quieres.",
   },
+  // ia.vek v1.9.39 (CRM-282): o contexto do lead no card.
+  "Faltam": { es: "Faltan" },
+  "letras (mínimo 20)": { es: "letras (mínimo 20)" },
+  "Contexto suficiente.": { es: "Contexto suficiente." },
+  "Ex.: procura SUV até 80 mil, quer financiar, tem um Gol 2015 na troca": {
+    es: "Ej.: busca un SUV de hasta 80 mil, quiere financiar, tiene un Gol 2015 para entregar",
+  },
 
   // ─── Tarefas (extraídas do PR #418) ───
   "Tarefas": { es: "Tareas" },

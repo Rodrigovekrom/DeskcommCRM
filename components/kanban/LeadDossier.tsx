@@ -2,7 +2,10 @@
 
 import { SeloCarroIndisponivel } from "@/components/iavek/SeloCarroIndisponivel";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
+
+import { Button } from "@/components/ui/button";
+import { IncompletosNoCardContext } from "@/components/iavek/CamposObrigatorios";
 
 import { useT } from "@/hooks/i18n/useT";
 import { useActiveOrg, useUser } from "@/hooks/auth/AuthProvider";
@@ -95,6 +98,24 @@ export function LeadDossier({
         (ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent && ehDono))) ||
     false;
 
+  // ia.vek v1.9.39 (CRM-282): o que falta para a trava, do mesmo mapa que pinta o selo do cartão.
+  const mapaDosIncompletos = useContext(IncompletosNoCardContext);
+  const faltam = (lojaDeCarros && mapaDosIncompletos?.[lead.id]) || [];
+  const irParaOsCampos = () => campos.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const blocoDosCampos = (
+    <div
+      ref={campos}
+      className={lojaDeCarros ? "border-t border-border py-3" : "border-t border-border pt-3"}
+      data-testid="dados-do-negocio"
+    >
+      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
+        {t("Dados do negócio")}
+      </h3>
+      <CorrigirVenda lead={lead} />
+      <LeadFieldsForm lead={lead} pipelineId={pipelineId} fieldDefs={fieldDefs} />
+    </div>
+  );
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -144,13 +165,33 @@ export function LeadDossier({
             />
           )}
 
-          <button
-            type="button"
-            onClick={() => campos.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            className="ml-auto text-text-muted underline-offset-2 hover:text-text hover:underline"
-          >
-            {t("Editar campos")}
-          </button>
+          {/* ia.vek v1.9.39 (CRM-282): na loja, um botão de verdade, com quantos campos faltam. */}
+          {lojaDeCarros ? (
+            <Button
+              type="button"
+              onClick={irParaOsCampos}
+              size="sm"
+              variant={faltam.length ? "default" : "outline"}
+              className="ml-auto h-7 px-2.5 text-xs"
+              title={faltam.length ? faltam.join(" · ") : undefined}
+              data-testid="editar-campos"
+            >
+              {t("Editar campos")}
+              {faltam.length > 0 && (
+                <span className="ml-1.5 rounded-full bg-background/25 px-1.5 tabular-nums" data-testid="campos-que-faltam">
+                  {t("faltam")} {faltam.length}
+                </span>
+              )}
+            </Button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => campos.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="ml-auto text-text-muted underline-offset-2 hover:text-text hover:underline"
+            >
+              {t("Editar campos")}
+            </button>
+          )}
         </div>
 
         {/* O score NÃO aparece na timeline: recálculo é telemetria e não emite
@@ -184,6 +225,10 @@ export function LeadDossier({
           />
         </section>
 
+        {/* ③ campos. ia.vek v1.9.39 (CRM-282): na loja, ANTES da linha do tempo, porque é
+            ali que o vendedor trabalha; fora da loja, por último, como sempre foi. */}
+        {lojaDeCarros && blocoDosCampos}
+
         {/* ② timeline */}
         <section className="flex-1 py-3">
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
@@ -197,14 +242,7 @@ export function LeadDossier({
           />
         </section>
 
-        {/* ③ campos, por último */}
-        <div ref={campos} className="border-t border-border pt-3">
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
-            {t("Dados do negócio")}
-          </h3>
-          <CorrigirVenda lead={lead} />
-          <LeadFieldsForm lead={lead} pipelineId={pipelineId} fieldDefs={fieldDefs} />
-        </div>
+        {!lojaDeCarros && blocoDosCampos}
 
         {/* N1 — seção "Propostas", depois de "Dados do negócio". Some sozinha
             (null) quando a capacidade está desligada — ver PropostasDoNegocio. */}

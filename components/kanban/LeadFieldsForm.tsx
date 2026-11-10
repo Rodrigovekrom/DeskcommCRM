@@ -5,7 +5,7 @@ import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 import { useT } from "@/hooks/i18n/useT";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch, type Control } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { soChavesAlteradas } from "@/lib/leads/custom-fields-so-diff";
 import { CustomFieldsEditor, type CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { EcoDoValor } from "./EcoDoValor";
 import { SeletorDeEtiquetas } from "@/components/iavek/SeletorDeEtiquetas";
+import { faltamParaOContexto } from "@/lib/iavek/contexto-do-lead";
 
 interface FormShape {
   title: string;
@@ -154,8 +155,21 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description">{t("Descrição")}</Label>
-          <Textarea id="description" rows={3} {...form.register("description")} />
+          {/* ia.vek v1.9.39 (CRM-282): na loja, a Descrição é o contexto que a trava pede. */}
+          <Label htmlFor="description">
+            {naLojaDeCarros ? t("Contexto do atendimento") : t("Descrição")}
+          </Label>
+          <Textarea
+            id="description"
+            rows={3}
+            placeholder={
+              naLojaDeCarros
+                ? t("Ex.: procura SUV até 80 mil, quer financiar, tem um Gol 2015 na troca")
+                : undefined
+            }
+            {...form.register("description")}
+          />
+          {naLojaDeCarros && <ContadorDoContexto control={form.control} />}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -220,5 +234,23 @@ export function LeadFieldsForm({ lead, pipelineId, fieldDefs = [], onSaved, onCa
         </Button>
       </div>
     </form>
+  );
+}
+
+/** "Faltam X letras (mínimo 20)", na mesma régua da trava; some quando chega lá. */
+function ContadorDoContexto({ control }: { control: Control<FormShape> }) {
+  const t = useT();
+  const texto = useWatch({ control, name: "description" });
+  const faltam = faltamParaOContexto(texto);
+  return (
+    <p
+      className={faltam > 0 ? "text-xs text-amber-700" : "text-xs text-text-muted"}
+      data-testid="contador-do-contexto"
+      aria-live="polite"
+    >
+      {faltam > 0
+        ? `${t("Faltam")} ${faltam} ${t("letras (mínimo 20)")}`
+        : t("Contexto suficiente.")}
+    </p>
   );
 }
