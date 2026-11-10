@@ -452,6 +452,15 @@ export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): RetornoDoDu
           select: (colunas = "") => {
             capturas.selects.messages!.push(colunas);
             const filtros: Array<(r: LinhaDoDuble) => boolean> = [];
+            // ia.vek v1.9.40: a ordem pedida VALE no maybeSingle/single (a última mensagem que saiu).
+            let ordem: { coluna: string; asc: boolean } | null = null;
+            const ordenar = (linhas: LinhaDoDuble[]) =>
+              ordem === null
+                ? linhas
+                : [...linhas].sort((a, b) => {
+                    const x = String(a[ordem!.coluna] ?? ""), y = String(b[ordem!.coluna] ?? "");
+                    return ordem!.asc ? x.localeCompare(y) : y.localeCompare(x);
+                  });
             const cadeia = {
               eq: (coluna: string, valor: unknown) => {
                 filtros.push((r) => r[coluna] === valor);
@@ -468,7 +477,16 @@ export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): RetornoDoDu
                 capturas.filtros.messages!.push({ coluna, valor: valores });
                 return cadeia;
               },
-              order: () => cadeia,
+              // `.not(coluna, "is", null)` do PostgREST: a coluna não é nula.
+              not: (coluna: string, operador: string, valor: unknown) => {
+                if (operador === "is" && valor === null) filtros.push((r) => r[coluna] !== null && r[coluna] !== undefined);
+                capturas.filtros.messages!.push({ coluna, valor: `not.${operador}:${String(valor)}` });
+                return cadeia;
+              },
+              order: (coluna: string, op?: { ascending?: boolean }) => {
+                ordem = { coluna, asc: op?.ascending !== false };
+                return cadeia;
+              },
               limit: () => cadeia,
               // A leitura em lote devolve as linhas como elas estão, sem casar
               // filtro: é o acumulado do dublê legado, e é ele que faz o aviso
@@ -482,11 +500,11 @@ export function criarDubleDoHandler(opcoes: OpcoesDoDubleDoHandler): RetornoDoDu
                   error: null,
                 }).then(resolve, reject),
               maybeSingle: async () => {
-                const alvos = filtrarMensagens(filtros);
+                const alvos = ordenar(filtrarMensagens(filtros));
                 return { data: alvos[0] ? { ...alvos[0] } : null, error: null };
               },
               single: async () => {
-                const alvos = filtrarMensagens(filtros);
+                const alvos = ordenar(filtrarMensagens(filtros));
                 return { data: alvos[0] ? { ...alvos[0] } : null, error: null };
               },
             };

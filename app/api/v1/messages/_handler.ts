@@ -50,7 +50,14 @@ import {
 import type { ListMessagesQuery, SendMessageInput } from "@/lib/schemas";
 import { sendTemplateForSession } from "@/lib/channels/meta/send-template-for-session";
 import { emitirFalhaDeEntrega } from "@/lib/messaging/falha-de-entrega";
-import { aplicarAssinatura, configAssinatura, linhaDeAssinatura } from "@/lib/messaging/assinatura";
+import {
+  aplicarAssinatura,
+  configAssinatura,
+  linhaDeAssinatura,
+  precisaIdentificar,
+  type EmissorDaAssinatura,
+  type MensagemAnterior,
+} from "@/lib/messaging/assinatura";
 import { ehFuncao, type Funcao } from "@/lib/iavek/funcoes";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
@@ -664,7 +671,25 @@ export async function sendMessageHandler(
         const funcao = (vinculo?.interface_settings as { funcao?: unknown } | null)?.funcao;
         funcaoDoAtendente = ehFuncao(funcao) ? funcao : null;
       }
-      assinatura = linhaDeAssinatura(configAss, origemDoEmissor, nomeDoAtendente, funcaoDoAtendente);
+      // ia.vek v1.9.40: o papel só na 1ª mensagem de quem fala agora. Se a mensagem com texto
+      // anterior desta conversa também foi de quem manda, sai só o nome. A leitura usa
+      // idx_messages_conversation_sent (conversation_id, sent_at desc) e para na primeira linha.
+      // Se ela falhar, a pessoa se identifica (o mais seguro para o cliente).
+      const { data: anterior, error: erroAnterior } = await supabase
+        .from("messages")
+        .select("sent_by_user_id, sent_via")
+        .eq("conversation_id", c.id)
+        .eq("direction", "outbound")
+        .not("body", "is", null)
+        .neq("body", "")
+        .neq("status", "failed")
+        .order("sent_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const emissor: EmissorDaAssinatura =
+        origemDoEmissor === "ai" ? { tipo: "ai" } : { tipo: "user", id: ctx.actor.type === "user" ? ctx.actor.id : "" };
+      const soNome = !erroAnterior && !precisaIdentificar(anterior as MensagemAnterior | null, emissor);
+      assinatura = linhaDeAssinatura(configAss, origemDoEmissor, nomeDoAtendente, funcaoDoAtendente, { soNome });
     }
   }
 

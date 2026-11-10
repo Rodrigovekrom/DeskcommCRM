@@ -5,9 +5,10 @@ import type { AvailabilitySchedule } from "@/lib/schemas/routing";
  * não publicou a própria jornada — na LOJA (sem modo agendamento). Antes a tela travava com "A jornada
  * de atendimento ainda não foi publicada" e não deixava escolher o dia.
  *
- * De onde veio o horário (Fenômenos Car): seg–sex 9h às 18h, sáb 9h às 14h, domingo fechado —
- * `fenomenos/memoria-org-fenomenos-v4.md` (linha 6, a memória da organização que a IA usa) e o cofre
- * `04-CLIENTES/fenomenos.md` ("Horário rígido: seg-sex 9h-18h, sáb 9h-14h, dom fechado").
+ * ia.vek v1.9.40 (Rodrigo, 10/11: "nenhuma trava de agendamento"): 24h, todos os dias, das 00:00 às 23:59.
+ * O "24:00" não passa no esquema da jornada (`lib/schemas/routing.ts`, HHMM vai até 23:59). Antes (v1.9.38)
+ * era o horário da Fenômenos (seg–sex 9h–18h, sáb 9h–14h, domingo fechado). É a mesma regra que a
+ * produção recebeu por dado em 10/11 (jornada-24h.sh): aqui ela vale também para quem entrar depois.
  *
  * ⚠️ Só a GRADE usa isto (`app/api/v1/agenda/horarios-livres`). NÃO é gravado em
  * `attendant_availability`: a mesma coluna decide a distribuição automática de conversas
@@ -19,12 +20,5 @@ import type { AvailabilitySchedule } from "@/lib/schemas/routing";
  */
 export const JORNADA_DA_LOJA: AvailabilitySchedule = Object.freeze({
   timezone: "America/Sao_Paulo",
-  windows: [
-    { dow: 1, start: "09:00", end: "18:00" },
-    { dow: 2, start: "09:00", end: "18:00" },
-    { dow: 3, start: "09:00", end: "18:00" },
-    { dow: 4, start: "09:00", end: "18:00" },
-    { dow: 5, start: "09:00", end: "18:00" },
-    { dow: 6, start: "09:00", end: "14:00" },
-  ],
+  windows: [0, 1, 2, 3, 4, 5, 6].map((dow) => ({ dow, start: "00:00", end: "23:59" })),
 }) as AvailabilitySchedule;

@@ -201,3 +201,50 @@ describe("a assinatura sai pela cadeia de envio, sem poluir messages.body", () =
     expect(mensagemEnviadoNaRede(fetchMock)).toEqual(expect.objectContaining({ message: "oi" }));
   });
 });
+
+describe("ia.vek v1.9.40 — o papel só na 1ª mensagem de quem fala, pela cadeia de envio", () => {
+  const anterior = (sentBy: string | null, sentVia: string, over: Row = {}): Row => ({
+    id: `antes-${sentVia}-${sentBy ?? "x"}`,
+    organization_id: ORG,
+    conversation_id: CONV,
+    direction: "outbound",
+    status: "sent",
+    body: "mensagem de antes",
+    sent_by_user_id: sentBy,
+    sent_via: sentVia,
+    sent_at: "2026-11-10T20:00:00.000Z",
+    ...over,
+  });
+  const enviar = async (mensagensIniciais: Row[]) => {
+    mockedNomes.mockResolvedValue(new Map([[USER, "carlos gaban"]]));
+    vi.stubEnv("ZERNIO_ACCOUNT_ID", CONTA);
+    vi.stubEnv("ZERNIO_API_KEY", "sk_env");
+    const fetchMock = respostaOk();
+    vi.stubGlobal("fetch", fetchMock);
+    const { supabase } = criarDubleDoHandler({
+      conversation: conversaCompleta({ providerConversationId: THREAD }),
+      organizacao: { settings: { assinatura_mensagens: { humanos: true, ia: false, nome_ia: "Assistente Virtual" } }, status: "active" },
+      vinculo: { interface_settings: { preset: "completa", funcao: "vendedor" } } as Row,
+      mensagensIniciais,
+    });
+    await sendMessageHandler(supabase, ctx, texto());
+    return (mensagemEnviadoNaRede(fetchMock) as { message?: string }).message;
+  };
+
+  it("a anterior com texto foi minha: só o nome", async () => {
+    expect(await enviar([anterior(USER, "user")])).toBe("*Carlos Gaban*\noi");
+  });
+  it("a anterior foi de outra pessoa ou da IA: o papel volta", async () => {
+    expect(await enviar([anterior("99999999-9999-4999-8999-999999999999", "user")])).toBe("*Carlos Gaban | Consultor de Vendas*\noi");
+    expect(await enviar([anterior(null, "ai")])).toBe("*Carlos Gaban | Consultor de Vendas*\noi");
+  });
+  it("vale a ÚLTIMA: minha antes, a IA depois → o papel volta", async () => {
+    expect(
+      await enviar([anterior(USER, "user", { sent_at: "2026-11-10T19:00:00.000Z" }), anterior(null, "ai", { sent_at: "2026-11-10T20:00:00.000Z" })]),
+    ).toBe("*Carlos Gaban | Consultor de Vendas*\noi");
+  });
+  it("mensagem minha que falhou ou sem texto não conta", async () => {
+    expect(await enviar([anterior(USER, "user", { status: "failed" })])).toBe("*Carlos Gaban | Consultor de Vendas*\noi");
+    expect(await enviar([anterior(USER, "user", { body: null })])).toBe("*Carlos Gaban | Consultor de Vendas*\noi");
+  });
+});

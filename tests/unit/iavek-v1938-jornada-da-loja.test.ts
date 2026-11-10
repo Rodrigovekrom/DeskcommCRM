@@ -35,18 +35,19 @@ describe("(1) loja, pessoa SEM jornada → a grade abre com o horário da loja",
     }
   });
 
-  it("o horário é o da loja: seg–sex 09–18, sáb 09–14, domingo fechado", () => {
+  it("v1.9.40: o horário da loja é 24h, todos os dias (00:00–23:59), sem trava", () => {
+    expect(JORNADA_DA_LOJA.windows).toEqual([0, 1, 2, 3, 4, 5, 6].map((dow) => ({ dow, start: "00:00", end: "23:59" })));
     const l = jornadaDaGrade(null, JORNADA_DA_LOJA);
     if (!l.ok) throw new Error("devia ler");
     const slots = slotsDa(l.jornada);
-    expect(slots.length).toBeGreaterThan(0);
     expect(slots.some((s) => s.inicio.getTime() === TER_9H_SP.getTime())).toBe(true);
     const diaSP = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", weekday: "short" }).format(d);
-    expect(slots.some((s) => diaSP(s.inicio) === "Sun")).toBe(false);
-    // Sábado: o último começo cabe antes das 14h (1h30 de duração).
-    const sab = slots.filter((s) => diaSP(s.inicio) === "Sat");
-    expect(sab.length).toBeGreaterThan(0);
-    expect(Math.max(...sab.map((s) => s.fim.getTime()))).toBeLessThanOrEqual(new Date("2026-11-21T17:00:00Z").getTime());
+    const horaSP = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(d);
+    // Os 7 dias, inclusive domingo.
+    expect(new Set(slots.map((s) => diaSP(s.inicio))).size).toBe(7);
+    // Um dia: de 1h30 em 1h30 desde a meia-noite; o 22:30 não cabe (terminaria depois de 23:59).
+    const terca = slots.filter((s) => diaSP(s.inicio) === "Tue").map((s) => horaSP(s.inicio));
+    expect(terca).toEqual(["00:00", "01:30", "03:00", "04:30", "06:00", "07:30", "09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30", "21:00"]);
   });
 });
 

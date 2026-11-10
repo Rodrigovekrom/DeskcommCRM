@@ -180,11 +180,17 @@ export function linhaDeAssinatura(
   nomeHumano?: string | null,
   /** ia.vek v1.7.2: a função do atendente; sem função, só o nome (como antes). */
   funcaoHumano?: Funcao | null,
+  /**
+   * ia.vek v1.9.40: `soNome` = a pessoa (ou a IA) já se identificou nesta conversa e ninguém falou
+   * no meio. Sai só a linha do nome em negrito, com o emoji, sem a citação do papel e sem o rótulo.
+   */
+  opcoes?: { soNome?: boolean },
 ): string | null {
+  const soNome = opcoes?.soNome === true;
   if (origem === "ai") {
     if (!config.ia) return null;
     const cab = config.cabecalhos?.ia;
-    if (cab) return cabecalho(cab.titulo, cab.frase);
+    if (cab) return soNome ? `*${cab.titulo}*\n` : cabecalho(cab.titulo, cab.frase);
     // Para a IA o relato não pede capitalização — o nome é o que a organização
     // configurou ("Assistente Virtual", o nome do agente, uma marca).
     return `*${config.nomeIa}*\n`;
@@ -196,11 +202,36 @@ export function linhaDeAssinatura(
   const funcao = funcaoDaTela(funcaoHumano);
   const cab = funcao ? config.cabecalhos?.funcoes?.[funcao] : undefined;
   // v1.9.6: com cabeçalho, só o PRIMEIRO nome (como nos prints do Rodrigo).
-  if (cab) return cabecalho(`${capitalizarIniciais(nome.split(/\s+/)[0] ?? nome)} ${cab.emoji}`, cab.frase);
+  if (cab) {
+    const titulo = `${capitalizarIniciais(nome.split(/\s+/)[0] ?? nome)} ${cab.emoji}`;
+    return soNome ? `*${titulo}*\n` : cabecalho(titulo, cab.frase);
+  }
   const rotulo = funcao ? config.rotulosFuncao?.[funcao] : undefined;
-  return rotulo
+  return rotulo && !soNome
     ? `*${capitalizarIniciais(nome)} | ${rotulo}*\n`
     : `*${capitalizarIniciais(nome)}*\n`;
+}
+
+/** A última mensagem COM TEXTO que saiu nesta conversa (antes da que está saindo agora). */
+export interface MensagemAnterior {
+  sent_by_user_id: string | null;
+  sent_via: string | null;
+}
+
+/** Quem está mandando agora. */
+export type EmissorDaAssinatura = { tipo: "user"; id: string } | { tipo: "ai" };
+
+/**
+ * ia.vek v1.9.40 (Rodrigo, 10/11; regra recomendada pelo Maestro): o papel aparece quando a mensagem
+ * com texto ANTERIOR da conversa não foi de quem manda agora: a 1ª da conversa, quem acabou de
+ * assumir, quem volta depois de outra pessoa ou da IA falar no meio. Nas seguintes, só o nome.
+ * Vale para as pessoas e para a IA (Daiane). Mensagem de automação, de sistema ou do celular
+ * (external_device) nunca conta como "minha": quem fala depois dela se identifica.
+ */
+export function precisaIdentificar(anterior: MensagemAnterior | null | undefined, eu: EmissorDaAssinatura): boolean {
+  if (!anterior) return true;
+  if (eu.tipo === "ai") return anterior.sent_via !== "ai";
+  return !(anterior.sent_via === "user" && anterior.sent_by_user_id === eu.id);
 }
 
 /** `*Título*`, a frase em citação e a linha em branco antes do texto. */
