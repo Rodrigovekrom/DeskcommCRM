@@ -45,6 +45,7 @@ import {
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { JORNADA_DA_LOJA } from "@/lib/iavek/jornada-da-loja";
 import { modoAgendamentoDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -95,13 +96,17 @@ export async function GET(req: NextRequest): Promise<Response> {
   // O miolo mora em `lib/agenda/consulta.ts` porque as ferramentas MCP precisam
   // do MESMO cálculo sem ter request nem cookie. Duas coletas dariam à IA e à
   // tela respostas diferentes sobre o mesmo horário.
+  const naClinica = await modoAgendamentoDaOrg(activeOrg.orgId);
   const consulta = await horariosLivresDaOrg(supabase, activeOrg.orgId, {
     eventTypeId: parsed.data.event_type_id,
     eventTypeSlug: null,
     ownerUserId: parsed.data.owner_user_id ?? null,
     // ia.vek CRM-255/257: na loja, o tipo sem responsável mostra a agenda de quem está marcando — a mesma
     // regra que a criação aplica (`_handler.ts`). Na clínica segue sem responsável = sem agenda.
-    donoSeFaltar: (await modoAgendamentoDaOrg(activeOrg.orgId)) ? null : authz.user.id,
+    donoSeFaltar: naClinica ? null : authz.user.id,
+    // ia.vek v1.9.38 (CRM-255): na loja, quem não publicou jornada vê o HORÁRIO DA LOJA na grade, em vez
+    // de "A jornada de atendimento ainda não foi publicada". Na clínica, o aviso de sempre.
+    jornadaSeNaoPublicou: naClinica ? null : JORNADA_DA_LOJA,
     de,
     ate,
     agora: new Date(),

@@ -74,7 +74,7 @@ import { nomeDoContato, type ContatoNomeavel } from "@/lib/contacts/rotulo-do-co
 
 import { diaLocalISO, instanteDe } from "./fuso";
 import { horariosLivres, type ExcecaoDeData, type Slot } from "./horarios-livres";
-import { lerJornadaDoBanco } from "./jornada";
+import { jornadaDaGrade } from "./jornada";
 import {
   agendaExternaNuncaLida,
   ocupadosDoDono,
@@ -110,6 +110,11 @@ export interface ParametrosDaConsulta {
   ownerUserId?: string | null;
   /** ia.vek (loja): quem fica com a agenda quando nem o pedido nem o tipo dizem o responsável. */
   donoSeFaltar?: string | null;
+  /**
+   * ia.vek v1.9.38 (CRM-255): horário de reserva para quem NÃO publicou jornada (o horário da loja).
+   * Só a grade da tela manda (rota horarios-livres, na loja); a IA, o token e a criação não mandam.
+   */
+  jornadaSeNaoPublicou?: { timezone: string; windows: readonly { dow: number; start: string; end: string }[] } | null;
   de: Date;
   ate: Date;
   /** INJETADO, como em `horariosLivres`. Relógio lido aqui dentro é o defeito que `janela-do-canal.ts` documenta. */
@@ -253,7 +258,7 @@ export async function horariosLivresDaOrg(
     };
   }
 
-  const leitura = lerJornadaDoBanco(disponibilidade?.schedule);
+  const leitura = jornadaDaGrade(disponibilidade?.schedule, params.jornadaSeNaoPublicou);
   if (!leitura.ok) {
     // Falha fechada na AÇÃO, aberta na INFORMAÇÃO: schedule corrompido não pode
     // virar lista vazia, senão o dono conclui que está sem vaga e essa conclusão

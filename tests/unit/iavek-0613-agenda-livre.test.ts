@@ -69,7 +69,9 @@ describe("CRM-255/257: na loja, tipo sem responsável não trava ninguém", () =
   });
   it("horários: a mesma regra, e a clínica segue sem responsável = sem agenda", () => {
     const r = readFileSync("app/api/v1/agenda/horarios-livres/route.ts", "utf8");
-    expect(r).toContain("donoSeFaltar: (await modoAgendamentoDaOrg(activeOrg.orgId)) ? null : authz.user.id");
+    // v1.9.38: o modo é lido uma vez (`naClinica`) e serve também ao horário da loja; a regra é a mesma.
+    expect(r).toContain("const naClinica = await modoAgendamentoDaOrg(activeOrg.orgId);");
+    expect(r).toContain("donoSeFaltar: naClinica ? null : authz.user.id");
     const c = readFileSync("lib/agenda/consulta.ts", "utf8");
     expect(c).toContain("params.ownerUserId ?? tipo.default_owner_user_id ?? params.donoSeFaltar ?? null");
   });

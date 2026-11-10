@@ -175,3 +175,30 @@ export function lerJornadaDoBanco(scheduleDoBanco: unknown): LeituraDaJornada {
     fusoSuposto,
   };
 }
+
+/**
+ * ia.vek v1.9.38 (CRM-255): a jornada que a GRADE usa quando há um horário de reserva (o horário da loja,
+ * `lib/iavek/jornada-da-loja.ts`).
+ *
+ * A reserva só entra quando a pessoa NÃO publicou: linha inexistente ou `windows` vazio. Quem publicou
+ * fica com a própria jornada; jornada mal configurada (schedule corrompido) segue sendo recusa nomeada —
+ * esconder o defeito atrás do horário da loja tiraria de quem opera o aviso de que há algo para consertar.
+ * Sem reserva (clínica, IA, token), é exatamente `lerJornadaDoBanco`.
+ */
+export function jornadaDaGrade(
+  scheduleDoBanco: unknown,
+  reserva: { timezone: string; windows: readonly { dow: number; start: string; end: string }[] } | null | undefined,
+): LeituraDaJornada & { usouReserva?: boolean } {
+  const leitura = lerJornadaDoBanco(scheduleDoBanco);
+  if (!reserva) return leitura;
+  const naoPublicou =
+    scheduleDoBanco === null || scheduleDoBanco === undefined || (leitura.ok && !leitura.publicouHorarios);
+  if (!naoPublicou) return leitura;
+  return {
+    ok: true,
+    jornada: { timezone: reserva.timezone, windows: reserva.windows.map((w) => ({ ...w })) },
+    publicouHorarios: true,
+    fusoSuposto: false,
+    usouReserva: true,
+  };
+}
