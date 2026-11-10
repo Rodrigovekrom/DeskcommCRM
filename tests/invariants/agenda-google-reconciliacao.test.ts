@@ -535,15 +535,16 @@ it("sucesso/erro/lease são privados; membro vizinho não pode rearmar publicaç
     "google_claim_token=gen_random_uuid()",
     "google_synced_local_revision=google_local_revision",
   ]) {
-    // ia.vek v1.7.6 (0581/0582/0583): calendar_appointments_write passou de agent+ para
-    // admin (0583). O dono `agent` já é barrado pela RLS (0 linhas, sem chegar ao
-    // gatilho); quem ainda alcança a linha é o admin — e o gatilho o recusa igual.
-    const doDono = await asUser(
-      GOV_AGENT_A,
-      `update calendar_appointments set ${patch} where organization_id=$1 and id=$2`,
-      [GOV_ORG, f.id],
-    );
-    expect(doDono.rowCount).toBe(0);
+    // ia.vek 0613: na loja (sem modo agendamento) o dono `agent` voltou a alcançar a linha pela
+    // RLS (na 0583 eram 0 linhas). Alcança e o GATILHO o recusa: o metadado do Google é privado
+    // para qualquer papel — o admin, logo abaixo, igual.
+    await expect(
+      asUser(
+        GOV_AGENT_A,
+        `update calendar_appointments set ${patch} where organization_id=$1 and id=$2`,
+        [GOV_ORG, f.id],
+      ),
+    ).rejects.toThrow("google_metadata_private");
     await expect(
       asUser(
         GOV_ADMIN,
@@ -556,8 +557,8 @@ it("sucesso/erro/lease são privados; membro vizinho não pode rearmar publicaç
     "update calendar_appointments set google_next_attempt_at=now()+interval '1 hour' where id=$1",
     [f.id],
   );
-  // ia.vek v1.7.6 (0581/0582/0583): o membro que não é dono e ainda alcança a
-  // linha pela RLS é o admin (o agent B já recebe 0 linhas da policy).
+  // O membro que não é dono e alcança a linha pela RLS (o admin; na loja, desde a 0613, também
+  // o agent B) é recusado pelo gatilho do mesmo jeito.
   await expect(
     asUser(
       GOV_ADMIN,

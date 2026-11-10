@@ -91,8 +91,13 @@ describe("agenda: superfícies humanas e recibo privado têm autorização compo
     await pool.query("insert into auth.mfa_factors(id,user_id,status,factor_type) values($1,$2,'verified','totp')", [factor, tenant.agent]);
     try {
       const before = await snapshot();
-      await expect(asRole("authenticated", tenant.agent, changeQuery, [tenant.org, id, { status: "no_show" }], "aal1")).rejects.toMatchObject({ code: "42501" });
+      // ia.vek 0613 (CRM-255/257): CONCLUIR (realizado/faltou) deixou de pedir as duas etapas; o resto
+      // segue pedindo. A prova do fator passa a ser medida em CANCELAR, que continua exigindo aal2.
+      await expect(asRole("authenticated", tenant.agent, changeQuery, [tenant.org, id, { status: "cancelled" }], "aal1")).rejects.toMatchObject({ code: "42501" });
       expect(await snapshot()).toEqual(before);
+      // ...e concluir com o mesmo fator em aal1 passa na loja — e registra QUEM concluiu.
+      const concluido = await asRole("authenticated", tenant.agent, changeQuery, [tenant.org, await appointment(tenant), { status: "no_show" }], "aal1");
+      expect(concluido.rows[0].result).toMatchObject({ status: "no_show", outcome_user_id: tenant.agent, outcome_source_kind: "user" });
       const allowed = await asRole("authenticated", tenant.agent, changeQuery, [tenant.org, id, { status: "no_show" }], "aal2");
       expect(allowed.rows[0].result).toMatchObject({ status: "no_show", outcome_user_id: tenant.agent, revision: 2 });
       const internal = await asRole("service_role", null, changeQuery, [tenant.org, await appointment(tenant), { status: "cancelled" }]);

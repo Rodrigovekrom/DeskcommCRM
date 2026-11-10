@@ -48,16 +48,17 @@ beforeAll(() => {
 });
 
 describe("campos obrigatórios ao mover", () => {
-  it("o banco diz o que falta, na ordem da tela (0597: a lista da passagem)", () => {
+  it("o banco diz o que falta, na ordem da tela (0597: a lista da passagem; 0612: sem o carro)", () => {
+    // ia.vek 0612 (Rodrigo, 06/11): o carro de interesse deixou de ser obrigatório; os outros ficam.
     expect(faltam()).toBe(
-      "Contexto do atendimento|Carro de interesse|Cidade / região|Forma de pagamento|Entrada (R$; 0 = sem entrada)|Tem carro na troca?|Prazo para comprar",
+      "Contexto do atendimento|Cidade / região|Forma de pagamento|Entrada (R$; 0 = sem entrada)|Tem carro na troca?|Prazo para comprar",
     );
   });
 
   it("ligado: a pessoa NÃO move para Agendamento sem os campos — e a recusa diz o que falta", () => {
     expect(() =>
       writeCountAs(GOV_AGENT_A, `update public.crm_leads set stage_id = '${AGENDAMENTO}' where id = '${LEAD}'`),
-    ).toThrow(/Faltam campos obrigatórios: Contexto do atendimento, Carro de interesse/);
+    ).toThrow(/Faltam campos obrigatórios: Contexto do atendimento, Cidade \/ região/);
     expect(etapa()).toBe(GOV_STAGE);
   });
 

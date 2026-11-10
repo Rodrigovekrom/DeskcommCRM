@@ -751,17 +751,15 @@ it("booking aceita somente contexto interno do job original; metadados diretos s
   await expect(
     pool.query(insert, [f.org, f.contact, f.boundary.conversation_id, GOV_AGENT_A, intent]),
   ).rejects.toThrow("meet_booking_stale");
-  // ia.vek v1.7.6 (0581/0582/0583): calendar_appointments_write passou de agent+ para admin
-  // (0583). O agent já não alcança a linha pela RLS (UPDATE de 0 linhas, sem chegar ao
-  // gatilho); quem alcança é o admin — e o gatilho o recusa igual.
-  expect(
-    (
-      await actor(GOV_AGENT_A, "update calendar_appointments set meeting_delivery=$1 where id=$2", [
-        intent,
-        a.id,
-      ])
-    ).rowCount,
-  ).toBe(0);
+  // ia.vek 0613: na loja (sem modo agendamento) o agent voltou a alcançar a linha pela RLS
+  // (antes, na 0583, UPDATE de 0 linhas). Alcança e o GATILHO o recusa — a proteção do metadado
+  // do Meet é do gatilho, não da RLS, e vale para qualquer papel (o admin, logo abaixo, igual).
+  await expect(
+    actor(GOV_AGENT_A, "update calendar_appointments set meeting_delivery=$1 where id=$2", [
+      intent,
+      a.id,
+    ]),
+  ).rejects.toThrow("meet_metadata_private");
   await pool.query(
     "insert into user_organizations(organization_id,user_id,role,accepted_at) values($1,$2,'admin',now()) on conflict do nothing",
     [f.org, GOV_ADMIN],

@@ -143,19 +143,21 @@ describe("tipos de agendamento — configuração do negócio, escreve admin", (
   });
 });
 
-describe("compromissos — a agenda da loja, escreve só o admin", () => {
+describe("compromissos — na LOJA toda a equipe marca (0613); o viewer não", () => {
   it("o viewer NÃO marca um compromisso", () => {
     expect(novoCompromisso(VIEWER, "marcado pelo viewer")).toBe(false);
   });
 
-  it("o agent NÃO marca direto — ele faz um pedido de agendamento", () => {
-    // ia.vek v1.7.6 (0581/0582/0583): calendar_appointments_write passou de agent+ para admin (0583).
-    expect(novoCompromisso(AGENT, "marcado pelo agent")).toBe(false);
+  it("o agent marca direto na loja", () => {
+    // ia.vek 0613 (CRM-255/257, Rodrigo 06/11: "eu preciso que todos consigam agendar sem problemas"):
+    // na organização SEM modo agendamento (esta), calendar_appointments_write voltou a aceitar agent+.
+    // Na clínica (modo ligado) o agent segue barrado: tests/invariants/iavek-modo-agendamento.test.ts.
+    expect(novoCompromisso(AGENT, "marcado pelo agent")).toBe(true);
   });
 
-  it("o manager também NÃO marca direto", () => {
-    // ia.vek v1.7.6 (0581/0582/0583): só o admin mexe na agenda (0583).
-    expect(novoCompromisso(MANAGER, "marcado pelo manager")).toBe(false);
+  it("o manager também marca na loja", () => {
+    // ia.vek 0613: idem. Antes (0583) só o admin.
+    expect(novoCompromisso(MANAGER, "marcado pelo manager")).toBe(true);
   });
 
   it("...e o admin marca — senão a agenda não teria quem a escrevesse", () => {

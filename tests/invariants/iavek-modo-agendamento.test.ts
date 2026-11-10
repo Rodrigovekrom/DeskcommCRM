@@ -116,9 +116,12 @@ describe("0594 — quem escreve na agenda", () => {
     expect(() => marcarComo(RECEPCAO_C, ORG_C, PRO_C, 9)).not.toThrow();
   });
 
-  it("na loja, o gerente NÃO marca (só o admin, como na 0583)", () => {
-    expect(() => marcarComo(GERENTE_L, ORG_L, PRO_L, 9)).toThrow(/row-level security/);
-    expect(() => marcarComo(ADMIN_L, ORG_L, PRO_L, 9)).not.toThrow();
+  it("na loja, toda a equipe marca: gerente, atendente e admin (0613)", () => {
+    // ia.vek 0613 (CRM-255/257, Rodrigo 06/11): na loja (sem o modo) agent+ escreve na agenda.
+    // Antes (0583/0594) o gerente da loja era recusado. A clínica não muda (casos ao lado).
+    expect(() => marcarComo(GERENTE_L, ORG_L, PRO_L, 9)).not.toThrow();
+    expect(() => marcarComo(PRO_L, ORG_L, PRO_L, 10)).not.toThrow();
+    expect(() => marcarComo(ADMIN_L, ORG_L, PRO_L, 11)).not.toThrow();
   });
 
   it("o profissional (agent) não marca nem na clínica", () => {

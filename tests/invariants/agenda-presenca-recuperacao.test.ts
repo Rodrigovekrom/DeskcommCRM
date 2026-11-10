@@ -156,12 +156,29 @@ describe("presença e recuperação transacionais", () => {
         )
       ).rows[0].n,
     ).toBe(1);
+    // ia.vek 0613 (CRM-255/257): na LOJA (sem modo agendamento) dá para concluir antes do início, e
+    // quem concluiu fica registrado. Na CLÍNICA (modo ligado) segue recusado com 22023.
     const future = await fixture();
     await pool.query(
       "update calendar_appointments set starts_at=now()+interval '1 hour',ends_at=now()+interval '2 hours' where id=$1",
       [future.id],
     );
-    await expect(change(future.id, 2)).rejects.toMatchObject({ code: "22023" });
+    await expect(change(future.id, 2)).resolves.toMatchObject({ status: "no_show", outcome_user_id: GOV_AGENT_A });
+    const naClinica = await fixture();
+    await pool.query(
+      "update calendar_appointments set starts_at=now()+interval '1 hour',ends_at=now()+interval '2 hours' where id=$1",
+      [naClinica.id],
+    );
+    const settingsAntes = (await pool.query("select settings from organizations where id=$1", [GOV_ORG])).rows[0].settings;
+    await pool.query(
+      "update organizations set settings = jsonb_set(coalesce(settings,'{}'::jsonb), '{iavek,perfil,modo_agendamento}', 'true'::jsonb, true) where id=$1",
+      [GOV_ORG],
+    );
+    try {
+      await expect(change(naClinica.id, 2)).rejects.toMatchObject({ code: "22023" });
+    } finally {
+      await pool.query("update organizations set settings=$2 where id=$1", [GOV_ORG, settingsAntes]);
+    }
   });
   it("relógio solicita, deduplica e escala sem converter desconhecido em falta", async () => {
     const a = await fixture();
