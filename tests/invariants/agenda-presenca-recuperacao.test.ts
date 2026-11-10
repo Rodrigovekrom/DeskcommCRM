@@ -171,10 +171,13 @@ describe("presença e recuperação transacionais", () => {
     );
     const settingsAntes = (await pool.query("select settings from organizations where id=$1", [GOV_ORG])).rows[0].settings;
     await pool.query(
-      "update organizations set settings = jsonb_set(coalesce(settings,'{}'::jsonb), '{iavek,perfil,modo_agendamento}', 'true'::jsonb, true) where id=$1",
+      // jsonb_set não cria os níveis do meio (iavek, perfil); por isso a montagem por camadas.
+      "update organizations set settings = coalesce(settings,'{}'::jsonb) || jsonb_build_object('iavek', coalesce(settings->'iavek','{}'::jsonb) || jsonb_build_object('perfil', coalesce(settings->'iavek'->'perfil','{}'::jsonb) || '{\"modo_agendamento\":true}'::jsonb)) where id=$1",
       [GOV_ORG],
     );
     try {
+      // A chave ligou mesmo (sem isto, um modo que não ligasse deixaria o caso verde pelo motivo errado).
+      expect((await pool.query("select public.fn_iavek_modo_agendamento($1) m", [GOV_ORG])).rows[0].m).toBe(true);
       await expect(change(naClinica.id, 2)).rejects.toMatchObject({ code: "22023" });
     } finally {
       await pool.query("update organizations set settings=$2 where id=$1", [GOV_ORG, settingsAntes]);
