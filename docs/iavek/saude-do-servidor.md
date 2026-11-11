@@ -29,18 +29,20 @@ fora sem entrar no contêiner, então o `anon` do app é o termômetro.
 
 ## O semáforo
 
-Os limites do **plano de contingência da Lupa**, medidos em 11/11 (a memória em MB de `anon`). Podem ser trocados
+Os limites são EXATAMENTE os do plano de contingência da Lupa, [`contingencia-memoria.md`](contingencia-memoria.md)
+(medidos em 11/11; a memória em MB de `anon`), com as mesmas bordas. Um teste de bordas no servidor confere as
+28 fronteiras (699/700/799/800 do app etc.). Podem ser trocados
 em `/root/iavek-saude/limites.json`; o servidor novo (KVM 4) terá os dele.
 
 | | Amarelo | Vermelho | Por quê |
 |---|---|---|---|
 | app | ≥ 700 MB | ≥ 800 MB | com heap 576, o Node morre com ~900 MB (havia ~330 MB fora do heap na queda das 19:05); a 90% do teto o aviso nunca viria |
 | waha | ≥ 900 MB | ≥ 1.050 MB | heap 900 + 150 a 250 fora do heap: morre perto de 1.050 a 1.150 |
-| swap do cgroup do waha | > 100 MB | > 300 MB | antes da troca de 11/11 ele vivia com 852 MB no swap |
-| worker | ≥ 75% do teto | ≥ 90% do teto | parado em ~268 MB de 512 |
-| RAM disponível do servidor | < 500 MB | < 250 MB | |
-| swap do servidor | > 500 MB | > 1.000 MB | |
-| disco | > 80% | > 90% | |
+| swap do cgroup do waha | 100 a 299 MB | ≥ 300 MB | antes da troca de 11/11 ele vivia com 852 MB no swap |
+| worker | 384 a 460 MB | > 460 MB | parado em ~268 MB de 512 |
+| RAM disponível do servidor | 250 a 500 MB | < 250 MB | |
+| swap do servidor | 500 a 1.000 MB | > 1.000 MB | |
+| disco | 80 a 90% | > 90% | |
 | contêiner parado, unhealthy, reiniciou sozinho | | sempre | |
 | OOM (só quando muda de não para sim, no mesmo contêiner) | | sempre | o `OOMKilled` fica marcado até recriar |
 | sessão do WhatsApp fora de WORKING | | sempre | |
