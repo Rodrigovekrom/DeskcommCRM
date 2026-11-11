@@ -61,7 +61,7 @@ function chunked(caminho: string, stream: ReadableStream<Uint8Array>): NextReque
     headers: { authorization: "Bearer dsk_abc_def", "content-type": "multipart/form-data; boundary=x" },
     body: stream,
     duplex: "half",
-  } as RequestInit & { duplex: "half" });
+  } as unknown as ConstructorParameters<typeof NextRequest>[1]);
 }
 
 beforeEach(() => {
