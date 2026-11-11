@@ -15,7 +15,11 @@
  *  2. toda migration desde 02/10/2026 (quando o MANIFEST.md virou histórico) tem `-- manifest:`, salvo
  *     as 6 de antes da regra pegar, congeladas;
  *  3. nenhum número repetido;
- *  4. as listas só ENCOLHEM: nenhuma lacuna da era ia.vek (> 0578), e uma lacuna consertada sai da lista.
+ *  4. as listas só ENCOLHEM: nenhuma lacuna da era ia.vek (> 0578), e uma lacuna consertada sai da lista;
+ *  5. (Lupa, 11/11) partindo das MIGRATIONS da era ia.vek: cada OBJETO que elas criam (função, tabela,
+ *     coluna, índice, policy, constraint, gatilho, view) tem o seu comando no baseline, fora de
+ *     comentário. O `apendice-nao-diverge` só compara o que JÁ está no apêndice: foi por isso que a
+ *     0616 escapou. Citar o número num comentário não basta para esta regra.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -89,5 +93,46 @@ describe("migration é uma tripla (migration + baseline + manifest)", () => {
     expect(consertadas, "já citadas no baseline: tire da lista HISTORICO_SEM_CITACAO_NO_BASELINE").toEqual([]);
     const comManifest = migrations.filter((m) => HISTORICO_SEM_MANIFEST.has(m.numero) && temManifest(m.texto));
     expect(comManifest.map((m) => m.numero), "já têm manifest: tire da lista HISTORICO_SEM_MANIFEST").toEqual([]);
+  });
+
+  it("⭐ cada objeto criado numa migration da era ia.vek (> 0578) tem o seu comando no baseline", () => {
+    const semComentario = (t: string) => t.split("\n").map((l) => l.replace(/--.*$/, "")).join("\n").toLowerCase();
+    const B = semComentario(BASELINE);
+    const id = String.raw`"?(\w+)"?`;
+    const tem = (rx: string) => new RegExp(rx).test(B);
+    const tipos: Array<[string, RegExp, (n: string) => boolean]> = [
+      ["função", new RegExp(String.raw`create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?${id}\s*\(`, "g"),
+        (n) => tem(String.raw`create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?"?${n}"?\s*\(`)],
+      ["tabela", new RegExp(String.raw`create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?${id}`, "g"),
+        (n) => tem(String.raw`create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?"?${n}"?\b`)],
+      ["coluna", new RegExp(String.raw`add\s+column\s+(?:if\s+not\s+exists\s+)?${id}`, "g"),
+        (n) => tem(String.raw`add\s+column\s+(?:if\s+not\s+exists\s+)?"?${n}"?\b`) || tem(String.raw`\n\s+"?${n}"?\s+\w`)],
+      ["índice", new RegExp(String.raw`create\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?${id}`, "g"),
+        (n) => tem(String.raw`index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?"?${n}"?\b`)],
+      ["policy", new RegExp(String.raw`create\s+policy\s+${id}`, "g"), (n) => tem(String.raw`create\s+policy\s+"?${n}"?\b`)],
+      ["constraint", new RegExp(String.raw`add\s+constraint\s+${id}`, "g"), (n) => tem(String.raw`constraint\s+"?${n}"?\b`)],
+      ["gatilho", new RegExp(String.raw`create\s+(?:or\s+replace\s+)?trigger\s+${id}`, "g"), (n) => tem(String.raw`trigger\s+"?${n}"?\b`)],
+      ["view", new RegExp(String.raw`create\s+(?:or\s+replace\s+)?view\s+(?:public\.)?${id}`, "g"),
+        (n) => tem(String.raw`view\s+(?:public\.)?"?${n}"?\b`)],
+    ];
+    const daEraIavek = migrations.filter((m) => Number(m.numero) > ULTIMA_DO_UPSTREAM);
+    expect(daEraIavek.length).toBeGreaterThan(30);
+    let objetos = 0;
+    const faltam: string[] = [];
+    for (const m of daEraIavek) {
+      const t = semComentario(m.texto);
+      for (const [tipo, rx, noBaseline] of tipos) {
+        for (const nome of new Set([...t.matchAll(rx)].map((x) => x[1]!))) {
+          objetos++;
+          if (!noBaseline(nome)) faltam.push(`${m.numero} ${tipo} ${nome}`);
+        }
+      }
+    }
+    expect(objetos, "a extração de objetos parou de achar o que medir").toBeGreaterThan(150);
+    expect(
+      faltam,
+      "Objeto criado na migration e ausente do baseline.sql (fora de comentário). O kit e o CI aplicam SÓ o " +
+        "baseline: cole o comando no apêndice, ANTES de '-- ---- VARREDURA anon:'.",
+    ).toEqual([]);
   });
 });
