@@ -16,6 +16,7 @@ on:
     paths:
       - "supabase/**"
       - "tests/invariants/**"
+      - "tests/support/**"   # os dublês que as invariantes usam (ex.: routing-pg-supabase)
       - "scripts/test-db.sh"
       - "scripts/test-update-com-dados.sh"
       - ".github/workflows/iavek-banco.yml"

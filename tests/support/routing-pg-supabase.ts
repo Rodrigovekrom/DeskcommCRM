@@ -4,6 +4,26 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Não implementa HTTP Supabase/RLS de sessão; ACL humana é provada por SET ROLE. */
 export function routingPgSupabase(pool: pg.Pool) {
   const errors: unknown[] = [];
+  const metas = new Map<string, Promise<{ arrays: Set<string>; retornaConjunto: boolean }>>();
+  const metaDaFuncao = (name: string) => {
+    let m = metas.get(name);
+    if (!m) {
+      m = pool
+        .query<{ retset: boolean; arrays: string[] | null }>(
+          `select bool_or(p.proretset) as retset,
+                  array_agg(distinct a.nome) filter (where t.typcategory = 'A') as arrays
+             from pg_proc p
+             join pg_namespace n on n.oid = p.pronamespace and n.nspname = 'public'
+             left join lateral unnest(coalesce(p.proargnames, '{}'::text[]), p.proargtypes::oid[]) as a(nome, oid) on true
+             left join pg_type t on t.oid = a.oid
+            where p.proname = $1`,
+          [name],
+        )
+        .then((r) => ({ arrays: new Set(r.rows[0]?.arrays ?? []), retornaConjunto: r.rows[0]?.retset === true }));
+      metas.set(name, m);
+    }
+    return m;
+  };
   const identifier = (s: string) => {
     if (!/^[a-z_][a-z0-9_]*$/.test(s)) throw Error(`identificador de teste inválido: ${s}`);
     return `"${s}"`;
@@ -155,11 +175,22 @@ export function routingPgSupabase(pool: pg.Pool) {
     from: (table: string) => new Query(table),
     rpc: async (name: string, args: Record<string, unknown>) => {
       try {
+        // ia.vek v1.9.44 (0617): o PostgREST de verdade converte um array JSON num parametro `uuid[]`
+        // e devolve TODAS as linhas de uma funcao que retorna conjunto. O duble imita os dois,
+        // perguntando ao catalogo: array vai como array (o pg formata), json/jsonb vai como texto
+        // JSON, e funcao `returns table/setof` responde com as linhas, nao com um valor so.
+        const meta = await metaDaFuncao(name);
         const entries = Object.entries(args);
-        const result = await pool.query(
-          `select ${identifier(name)}(${entries.map(([k], i) => `${identifier(k)}=>$${i + 1}`).join(",")}) r`,
-          entries.map(([, v]) => (typeof v === "object" && v !== null ? JSON.stringify(v) : v)),
-        );
+        const valores = entries.map(([k, v]) => {
+          if (v === null || typeof v !== "object") return v;
+          return Array.isArray(v) && meta.arrays.has(k) ? v : JSON.stringify(v);
+        });
+        const chamada = `${identifier(name)}(${entries.map(([k], i) => `${identifier(k)}=>$${i + 1}`).join(",")})`;
+        if (meta.retornaConjunto) {
+          const result = await pool.query(`select * from ${chamada}`, valores);
+          return { data: result.rows, error: null };
+        }
+        const result = await pool.query(`select ${chamada} r`, valores);
         return { data: result.rows[0]?.r, error: null };
       } catch (error) {
         errors.push(error);
