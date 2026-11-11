@@ -160,6 +160,9 @@ export const config = {
     // Run on all paths except static assets / Next internals.
     // ia.vek CRM-258: o envio de VÍDEO (até 300 MB) fica fora — o proxy guarda o corpo na memória e o corta
     // em 10 MB (`proxyClientMaxBodySize`). A rota confere login, papel e suporte sozinha (resolveAuthDual).
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|api/v1/conversations/[^/]+/media/video$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
+    // ia.vek v1.9.45 (CRM-259): pelo MESMO motivo, o envio de foto, documento e áudio (`/media`, até 50 MB)
+    // e o anexo de nota (`/notes/media`) também ficam fora. As duas rotas conferem login, papel e suporte
+    // sozinhas (requireSupportWrite + resolveAuthDual), como a do vídeo.
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|api/v1/conversations/[^/]+/(?:media|media/video|notes/media)$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
   ],
 };

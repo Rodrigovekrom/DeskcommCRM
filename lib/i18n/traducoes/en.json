@@ -6199,7 +6199,7 @@
   "Agent não tem versão para duplicar.": "Agent has no version to duplicate.",
   "A imagem precisa ter até 5 MB.": "The image must be under 5 MB.",
   "Apenas versões 'draft' podem ser editadas.": "Only 'draft' versions can be edited.",
-  "Arquivo acima de 50MB.": "File over 50MB.",
+  "Arquivo acima de 50 MB.": "File over 50 MB.",
   "Arquivo excede o limite de 20MB.": "File exceeds the 20MB limit.",
   "Atendente não encontrado na organização.": "Agent not found in the organization.",
   "Atualização não encontrada.": "Update not found.",

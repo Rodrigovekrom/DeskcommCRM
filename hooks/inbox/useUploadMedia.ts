@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { ApiError, type ApiErrorBody } from "@/lib/api/types";
+import { MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 
 export interface UploadedMedia {
   storage_path: string;
@@ -31,6 +32,11 @@ export function useUploadMedia() {
       filename?: string;
       destino?: DestinoDoUpload;
     }) => {
+      // ia.vek v1.9.45 (CRM-259): até 50 MB para foto, documento e áudio, como no vídeo. Acima disso a
+      // tela avisa na hora, com a MESMA frase do servidor, sem gastar o envio para ouvir o 413.
+      if (args.file.size > MAX_MEDIA_BYTES) {
+        throw new ApiError(413, "payload_too_large", undefined, "", "Arquivo acima de 50 MB.");
+      }
       const form = new FormData();
       form.append("file", args.file, args.filename ?? (args.file instanceof File ? args.file.name : "audio"));
       const rota = args.destino === "nota" ? "notes/media" : "media";

@@ -69,7 +69,7 @@ describe("fetchWahaMedia", () => {
     );
   });
 
-  it("rejeita mídia acima de 50MB", async () => {
+  it("rejeita mídia acima de 50 MB", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
