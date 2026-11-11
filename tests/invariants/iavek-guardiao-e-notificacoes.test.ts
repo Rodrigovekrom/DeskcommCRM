@@ -234,11 +234,25 @@ describe("avisos", () => {
     expect(notificacoes(SDR, "guardiao_perda")).toBe(1);
   });
 
-  it("tarefa vencida avisa o responsável e o guardião", () => {
+  it("ia.vek v1.9.45 (0621): tarefa de lead PERDIDO não avisa ninguém", () => {
+    // o teste de cima deixou o LEAD perdido. Desde a 0621, o aviso de tarefa vencida só sai para lead 'open'
+    // ("pode cancelar as tarefas dos leads fechados", Rodrigo, 11/11).
     sql(`
       insert into public.crm_tasks (id, organization_id, title, lead_id, assigned_to, due_date, status)
         values ('${TAREFA}', '${ORG}', 'Ligar', '${LEAD}', '${VENDEDOR}', now() - interval '1 hour', 'pending')
         on conflict do nothing;
+      insert into public.event_log (organization_id, event_type, entity_kind, entity_id, payload)
+        values ('${ORG}', 'task.overdue', 'crm_task', '${TAREFA}', '{}'::jsonb);
+    `);
+    expect(notificacoes(VENDEDOR, "tarefa_vencida")).toBe(0);
+    expect(notificacoes(SDR, "guardiao_tarefa_vencida")).toBe(0);
+  });
+
+  it("tarefa vencida de lead ABERTO avisa o responsável e o guardião", () => {
+    // reabre o lead (só o status: sem trocar a etapa, o gatilho BEFORE não mexe) e a tarefa vence de novo
+    sql(`
+      update public.crm_leads set status = 'open', lost_reason = null, closed_at = null where id = '${LEAD}';
+      update public.crm_tasks set status = 'pending' where id = '${TAREFA}';
       insert into public.event_log (organization_id, event_type, entity_kind, entity_id, payload)
         values ('${ORG}', 'task.overdue', 'crm_task', '${TAREFA}', '{}'::jsonb);
     `);
