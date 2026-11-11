@@ -81,7 +81,9 @@ describe("CRM-258: o proxy deixa de fora SÓ o envio de vídeo", () => {
   });
   it("o resto segue passando: o estado do vídeo, a mídia comum, as telas", () => {
     expect(re.test("/api/v1/conversations/abc-123/media/video/trab-1")).toBe(true);
-    expect(re.test("/api/v1/conversations/abc-123/media")).toBe(true);
+    // ia.vek v1.9.45 (CRM-259): o envio de foto/documento/áudio (/media) também saiu do proxy, pelo mesmo
+    // corte de 10 MB. Ver tests/unit/iavek-v1945-midia-ate-50mb.test.ts.
+    expect(re.test("/api/v1/conversations/abc-123/media")).toBe(false);
     expect(re.test("/api/v1/messages")).toBe(true);
     expect(re.test("/app/inbox")).toBe(true);
   });

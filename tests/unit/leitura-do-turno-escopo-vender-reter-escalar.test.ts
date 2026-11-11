@@ -79,8 +79,10 @@ function bancoFalso(tabelas: Record<string, Linha[]>) {
     let linhas = [...(tabelas[tabela] ?? [])];
     let limite: number | undefined;
     let soContagem = false;
+    let faixa: [number, number] | null = null;
     const resposta = () => ({
-      data: soContagem ? null : linhas.slice(0, limite),
+      // v1.9.45 (CRM-297): o radar lê os leads em páginas (lerTudo); o dublê recorta a faixa pedida.
+      data: soContagem ? null : (faixa ? linhas.slice(faixa[0], faixa[1] + 1) : linhas).slice(0, limite),
       count: linhas.length,
       error: null,
     });
@@ -104,6 +106,10 @@ function bancoFalso(tabelas: Record<string, Linha[]>) {
       },
       limit: (n: number) => {
         limite = n;
+        return cadeia;
+      },
+      range: (de: number, ate: number) => {
+        faixa = [de, ate];
         return cadeia;
       },
       maybeSingle: () => Promise.resolve({ data: linhas[0] ?? null, error: null }),

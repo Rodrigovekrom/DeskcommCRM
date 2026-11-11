@@ -137,6 +137,13 @@ const schema = z.object({
    * elevado ao piso de 30 dias, em vez de descobrir pela ausência de efeito.
    */
   LEAD_CAPTURE_RETENTION_DAYS: z.string().optional().default(""),
+  /**
+   * ia.vek v1.9.45 (CRM-280): a chave grátis do OpenRouteService (HeiGIT), para o km de carro da loja até
+   * o cliente no agendamento "Ir até o cliente". Vazia = o km fica "indisponível" e nada mais muda.
+   * ORS_BASE_URL vazio = https://api.heigit.org (o api.openrouteservice.org foi trocado em 2026).
+   */
+  ORS_API_KEY: z.string().optional().default(""),
+  ORS_BASE_URL: z.string().optional().default(""),
 
   // Encryption keys (pgcrypto)
   CPF_ENCRYPTION_KEY: required("CPF_ENCRYPTION_KEY"),

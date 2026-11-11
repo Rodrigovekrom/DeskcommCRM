@@ -215,6 +215,10 @@ export interface AppointmentRow {
   description: string | null;
   notes: string | null;
   location_details: string | null;
+  /** ia.vek v1.9.45 (CRM-280): o CEP, o número e o km do "Ir até o cliente". */
+  iavek_cep?: string | null;
+  iavek_numero?: string | null;
+  iavek_km?: number | null;
   cancellation_reason: string | null;
   starts_at: string;
   ends_at: string;
@@ -1577,7 +1581,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     const { data, error } = await admin
       .from("calendar_appointments")
       .select(
-        "id, title, description, notes, location_details, cancellation_reason, starts_at, ends_at, time_zone, status, google_base_projection, google_conflict, google_pending_write, meeting_url, meeting_state",
+        "id, title, description, notes, location_details, iavek_cep, iavek_numero, iavek_km, cancellation_reason, starts_at, ends_at, time_zone, status, google_base_projection, google_conflict, google_pending_write, meeting_url, meeting_state",
       )
       .eq("organization_id", organizationId)
       .eq("contact_id", contactId)

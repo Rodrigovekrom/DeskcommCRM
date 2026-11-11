@@ -815,6 +815,17 @@ type CategoriaDeHost =
 type EntradaDeHost = { categoria: CategoriaDeHost; motivo: string };
 
 const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
+  // ── ia.vek v1.9.45 (CRM-280): km de carro da loja até o cliente no "Ir até o cliente" ──
+  "viacep.com.br": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "ia.vek CRM-280: o CEP do cliente vira endereço por extenso (rua, bairro, cidade) no agendamento 'Ir até o cliente'. Serviço público e grátis, sem chave; chamado SÓ pelo servidor (lib/iavek/km/calcular-km.ts).",
+  },
+  "api.heigit.org": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "ia.vek CRM-280: o OpenRouteService (HeiGIT) dá a coordenada do endereço (geocode Pelias) e a rota de carro até o cliente. Opção grátis aprovada pelo Rodrigo em 11/11; a chave é da conta dele, em ORS_API_KEY, e a base é configurável em ORS_BASE_URL. Chamado SÓ pelo servidor.",
+  },
   "datamanager.googleapis.com": {
     categoria: "FORNECEDOR",
     motivo: "endpoint oficial da Google Data Manager API: recebe conversões e consulta o processamento na conta autorizada pela própria organização. O destino pertence ao fornecedor e não à instalação do CRM.",
