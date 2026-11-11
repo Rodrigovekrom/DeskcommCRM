@@ -283,8 +283,8 @@ export const RETENCAO_CANDIDATOS_GOLDEN_DIAS_PADRAO = 90;
 export const RETENCAO_CANDIDATOS_GOLDEN_DIAS_PISO = 30;
 
 /**
- * 365 dias para a MÍDIA de mensagem (`messages.media_storage_path` / bucket
- * `whatsapp-media`, migration 0432).
+ * 90 dias para a MÍDIA de mensagem (`messages.media_storage_path` / bucket
+ * `whatsapp-media`, migration 0432). Era 365; ia.vek v1.9.46 (0622, decisão do Rodrigo de 11/11): "3 meses".
  *
  * É o padrão do formulário da organização (`organizations.media_retention_days`,
  * migration 0432/#1731). A MÍDIA que a empresa promete guardar não é tratada
@@ -302,7 +302,7 @@ export const RETENCAO_CANDIDATOS_GOLDEN_DIAS_PISO = 30;
  * (doc 92, opção A). Esta dupla de constantes descreve o PADRÃO e o PISO; quem
  * decide se VALE para uma organização é o interruptor, não estes números.
  */
-export const RETENCAO_MIDIA_DIAS_PADRAO = 365;
+export const RETENCAO_MIDIA_DIAS_PADRAO = 90;
 /**
  * Piso de 30 dias para a MÍDIA: o mesmo piso que o formulário do tenant.
  *
