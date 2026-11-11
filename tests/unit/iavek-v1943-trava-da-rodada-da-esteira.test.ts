@@ -173,4 +173,16 @@ describe("v1.9.43 (Lupa): a rodada da esteira deixa prova positiva no log do sch
     const s = readFileSync("docker/scheduler/entrypoint.sh", "utf8");
     expect(s).toMatch(/^\*\/5 \* \* \* \*\|300\|api\/v1\/cron\/esteira-vendas\|resposta$/m);
   });
+
+  it("o entrypoint continua um sh válido e o bloco CRONS (entre aspas duplas) não tem crase nem $(", async () => {
+    // Medido no 4634c9b: uma crase num comentário DENTRO de CRONS="..." vira comando no sh, e o
+    // scheduler não sobe. A linha do crontab acima continuava casando: este caso é o que pega.
+    const { readFileSync } = await import("node:fs");
+    const { execFileSync } = await import("node:child_process");
+    const s = readFileSync("docker/scheduler/entrypoint.sh", "utf8");
+    const bloco = s.slice(s.indexOf('CRONS="'), s.indexOf('\n"\n', s.indexOf('CRONS="')));
+    expect(bloco.length).toBeGreaterThan(100);
+    expect(bloco).not.toMatch(/`|\$\(/);
+    expect(() => execFileSync("sh", ["-n", "docker/scheduler/entrypoint.sh"])).not.toThrow();
+  });
 });
