@@ -37,11 +37,24 @@ export async function comTravaDaEsteira<T>(
   orgId: string,
   fn: () => Promise<T>,
 ): Promise<ResultadoDaTrava<T>> {
-  const db = await pool.connect();
+  // ia.vek v1.9.46 (nota 1 da Lupa, Maestro 234646): o pool tem 1 conexão. Se uma rodada presa (no MESMO processo)
+  // ainda segura a conexão, esperar por ela faria esta rodar DOBRADA logo depois. Passou do tempo de esperar a
+  // conexão (TEMPO_PARA_PEGAR_A_CONEXAO_MS, bem abaixo dos 5 min da rodada): pula, como "rodada_em_curso".
+  let db: pg.PoolClient;
+  try {
+    db = (await pool.connect()) as pg.PoolClient;
+  } catch (e) {
+    if (eTempoEsgotadoDaConexao(e)) return { rodou: false };
+    throw e;
+  }
   let aberta = false;
   try {
     await db.query("begin");
     aberta = true;
+    // ia.vek v1.9.46 (nota 1 da Lupa): os tetos valem só nesta transação (o pooler devolve a conexão limpa).
+    await db.query(
+      `set local statement_timeout = ${TETO_DOS_COMANDOS_DA_TRAVA_MS}; set local lock_timeout = ${TETO_DOS_COMANDOS_DA_TRAVA_MS}`,
+    );
     const r = await db.query<{ travou: boolean }>(
       "select pg_try_advisory_xact_lock(hashtextextended($1, 0)) as travou",
       [chaveDaTravaDaEsteira(orgId)],
@@ -58,6 +71,16 @@ export async function comTravaDaEsteira<T>(
   }
 }
 
+/** Quanto a rodada espera a conexão da trava antes de pular (bem abaixo do intervalo de 5 min da rodada). */
+export const TEMPO_PARA_PEGAR_A_CONEXAO_MS = 5_000;
+/** O teto de cada comando na conexão da trava (o begin, o try_lock e o rollback são instantâneos). */
+export const TETO_DOS_COMANDOS_DA_TRAVA_MS = 10_000;
+
+/** O erro do node-postgres quando o pool não entrega a conexão a tempo. */
+export function eTempoEsgotadoDaConexao(e: unknown): boolean {
+  return e instanceof Error && /timeout exceeded when trying to connect/i.test(e.message);
+}
+
 /** Quantas conexões o pool das travas tem. 1 enquanto a esteira roda as organizações em fila. */
 export const CONEXOES_DAS_TRAVAS_DA_ESTEIRA = 1;
 export const NOME_DA_CONEXAO_DA_TRAVA = "iavek-trava-esteira";
@@ -72,7 +95,14 @@ export function poolDasTravasDaEsteira(base: Pick<pg.Pool, "connect">): Pick<pg.
   if (!url) return base;
   let p = POOLS_DAS_TRAVAS.get(base);
   if (!p) {
-    p = new pg.Pool({ connectionString: url, max: CONEXOES_DAS_TRAVAS_DA_ESTEIRA, application_name: NOME_DA_CONEXAO_DA_TRAVA });
+    p = new pg.Pool({
+      connectionString: url,
+      max: CONEXOES_DAS_TRAVAS_DA_ESTEIRA,
+      application_name: NOME_DA_CONEXAO_DA_TRAVA,
+      // ia.vek v1.9.46 (nota 1 da Lupa): nunca esperar sem fim pela conexão. Os tetos de comando e de trava vão
+      // por `set local` na transação (comTravaDaEsteira), não como parâmetro de partida (o pooler pode recusar).
+      connectionTimeoutMillis: TEMPO_PARA_PEGAR_A_CONEXAO_MS,
+    });
     p.on("connect", (c) => c.on("error", () => undefined));
     p.on("error", () => undefined);
     POOLS_DAS_TRAVAS.set(base, p);

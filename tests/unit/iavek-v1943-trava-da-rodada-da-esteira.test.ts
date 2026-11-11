@@ -60,6 +60,8 @@ vi.mock("@/lib/agent-engine/db/request-pool", () => ({
       return {
         query: async (sql: string, params: string[] = []) => {
           if (sql === "begin") { estado.transacoes.add(sessao); return { rows: [] }; }
+          // v1.9.46 (nota 1 da Lupa): os tetos de comando e de trava, só na transação
+          if (sql.startsWith("set local statement_timeout")) return { rows: [] };
           if (sql === "commit" || sql === "rollback") {
             estado.transacoes.delete(sessao);
             for (const [k, dona] of estado.travas) if (dona === sessao) estado.travas.delete(k);
