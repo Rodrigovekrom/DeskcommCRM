@@ -19,7 +19,7 @@ import { configDaEsteira } from "@/lib/esteira/config";
 import { depsReaisDaEsteira } from "@/lib/esteira/deps-reais";
 import { esteiraFalhou, esteiraRodou } from "@/lib/esteira/aviso-de-parada";
 import { rodadaTeveEfeito, rodarEsteira, type ResumoDaRodada } from "@/lib/esteira/rodada";
-import { comTravaDaEsteira } from "@/lib/esteira/trava-da-rodada";
+import { comTravaDaEsteira, poolDasTravasDaEsteira } from "@/lib/esteira/trava-da-rodada";
 import { rodarCompraFutura, type ResumoDaCompraFutura } from "@/lib/iavek/compra-futura/rodada";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { logger } from "@/lib/logger";
@@ -52,7 +52,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     }
   > = [];
   // ia.vek v1.9.43: uma rodada por organização de cada vez (lib/esteira/trava-da-rodada.ts).
-  const pool = getRequestPool();
+  // ia.vek v1.9.45: a trava num pool SÓ DELA (1 conexão), para não tirar uma das 4 conexões das telas por ~19 s.
+  const pool = poolDasTravasDaEsteira(getRequestPool());
   for (const org of (orgs ?? []) as Array<{ id: string; settings: unknown }>) {
     if (paradas.has(org.id)) continue;
     const cfg = configDaEsteira(org.settings);

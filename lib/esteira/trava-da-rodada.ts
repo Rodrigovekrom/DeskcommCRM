@@ -20,8 +20,13 @@
  *
  * É no Postgres, não na memória: o app pode ter mais de um processo (app + canário, ou réplicas).
  * A chave é por organização: a rodada de uma organização não segura a de outra.
+ *
+ * ia.vek v1.9.45 (Maestro 203253): a conexão da trava vem de um pool SÓ DAS TRAVAS (`poolDasTravasDaEsteira`), e não
+ * do pool das requisições. MEDIDO em 11/11: a trava segurava 1 das 4 conexões das TELAS (DB_POOL_MAX=4) por ~19 s a
+ * cada rodada de 5 min — lentidão possível nas telas, hoje. O pool das travas tem 1 conexão (as organizações ainda
+ * rodam em fila; o paralelo é outra versão) e se identifica no Postgres como `iavek-trava-esteira`.
  */
-import type pg from "pg";
+import pg from "pg";
 
 export const chaveDaTravaDaEsteira = (orgId: string) => `esteira:${orgId}`;
 
@@ -51,4 +56,26 @@ export async function comTravaDaEsteira<T>(
       db.release();
     }
   }
+}
+
+/** Quantas conexões o pool das travas tem. 1 enquanto a esteira roda as organizações em fila. */
+export const CONEXOES_DAS_TRAVAS_DA_ESTEIRA = 1;
+export const NOME_DA_CONEXAO_DA_TRAVA = "iavek-trava-esteira";
+const POOLS_DAS_TRAVAS = new WeakMap<object, pg.Pool>();
+
+/**
+ * O pool SÓ DAS TRAVAS da esteira, montado a partir do pool das requisições (a mesma URL), uma vez por processo.
+ * Separado, a trava nunca tira uma conexão das telas. Dublês de teste e pools sem URL: o próprio pool.
+ */
+export function poolDasTravasDaEsteira(base: Pick<pg.Pool, "connect">): Pick<pg.Pool, "connect"> {
+  const url = (base as { options?: { connectionString?: string } }).options?.connectionString;
+  if (!url) return base;
+  let p = POOLS_DAS_TRAVAS.get(base);
+  if (!p) {
+    p = new pg.Pool({ connectionString: url, max: CONEXOES_DAS_TRAVAS_DA_ESTEIRA, application_name: NOME_DA_CONEXAO_DA_TRAVA });
+    p.on("connect", (c) => c.on("error", () => undefined));
+    p.on("error", () => undefined);
+    POOLS_DAS_TRAVAS.set(base, p);
+  }
+  return p;
 }
