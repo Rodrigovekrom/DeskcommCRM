@@ -25,7 +25,7 @@ export function parseAgentOwnerFilter(value: string | undefined): string | null 
 export interface LeadFilters {
   /** userId | `agent:<uuid>` | "any" | "unassigned" */
   owner?: string | "any" | "unassigned";
-  status?: "all" | "open" | "won" | "lost";
+  status?: "all" | "open" | "won" | "lost" | "future";
   /**
    * A etiqueta escolhida, ou VÁRIAS (#1274).
    *
@@ -112,7 +112,7 @@ export function filtersFromParams(
   return {
     owner: owner ?? undefined,
     status:
-      status === "open" || status === "won" || status === "lost" || status === "all"
+      status === "open" || status === "won" || status === "lost" || status === "future" || status === "all"
         ? status
         : "all",
     tag: tag ?? undefined,

@@ -5,6 +5,8 @@ export interface PipelineVocabulary {
   deal?: string;
   won?: string;
   lost?: string;
+  /** ia.vek v1.9.45 (CRM-294): o nome da Compra futura no funil. */
+  future?: string;
 }
 
 export interface Pipeline {

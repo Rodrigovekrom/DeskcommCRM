@@ -344,7 +344,7 @@ function SemLista({
  * ao lado de "Consulta marcada". Guardado em
  * tests/unit/inbox-leads-recentes-com-funil.test.tsx.
  */
-const STATUS_DO_LEAD: Record<string, string> = { open: "Aberto", won: "Ganho", lost: "Perdido" };
+const STATUS_DO_LEAD: Record<string, string> = { open: "Aberto", won: "Ganho", lost: "Perdido", future: "Compra futura" };
 
 /** "Funil · Etapa" — sem isto dois leads de mesmo título ficam idênticos (#943). */
 function ondeEstaOLead(l: LeadRow): string {

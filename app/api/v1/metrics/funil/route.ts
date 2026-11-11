@@ -234,7 +234,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     stage_id: l.stage_id,
     // ia.vek 28/10: o negócio levado para outro funil (o Follow-up) segue vivo lá —
     // não é perda em lugar nenhum. Na matriz origem × status ele conta como aberto.
-    status: (l.status === "won" || (l.status === "lost" && l.lost_reason !== MOTIVO_DA_TRANSFERENCIA) ? l.status : "open"),
+    // ia.vek v1.9.45 (CRM-294, D2): a Compra futura segue como ela mesma; nunca vira "aberto".
+    status: (l.status === "won" || l.status === "future" || (l.status === "lost" && l.lost_reason !== MOTIVO_DA_TRANSFERENCIA) ? l.status : "open"),
     source: l.source ?? "",
     value_cents: l.value_cents,
     currency: l.currency,

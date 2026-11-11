@@ -30,7 +30,7 @@ export async function recalculaScoreDoLead(
   agora = new Date(),
 ): Promise<ResultadoDaEscrita> {
   const { rows } = await db.query<{
-    status: "open" | "won" | "lost";
+    status: "open" | "won" | "lost" | "future";
     contact_id: string | null;
     last_activity_at: string | null;
     created_at: string;

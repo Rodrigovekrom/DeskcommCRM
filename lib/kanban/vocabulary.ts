@@ -5,6 +5,7 @@ const DEFAULTS: Required<PipelineVocabulary> = {
   deal: "Negócio",
   won: "Ganho",
   lost: "Perdido",
+  future: "Compra futura",
 };
 
 export function resolveVocabulary(

@@ -148,6 +148,13 @@ const deliveryStatus: Record<string, string> = {
   failed: "Falha no processamento",
   dead: "Tentativas encerradas",
 };
+// ia.vek v1.9.45 (CRM-294): o status do negócio por extenso para o titular (sem o código "future").
+const statusDoNegocio: Record<string, string> = {
+  open: "Aberto",
+  won: "Ganho",
+  lost: "Perdido",
+  future: "Compra futura",
+};
 const noticeStatus: Record<string, string> = {
   open: "Aberto",
   resolved: "Resolvido",
@@ -436,7 +443,7 @@ export function LgpdExportPdf({ data, unsignedWarning }: Props): React.ReactElem
             {data.leads.map((l) => (
               <View key={l.id} style={styles.itemBlock}>
                 <Text>
-                  {l.title ?? "(sem título)"} · {l.status} ·{" "}
+                  {l.title ?? "(sem título)"} · {statusDoNegocio[l.status] ?? l.status} ·{" "}
                   {fmtMoney(l.value_cents, l.currency)}
                 </Text>
                 <Text style={styles.small}>Criado em {fmtDate(l.created_at)}</Text>

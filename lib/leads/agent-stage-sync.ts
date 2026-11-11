@@ -256,7 +256,7 @@ export async function sincronizaEstagioDoAgente(
       id: c.id,
       organization_id: c.organization_id,
       pipeline_id: c.pipeline_id,
-      status: c.status as "open" | "won" | "lost",
+      status: c.status as "open" | "won" | "lost" | "future",
       created_at: c.created_at,
       last_activity_at: c.last_activity_at,
     })),

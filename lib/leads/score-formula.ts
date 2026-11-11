@@ -37,7 +37,7 @@ export interface SinaisDoLead {
    * um lead ganho exibindo "72%" para sempre é o dado que não muda decisão
    * nenhuma, e o card ficaria carregando um número que já foi respondido.
    */
-  status: "open" | "won" | "lost";
+  status: "open" | "won" | "lost" | "future";
   /** Faixa anterior, para a histerese. `null` na primeira vez. */
   bandAnterior: ScoreBand | null;
 }

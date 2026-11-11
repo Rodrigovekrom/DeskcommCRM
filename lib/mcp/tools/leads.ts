@@ -138,7 +138,7 @@ async function enrichLeads(
 const listInputShape = {
   pipeline_id: z.string().uuid().optional(),
   stage_id: z.string().uuid().optional(),
-  status: z.enum(["open", "won", "lost"]).optional(),
+  status: z.enum(["open", "won", "lost", "future"]).optional(),
   owner_user_id: z.string().uuid().optional(),
   /** `lost_reason` exato do negócio perdido (issue #1537). */
   lost_reason: z.string().min(1).max(500).optional(),

@@ -52,8 +52,8 @@ export const filtroDeAudienciaSchema = z
     etapas: z.array(z.string().uuid()).max(50).default([]),
     /** ...com algum destes donos. */
     responsaveis: z.array(z.string().uuid()).max(50).default([]),
-    /** Situação do negócio: `open`, `won`, `lost`. */
-    situacoes_do_negocio: z.array(z.enum(["open", "won", "lost"])).max(3).default([]),
+    /** Situação do negócio: `open`, `won`, `lost`, `future` (ia.vek: Compra futura). */
+    situacoes_do_negocio: z.array(z.enum(["open", "won", "lost", "future"])).max(4).default([]),
 
     /** Sem interação há N dias (silêncio) — o filtro de reativação. */
     sem_interacao_ha_dias: z.number().int().min(1).max(3650).nullable().default(null),

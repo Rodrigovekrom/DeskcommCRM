@@ -334,7 +334,7 @@ function actorAuditPayload(actor: Actor): {
 export interface ListLeadsQuery {
   pipeline_id?: string;
   stage_id?: string;
-  status?: "open" | "won" | "lost";
+  status?: "open" | "won" | "lost" | "future";
   owner_user_id?: string;
   /** `lost_reason` exato (issue #1537) — o filtro de perda por motivo. */
   lost_reason?: string;

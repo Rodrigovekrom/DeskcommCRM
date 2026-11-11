@@ -48,6 +48,8 @@ const STATUS_OPTIONS: Array<{ value: NonNullable<LeadFilters["status"]>; label: 
   { value: "open", label: "Abertos" },
   { value: "won", label: "Ganhos" },
   { value: "lost", label: "Perdidos" },
+  // ia.vek v1.9.45 (CRM-294, D3): os leads em Compra futura, para o gerente achar.
+  { value: "future", label: "Compra futura" },
 ];
 
 export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps) {

@@ -55,7 +55,7 @@ export interface LeadDaJanela {
   id: string;
   pipeline_id: string;
   stage_id: string;
-  status: "open" | "won" | "lost";
+  status: "open" | "won" | "lost" | "future";
   source: string;
   value_cents: number | null;
   currency: string | null;
@@ -132,7 +132,7 @@ export interface BaldePorMoeda {
 
 export interface LinhaDeOrigem {
   origem: string;
-  status: "won" | "lost" | "open";
+  status: "won" | "lost" | "open" | "future";
   quantidade: number;
   por_moeda: BaldePorMoeda[];
 }
@@ -158,7 +158,8 @@ export interface RelatorioDeFunil {
 
 export const SEM_ORIGEM = "sem origem";
 /** Ordem de leitura da matriz origem × status: o que interessa primeiro. */
-const ORDEM_DO_STATUS: ReadonlyArray<LeadDaJanela["status"]> = ["won", "lost", "open"];
+// ia.vek v1.9.45 (CRM-294, D2): a Compra futura é coluna PRÓPRIA (não é aberto, ganho nem perdido).
+const ORDEM_DO_STATUS: ReadonlyArray<LeadDaJanela["status"]> = ["won", "lost", "open", "future"];
 
 function dentro(momento: string | null | undefined, janela: Janela): boolean {
   if (!momento) return false;
