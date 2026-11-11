@@ -57,7 +57,10 @@ describe("v1.9.19.2: leitura sem corte", () => {
   });
   it("a esteira não trata erro como 'ninguém cobrado' nem 'nenhuma ligação'", () => {
     const s = readFileSync("lib/esteira/deps-reais.ts", "utf8");
-    expect(s.match(/buscaEmLotes\(/g)?.length).toBeGreaterThanOrEqual(3);
+    // v1.9.42: handoff e ligações seguem em lotes; as cobranças vão direto ao banco (pares distintos),
+    // porque em lotes pela API a resposta era cortada e a cobrança se repetia (CRM, 11/11).
+    expect(s.match(/buscaEmLotes\(/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(s).toMatch(/select distinct source_id::text as task_id/);
     expect(s).not.toMatch(/\.limit\(500\)/);
   });
 });

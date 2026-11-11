@@ -414,21 +414,21 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
     async cobrancasFeitas(tarefaIds) {
       const mapa = new Map<string, Set<number>>();
       if (tarefaIds.length === 0) return mapa;
-      // v1.9.19.2: um corte ou erro aqui viraria "ninguém foi cobrado", e cobraria de novo.
-      const { data, error } = await buscaEmLotes(tarefaIds, (lote) =>
-        admin
-          .from("crm_lead_activities")
-          .select("payload")
-          .eq("organization_id", orgId)
-          .eq("type", "esteira_ligacao_cobrada")
-          .in("source_id", lote),
+      // ia.vek v1.9.42 (11/11): só os pares DISTINTOS (tarefa, nível), direto no banco. Antes vinham pela
+      // API TODAS as atividades de cobrança das tarefas, e a resposta era cortada no max_rows do
+      // PostgREST: tarefa fora do corte parecia "nunca cobrada", era cobrada de novo e gerava mais linhas
+      // (408 mil cobranças repetidas, medido em 11/11). Um erro aqui DERRUBA a rodada (throw): é melhor
+      // não cobrar ninguém numa rodada do que cobrar todo mundo de novo.
+      const { rows } = await getRequestPool().query(
+        `select distinct source_id::text as task_id, (payload->>'nivel')::int as nivel
+           from crm_lead_activities
+          where organization_id = $1 and type = 'esteira_ligacao_cobrada'
+            and source_id = any($2::uuid[]) and (payload->>'nivel') ~ '^[0-9]+$'`,
+        [orgId, tarefaIds],
       );
-      if (error) throw new Error(error.message);
-      for (const r of data as Array<{ payload: { task_id?: string; nivel?: number } | null }>) {
-        const id = r.payload?.task_id;
-        if (!id || typeof r.payload?.nivel !== "number") continue;
-        if (!mapa.has(id)) mapa.set(id, new Set());
-        mapa.get(id)!.add(r.payload.nivel);
+      for (const r of rows as Array<{ task_id: string; nivel: number }>) {
+        if (!mapa.has(r.task_id)) mapa.set(r.task_id, new Set());
+        mapa.get(r.task_id)!.add(r.nivel);
       }
       return mapa;
     },
