@@ -17,3 +17,21 @@ merge sem cuidado os quebraria ou seria quebrado por eles.
 - **Num merge:** todo código novo do upstream que trate "não é `open`" como fechado, ou que
   faça um `switch` exaustivo em `open`, `won` e `lost`, tem de decidir o que fazer com o
   `future`. Ver `compra-futura-impacto.md`, que lista onde isso já foi decidido.
+
+## docker-compose.prod.yml do SERVIDOR: limites de memória (incidente de 11/11/2026, 19:05Z)
+
+O app caiu com "JavaScript heap out of memory": sem NODE_OPTIONS, o Node escolhia sozinho 396 MB de heap
+(metade do teto de 768m), e a queda veio em 368 MB de uso. O WAHA rodava com o heap de 16384 MB que a imagem
+traz, num teto de 1280m: o Node dele nunca apertava a coleta e o contêiner vivia colado no teto.
+Com a ordem do Rodrigo e a revisão da Lupa, o docker-compose.prod.yml DO SERVIDOR foi editado (com backup em
+/root/iavek-backups/memoria-20261111T195229Z):
+
+| Serviço | Antes | Depois |
+|---|---|---|
+| app | mem_limit 768m, heap automático (396 MB) | mem_limit 1024m, NODE_OPTIONS=--max-old-space-size=576 |
+| waha | mem_limit 1280m, heap 16384 MB (da imagem) | mem_limit 1280m (igual), NODE_OPTIONS=--max-old-space-size=900 |
+
+- Por que no compose e não num arquivo de acréscimo: o `dc()` do hostgator-setup-kit usa `-f docker-compose.prod.yml`
+  fixo, então um override não seria lido numa troca. E não no .env: o .env também alimenta o worker (teto 512m).
+- O `trocar-producao.sh` (ops) confere estes 4 valores depois de toda troca e avisa se mudarem.
+- Numa atualização do upstream que traga um docker-compose.prod.yml novo, estas 2 edições têm de ser refeitas.
