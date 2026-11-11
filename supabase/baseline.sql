@@ -48731,6 +48731,62 @@ create policy orgs_select_analista_de_ficha on public.organizations
     id in (select public.fn_iavek_orgs_onde_sou_analista())
   );
 
+-- ---- ia.vek: source_metadata mesclado no banco (migration 0616, v1.9.43) ----
+-- Ver o cabeçalho de supabase/migrations/20261111140000_0616_iavek_mesclar_source_metadata.sql.
+create or replace function public.fn_iavek_mesclar_source_metadata(p_org uuid, p_lead uuid, p_patch jsonb)
+returns boolean
+language sql
+security invoker
+set search_path = public
+as $$
+  with u as (
+    update public.crm_leads
+       set source_metadata = coalesce(source_metadata, '{}'::jsonb) || p_patch
+     where id = p_lead
+       and organization_id = p_org
+       and jsonb_typeof(p_patch) = 'object'
+    returning 1
+  )
+  select exists (select 1 from u);
+$$;
+
+revoke all on function public.fn_iavek_mesclar_source_metadata(uuid, uuid, jsonb) from public, anon;
+grant execute on function public.fn_iavek_mesclar_source_metadata(uuid, uuid, jsonb) to authenticated, service_role;
+
+comment on function public.fn_iavek_mesclar_source_metadata(uuid, uuid, jsonb) is
+  'ia.vek v1.9.43 (0616): source_metadata = coalesce(source_metadata, {}) || p_patch, numa instrução só (sem ler-e-regravar). SECURITY INVOKER: vale o RLS de quem chama. Devolve true se o lead (da organização) foi atualizado.';
+
+-- ---- ia.vek: a última atribuição de cada atendente, para o rodízio (migration 0617, v1.9.44) ----
+-- Ver o cabeçalho de supabase/migrations/20261111160000_0617_iavek_ultima_atribuicao_por_atendente.sql.
+create or replace function public.fn_iavek_ultima_atribuicao(
+  p_org uuid,
+  p_users uuid[],
+  p_channel_session uuid default null
+)
+returns table (to_user_id uuid, created_at timestamptz)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select distinct on (e.to_user_id) e.to_user_id, e.created_at
+    from public.conversation_assignment_events e
+    join public.conversations c on c.id = e.conversation_id
+   where e.organization_id = p_org
+     and e.to_user_id = any (p_users)
+     and (
+       p_channel_session is null
+       or (c.organization_id = p_org and c.channel_session_id = p_channel_session)
+     )
+   order by e.to_user_id, e.created_at desc;
+$$;
+
+revoke all on function public.fn_iavek_ultima_atribuicao(uuid, uuid[], uuid) from public, anon;
+grant execute on function public.fn_iavek_ultima_atribuicao(uuid, uuid[], uuid) to authenticated, service_role;
+
+comment on function public.fn_iavek_ultima_atribuicao(uuid, uuid[], uuid) is
+  'ia.vek v1.9.44 (0617): a última atribuição de cada atendente (distinct on to_user_id) para o rodízio. SECURITY INVOKER. No escopo de canal, só as conversas daquele canal.';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
