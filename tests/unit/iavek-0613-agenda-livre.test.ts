@@ -49,8 +49,14 @@ describe("banco (0613, última definição do baseline)", () => {
     const p = b.slice(i, b.indexOf(");\n", b.indexOf("with check", i)));
     expect(p.match(/fn_role_at_least\(organization_id, 'agent'\)\s*and not public\.fn_iavek_modo_agendamento\(organization_id\)/g)?.length).toBe(2);
   });
-  it("concluir não pede duas etapas; o resto segue pedindo", () => {
-    expect(ultima(b, "fn_appointment_change_core")).toContain("coalesce(p_patch->>'status','') not in ('completed','no_show') and not public.fn_session_mfa_proven()");
+  it("v1.9.45 (0618, CRM-281): concluir sem duas etapas SÓ na loja; na clínica (modo agendamento) volta a pedir", () => {
+    const f = ultima(b, "fn_appointment_change_core");
+    expect(f).toContain(
+      "and (coalesce(p_patch->>'status','') not in ('completed','no_show') or public.fn_iavek_modo_agendamento(p_org))",
+    );
+    expect(f).toContain("and not public.fn_session_mfa_proven() then raise exception 'appointment_mfa_required'");
+    // a regra da 0613, que liberava concluir em TODA organização, não pode voltar
+    expect(f).not.toContain("coalesce(p_patch->>'status','') not in ('completed','no_show') and not public.fn_session_mfa_proven()");
   });
   it("agenda do colega e 'ainda não começou' só valem no modo agendamento", () => {
     expect(ultima(b, "fn_appointment_change_core")).toContain("and public.fn_iavek_modo_agendamento(p_org)");
