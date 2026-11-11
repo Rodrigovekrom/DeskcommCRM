@@ -76,7 +76,9 @@ CRONS="
 */5 * * * *|45|api/v1/cron/channel-health
 */10 * * * *|60|api/v1/cron/contact-avatars
 17 * * * *|300|api/v1/cron/estoque-altimus|resposta
-*/5 * * * *|300|api/v1/cron/esteira-vendas
+# ia.vek v1.9.43 (Lupa): `|resposta` deixa UMA linha por rodada da esteira no log do scheduler
+# (contagens, ou `pulada`). É a prova positiva de que ela RODOU: a vigia da troca exige ao menos uma.
+*/5 * * * *|300|api/v1/cron/esteira-vendas|resposta
 # Segunda, 8h em São Paulo (11h UTC): relatório semanal das ligações da esteira.
 0 11 * * 1|120|api/v1/cron/esteira-relatorio
 */15 * * * *|120|api/v1/cron/tarefas-vencidas

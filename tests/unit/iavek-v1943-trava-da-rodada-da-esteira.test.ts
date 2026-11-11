@@ -166,3 +166,11 @@ describe("v1.9.43: trava da rodada da esteira por organização", () => {
     expect(chaveDaTravaDaEsteira("x")).toBe("esteira:x");
   });
 });
+
+describe("v1.9.43 (Lupa): a rodada da esteira deixa prova positiva no log do scheduler", () => {
+  it("a rota da esteira está marcada com |resposta (uma linha por rodada; a vigia da troca exige ao menos uma)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const s = readFileSync("docker/scheduler/entrypoint.sh", "utf8");
+    expect(s).toMatch(/^\*\/5 \* \* \* \*\|300\|api\/v1\/cron\/esteira-vendas\|resposta$/m);
+  });
+});
