@@ -32,6 +32,8 @@ export interface Stage {
   color: string | null;
   is_won: boolean;
   is_lost: boolean;
+  /** ia.vek v1.9.45 (CRM-294): a etapa Compra futura (o lead nela fica 'future'). */
+  is_compra_futura?: boolean;
   is_archived: boolean;
   expected_duration_hours: number | null;
   /**

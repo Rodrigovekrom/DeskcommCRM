@@ -10436,6 +10436,14 @@ export const DICIONARIO: Traducoes = {
   "A imagem precisa ter até 5 MB.": { es: "La imagen no debe superar los 5 MB." },
   "Apenas versões 'draft' podem ser editadas.": { es: "Solo se pueden editar las versiones 'draft'." },
   "Arquivo acima de 50 MB.": { es: "El archivo supera los 50 MB." },
+  // ia.vek v1.9.45 (CRM-294): Compra futura
+  "Compra futura": { es: "Compra futura" },
+  "O cliente quer comprar mais para frente. Escolha o mês e o ano previstos: 7 dias antes, você ganha uma tarefa para ligar.": {
+    es: "El cliente quiere comprar más adelante. Elija el mes y el año previstos: 7 días antes, recibirá una tarea para llamar.",
+  },
+  "Mês e ano previstos": { es: "Mes y año previstos" },
+  "O mês previsto não pode estar no passado.": { es: "El mes previsto no puede estar en el pasado." },
+  "Informe o mês e o ano previstos da compra.": { es: "Indique el mes y el año previstos de la compra." },
   // ia.vek v1.9.45 (CRM-280): CEP e km do "Ir até o cliente"
   "CEP do cliente": { es: "Código postal del cliente" },
   "Nº": { es: "Nº" },

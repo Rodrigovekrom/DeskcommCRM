@@ -24,6 +24,8 @@ export interface MoveArgs {
   venda?: VendaDaLoja;
   /** ia.vek v1.9.18: por onde veio, para a auditoria. */
   via?: "arrasto" | "botao" | "desfazer";
+  /** ia.vek v1.9.45 (CRM-294): "AAAA-MM", quando o destino é a Compra futura. */
+  compraFuturaMes?: string;
 }
 
 /**
@@ -93,6 +95,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
         ...(args.wonReason !== undefined ? { won_reason: args.wonReason } : {}),
         ...(args.venda ? { venda: args.venda } : {}),
         ...(args.via ? { via: args.via } : {}),
+        ...(args.compraFuturaMes ? { compra_futura_mes: args.compraFuturaMes } : {}),
       });
     },
     // ia.vek v1.7.7: por PREFIXO (`setQueriesData`) — o mesmo funil pode estar

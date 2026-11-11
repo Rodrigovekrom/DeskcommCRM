@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { compararLeads, ehColunaDaIa, manterOrdem, semRespostaPrimeiro, type OrdemDoQuadro } from "@/lib/iavek/ordem-do-quadro";
 import { LoseLeadDialog } from "./LoseLeadDialog";
+import { CompraFuturaDialog } from "./CompraFuturaDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { ConversaNoQuadro, ConversaNoQuadroContext } from "@/components/iavek/ConversaNoQuadro";
 import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
@@ -157,6 +158,12 @@ export function KanbanBoard({
   // ia.vek v1.7.7: soltar o cartão numa etapa de PERDA pede o motivo (a mesma
   // janela do "Perder" do menu do cartão) em vez de tentar mover e levar recusa.
   const [perdaPendente, setPerdaPendente] = useState<string | null>(null);
+  // ia.vek v1.9.45 (CRM-294): entrar na Compra futura pede o mês e o ano previstos.
+  const [compraFuturaPendente, setCompraFuturaPendente] = useState<{
+    args: { leadId: string; stageId: string; positionInStage: number; expectedUpdatedAt: string; via: "arrasto" | "botao" };
+    lead: Lead;
+    etapa: Stage;
+  } | null>(null);
   const { lojaDeCarros } = usePerfilDaEmpresa();
   const [vendaPendente, setVendaPendente] = useState<{
     args: { leadId: string; stageId: string; positionInStage: number; expectedUpdatedAt: string };
@@ -368,6 +375,10 @@ export function KanbanBoard({
         expectedUpdatedAt: lead.updated_at,
         via,
       };
+      if (etapa.is_compra_futura && mudaDeEtapa) {
+        setCompraFuturaPendente({ args, lead, etapa });
+        return;
+      }
       // ia.vek v1.9.12: entrar na venda, na loja de carros, pede valor e data.
       if (lojaDeCarros && etapa.is_won && mudaDeEtapa && lead.status !== "won") {
         setVendaPendente({ args, valorCents: lead.value_cents ?? null });
@@ -662,6 +673,25 @@ export function KanbanBoard({
             const lead = data?.leads.find((l) => l.id === perdaPendente);
             const etapa = data?.stages.find((e) => e.is_lost);
             if (lead && etapa) avisarMovimento(lead, etapa);
+          }}
+        />
+      )}
+      {compraFuturaPendente && (
+        <CompraFuturaDialog
+          open
+          pending={moveCard.isPending}
+          onOpenChange={(v: boolean) => !v && setCompraFuturaPendente(null)}
+          onConfirm={(mes) => {
+            const { args, lead, etapa } = compraFuturaPendente;
+            moveCard.mutate(
+              { ...args, compraFuturaMes: mes },
+              {
+                onSuccess: () => {
+                  setCompraFuturaPendente(null);
+                  avisarMovimento(lead, etapa);
+                },
+              },
+            );
           }}
         />
       )}

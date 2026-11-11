@@ -86,7 +86,7 @@ export async function POST(
   // REABRIRIA um negócio encerrado (issue #1538).
   const { data: stage, error: stageErr } = await supabase
     .from("crm_stages")
-    .select("id, pipeline_id, name, is_lost, is_won")
+    .select("id, pipeline_id, name, is_lost, is_won, is_compra_futura")
     .eq("id", input.stage_id)
     .maybeSingle();
 
@@ -235,6 +235,10 @@ export async function POST(
       ...(stage.is_won && input.won_reason?.trim()
         ? { won_reason: input.won_reason.trim() }
         : {}),
+      // ia.vek v1.9.45 (CRM-294): o mês da Compra futura, NA MESMA escrita (o gatilho exige e confere).
+      ...((stage as { is_compra_futura?: boolean }).is_compra_futura && input.compra_futura_mes
+        ? { compra_futura_mes: `${input.compra_futura_mes}-01` }
+        : {}),
       // O merge é AQUI, nunca num PATCH anterior: ver `custom_fields` em
       // `moveLeadSchema` — dois writes teriam janela e uma segunda OCC.
       ...(input.custom_fields
@@ -257,6 +261,13 @@ export async function POST(
     // com a decisão acima, quem está na tela recebe a recusa de negócio. Sem isto,
     // qualquer caminho novo que escreva `stage_id` sem passar pela decisão volta a
     // chegar aqui como 500 — que é o defeito, com outro nome.
+    // ia.vek v1.9.45 (CRM-294): as recusas da Compra futura (sem mês, mês no passado) são de negócio.
+    if (/compra_futura_mes_required/.test(updErr.message)) {
+      return fail("compra_futura_mes_required", t("Informe o mês e o ano previstos da compra."), 422, { requestId });
+    }
+    if (/compra_futura_mes_no_passado/.test(updErr.message)) {
+      return fail("compra_futura_mes_no_passado", t("O mês previsto não pode estar no passado."), 422, { requestId });
+    }
     const recusa = recusaDeMotivoDaPerdaPeloBanco(updErr, user.idioma);
     // v1.8.3: a trava da loja leva a lista do que falta — a tela abre a janela, não um toast.
     if (recusa) {

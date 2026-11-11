@@ -43,6 +43,11 @@ export const moveLeadSchema = z.object({
    */
   won_reason: z.string().max(500).optional(),
   /**
+   * ia.vek v1.9.45 (CRM-294): o mês e o ano previstos da Compra futura ("AAAA-MM"), quando a etapa de
+   * destino é a Compra futura. Vai NA MESMA escrita que muda a etapa; o banco exige e recusa o passado.
+   */
+  compra_futura_mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mês inválido (AAAA-MM).").optional(),
+  /**
    * ia.vek v1.9.12: valor final e data, na loja de carros. Quem valida é
    * `lerVendaDaLoja` (a recusa de negócio é a mesma do botão de ganho).
    */
