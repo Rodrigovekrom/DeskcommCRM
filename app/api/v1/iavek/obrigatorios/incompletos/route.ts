@@ -15,6 +15,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 
+/** ia.vek v1.9.44: leads por chamada do rpc (abaixo do corte do servidor). */
+const LOTE_DO_RPC = 1000;
+
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
@@ -38,9 +41,16 @@ export async function GET(): Promise<Response> {
   if (error) return fail("internal_error", error.message, 500, { requestId });
   const lista = (leads ?? []) as Array<{ id: string; title: string; owner_user_id: string }>;
   if (lista.length === 0) return ok({ ativo: true, vendedores: [] }, { requestId });
-  const { data: faltas, error: e2 } = await supabase.rpc("fn_iavek_campos_que_faltam", { p_lead_ids: lista.map((l) => l.id) });
-  if (e2) return fail("internal_error", e2.message, 500, { requestId });
-  const faltam = new Map(((faltas ?? []) as Array<{ lead_id: string; faltam: string[] | null }>).map((r) => [r.lead_id, r.faltam ?? []]));
+  // ia.vek v1.9.44 (Lupa): a saída do rpc também passa pelo corte do servidor (3.000 na produção).
+  // Com todos os leads numa chamada, quem ficasse de fora da resposta contava como COMPLETO. Em lotes
+  // de LOTE_DO_RPC, cada resposta fica abaixo do corte.
+  const faltam = new Map<string, string[]>();
+  for (let i = 0; i < lista.length; i += LOTE_DO_RPC) {
+    const lote = lista.slice(i, i + LOTE_DO_RPC).map((l) => l.id);
+    const { data: faltas, error: e2 } = await supabase.rpc("fn_iavek_campos_que_faltam", { p_lead_ids: lote });
+    if (e2) return fail("internal_error", e2.message, 500, { requestId });
+    for (const r of (faltas ?? []) as Array<{ lead_id: string; faltam: string[] | null }>) faltam.set(r.lead_id, r.faltam ?? []);
+  }
 
   const porVendedor = new Map<string, Array<{ lead_id: string; titulo: string; faltam: string[] }>>();
   for (const l of lista) {

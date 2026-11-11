@@ -41,6 +41,8 @@ interface StubState {
   allowed?: string[];
   claimResult?: string;
   rpcCalls: Array<{ fn: string; args: Record<string, unknown> }>;
+  /** v1.9.44: os argumentos do rpc do histórico do rodízio (fn_iavek_ultima_atribuicao). */
+  historicoPedido?: Record<string, unknown>;
   updates: Array<{ table: string; values: Record<string, unknown> }>;
   inserts: Array<{ table: string; values: Record<string, unknown> }>;
 }
@@ -100,6 +102,11 @@ function makeSupabaseStub(state: StubState) {
   return {
     from,
     rpc: (fn: string, args: Record<string, unknown>) => {
+      // v1.9.44 (0617): o histórico do rodízio vem de um rpc de LEITURA, fora do que este arquivo mede.
+      if (fn === "fn_iavek_ultima_atribuicao") {
+        state.historicoPedido = args;
+        return Promise.resolve({ data: [], error: null });
+      }
       state.rpcCalls.push({ fn, args });
       return Promise.resolve({ data: fn === "fn_channel_routing_claim" ? state.claimResult ?? "assigned" : null, error: null });
     },

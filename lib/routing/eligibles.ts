@@ -79,23 +79,21 @@ export async function loadEligibleAttendants(
   }
 
   // Última atribuição recebida (rodízio real, sem coluna de estado).
-  let history = supabase
-    .from("conversation_assignment_events")
-    .select("to_user_id, created_at, conversations!inner(organization_id, channel_session_id)")
-    .eq("organization_id", organizationId)
-    .in("to_user_id", userIds)
-    .order("created_at", { ascending: false });
-  if (scope.kind === "conversation_channel") {
-    history = history.eq("conversations.organization_id", organizationId)
-      .eq("conversations.channel_session_id", scope.channelSessionId);
-  }
-  const { data: assignEvents, error: historyError } = await history;
+  // ia.vek v1.9.44 (0617, Lupa): antes vinham TODOS os eventos e o código ficava com o primeiro de
+  // cada um. Acima do corte do servidor (3.000), quem recebeu antes dos eventos mais recentes voltava
+  // como "nunca recebeu" e furava o rodízio. O rpc devolve no máximo uma linha por atendente.
+  const { data: ultimas, error: historyError } = await (supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>)("fn_iavek_ultima_atribuicao", {
+    p_org: organizationId,
+    p_users: userIds,
+    p_channel_session: scope.kind === "conversation_channel" ? scope.channelSessionId : null,
+  });
   if (historyError) throw new Error(historyError.message);
   const lastAssignedByUser = new Map<string, number>();
-  for (const e of (assignEvents ?? []) as Array<{ to_user_id: string | null; created_at: string }>) {
-    if (e.to_user_id && !lastAssignedByUser.has(e.to_user_id)) {
-      lastAssignedByUser.set(e.to_user_id, new Date(e.created_at).getTime());
-    }
+  for (const e of (ultimas ?? []) as Array<{ to_user_id: string | null; created_at: string }>) {
+    if (e.to_user_id) lastAssignedByUser.set(e.to_user_id, new Date(e.created_at).getTime());
   }
 
   const candidates: RoutingCandidate[] = [];
