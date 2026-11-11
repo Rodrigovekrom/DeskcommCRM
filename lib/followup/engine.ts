@@ -50,6 +50,7 @@ import {
   type AvisoRecuperacaoEsgotada,
 } from "./no-show-recuperacao-esgotada";
 import { interpolarDestino, persistirRespostaFollowupSupabase } from "./persistir-resposta";
+import { FONTE_DA_TAREFA_DE_FOLLOWUP } from "@/lib/tarefas/vocabulario-de-origem";
 import { criarTarefaInterna as criarTarefaNoCrm } from "@/lib/tarefas/criar-tarefa";
 import { moveLeadHandler } from "@/app/api/v1/leads/_handler";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
@@ -1125,6 +1126,8 @@ export function createSupabaseAdminClient(admin: SupabaseClient): AdminClient {
         contactId: item.contact_id,
         descricao: null,
         origem: `followup:${item.enrollment_id}`,
+        // ia.vek v1.9.46 (0625): marca a tarefa como de PRÉ-VENDA (o ganho do lead a cancela; a de pós-venda fica)
+        sourceKind: FONTE_DA_TAREFA_DE_FOLLOWUP,
       });
       if (!resultado.ok) {
         logger.warn("followup_internal_task_skipped", {

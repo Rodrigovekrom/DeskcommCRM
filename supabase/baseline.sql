@@ -49609,6 +49609,39 @@ create trigger trg_iavek_trava_retencao_paga
   before update of media_retention_days on public.organizations
   for each row execute function public.fn_iavek_trava_retencao_paga();
 
+-- ---- ia.vek: o ganho só cancela a pré-venda (migration 0625, v1.9.46) ----
+-- ⚠️ ANTES DA VARREDURA anon: substitui função. Ver o cabeçalho de supabase/migrations/20261112000000_0625_iavek_ganho_so_cancela_pre_venda.sql.
+create or replace function public.fn_iavek_cancela_tarefas_do_lead_fechado()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  with canceladas as (
+    update public.crm_tasks t
+       set status = 'cancelled'
+     where t.lead_id = new.id
+       and t.organization_id = new.organization_id
+       and t.status in ('pending', 'in_progress')
+       -- ia.vek 0625: no GANHO, só a pré-venda. Perder e Compra futura: todas.
+       and (new.status <> 'won'
+            or t.source_kind like 'ligacao%'
+            or t.source_kind in ('followup', 'promised_proposal', 'promised_followup'))
+    returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title
+  )
+  insert into public.crm_lead_activities
+    (organization_id, lead_id, contact_id, source_module, source_id, type, actor_kind, reason, payload, metadata, performed_at)
+  select c.organization_id, c.lead_id, c.contact_id, 'tarefas', c.id, 'task_cancelled', 'rule',
+         case when new.status = 'won' then 'Tarefa cancelada: lead ganho (era da pré-venda)' else 'Tarefa cancelada: lead fechado' end,
+         jsonb_build_object('motivo', 'lead_fechado', 'status_do_lead', new.status, 'titulo', left(c.title, 200)),
+         jsonb_build_object('origem', 'gatilho_0625'), now()
+    from canceladas c;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_cancela_tarefas_do_lead_fechado() from public, anon, authenticated;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
