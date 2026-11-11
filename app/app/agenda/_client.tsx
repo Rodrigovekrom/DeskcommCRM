@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { EntradaDaAgenda } from "@/components/agenda/EntradaDaAgenda";
 import { EnderecoDaMarcacao } from "@/components/agenda/EnderecoDaMarcacao";
+import { CepEKmDoCliente } from "@/components/iavek/CepEKmDoCliente";
 import { VinculoDaMarcacao } from "@/components/agenda/VinculoDaMarcacao";
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
@@ -205,6 +206,9 @@ export function AgendaClient({
   // `null` = ainda não mexeu: o campo mostra o local do TIPO. String (mesmo
   // vazia) = a pessoa editou, e o tipo novo não pode devolver o que ela apagou.
   const [enderecoEditado, setEnderecoEditado] = React.useState<string | null>(null);
+  // ia.vek v1.9.45 (CRM-280): CEP e número do cliente no "Ir até o cliente".
+  const [cepDoCliente, setCepDoCliente] = React.useState("");
+  const [numeroDoCliente, setNumeroDoCliente] = React.useState("");
   /**
    * ia.vek v1.9.38 (CRM-256): o TÍTULO do compromisso, livre. Nasce com o nome do
    * tipo — quem não mexe marca exatamente como antes — e quem quer escreve o que
@@ -866,6 +870,19 @@ export function AgendaClient({
                   </p>
                 </div>
                 <EnderecoDaMarcacao value={endereco} onChange={setEnderecoEditado} />
+                {/* ia.vek v1.9.45 (CRM-280): no "Ir até o cliente", o CEP traz o endereço e o km da loja. */}
+                {/cliente/i.test(tipo?.localDetalhes ?? "") ? (
+                  <CepEKmDoCliente
+                    cep={cepDoCliente}
+                    numero={numeroDoCliente}
+                    onCep={setCepDoCliente}
+                    onNumero={setNumeroDoCliente}
+                    onEnderecoDoCep={(e) => {
+                      // Só preenche se o endereço ainda está vazio ou é a dica do tipo; nunca apaga o que foi digitado.
+                      if (!endereco.trim() || endereco.trim() === (tipo?.localDetalhes ?? "").trim()) setEnderecoEditado(e);
+                    }}
+                  />
+                ) : null}
                 <div>
                   <label className="block" htmlFor="observacao-do-compromisso">
                     {t("Observação")}{" "}
@@ -994,12 +1011,17 @@ export function AgendaClient({
                       starts_at: instante,
                       guest_email: convidado,
                       location_details: endereco.trim(),
+                      ...(cepDoCliente.replace(/\D/g, "").length === 8
+                        ? { iavek_cep: cepDoCliente.replace(/\D/g, ""), iavek_numero: numeroDoCliente.trim() || undefined }
+                        : {}),
                       description: observacao.trim() || undefined,
                     })
                     .then((r) => {
                       setEmailConvidado("");
                       setEnderecoEditado(null);
                       setTituloEditado(null);
+                      setCepDoCliente("");
+                      setNumeroDoCliente("");
                       setObservacao("");
                       // Guardado para o fechamento saber para onde levar a grade.
                       setMarcadoEm(instante);

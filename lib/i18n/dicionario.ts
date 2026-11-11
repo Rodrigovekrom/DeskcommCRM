@@ -10436,6 +10436,13 @@ export const DICIONARIO: Traducoes = {
   "A imagem precisa ter até 5 MB.": { es: "La imagen no debe superar los 5 MB." },
   "Apenas versões 'draft' podem ser editadas.": { es: "Solo se pueden editar las versiones 'draft'." },
   "Arquivo acima de 50 MB.": { es: "El archivo supera los 50 MB." },
+  // ia.vek v1.9.45 (CRM-280): CEP e km do "Ir até o cliente"
+  "CEP do cliente": { es: "Código postal del cliente" },
+  "Nº": { es: "Nº" },
+  "Calculando o km…": { es: "Calculando los km…" },
+  "km da loja": { es: "km desde la tienda" },
+  "CEP não encontrado.": { es: "Código postal no encontrado." },
+  "Km indisponível agora; o agendamento segue normal.": { es: "Km no disponible ahora; la cita sigue normal." },
   "Arquivo excede o limite de 20MB.": { es: "El archivo supera el límite de 20MB." },
   "Atendente não encontrado na organização.": { es: "Asesor no encontrado en la organización." },
   "Atualização não encontrada.": { es: "Actualización no encontrada." },

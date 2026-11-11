@@ -25,6 +25,9 @@ export interface NovoAgendamento {
    * Google quando existe. Vazio ou ausente não convida outra pessoa.
    */
   guest_email?: string;
+  /** ia.vek v1.9.45 (CRM-280): CEP e número do cliente no "Ir até o cliente" (o km é do servidor). */
+  iavek_cep?: string;
+  iavek_numero?: string;
 }
 
 /**
