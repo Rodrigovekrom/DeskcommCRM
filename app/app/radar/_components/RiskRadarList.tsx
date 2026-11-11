@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -7,7 +8,10 @@ import { useT } from "@/hooks/i18n/useT";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/auth/AuthProvider";
+import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
+import { useEditLead } from "@/hooks/kanban/useUpdateLead";
 import { useAtRiskLeads, type AtRiskLead } from "@/hooks/leads/useAtRiskLeads";
 import type { RiskBucket } from "@/lib/leads/risk-radar";
 import {
@@ -54,9 +58,22 @@ export function destinoDaDemandaSemPasso(demanda: {
   return `/app/contacts/${demanda.contact_id}`;
 }
 
+/**
+ * ia.vek v1.9.45 (CRM-297, decisão do Rodrigo): "coloque em radar, para analisar a situação de cada um e transferir
+ * manualmente para cada usuário responsável". O lead SEM DONO é o que o próprio radar já rotula assim: nem dono humano,
+ * nem agente dono, nem atendente na conversa. Ele sai da lista padrão e vai para uma aba própria, com o número.
+ */
+export function semDonoNoRadar(lead: Pick<AtRiskLead, "owner_user_id" | "owner_kind" | "assignee_kind">): boolean {
+  return !lead.owner_user_id && lead.owner_kind !== "ai" && lead.assignee_kind !== "user";
+}
+
 export function RiskRadarList() {
   const t = useT();
   const { data, isLoading } = useAtRiskLeads();
+  const { activeOrg } = useAuth();
+  const [aba, setAba] = useState<"com_dono" | "sem_dono">("com_dono");
+  // "Transferir para…" é de gerente e admin (o PATCH também recusa vendedor: responsavel_so_gestao)
+  const podeTransferir = activeOrg?.role === "manager" || activeOrg?.role === "admin";
 
   if (isLoading) {
     return (
@@ -206,16 +223,33 @@ export function RiskRadarList() {
         </Badge>
       </div>
 
-      <ul className="divide-y divide-border rounded-lg border border-border bg-surface/90 backdrop-blur">
-        {data.items.map((lead) => (
-          <RadarRow key={lead.id} lead={lead} />
-        ))}
-      </ul>
+      {(() => {
+        const semDono = data.items.filter(semDonoNoRadar);
+        const comDono = data.items.filter((l) => !semDonoNoRadar(l));
+        const lista = aba === "sem_dono" ? semDono : comDono;
+        return (
+          <>
+            <div role="tablist" className="flex gap-2" data-testid="radar-abas">
+              <Button size="sm" role="tab" aria-selected={aba === "com_dono"} variant={aba === "com_dono" ? "default" : "outline"} onClick={() => setAba("com_dono")} data-testid="radar-aba-com-dono">
+                {t("Com dono")} ({comDono.length})
+              </Button>
+              <Button size="sm" role="tab" aria-selected={aba === "sem_dono"} variant={aba === "sem_dono" ? "default" : "outline"} onClick={() => setAba("sem_dono")} data-testid="radar-aba-sem-dono">
+                {t("Sem dono")} ({semDono.length})
+              </Button>
+            </div>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-surface/90 backdrop-blur">
+              {lista.map((lead) => (
+                <RadarRow key={lead.id} lead={lead} transferir={aba === "sem_dono" && podeTransferir} />
+              ))}
+            </ul>
+          </>
+        );
+      })()}
     </div>
   );
 }
 
-function RadarRow({ lead }: { lead: AtRiskLead }) {
+function RadarRow({ lead, transferir = false }: { lead: AtRiskLead; transferir?: boolean }) {
   const t = useT();
   const meta = RISK_META[lead.risk as Exclude<RiskBucket, "em_dia">] ?? RISK_META.em_risco;
   const href = lead.conversation_id
@@ -296,6 +330,7 @@ function RadarRow({ lead }: { lead: AtRiskLead }) {
       </Link>
       <div className="flex shrink-0 items-center gap-2 self-center">
         {lead.agenda?.appointment_id ? <Link className="text-xs underline" href={`/app/agenda?compromisso=${lead.agenda.appointment_id}`}>{t("Ver compromisso")}</Link> : null}
+        {transferir ? <TransferirPara lead={lead} /> : null}
         {canClaim ? (
           <Button
             size="sm"
@@ -310,5 +345,46 @@ function RadarRow({ lead }: { lead: AtRiskLead }) {
         <ArrowRight size={16} className="text-muted-foreground" aria-hidden />
       </div>
     </li>
+  );
+}
+
+/**
+ * ia.vek v1.9.45 (CRM-297): "Transferir para…" na aba Sem dono. É o MESMO caminho do "Transferir" do cartão do lead
+ * (useEditLead → PATCH /api/v1/leads/:id com owner_user_id), e o banco manda o aviso normal ao recebedor
+ * (fn_iavek_notifica_mudanca_do_lead: 'lead_passado'). Só gerente e admin chegam aqui.
+ */
+function TransferirPara({ lead }: { lead: AtRiskLead }) {
+  const t = useT();
+  const qc = useQueryClient();
+  const { data: members } = useAssignableMembers(true);
+  const edit = useEditLead(lead.pipeline_id);
+  return (
+    <select
+      aria-label={t("Transferir para…")}
+      data-testid="radar-transferir"
+      className="max-w-40 rounded-md border border-border bg-surface px-2 py-1 text-xs"
+      value=""
+      disabled={edit.isPending}
+      onChange={(e) => {
+        const para = e.target.value;
+        if (!para) return;
+        edit.mutate(
+          { leadId: lead.id, patch: { owner_user_id: para } },
+          {
+            onSuccess: () => {
+              qc.invalidateQueries({ queryKey: ["leads-at-risk"] });
+              toast.success(t("Lead transferido"));
+            },
+          },
+        );
+      }}
+    >
+      <option value="">{t("Transferir para…")}</option>
+      {(members ?? []).map((m) => (
+        <option key={m.user_id} value={m.user_id}>
+          {m.full_name ?? t("sem nome")}
+        </option>
+      ))}
+    </select>
   );
 }

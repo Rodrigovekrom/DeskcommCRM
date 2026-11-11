@@ -10436,6 +10436,10 @@ export const DICIONARIO: Traducoes = {
   "A imagem precisa ter até 5 MB.": { es: "La imagen no debe superar los 5 MB." },
   "Apenas versões 'draft' podem ser editadas.": { es: "Solo se pueden editar las versiones 'draft'." },
   "Arquivo acima de 50 MB.": { es: "El archivo supera los 50 MB." },
+  // ia.vek v1.9.45 (CRM-297): o radar com a aba Sem dono e o "Transferir para…"
+  "Com dono": { es: "Con responsable" },
+  "Transferir para…": { es: "Transferir a…" },
+  "Lead transferido": { es: "Lead transferido" },
   // ia.vek v1.9.45 (CRM-294): Compra futura
   "O cliente quer comprar mais para frente. Se souber, anote o mês e o ano previstos (opcional).": { es: "El cliente quiere comprar más adelante. Si lo sabe, anote el mes y el año previstos (opcional)." },
   "Mês e ano previstos (opcional)": { es: "Mes y año previstos (opcional)" },
