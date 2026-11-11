@@ -29,28 +29,41 @@ fora sem entrar no contêiner, então o `anon` do app é o termômetro.
 
 ## O semáforo
 
-Provisório, até a Lupa trazer os limites do plano de contingência:
+Os limites do **plano de contingência da Lupa**, medidos em 11/11 (a memória em MB de `anon`). Podem ser trocados
+em `/root/iavek-saude/limites.json`; o servidor novo (KVM 4) terá os dele.
 
-| | Amarelo | Vermelho |
-|---|---|---|
-| memória do contêiner (app, waha, worker) | ≥ 75% do teto | ≥ 90% do teto |
-| RAM disponível | < 500 MB | < 250 MB |
-| swap | > 500 MB | > 1000 MB |
-| disco | > 80% | > 90% |
-| contêiner parado, unhealthy, reiniciou sozinho, OOM | | sempre |
-| sessão do WhatsApp fora de WORKING | | sempre |
-| não leu as sessões do WhatsApp | sempre | |
+| | Amarelo | Vermelho | Por quê |
+|---|---|---|---|
+| app | ≥ 700 MB | ≥ 800 MB | com heap 576, o Node morre com ~900 MB (havia ~330 MB fora do heap na queda das 19:05); a 90% do teto o aviso nunca viria |
+| waha | ≥ 900 MB | ≥ 1.050 MB | heap 900 + 150 a 250 fora do heap: morre perto de 1.050 a 1.150 |
+| swap do cgroup do waha | > 100 MB | > 300 MB | antes da troca de 11/11 ele vivia com 852 MB no swap |
+| worker | ≥ 75% do teto | ≥ 90% do teto | parado em ~268 MB de 512 |
+| RAM disponível do servidor | < 500 MB | < 250 MB | |
+| swap do servidor | > 500 MB | > 1.000 MB | |
+| disco | > 80% | > 90% | |
+| contêiner parado, unhealthy, reiniciou sozinho | | sempre | |
+| OOM (só quando muda de não para sim, no mesmo contêiner) | | sempre | o `OOMKilled` fica marcado até recriar |
+| sessão do WhatsApp fora de WORKING | | sempre | |
+| não leu as sessões do WhatsApp | sempre | | |
+| mensagens saídas presas em queued/sending, nos 30 min depois de um reinício automático | sempre | | o efeito colateral medido em 11/11 |
 
-- **Amarelo:** registro + mensagem ao Maestro, no máximo 1 a cada 30 min (na hora, se o problema mudar).
-- **Vermelho:** o mesmo + 1 áudio curto no Telegram do Rodrigo (`falar.sh`), com o que está alto e o que o
-  time está fazendo; também no máximo 1 a cada 30 min, salvo problema novo.
-- **Voltou ao verde** depois de um aviso: 1 mensagem ao Maestro.
+Cada problema tem uma **categoria fixa** (ex.: `app:memoria`, `waha:swap`, `whatsapp`, `app:reinicio`), sem
+números. É ela que o aviso compara, para não repetir a cada leitura (Lupa, bloqueio 1).
+
+### Quem recebe o quê
+- **Ao Maestro (mensageiro): tudo, sem dobrar.**
+  - Uma mensagem quando um problema aparece, piora, melhora ou resolve.
+  - Se um vermelho continuar, 1 lembrete a cada 3 h.
+- **Ao Rodrigo (áudio no Telegram, `falar.sh`).** Regra do Maestro em 11/11; o Rodrigo pode mudar:
+  - só na 1ª vez que um problema fica vermelho, e 1 lembrete a cada 3 h se continuar;
+  - 1 áudio de "voltou ao normal" quando resolve;
+  - das 22h às 7h, áudio SÓ para sistema fora do ar (app ou WAHA parado, unhealthy, reiniciando ou sem memória) ou WhatsApp caído. O resto espera as 7h e só toca se ainda estiver vermelho.
 - **Vigia cega:** 3 leituras seguidas sem SSH, ou o estado do servidor com mais de 15 min → mensagem ao Maestro.
 - A PAUSA das rotinas (`~/operacao/virada/PAUSA`) cala o aviso.
 
 ## A única ação automática
 
-O **app** em vermelho de memória (≥ 90% do teto) por **3 leituras seguidas** (15 min), **só entre 21h e 7h de
+O **app** em vermelho de memória (≥ 800 MB) por **3 leituras seguidas** (15 min), **só entre 21h e 7h de
 Brasília**, e **no máximo 1 vez a cada 6 h** → `docker restart` SÓ do app (~14 s fora), registra e avisa.
 De dia, só avisa. **O WAHA nunca é reiniciado por aqui** (cair o WhatsApp é pior que o app): sempre só avisa.
 
