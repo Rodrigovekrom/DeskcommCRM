@@ -79,12 +79,13 @@ describe("menu por função", () => {
     expect(vendedor).not.toContain("/app/espaco-ia");
   });
 
-  it("v1.7.5: o gerente vê SÓ os 4 itens dele, mais as portas pessoais", () => {
+  it("v1.7.5 (+ o Radar na v1.9.45): o gerente vê SÓ os 5 itens dele, mais as portas pessoais", () => {
     const gerente = hrefs({ preset: "completa", funcao: "gerente" }, "manager");
     expect([...gerente].sort()).toEqual(
       [
         "/app/meu-dia",
         "/app/agenda",
+        "/app/radar", // v1.9.45 (Maestro 213737): o gerente transfere os sem dono pelo radar (decisão do Rodrigo, 11/11)
         "/app/pipeline", // v1.9.8: o "Kanban por vendedor" abre o Pipeline da loja
         "/app/inbox",
         "/app/settings/profile",
@@ -94,6 +95,11 @@ describe("menu por função", () => {
     // Toda entrada da lista existe no catálogo (sem porta fantasma).
     const catalogo = NAV_CATALOG.map((d) => d.href as string);
     for (const h of DESTINOS_DA_FUNCAO.gerente) expect(catalogo).toContain(h);
+    // v1.9.45: o apoio usa o MESMO menu do gerente, então também vê o Radar
+    expect(DESTINOS_DA_FUNCAO.apoio).toContain("/app/radar");
+    // e o vendedor e o SDR seguem SEM o Radar (as listas deles são "literalmente apenas esses", 30/10)
+    expect(DESTINOS_DA_FUNCAO.vendedor).not.toContain("/app/radar");
+    expect(DESTINOS_DA_FUNCAO.sdr).not.toContain("/app/radar");
   });
 
   it("nenhum gerente (gerente ou apoio) vê configuração técnica", () => {

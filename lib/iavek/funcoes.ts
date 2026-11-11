@@ -58,7 +58,9 @@ export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
  * e, para quem administra, equipe e organização). Item que não existe na
  * instalação, ou que o papel não abre, simplesmente não aparece.
  */
-const MENU_GERENTE = ["/app/meu-dia", "/app/agenda", "/app/pipeline", "/app/inbox"] as const;
+// v1.9.45 (Maestro 213737): + o Radar, depois da Agenda da loja. Consequência da decisão do Rodrigo de 11/11 ("coloque em
+// radar ... e transferir manualmente"): o gerente transfere os leads sem dono pelo radar, e precisa achá-lo no menu.
+const MENU_GERENTE = ["/app/meu-dia", "/app/agenda", "/app/radar", "/app/pipeline", "/app/inbox"] as const;
 
 export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   // v1.9.6 (Rodrigo, 30/10): "literalmente apenas esses", nesta ordem (`MENU_DA_FUNCAO`).
@@ -117,6 +119,7 @@ export const MENU_DO_GERENTE = [
     itens: [
       { href: "/app/meu-dia", label: "Meu dia" },
       { href: "/app/agenda", label: "Agenda da loja" },
+      { href: "/app/radar", label: "Radar" },
     ],
   },
   {

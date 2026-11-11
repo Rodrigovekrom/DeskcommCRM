@@ -118,7 +118,7 @@ describe("1. Espaço da IA: só admin e função suporte", () => {
 });
 
 describe("2. Menu do gerente", () => {
-  it("dois grupos com os nomes pedidos, 4 itens, e o rodapé (perfil e segurança)", () => {
+  it("dois grupos com os nomes pedidos, 5 itens (o Radar desde a v1.9.45), e o rodapé (perfil e segurança)", () => {
     const grupos = barra("gerente", "manager");
     expect(grupos.map((g) => g.group.label)).toEqual([
       "Controle e análise",
@@ -128,6 +128,7 @@ describe("2. Menu do gerente", () => {
     expect(grupos[0]!.items.map((d) => [d.href, d.label])).toEqual([
       ["/app/meu-dia", "Meu dia"],
       ["/app/agenda", "Agenda da loja"],
+      ["/app/radar", "Radar"], // v1.9.45 (Maestro 213737): depois da Agenda da loja, para o "Transferir para…" dos sem dono
     ]);
     expect(grupos[1]!.items.map((d) => [d.href, d.label])).toEqual([
       ["/app/pipeline", "Kanban por vendedor"], // v1.9.8: o Pipeline da loja
@@ -146,10 +147,10 @@ describe("2. Menu do gerente", () => {
     ).toEqual(["/app/settings/profile", "/app/settings/security"]);
   });
 
-  it("saem Radar, Contatos, Tarefas, Casos, Desempenho, Atividades, Equipe, Notificações…", () => {
+  // v1.9.45: o Radar VOLTOU ao menu do gerente (decisão do Rodrigo de 11/11, transferir pelo radar); o resto segue fora.
+  it("saem Contatos, Tarefas, Casos, Desempenho, Atividades, Equipe, Notificações… (o Radar voltou na v1.9.45)", () => {
     const menu = hrefs("gerente", "manager");
     for (const h of [
-      "/app/radar",
       "/app/templates",
       "/app/contacts",
       "/app/tasks",

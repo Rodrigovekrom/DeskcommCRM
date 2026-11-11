@@ -7,6 +7,11 @@ import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
 
 vi.mock("@/hooks/leads/useAtRiskLeads", () => ({ useAtRiskLeads: vi.fn() }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (chave: string) => chave }));
+// ia.vek v1.9.45 (CRM-297): o radar passou a ler o papel (o "Transferir para…" da aba Sem dono é de gerente/admin) e
+// usa os hooks do "Transferir" do cartão. Aqui, papel de vendedor: os casos deste arquivo seguem iguais (sem transferir).
+vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => ({ activeOrg: { role: "agent" } }) }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: [] }) }));
+vi.mock("@/hooks/kanban/useUpdateLead", () => ({ useEditLead: () => ({ mutate: vi.fn(), isPending: false }) }));
 vi.mock("@/hooks/inbox/useClaimConversation", () => ({
   useClaimConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
