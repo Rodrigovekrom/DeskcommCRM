@@ -363,3 +363,16 @@ export function interpretarRetencao(
 
   return { dias: numero, aviso: null };
 }
+
+/**
+ * ia.vek v1.9.46 (0624, decisão do Rodrigo): guardar a mídia por MAIS de 90 dias é um opcional (pago), e só o admin da
+ * PLATAFORMA (a ia.vek) liga. Vale SUBIR acima de 90: baixar, ou regravar o valor que já está, sempre pode (inclusive os
+ * 180 que a plataforma ligou). É a trava de verdade: quem grava a organização é o servidor, com service_role (a RLS de
+ * organizations não deixa o usuário escrever), e o gatilho do banco não vê o usuário por esse caminho.
+ */
+export const RETENCAO_MIDIA_DIAS_SEM_OPCIONAL = 90;
+export function podeGuardarMidiaPor(novo: number, atual: number | null, ehPlataforma: boolean): boolean {
+  if (ehPlataforma) return true;
+  if (novo <= RETENCAO_MIDIA_DIAS_SEM_OPCIONAL) return true;
+  return atual !== null && novo <= atual;
+}

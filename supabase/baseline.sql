@@ -49580,6 +49580,35 @@ $$;
 revoke execute on function public.fn_iavek_aviso_de_ajuda(uuid, text[], text) from public, anon, authenticated;
 grant execute on function public.fn_iavek_aviso_de_ajuda(uuid, text[], text) to service_role;
 
+-- ---- ia.vek: a retenção acima de 90 dias só pela plataforma (migration 0624, v1.9.46) ----
+-- ⚠️ ANTES DA VARREDURA anon: cria função. A trava de verdade é a do servidor (updateTenant). Ver o cabeçalho de supabase/migrations/20261111233000_0624_iavek_retencao_acima_de_90_so_plataforma.sql.
+create or replace function public.fn_iavek_trava_retencao_paga()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.media_retention_days is distinct from old.media_retention_days
+     and new.media_retention_days > 90
+     and new.media_retention_days > coalesce(old.media_retention_days, 0)
+     and auth.uid() is not null
+     and not public.fn_is_platform_admin()
+  then
+    raise exception 'retencao_acima_de_90_so_plataforma'
+      using errcode = '42501',
+            hint = 'Guardar por mais de 90 dias é um opcional; fale com a ia.vek.';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.fn_iavek_trava_retencao_paga() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_trava_retencao_paga on public.organizations;
+create trigger trg_iavek_trava_retencao_paga
+  before update of media_retention_days on public.organizations
+  for each row execute function public.fn_iavek_trava_retencao_paga();
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

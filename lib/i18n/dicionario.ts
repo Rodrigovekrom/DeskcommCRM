@@ -10436,6 +10436,8 @@ export const DICIONARIO: Traducoes = {
   "A imagem precisa ter até 5 MB.": { es: "La imagen no debe superar los 5 MB." },
   "Apenas versões 'draft' podem ser editadas.": { es: "Solo se pueden editar las versiones 'draft'." },
   "Arquivo acima de 50 MB.": { es: "El archivo supera los 50 MB." },
+  // ia.vek v1.9.46 (0624): a retenção da mídia acima de 90 dias é opcional
+  "Guardar por mais de 90 dias é um opcional; fale com a ia.vek.": { es: "Guardar por más de 90 días es un opcional; hable con ia.vek." },
   // ia.vek v1.9.45 (CRM-297): o radar com a aba Sem dono e o "Transferir para…"
   "Com dono": { es: "Con responsable" },
   "Transferir para…": { es: "Transferir a…" },

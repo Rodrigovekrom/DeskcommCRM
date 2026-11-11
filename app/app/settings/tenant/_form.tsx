@@ -24,12 +24,17 @@ import { FUSOS_OFERECIDOS } from "@/lib/tempo/fusos";
 
 interface Props {
   initial: TenantInput;
+  /**
+   * ia.vek v1.9.46 (0624): guardar a mídia por MAIS de 90 dias é um opcional (pago), e só o admin da PLATAFORMA (a
+   * ia.vek) liga. O banco recusa os outros; aqui a tela só não oferece. Padrão: falso (o admin da empresa).
+   */
+  podeAcimaDe90?: boolean;
 }
 
 // A mesma lista de toda tela de fuso — ver `lib/tempo/fusos.ts`.
 const TIMEZONES = FUSOS_OFERECIDOS.map((f) => f.codigo);
 
-export function TenantForm({ initial }: Props) {
+export function TenantForm({ initial, podeAcimaDe90 = false }: Props) {
   const t = useT();
   const [form, setForm] = useState<TenantInput>(initial);
   const [isPending, startTransition] = useTransition();
@@ -185,10 +190,15 @@ export function TenantForm({ initial }: Props) {
               id="media_retention_days"
               type="number"
               min={30}
-              max={3650}
+              max={podeAcimaDe90 ? 3650 : Math.max(90, initial.media_retention_days)}
               value={form.media_retention_days}
               onChange={(e) => set("media_retention_days", Number(e.target.value))}
             />
+            {!podeAcimaDe90 && (
+              <p className="text-xs text-muted-foreground" data-testid="retencao-opcional-pago">
+                {t("Guardar por mais de 90 dias é um opcional; fale com a ia.vek.")}
+              </p>
+            )}
           </div>
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>

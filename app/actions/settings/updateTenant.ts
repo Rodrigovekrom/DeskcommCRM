@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { podeGuardarMidiaPor } from "@/lib/retencao/politica";
 import { audit } from "@/lib/audit";
 import { tenantSchema, type TenantInput } from "@/lib/schemas/settings";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
@@ -50,6 +51,19 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
  * handler que usa service role.
  */
   const supabase = createAdminClient();
+
+  // ia.vek v1.9.46 (0624): acima de 90 dias, só a plataforma. Aqui é a trava de verdade: este update vai com
+  // service_role, e o gatilho do banco não vê o usuário por esse caminho.
+  const { data: atualOrg } = await supabase.from("organizations").select("media_retention_days").eq("id", activeOrg.orgId).maybeSingle();
+  if (
+    !podeGuardarMidiaPor(
+      parsed.data.media_retention_days,
+      (atualOrg as { media_retention_days?: number } | null)?.media_retention_days ?? null,
+      authUser.is_platform_admin && !authUser.support,
+    )
+  ) {
+    return { ok: false, error: "Guardar por mais de 90 dias é um opcional; fale com a ia.vek." };
+  }
   const hdrs = await headers();
   const requestId = hdrs.get("x-request-id");
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
@@ -81,7 +95,13 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
       privacy_policy_url: parsed.data.privacy_policy_url ?? null,
     })
     .eq("id", activeOrg.orgId);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // ia.vek v1.9.46 (0624): acima de 90 dias, só a plataforma (o banco recusa)
+    if (/retencao_acima_de_90_so_plataforma/.test(error.message)) {
+      return { ok: false, error: "Guardar por mais de 90 dias é um opcional; fale com a ia.vek." };
+    }
+    return { ok: false, error: error.message };
+  }
 
   await audit({
     action: "org.updated",

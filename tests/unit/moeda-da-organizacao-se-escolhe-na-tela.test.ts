@@ -70,7 +70,8 @@ function entrada(over: Record<string, unknown> = {}) {
     timezone: "America/Sao_Paulo",
     locale: "es",
     currency: "MXN",
-    media_retention_days: 365,
+    // ia.vek v1.9.46 (0624): 90, o padrão novo. Acima de 90 só a plataforma, e este teste é da moeda, não da retenção.
+    media_retention_days: 90,
     media_retention_enforced: true,
     dpo_email: null,
     privacy_policy_url: null,

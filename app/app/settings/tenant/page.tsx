@@ -60,6 +60,7 @@ export default async function TenantSettingsPage() {
       </header>
       {row && (
         <TenantForm
+          podeAcimaDe90={user.is_platform_admin && !user.support}
           initial={{
             display_name: row.display_name,
             legal_name: row.legal_name,
