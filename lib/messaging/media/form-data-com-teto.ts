@@ -34,6 +34,8 @@ export async function formDataComTeto(req: Request, teto: number): Promise<FormD
     corpo.set(p, pos);
     pos += p.byteLength;
   }
+  // P3 da Lupa: solta os pedaços logo depois de juntar (o pico cai de ~3x para ~2x o teto por envio).
+  pedacos.length = 0;
   try {
     const form = await new Response(corpo, {
       headers: { "content-type": req.headers.get("content-type") ?? "" },
