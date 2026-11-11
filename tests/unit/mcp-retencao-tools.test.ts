@@ -71,6 +71,7 @@ function novasCapturas(): Capturas {
 function fakeSupabase(resolve: Resolver, cap: Capturas) {
   const from = (table: string) => {
     const c: Consulta = { table, op: "select", terminal: "list", cols: "", filtros: {} };
+    let faixa: [number, number] | null = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chain: any = {
       select: (cols: string) => {
@@ -99,8 +100,17 @@ function fakeSupabase(resolve: Resolver, cap: Capturas) {
       limit: () => chain,
       maybeSingle: () => Promise.resolve(resolve({ ...c, terminal: "maybeSingle" })),
       single: () => Promise.resolve(resolve({ ...c, terminal: "single" })),
+      range: (de: number, ate: number) => ((faixa = [de, ate]), chain),
       then: (res: (v: unknown) => unknown) =>
-        Promise.resolve(resolve({ ...c, terminal: "list" })).then(res),
+        Promise.resolve(resolve({ ...c, terminal: "list" }))
+          // v1.9.45 (CRM-297): o radar lê os leads em páginas (lerTudo); o dublê recorta a faixa pedida.
+          .then((r) => {
+            const resposta = r as { data?: unknown } | undefined;
+            return faixa && resposta && Array.isArray(resposta.data)
+              ? { ...resposta, data: resposta.data.slice(faixa[0], faixa[1] + 1) }
+              : r;
+          })
+          .then(res),
     };
     return chain;
   };

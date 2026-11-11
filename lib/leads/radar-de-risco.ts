@@ -20,6 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeDoContato, type ContatoNomeavel } from "@/lib/contacts/rotulo-do-contato";
 import { logger } from "@/lib/logger";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 import {
   classifyRisk,
@@ -143,6 +144,20 @@ export interface OpcoesDoRadar {
   contactId?: string;
 }
 
+/** As colunas que o radar lê de cada lead aberto (o mesmo select de `carregaRadarDeRisco`). */
+interface LeadDoRadar {
+  id: string;
+  title: string;
+  contact_id: string | null;
+  owner_user_id: string | null;
+  owner_kind: "user" | "ai" | null;
+  owner_agent_id: string | null;
+  stage_id: string;
+  last_activity_at: string | null;
+  created_at: string;
+  pipeline_id: string;
+}
+
 export async function carregaRadarDeRisco(
   admin: SupabaseClient,
   opts: OpcoesDoRadar,
@@ -173,20 +188,33 @@ export async function carregaRadarDeRisco(
   if (arquivadosErr) throw new Error(`radar_pipelines_failed: ${arquivadosErr.message}`);
   const funisArquivados = (arquivados ?? []).map((p) => p.id as string);
 
-  let consultaDeLeads = admin
-    .from("crm_leads")
-    .select(
-      "id, title, contact_id, owner_user_id, owner_kind, owner_agent_id, stage_id, last_activity_at, created_at, pipeline_id",
-    )
-    .eq("organization_id", organizationId)
-    .eq("status", "open");
-  if (funisArquivados.length > 0) {
-    consultaDeLeads = consultaDeLeads.not("pipeline_id", "in", `(${funisArquivados.join(",")})`);
-  }
-  if (opts.contactId) consultaDeLeads = consultaDeLeads.eq("contact_id", opts.contactId);
-  const { data: leads, error: leadsErr } = await consultaDeLeads
-    .order("last_activity_at", { ascending: true, nullsFirst: true })
-    .limit(SCAN_CAP);
+  // ia.vek v1.9.45: a consulta é montada DE NOVO a cada página. O construtor do postgrest-js muda a si
+  // mesmo (cada `.order()` acumula na URL), então reaproveitar o mesmo objeto entre páginas é frágil.
+  const consultaDeLeads = () => {
+    let q = admin
+      .from("crm_leads")
+      .select(
+        "id, title, contact_id, owner_user_id, owner_kind, owner_agent_id, stage_id, last_activity_at, created_at, pipeline_id",
+      )
+      .eq("organization_id", organizationId)
+      .eq("status", "open");
+    if (funisArquivados.length > 0) {
+      q = q.not("pipeline_id", "in", `(${funisArquivados.join(",")})`);
+    }
+    if (opts.contactId) q = q.eq("contact_id", opts.contactId);
+    return q;
+  };
+  // ia.vek v1.9.45 (CRM-297, Rodrigo 11/11): o radar olha TODOS os leads abertos. Era `.limit(SCAN_CAP)`
+  // (500), e quem passava dos 500 mais frios nunca entrava no radar (a Fenômenos tem mais de 900 abertos).
+  // Paginado, na mesma ordem (o mais frio primeiro), com o id como desempate para a página ser estável.
+  // As leituras de demandas e de propostas, mais abaixo, seguem com SCAN_CAP: o pedido é dos leads, e as
+  // listas de ids que elas montam não vão em lote.
+  const { data: leads, error: leadsErr } = await lerTudo<LeadDoRadar>((de, ate) =>
+    consultaDeLeads()
+      .order("last_activity_at", { ascending: true, nullsFirst: true })
+      .order("id", { ascending: true })
+      .range(de, ate),
+  );
   if (leadsErr) throw new Error(`radar_query_failed: ${leadsErr.message}`);
 
   const rows = leads ?? [];

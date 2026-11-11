@@ -54,6 +54,8 @@ function bancoFalso(tabelas: Record<string, Linha[]>): SupabaseClient {
       },
       order: () => chain,
       limit: () => chain,
+      // v1.9.45 (CRM-297): o radar lê os leads em páginas (lerTudo); o dublê recorta a faixa pedida.
+      range: (de: number, ate: number) => ((linhas = linhas.slice(de, ate + 1)), chain),
       maybeSingle: async () => ({ data: linhas[0] ?? null, error: null }),
       then: (res: (v: unknown) => unknown) => Promise.resolve({ data: linhas, error: null }).then(res),
     };

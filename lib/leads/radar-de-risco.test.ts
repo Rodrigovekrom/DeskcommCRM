@@ -47,6 +47,8 @@ function montarAdmin(
     from: vi.fn((tabela: string) => {
       const filtros: Array<[string, unknown]> = [];
       chamadas.push({ tabela, filtros });
+      let faixa: [number, number] | null = null;
+      const recorta = (linhas: unknown[]) => (faixa ? linhas.slice(faixa[0], faixa[1] + 1) : linhas);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cadeia: any = {
         select: () => cadeia,
@@ -60,6 +62,8 @@ function montarAdmin(
         },
         order: () => cadeia,
         limit: () => cadeia,
+        // v1.9.45 (CRM-297): o radar lê os leads em páginas (lerTudo); o dublê recorta a faixa pedida.
+        range: (de: number, ate: number) => ((faixa = [de, ate]), cadeia),
         is: () => cadeia,
         in: (campo: string, valores: unknown) => {
           filtros.push([`in:${campo}`, valores]);
@@ -76,7 +80,7 @@ function montarAdmin(
           }
           if (tabela === "crm_leads") {
             return resolve({
-              data: idsAbertos.map((id) => ({
+              data: recorta(idsAbertos).map((id) => ({
                 id,
                 title: "",
                 contact_id: null,
