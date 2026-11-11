@@ -49593,7 +49593,7 @@ begin
      and new.media_retention_days > 90
      and new.media_retention_days > coalesce(old.media_retention_days, 0)
      and auth.uid() is not null
-     and not public.fn_is_platform_admin()
+     and not public.fn_is_platform_admin_full()
   then
     raise exception 'retencao_acima_de_90_so_plataforma'
       using errcode = '42501',

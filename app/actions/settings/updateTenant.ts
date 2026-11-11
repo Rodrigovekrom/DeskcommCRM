@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { escreveComoPlatformAdmin } from "@/lib/auth/types";
 import { podeGuardarMidiaPor } from "@/lib/retencao/politica";
 import { audit } from "@/lib/audit";
 import { tenantSchema, type TenantInput } from "@/lib/schemas/settings";
@@ -59,7 +60,7 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
     !podeGuardarMidiaPor(
       parsed.data.media_retention_days,
       (atualOrg as { media_retention_days?: number } | null)?.media_retention_days ?? null,
-      authUser.is_platform_admin && !authUser.support,
+      escreveComoPlatformAdmin(authUser) && !authUser.support, // scope full; o suporte não passa (Lupa, v1.9.46)
     )
   ) {
     return { ok: false, error: "Guardar por mais de 90 dias é um opcional; fale com a ia.vek." };

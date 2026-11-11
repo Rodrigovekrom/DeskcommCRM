@@ -28,7 +28,8 @@ describe("v1.9.46 (0624): a retenção acima de 90 dias só pela plataforma", ()
     expect(M).toMatch(/new\.media_retention_days > 90/);
     expect(M).toMatch(/new\.media_retention_days > coalesce\(old\.media_retention_days, 0\)/); // baixar de 180 para 120 pode
     expect(M).toMatch(/auth\.uid\(\) is not null/); // o sistema (service_role, crons) não é barrado
-    expect(M).toMatch(/not public\.fn_is_platform_admin\(\)/);
+    expect(M).toMatch(/not public\.fn_is_platform_admin_full\(\)/); // scope full: o suporte não passa (Lupa)
+    expect(M).not.toMatch(/not public\.fn_is_platform_admin\(\)/);
     expect(M).toMatch(/raise exception 'retencao_acima_de_90_so_plataforma'/);
   });
 
@@ -71,6 +72,6 @@ describe("v1.9.46 (0624): a trava de VERDADE, no servidor (o update vai com serv
     const gravacao = a.indexOf('.from("organizations")\n    .update(');
     expect(conferencia).toBeGreaterThan(0);
     expect(conferencia).toBeLessThan(gravacao);
-    expect(a).toMatch(/authUser\.is_platform_admin && !authUser\.support/);
+    expect(a).toMatch(/escreveComoPlatformAdmin\(authUser\) && !authUser\.support/);
   });
 });

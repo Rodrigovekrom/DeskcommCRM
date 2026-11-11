@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
-import { ROLE_RANK } from "@/lib/auth/types";
+import { ROLE_RANK, escreveComoPlatformAdmin } from "@/lib/auth/types";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { moedaServidaOu } from "@/lib/money";
@@ -60,7 +60,7 @@ export default async function TenantSettingsPage() {
       </header>
       {row && (
         <TenantForm
-          podeAcimaDe90={user.is_platform_admin && !user.support}
+          podeAcimaDe90={escreveComoPlatformAdmin(user) && !user.support}
           initial={{
             display_name: row.display_name,
             legal_name: row.legal_name,

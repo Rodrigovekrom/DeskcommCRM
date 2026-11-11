@@ -7,7 +7,8 @@
 -- (auth.uid() nulo = o sistema). Este gatilho é a 2ª camada: barra qualquer escrita feita com o login do usuário.
 --
 -- A REGRA (gatilho BEFORE UPDATE em organizations):
---   · subir media_retention_days para MAIS de 90 → só o admin da plataforma (fn_is_platform_admin) ou o próprio
+--   · subir media_retention_days para MAIS de 90 → só o admin da plataforma com scope 'full' (fn_is_platform_admin_full,
+--     a mesma regra da policy de escrita; a sessão de SUPORTE não passa — Lupa, v1.9.46) ou o próprio
 --     sistema (sem usuário: service_role, crons, scripts da troca);
 --   · baixar, ou deixar igual, sempre pode (inclusive regravar o formulário com os 180 que a plataforma ligou).
 -- Idempotente. Volta: voltar-0624.sql (tira o gatilho).
@@ -23,7 +24,7 @@ begin
      and new.media_retention_days > 90
      and new.media_retention_days > coalesce(old.media_retention_days, 0)
      and auth.uid() is not null
-     and not public.fn_is_platform_admin()
+     and not public.fn_is_platform_admin_full()
   then
     raise exception 'retencao_acima_de_90_so_plataforma'
       using errcode = '42501',
