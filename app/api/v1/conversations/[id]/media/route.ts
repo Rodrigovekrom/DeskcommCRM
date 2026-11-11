@@ -12,6 +12,7 @@ import { resolveAuthDual, tetoDeEscritaDoToken } from "@/lib/api/auth-dual";
 import { IDIOMA_PADRAO } from "@/lib/i18n/idiomas";
 import { extFromMime, MAX_MEDIA_BYTES } from "@/lib/messaging/media/types";
 import { validateOutboundMedia } from "@/lib/messaging/media/upload-validation";
+import { formDataComTeto } from "@/lib/messaging/media/form-data-com-teto";
 import { transcodificarNotaDeVoz } from "@/lib/messaging/media/voice-transcode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -77,7 +78,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     return fail("payload_too_large", t("Arquivo acima de 50 MB."), 413, { requestId });
   }
 
-  const form = await req.formData().catch(() => null);
+  // ia.vek v1.9.45 (CRM-259, bloqueio da Lupa): a rota está FORA do proxy (que cortava em 10 MB). O corpo
+  // é lido contando os bytes e cortado acima do teto, inclusive no envio chunked (sem Content-Length).
+  const lido = await formDataComTeto(req, MAX_MEDIA_BYTES + 1_048_576);
+  if (!lido.ok && lido.motivo === "grande") {
+    return fail("payload_too_large", t("Arquivo acima de 50 MB."), 413, { requestId });
+  }
+  const form = lido.ok ? lido.form : null;
   const file = form?.get("file");
   if (!(file instanceof File)) {
     return fail("validation_failed", t("Campo 'file' (multipart) obrigatório."), 422, { requestId });
