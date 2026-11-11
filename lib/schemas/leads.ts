@@ -183,6 +183,18 @@ export function categoriaPadraoDoMotivo(valor: string): CategoriaDePerda | undef
  */
 export const loseLeadSchema = z.object({
   lost_reason: z.string().min(1, "lost_reason é obrigatório").max(500),
+  /**
+   * ia.vek v1.9.43 (Rodrigo, 11/11): OBSERVAÇÃO opcional da perda, para QUALQUER motivo. O motivo é
+   * sempre o escolhido na lista; o texto livre nunca vira motivo (era isso que batia em
+   * fn_validate_lost_reason_required com 22023 e prendia o Confirmar). Vai para a atividade da perda
+   * e para `source_metadata.perda_observacao`. Vazia = ausente.
+   */
+  observacao: z
+    .string()
+    .trim()
+    .max(500, "A observação tem no máximo 500 caracteres.")
+    .optional()
+    .transform((v) => (v ? v : undefined)),
 });
 export type LoseLeadInput = z.infer<typeof loseLeadSchema>;
 

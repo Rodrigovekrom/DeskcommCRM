@@ -47,6 +47,8 @@ interface WinArgs {
 interface LoseArgs {
   leadId: string;
   lostReason: string;
+  /** v1.9.43: observação opcional da perda (nunca é o motivo). */
+  observacao?: string;
 }
 
 export function useWinLead(pipelineId: string) {
@@ -72,10 +74,12 @@ export function useLoseLead(pipelineId: string) {
   const qc = useQueryClient();
   const queryKey = ["board", pipelineId] as const;
   return useMutation({
-    mutationFn: async ({ leadId, lostReason }: LoseArgs) => {
+    mutationFn: async ({ leadId, lostReason, observacao }: LoseArgs) => {
       marcarEcoLocal(leadId);
       return apiClient.post<{ data: Lead }>(`/api/v1/leads/${leadId}/lose`, {
         lost_reason: lostReason,
+        // v1.9.43: a observação é opcional e nunca é o motivo.
+        ...(observacao?.trim() ? { observacao: observacao.trim() } : {}),
       });
     },
     onSuccess: (res, { leadId }) => {

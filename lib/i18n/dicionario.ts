@@ -11634,6 +11634,8 @@ export const DICIONARIO: Traducoes = {
   "Já vem com o nome do tipo. Escreva outro, se quiser.": {
     es: "Ya viene con el nombre del tipo. Escribe otro, si quieres.",
   },
+  // ia.vek v1.9.43: a observação da perda.
+  "Observação (opcional)": { es: "Observación (opcional)" },
   // ia.vek v1.9.39 (CRM-282): o contexto do lead no card.
   "Faltam": { es: "Faltan" },
   "letras (mínimo 20)": { es: "letras (mínimo 20)" },

@@ -406,3 +406,51 @@ describe("encerraDemanda", () => {
     ).rejects.toMatchObject({ code: "internal_error", status: 500 });
   });
 });
+
+// ia.vek v1.9.43 (Rodrigo, 11/11): a OBSERVAÇÃO da perda vai para a atividade e para o source_metadata.
+import { emitLeadActivity } from "@/lib/leads/activity-emitter";
+import { loseLeadSchema } from "@/lib/schemas/leads";
+
+describe("v1.9.43: observação da perda", () => {
+  beforeEach(() => vi.mocked(emitLeadActivity).mockClear());
+
+  it("(c) com observação: na MESMA escrita do fechamento, em source_metadata.perda_observacao (sem perder o resto) e na atividade", async () => {
+    const db = makeDb({ leads: [baseLead({ source_metadata: { ad_id: "123" } })], stages: baseStages() });
+    await encerraDemanda(db.client as never, ctx, {
+      leadId: LEAD,
+      desfecho: "lost",
+      motivo: "other",
+      observacaoDaPerda: "  Lead optou em outra solução  ",
+    });
+    expect(db.updates[0]).toMatchObject({
+      lost_reason: "other",
+      source_metadata: { ad_id: "123", perda_observacao: "Lead optou em outra solução" },
+    });
+    const chamada = vi.mocked(emitLeadActivity).mock.calls[0]![1] as { payload: Record<string, unknown>; reason: string };
+    expect(chamada.payload).toMatchObject({ desfecho: "lost", observacao: "Lead optou em outra solução" });
+    expect(chamada.reason).toBe("Perdido — other"); // o motivo continua sendo o escolhido
+  });
+
+  it("(b) sem observação: o source_metadata não é tocado e a atividade não leva o campo", async () => {
+    const db = makeDb({ leads: [baseLead({ source_metadata: { ad_id: "123" } })], stages: baseStages() });
+    await encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "lost", motivo: "price" });
+    expect(db.updates[0]).not.toHaveProperty("source_metadata");
+    const chamada = vi.mocked(emitLeadActivity).mock.calls[0]![1] as { payload: Record<string, unknown> };
+    expect(chamada.payload).not.toHaveProperty("observacao");
+  });
+
+  it("no GANHO a observação é ignorada (só vale para a perda)", async () => {
+    const db = makeDb({ leads: [baseLead()], stages: baseStages() });
+    await encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "won", observacaoDaPerda: "não devia entrar" });
+    expect(db.updates[0]).not.toHaveProperty("source_metadata");
+  });
+
+  it("o schema: observação opcional, aparada, vazia = ausente, até 500", () => {
+    expect(loseLeadSchema.parse({ lost_reason: "other" }).observacao).toBeUndefined();
+    expect(loseLeadSchema.parse({ lost_reason: "other", observacao: "   " }).observacao).toBeUndefined();
+    expect(loseLeadSchema.parse({ lost_reason: "other", observacao: "  ok  " }).observacao).toBe("ok");
+    expect(loseLeadSchema.safeParse({ lost_reason: "other", observacao: "x".repeat(501) }).success).toBe(false);
+    // (d) o motivo continua obrigatório
+    expect(loseLeadSchema.safeParse({ observacao: "só texto" }).success).toBe(false);
+  });
+});

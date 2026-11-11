@@ -64,6 +64,11 @@ export interface EncerraDemandaInput {
    * (`bruto` é o que o corpo trouxe). Só as rotas humanas passam isto.
    */
   vendaDaLoja?: { bruto: unknown };
+  /**
+   * ia.vek v1.9.43: a OBSERVAÇÃO da perda (texto livre, opcional, até 500). Nunca é o motivo: vai
+   * para a atividade (`payload.observacao`) e para `crm_leads.source_metadata.perda_observacao`.
+   */
+  observacaoDaPerda?: string;
 }
 
 export interface DemandaEncerrada {
@@ -255,6 +260,14 @@ export async function encerraDemanda(
     updated_at: new Date().toISOString(),
   };
   if (input.desfecho === "lost") patch.lost_reason = input.motivo;
+  const observacaoDaPerda = input.desfecho === "lost" ? input.observacaoDaPerda?.trim().slice(0, 500) || null : null;
+  if (observacaoDaPerda) {
+    // Na MESMA escrita do fechamento, preservando o resto do source_metadata (o lead foi lido com select *).
+    patch.source_metadata = {
+      ...(((lead as { source_metadata?: Record<string, unknown> | null }).source_metadata ?? {}) as Record<string, unknown>),
+      perda_observacao: observacaoDaPerda,
+    };
+  }
   // O ganho espelha a perda na MESMA escrita: `won_reason` só entra quando há
   // motivo (a coluna é nullable e sem CHECK — a obrigatoriedade é do funil,
   // decidida acima, nunca do banco).
@@ -324,6 +337,7 @@ export async function encerraDemanda(
       ...(input.payloadNaTimeline ?? {}),
       ...(venda?.ok ? { valor_final_cents: venda.valorCents, data_da_venda: venda.data } : {}),
       desfecho: input.desfecho,
+      ...(observacaoDaPerda ? { observacao: observacaoDaPerda } : {}),
       from_stage_id: (lead as { stage_id: string }).stage_id,
       to_stage_id: (stage as { id: string }).id,
     },
