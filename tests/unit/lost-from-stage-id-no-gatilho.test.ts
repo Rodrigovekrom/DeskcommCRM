@@ -23,6 +23,11 @@ const MIGRATION = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260926150000_0426_motivo_de_perda_com_categoria.sql"),
   "utf8",
 );
+// ia.vek v1.9.45: a ÚLTIMA definição do gatilho passou a ser a da 0620 (Compra futura), que mantém o #1537.
+const ULTIMA_DO_GATILHO = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20261111200000_0620_iavek_compra_futura.sql"),
+  "utf8",
+);
 const MANIFEST = readFileSync(join(process.cwd(), "supabase", "migrations", "MANIFEST.md"), "utf8");
 const TIPOS = readFileSync(join(process.cwd(), "lib", "database.types.ts"), "utf8");
 
@@ -48,11 +53,11 @@ function corpoDoGatilho(sql: string): string {
 
 describe("lost_from_stage_id gravado pelo gatilho (#1537)", () => {
   it("baseline e migration executam o MESMO corpo — instalação nova não diverge", () => {
-    expect(corpoDoGatilho(MIGRATION)).toBe(corpoDoGatilho(BASELINE));
+    expect(corpoDoGatilho(ULTIMA_DO_GATILHO)).toBe(corpoDoGatilho(BASELINE));
   });
 
   it("a origem só nasce na transição para `lost`, preservando o que já havia", () => {
-    for (const sql of [BASELINE, MIGRATION]) {
+    for (const sql of [BASELINE, MIGRATION, ULTIMA_DO_GATILHO]) {
       expect(sql).toContain(
         "new.lost_from_stage_id := coalesce(new.lost_from_stage_id, old.stage_id);",
       );
