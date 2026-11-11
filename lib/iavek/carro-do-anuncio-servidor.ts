@@ -4,6 +4,7 @@
  * A regra (o casamento) mora em `carro-do-anuncio.ts` e só preenche quando a resposta é ÚNICA.
  * Nunca pisa num valor já gravado e nunca derruba o nascimento do lead.
  */
+import { mesclarSourceMetadata } from "@/lib/leads/mesclar-source-metadata";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { acharCarroDoAnuncio, CAMPO_CARRO_DO_ANUNCIO, textoDoAnuncio, type CarroDoCatalogo } from "@/lib/iavek/carro-do-anuncio";
@@ -89,21 +90,10 @@ async function marcarDesfechoNoLead(
   candidatos: readonly string[],
 ): Promise<void> {
   try {
-    const { data, error } = await db
-      .from("crm_leads")
-      .select("source_metadata")
-      .eq("organization_id", orgId)
-      .eq("id", leadId)
-      .maybeSingle();
-    if (error || !data) return;
-    const atual = ((data as { source_metadata: Record<string, unknown> | null }).source_metadata ?? {}) as Record<string, unknown>;
+    // v1.9.43 (0616): mesclado NO BANCO (`||`), sem ler-e-regravar o source_metadata inteiro.
     const marca = { desfecho, em: new Date().toISOString(), ...(candidatos.length ? { candidatos: candidatos.slice(0, 5) } : {}) };
-    const { error: e2 } = await db
-      .from("crm_leads")
-      .update({ source_metadata: { ...atual, [CAMPO_DESFECHO_DO_CARRO]: marca } })
-      .eq("organization_id", orgId)
-      .eq("id", leadId);
-    if (e2) logger.warn("carro do anúncio: desfecho não marcado no lead", { organization_id: orgId, lead_id: leadId, error: e2.message.slice(0, 120) });
+    const r = await mesclarSourceMetadata(db, orgId, leadId, { [CAMPO_DESFECHO_DO_CARRO]: marca });
+    if (!r.ok) logger.warn("carro do anúncio: desfecho não marcado no lead", { organization_id: orgId, lead_id: leadId, error: r.erro.slice(0, 120) });
   } catch (err) {
     logger.warn("carro do anúncio: desfecho não marcado no lead", {
       organization_id: orgId,

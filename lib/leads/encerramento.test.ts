@@ -48,6 +48,7 @@ function makeDb({
   };
   const updates: Row[] = [];
   const rpcs: string[] = [];
+  const rpcArgs: Row[] = [];
 
   function from(table: string) {
     const filters: Array<[string, unknown]> = [];
@@ -128,10 +129,14 @@ function makeDb({
   }
 
   return {
-    client: { from, rpc: async (name: string) => (rpcs.push(name), { error: null }) },
+    client: {
+      from,
+      rpc: async (name: string, args?: Row) => (rpcs.push(name), rpcArgs.push(args ?? {}), { data: true, error: null }),
+    },
     tables,
     updates,
     rpcs,
+    rpcArgs,
   };
 }
 
@@ -414,7 +419,7 @@ import { loseLeadSchema } from "@/lib/schemas/leads";
 describe("v1.9.43: observação da perda", () => {
   beforeEach(() => vi.mocked(emitLeadActivity).mockClear());
 
-  it("(c) com observação: na MESMA escrita do fechamento, em source_metadata.perda_observacao (sem perder o resto) e na atividade", async () => {
+  it("(c) com observação: MESCLADA NO BANCO (fn_iavek_mesclar_source_metadata, `||`) com só a chave nova, e na atividade", async () => {
     const db = makeDb({ leads: [baseLead({ source_metadata: { ad_id: "123" } })], stages: baseStages() });
     await encerraDemanda(db.client as never, ctx, {
       leadId: LEAD,
@@ -422,19 +427,31 @@ describe("v1.9.43: observação da perda", () => {
       motivo: "other",
       observacaoDaPerda: "  Lead optou em outra solução  ",
     });
-    expect(db.updates[0]).toMatchObject({
-      lost_reason: "other",
-      source_metadata: { ad_id: "123", perda_observacao: "Lead optou em outra solução" },
-    });
+    // O fechamento NÃO regrava o source_metadata (o ler-e-regravar apagava escrita concorrente).
+    expect(db.updates[0]).toMatchObject({ lost_reason: "other" });
+    expect(db.updates[0]).not.toHaveProperty("source_metadata");
+    // A observação vai pela mesclagem no banco, com SÓ a chave nova (o resto fica com o `||`).
+    expect(db.rpcs).toEqual(["fn_iavek_mesclar_source_metadata"]);
+    expect(db.rpcArgs[0]).toEqual({ p_org: ORG, p_lead: LEAD, p_patch: { perda_observacao: "Lead optou em outra solução" } });
     const chamada = vi.mocked(emitLeadActivity).mock.calls[0]![1] as { payload: Record<string, unknown>; reason: string };
     expect(chamada.payload).toMatchObject({ desfecho: "lost", observacao: "Lead optou em outra solução" });
     expect(chamada.reason).toBe("Perdido — other"); // o motivo continua sendo o escolhido
+  });
+
+  it("(c) se a mesclagem falhar, o Perdido NÃO volta atrás (o lead fecha e a observação fica na atividade)", async () => {
+    const db = makeDb({ leads: [baseLead()], stages: baseStages() });
+    (db.client as { rpc: unknown }).rpc = async () => ({ data: null, error: { message: "boom" } });
+    const r = await encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "lost", motivo: "other", observacaoDaPerda: "x" });
+    expect(r.lead).toBeTruthy();
+    const chamada = vi.mocked(emitLeadActivity).mock.calls[0]![1] as { payload: Record<string, unknown> };
+    expect(chamada.payload).toMatchObject({ observacao: "x" });
   });
 
   it("(b) sem observação: o source_metadata não é tocado e a atividade não leva o campo", async () => {
     const db = makeDb({ leads: [baseLead({ source_metadata: { ad_id: "123" } })], stages: baseStages() });
     await encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "lost", motivo: "price" });
     expect(db.updates[0]).not.toHaveProperty("source_metadata");
+    expect(db.rpcs).toEqual([]);
     const chamada = vi.mocked(emitLeadActivity).mock.calls[0]![1] as { payload: Record<string, unknown> };
     expect(chamada.payload).not.toHaveProperty("observacao");
   });
@@ -443,6 +460,7 @@ describe("v1.9.43: observação da perda", () => {
     const db = makeDb({ leads: [baseLead()], stages: baseStages() });
     await encerraDemanda(db.client as never, ctx, { leadId: LEAD, desfecho: "won", observacaoDaPerda: "não devia entrar" });
     expect(db.updates[0]).not.toHaveProperty("source_metadata");
+    expect(db.rpcs).toEqual([]);
   });
 
   it("o schema: observação opcional, aparada, vazia = ausente, até 500", () => {

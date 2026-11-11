@@ -11,7 +11,14 @@ const ONIX = { id: "11111111-1111-4111-8111-111111111111", nome: "Chevrolet Onix
 const GOL = { id: "22222222-2222-4222-8222-222222222222", nome: "Volkswagen Gol 1.6 2015 Branco Manual", marca: "Volkswagen", ativo: true };
 
 function bancoFalso(campos: Record<string, unknown>, carros = [ONIX, GOL]) {
-  const log = { catalogoLido: 0, gravado: null as Record<string, unknown> | null, metadata: null as Record<string, unknown> | null };
+  const log = {
+    catalogoLido: 0,
+    gravado: null as Record<string, unknown> | null,
+    metadata: null as Record<string, unknown> | null,
+    /** v1.9.43: o que foi REGRAVADO inteiro por update (tem de ficar nulo: a mesclagem é no banco). */
+    regravouMetadata: null as Record<string, unknown> | null,
+    rpc: null as { nome: string; args: Record<string, unknown> } | null,
+  };
   const consulta = (tabela: string) => {
     const q: Record<string, unknown> = {};
     const encadear = () => q;
@@ -21,14 +28,20 @@ function bancoFalso(campos: Record<string, unknown>, carros = [ONIX, GOL]) {
       maybeSingle: async () => ({ data: { custom_fields: campos, source_metadata: { ad_id: "1" } }, error: null }),
       update: (v: { custom_fields?: Record<string, unknown>; source_metadata?: Record<string, unknown> }) => {
         if (v.custom_fields) log.gravado = v.custom_fields;
-        if (v.source_metadata) log.metadata = v.source_metadata;
+        if (v.source_metadata) log.regravouMetadata = v.source_metadata;
         return { eq: () => ({ eq: async () => ({ error: null }) }) };
       },
     });
     void tabela;
     return q;
   };
-  return { db: { from: consulta } as never, log };
+  // Imita o `||` da fn_iavek_mesclar_source_metadata sobre o que está no banco ({ad_id: "1"}).
+  const rpc = async (nome: string, args: { p_patch: Record<string, unknown> }) => {
+    log.rpc = { nome, args };
+    log.metadata = { ad_id: "1", ...args.p_patch };
+    return { data: true, error: null };
+  };
+  return { db: { from: consulta, rpc } as never, log };
 }
 
 describe("CRM-229: grava o carro do anúncio quando o lead nasce", () => {
@@ -69,6 +82,14 @@ describe("CRM-229: grava o carro do anúncio quando o lead nasce", () => {
     expect(marca.desfecho).toBe("empate");
     expect([...marca.candidatos].sort()).toEqual([POLO_A.id, POLO_B.id].sort());
     expect(Number.isNaN(Date.parse(marca.em))).toBe(false);
+  });
+  it("v1.9.43: o desfecho é MESCLADO NO BANCO, com só a chave dele — nunca lê-e-regrava o source_metadata inteiro", async () => {
+    const { db, log } = bancoFalso({});
+    await gravarCarroDoAnuncio(db, "org", "lead", { ad_title: "Promoção de pneus" });
+    expect(log.regravouMetadata).toBeNull();
+    expect(log.rpc!.nome).toBe("fn_iavek_mesclar_source_metadata");
+    expect(log.rpc!.args).toMatchObject({ p_org: "org", p_lead: "lead" });
+    expect(Object.keys(log.rpc!.args.p_patch as object)).toEqual(["iavek_carro_desfecho"]);
   });
   it("P3: 'gravou', 'ja_tinha' e 'sem_anuncio' NÃO mexem no source_metadata", async () => {
     for (const [campos, anuncio] of [[{}, { ad_title: "Onix LT 2022 prata" }], [{ carro_anuncio: GOL.id }, { ad_title: "Onix LT 2022 prata" }], [{}, {}]] as const) {

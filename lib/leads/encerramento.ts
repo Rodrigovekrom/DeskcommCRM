@@ -18,6 +18,8 @@
  * só existia em `event_log` e `api_audit_log` — nenhum dos dois aparece na tela.
  * O dossiê de um negócio fechado terminava sem dizer que fechou.
  */
+import { logger } from "@/lib/logger";
+import { mesclarSourceMetadata } from "@/lib/leads/mesclar-source-metadata";
 import { lerVendaDaLoja } from "@/lib/iavek/venda-da-loja";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -261,13 +263,6 @@ export async function encerraDemanda(
   };
   if (input.desfecho === "lost") patch.lost_reason = input.motivo;
   const observacaoDaPerda = input.desfecho === "lost" ? input.observacaoDaPerda?.trim().slice(0, 500) || null : null;
-  if (observacaoDaPerda) {
-    // Na MESMA escrita do fechamento, preservando o resto do source_metadata (o lead foi lido com select *).
-    patch.source_metadata = {
-      ...(((lead as { source_metadata?: Record<string, unknown> | null }).source_metadata ?? {}) as Record<string, unknown>),
-      perda_observacao: observacaoDaPerda,
-    };
-  }
   // O ganho espelha a perda na MESMA escrita: `won_reason` só entra quando há
   // motivo (a coluna é nullable e sem CHECK — a obrigatoriedade é do funil,
   // decidida acima, nunca do banco).
@@ -298,6 +293,22 @@ export async function encerraDemanda(
       throw new ApiError(422, recusa.codigo, undefined, ctx.requestId, recusa.mensagem);
     }
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
+  }
+
+  if (observacaoDaPerda) {
+    // v1.9.43 (0616): mesclada NO BANCO (`||`), logo depois do fechamento, sem ler-e-regravar o
+    // source_metadata inteiro (uma escrita concorrente nas outras chaves não se perde). Se falhar, o
+    // Perdido NÃO volta atrás: o lead já fechou, e a observação continua na atividade da perda.
+    const mescla = await mesclarSourceMetadata(supabase, ctx.organization_id, input.leadId, {
+      perda_observacao: observacaoDaPerda,
+    });
+    if (!mescla.ok) {
+      logger.warn("perda: observação não gravada no source_metadata", {
+        organization_id: ctx.organization_id,
+        lead_id: input.leadId,
+        error: mescla.erro,
+      });
+    }
   }
 
   const { data: fresh } = await supabase

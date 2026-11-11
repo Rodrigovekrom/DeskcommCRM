@@ -1,0 +1,168 @@
+/**
+ * ia.vek v1.9.43 (P3, 11/11): DUAS rodadas simultâneas da esteira não podem trabalhar a mesma
+ * organização. A segunda PULA (não espera, não dobra cobrança nem ligação); a de outra organização
+ * roda normalmente; e a trava é solta no fim, inclusive quando a rodada dá erro.
+ *
+ * O pool falso imita o `pg_try_advisory_xact_lock`: a trava é da TRANSAÇÃO que a pegou e só sai
+ * quando essa transação termina (commit ou rollback). O teste real no Postgres fica no canário (TESTE).
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+type Org = { id: string; settings: unknown };
+const estado = vi.hoisted(() => ({
+  orgs: [] as Org[],
+  travas: new Map<string, number>(),
+  conexoes: 0,
+  soltas: 0,
+  emCurso: new Map<string, number>(),
+  maxSimultaneoPorOrg: 0,
+  liberar: [] as Array<() => void>,
+  falharOrg: null as string | null,
+  rodadas: [] as string[],
+  transacoes: new Set<number>(),
+}));
+
+vi.mock("@/lib/auth/cron-auth", () => ({ autorizaCron: () => true }));
+vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
+vi.mock("@/lib/organizacao/operante", () => ({ idsDeOrgsParadas: vi.fn(async () => []) }));
+vi.mock("@/lib/esteira/aviso-de-parada", () => ({
+  esteiraRodou: vi.fn(async () => undefined),
+  esteiraFalhou: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/esteira/config", () => ({ configDaEsteira: () => ({ funis: {} }) }));
+vi.mock("@/lib/esteira/deps-reais", () => ({ depsReaisDaEsteira: (_a: unknown, org: string) => ({ org }) }));
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({
+    from: () => ({ select: () => ({ eq: async () => ({ data: estado.orgs, error: null }) }) }),
+  }),
+}));
+vi.mock("@/lib/esteira/rodada", () => ({
+  rodadaTeveEfeito: () => false,
+  rodarEsteira: vi.fn(async (_cfg: unknown, deps: { org: string }) => {
+    const org = deps.org;
+    estado.rodadas.push(org);
+    const n = (estado.emCurso.get(org) ?? 0) + 1;
+    estado.emCurso.set(org, n);
+    estado.maxSimultaneoPorOrg = Math.max(estado.maxSimultaneoPorOrg, n);
+    try {
+      await new Promise<void>((r) => estado.liberar.push(r)); // segura a rodada "lenta" até o teste soltar
+      if (estado.falharOrg === org) throw new Error("rodada falhou");
+      return { passados: 0, cobrancas: 1 };
+    } finally {
+      estado.emCurso.set(org, (estado.emCurso.get(org) ?? 1) - 1);
+    }
+  }),
+}));
+vi.mock("@/lib/agent-engine/db/request-pool", () => ({
+  getRequestPool: () => ({
+    connect: async () => {
+      const sessao = ++estado.conexoes;
+      return {
+        query: async (sql: string, params: string[] = []) => {
+          if (sql === "begin") { estado.transacoes.add(sessao); return { rows: [] }; }
+          if (sql === "commit" || sql === "rollback") {
+            estado.transacoes.delete(sessao);
+            for (const [k, dona] of estado.travas) if (dona === sessao) estado.travas.delete(k);
+            return { rows: [] };
+          }
+          const chave = params[0]!;
+          if (sql.includes("pg_try_advisory_xact_lock")) {
+            // fora de transação a trava de transação não vale: o teste tem de reprovar
+            if (!estado.transacoes.has(sessao)) throw new Error("xact lock fora de transação");
+            const dona = estado.travas.get(chave);
+            if (dona !== undefined && dona !== sessao) return { rows: [{ travou: false }] };
+            estado.travas.set(chave, sessao);
+            return { rows: [{ travou: true }] };
+          }
+          throw new Error("sql inesperado: " + sql);
+        },
+        release: () => void estado.soltas++,
+      };
+    },
+  }),
+}));
+
+import { GET } from "@/app/api/v1/cron/esteira-vendas/route";
+import { chaveDaTravaDaEsteira } from "@/lib/esteira/trava-da-rodada";
+
+const chamar = async () => {
+  const res = await GET({} as never);
+  return ((await res.json()) as { data: { organizacoes: Array<Record<string, unknown>> } }).data.organizacoes;
+};
+const esperarRodadas = async (n: number) => {
+  await vi.waitFor(() => expect(estado.liberar.length).toBe(n));
+};
+const soltarTodas = () => estado.liberar.splice(0).forEach((r) => r());
+
+afterEach(() => {
+  soltarTodas();
+  Object.assign(estado, {
+    orgs: [], travas: new Map(), conexoes: 0, soltas: 0, emCurso: new Map(),
+    maxSimultaneoPorOrg: 0, liberar: [], falharOrg: null, rodadas: [], transacoes: new Set(),
+  });
+});
+
+describe("v1.9.43: trava da rodada da esteira por organização", () => {
+  it("⭐ 2 rodadas SIMULTÂNEAS: a 2ª pula a organização; só UMA rodada trabalha, e a trava é solta no fim", async () => {
+    estado.orgs = [{ id: "org-a", settings: {} }];
+
+    const primeira = chamar();
+    await esperarRodadas(1); // a 1ª está DENTRO da rodada, segurando a trava
+    const segunda = await chamar(); // a 2ª chega no meio
+
+    expect(segunda).toEqual([{ organization_id: "org-a", pulada: "rodada_em_curso" }]);
+    soltarTodas();
+    expect(await primeira).toEqual([expect.objectContaining({ organization_id: "org-a", cobrancas: 1 })]);
+
+    expect(estado.rodadas).toEqual(["org-a"]); // rodarEsteira só uma vez
+    expect(estado.maxSimultaneoPorOrg).toBe(1);
+    expect(estado.travas.size).toBe(0); // solta
+    expect(estado.transacoes.size).toBe(0); // nenhuma transação aberta ficou para trás
+    expect(estado.soltas).toBe(estado.conexoes); // toda conexão devolvida ao pool
+  });
+
+  it("depois que a 1ª termina, a rodada seguinte roda normalmente (a trava não fica presa)", async () => {
+    estado.orgs = [{ id: "org-a", settings: {} }];
+    const r1 = chamar();
+    await esperarRodadas(1);
+    soltarTodas();
+    await r1;
+    const r2 = chamar();
+    await esperarRodadas(1);
+    soltarTodas();
+    expect(await r2).toEqual([expect.objectContaining({ organization_id: "org-a", cobrancas: 1 })]);
+    expect(estado.rodadas).toEqual(["org-a", "org-a"]);
+  });
+
+  it("a trava é POR organização: a rodada de uma não segura a de outra", async () => {
+    estado.orgs = [{ id: "org-a", settings: {} }];
+    const r1 = chamar();
+    await esperarRodadas(1);
+    estado.orgs = [{ id: "org-a", settings: {} }, { id: "org-b", settings: {} }];
+    const r2 = chamar();
+    await esperarRodadas(2); // a org-b entrou, mesmo com a org-a travada
+    soltarTodas();
+    const segunda = await r2;
+    await r1;
+    expect(segunda).toEqual([
+      { organization_id: "org-a", pulada: "rodada_em_curso" },
+      expect.objectContaining({ organization_id: "org-b", cobrancas: 1 }),
+    ]);
+    expect(estado.travas.size).toBe(0);
+  });
+
+  it("se a rodada dá ERRO, a trava é solta mesmo assim (e o erro continua registrado)", async () => {
+    estado.orgs = [{ id: "org-a", settings: {} }];
+    estado.falharOrg = "org-a";
+    const r1 = chamar();
+    await esperarRodadas(1);
+    soltarTodas();
+    expect(await r1).toEqual([{ organization_id: "org-a", erro: "rodada falhou" }]);
+    expect(estado.travas.size).toBe(0);
+    expect(estado.soltas).toBe(estado.conexoes);
+  });
+
+  it("a chave é estável e por organização", () => {
+    expect(chaveDaTravaDaEsteira("x")).toBe("esteira:x");
+  });
+});

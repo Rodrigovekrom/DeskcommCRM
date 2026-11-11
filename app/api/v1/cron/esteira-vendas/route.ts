@@ -19,6 +19,8 @@ import { configDaEsteira } from "@/lib/esteira/config";
 import { depsReaisDaEsteira } from "@/lib/esteira/deps-reais";
 import { esteiraFalhou, esteiraRodou } from "@/lib/esteira/aviso-de-parada";
 import { rodadaTeveEfeito, rodarEsteira, type ResumoDaRodada } from "@/lib/esteira/rodada";
+import { comTravaDaEsteira } from "@/lib/esteira/trava-da-rodada";
+import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { logger } from "@/lib/logger";
 import { idsDeOrgsParadas } from "@/lib/organizacao/operante";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -40,13 +42,26 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (error) return fail("internal_error", "Não deu para ler as organizações.", 500, { requestId });
 
   const paradas = new Set(await idsDeOrgsParadas(admin));
-  const resultados: Array<{ organization_id: string } & Partial<ResumoDaRodada> & { erro?: string }> = [];
+  const resultados: Array<
+    { organization_id: string } & Partial<ResumoDaRodada> & { erro?: string; pulada?: "rodada_em_curso" }
+  > = [];
+  // ia.vek v1.9.43: uma rodada por organização de cada vez (lib/esteira/trava-da-rodada.ts).
+  const pool = getRequestPool();
   for (const org of (orgs ?? []) as Array<{ id: string; settings: unknown }>) {
     if (paradas.has(org.id)) continue;
     const cfg = configDaEsteira(org.settings);
     if (cfg.funis === null) continue;
     try {
-      const resumo = await rodarEsteira(cfg, depsReaisDaEsteira(admin, org.id, () => new Date()));
+      const travada = await comTravaDaEsteira(pool, org.id, () =>
+        rodarEsteira(cfg, depsReaisDaEsteira(admin, org.id, () => new Date())),
+      );
+      if (!travada.rodou) {
+        // A rodada anterior desta organização ainda está em curso: pula, não espera nem dobra.
+        logger.info("esteira_rodada_pulada", { organization_id: org.id, motivo: "rodada_em_curso" });
+        resultados.push({ organization_id: org.id, pulada: "rodada_em_curso" });
+        continue;
+      }
+      const resumo = travada.valor;
       resultados.push({ organization_id: org.id, ...resumo });
       await esteiraRodou(admin, org.id);
       if (rodadaTeveEfeito(resumo)) {
