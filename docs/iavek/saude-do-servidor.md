@@ -52,12 +52,20 @@ em `/root/iavek-saude/limites.json`; o servidor novo (KVM 4) terá os dele.
 Cada problema tem uma **categoria fixa** (ex.: `app:memoria`, `waha:swap`, `whatsapp`, `app:reinicio`), sem
 números. É ela que o aviso compara, para não repetir a cada leitura (Lupa, bloqueio 1).
 
+### A folga para descer (histerese, Lupa, bloqueio 3)
+Um problema **sobe** de nível na hora, mas só **desce** depois de 3 leituras seguidas abaixo do limite (15 min).
+Assim, a memória rondando o limite (805, 795, 805…) não vira um aviso a cada 5 min. Teste: 1 h oscilando assim
+dá 1 mensagem e 1 áudio.
+
 ### Quem recebe o quê
 - **Ao Maestro (mensageiro): tudo, sem dobrar.**
   - Uma mensagem quando um problema aparece, piora, melhora ou resolve.
+  - No máximo 1 por problema a cada 30 min. Saem na hora: a 1ª vez que ele fica vermelho, e o resolvido de um problema que tocou áudio.
+  - Uma mensagem segurada pelos 30 min não se perde: sai quando eles passam.
   - Se um vermelho continuar, 1 lembrete a cada 3 h.
 - **Ao Rodrigo (áudio no Telegram, `falar.sh`).** Regra do Maestro em 11/11; o Rodrigo pode mudar:
-  - só na 1ª vez que um problema fica vermelho, e 1 lembrete a cada 3 h se continuar;
+  - só na 1ª vez que um problema fica vermelho, e 1 lembrete a cada 3 h se continuar. Voltar ao vermelho também
+    respeita as 3 h do último áudio daquele problema;
   - 1 áudio de "voltou ao normal" quando resolve;
   - das 22h às 7h, áudio SÓ para sistema fora do ar (app ou WAHA parado, unhealthy, reiniciando ou sem memória) ou WhatsApp caído. O resto espera as 7h e só toca se ainda estiver vermelho.
 - **Vigia cega:** 3 leituras seguidas sem SSH, ou o estado do servidor com mais de 15 min → mensagem ao Maestro.
