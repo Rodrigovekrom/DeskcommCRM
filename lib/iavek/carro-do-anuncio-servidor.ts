@@ -25,7 +25,10 @@ export async function gravarCarroDoAnuncio(
   );
   if (error) return "erro";
   const r = acharCarroDoAnuncio(texto, (carros ?? []) as CarroDoCatalogo[]);
-  if (r.tipo !== "achou") return r.tipo;
+  if (r.tipo !== "achou") {
+    await marcarDesfechoNoLead(db, orgId, leadId, r.tipo, r.tipo === "empate" ? r.ids : []);
+    return r.tipo;
+  }
   const { data: lead, error: e2 } = await db
     .from("crm_leads")
     .select("custom_fields")
@@ -67,3 +70,46 @@ export function registrarDesfechoDoCarro(
   if (desfecho === "erro") logger.warn("carro do anúncio: não gravado", ctx);
   else logger.info("carro do anúncio: casador", ctx);
 }
+
+/** O campo do lead onde o desfecho sem carro fica guardado (source_metadata). */
+export const CAMPO_DESFECHO_DO_CARRO = "iavek_carro_desfecho";
+
+/**
+ * ia.vek P3 (11/11): o desfecho SEM carro ("nenhum" ou "empate") fica gravado NO LEAD, em
+ * `source_metadata.iavek_carro_desfecho = {desfecho, em, candidatos}`. Os 2 leads "sem causa medida"
+ * de 07/11 eram um EMPATE (dois Polo Track 2023/2024 cinza ativos), e a causa se perdeu porque o
+ * log do contêiner some a cada troca. No lead, "por que este lead não tem carro?" tem resposta.
+ * Nunca derruba o nascimento: falhar aqui só deixa um aviso no log.
+ */
+async function marcarDesfechoNoLead(
+  db: SupabaseClient,
+  orgId: string,
+  leadId: string,
+  desfecho: "nenhum" | "empate",
+  candidatos: readonly string[],
+): Promise<void> {
+  try {
+    const { data, error } = await db
+      .from("crm_leads")
+      .select("source_metadata")
+      .eq("organization_id", orgId)
+      .eq("id", leadId)
+      .maybeSingle();
+    if (error || !data) return;
+    const atual = ((data as { source_metadata: Record<string, unknown> | null }).source_metadata ?? {}) as Record<string, unknown>;
+    const marca = { desfecho, em: new Date().toISOString(), ...(candidatos.length ? { candidatos: candidatos.slice(0, 5) } : {}) };
+    const { error: e2 } = await db
+      .from("crm_leads")
+      .update({ source_metadata: { ...atual, [CAMPO_DESFECHO_DO_CARRO]: marca } })
+      .eq("organization_id", orgId)
+      .eq("id", leadId);
+    if (e2) logger.warn("carro do anúncio: desfecho não marcado no lead", { organization_id: orgId, lead_id: leadId, error: e2.message.slice(0, 120) });
+  } catch (err) {
+    logger.warn("carro do anúncio: desfecho não marcado no lead", {
+      organization_id: orgId,
+      lead_id: leadId,
+      error: err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120),
+    });
+  }
+}
+
