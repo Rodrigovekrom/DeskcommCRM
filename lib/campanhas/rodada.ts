@@ -651,9 +651,12 @@ export async function estadoDeEnvio(
   // O dia do teto diário é o dia DO CLIENTE, como o resto do ritmo. Ver a nota
   // no chamador: `setUTCHours` fazia o dia virar 21h em `America/Sao_Paulo`.
   const inicioDoDia = dayStartInTz(agora, fuso);
-  const { data } = await admin
+  // ia.vek v1.9.44 (Lupa): `enviados.length` parava no corte do servidor (3.000 na produção) e o teto
+  // diário de uma campanha grande deixava de segurar. A contagem do dia vem do banco (`count: exact`);
+  // a lista, em ordem decrescente, só serve para o último envio e para a última hora (no topo dela).
+  const { data, count } = await admin
     .from("campaign_recipients")
-    .select("sent_at")
+    .select("sent_at", { count: "exact" })
     .eq("campaign_id", campanhaId)
     .not("sent_at", "is", null)
     .gte("sent_at", inicioDoDia.toISOString())
@@ -663,7 +666,7 @@ export async function estadoDeEnvio(
   const umaHoraAtras = agora.getTime() - 3_600_000;
   return {
     ultimoEnvio: enviados[0] ?? null,
-    enviadasHoje: enviados.length,
+    enviadasHoje: typeof count === "number" ? count : enviados.length,
     enviadasNaUltimaHora: enviados.filter((d) => d.getTime() >= umaHoraAtras).length,
   };
 }

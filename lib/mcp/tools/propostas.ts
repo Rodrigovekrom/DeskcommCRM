@@ -128,6 +128,9 @@ function prazoEmDiasUteisDoBriefing(briefing: unknown): number | null {
   return dias;
 }
 
+/** Quantas mensagens recentes bastam para achar o turno atual (abaixo de qualquer corte do servidor). */
+export const MENSAGENS_DO_TURNO = 1000;
+
 interface MensagemDoLote {
   direction: string;
   sent_via: string;
@@ -147,16 +150,21 @@ async function loteDoTurnoAtual(
   ctx: McpContext,
   conversationId: string,
 ): Promise<{ pendente: boolean; textos: string[] }> {
-  const { data } = await ctx.supabase
+  // ia.vek v1.9.44 (P3 da Lupa): em ordem CRESCENTE sem limite, o corte do servidor (3.000 na
+  // produção) devolvia as mensagens mais ANTIGAS e o turno atual sumia numa conversa longa (a maior
+  // tem 2.183). Agora: as MAIS RECENTES primeiro, com limite, e invertidas para a ordem do tempo.
+  const { data: recentes } = await ctx.supabase
     .from("messages")
     .select("direction, sent_via, body, media_derived_text, created_at")
     .eq("organization_id", ctx.organizationId)
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true });
-  const recebidas = ((data ?? []) as MensagemDoLote[]).filter((m) => m.direction === "inbound");
+    .order("created_at", { ascending: false })
+    .limit(MENSAGENS_DO_TURNO);
+  const data = ((recentes ?? []) as MensagemDoLote[]).slice().reverse();
+  const recebidas = data.filter((m) => m.direction === "inbound");
   if (recebidas.length === 0) return { pendente: false, textos: [] };
   const maisRecente = recebidas.map((m) => m.created_at).reduce((a, b) => (a > b ? a : b));
-  const cortes = ((data ?? []) as MensagemDoLote[])
+  const cortes = data
     .filter((m) => m.direction === "outbound" && m.sent_via === "ai" && m.created_at < maisRecente)
     .map((m) => m.created_at);
   const corte = cortes.length > 0 ? cortes.reduce((a, b) => (a > b ? a : b)) : null;

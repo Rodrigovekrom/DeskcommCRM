@@ -46,6 +46,8 @@ interface MundoOpts {
   modelosOcultos?: string[];
   /** Linhas da tabela messages; default: turno com confirmação válida. */
   mensagens?: MensagemMock[];
+  /** v1.9.44: o max_rows simulado do servidor (corta cada resposta de messages). */
+  corteDoServidor?: number;
 }
 
 const RASCUNHO_ID = "99999999-9999-4999-8999-999999999999";
@@ -217,13 +219,23 @@ function montarMundoDeFerramenta(opts?: MundoOpts) {
         // A trava do briefing lê o turno atual: qualifica pelos `.eq` que o
         // handler manda — linha de outra organização ou conversa nunca conta.
         const filtros: Record<string, unknown> = {};
+        // v1.9.44: a leitura é das MAIS RECENTES (ordem decrescente + limite); o dublê respeita os dois.
+        let crescente = true;
+        let limite = Number.POSITIVE_INFINITY;
         const cadeia: any = {
           select: () => cadeia,
           eq: (coluna: string, valor: unknown) => {
             filtros[coluna] = valor;
             return cadeia;
           },
-          order: () => cadeia,
+          order: (_col: string, o?: { ascending?: boolean }) => {
+            crescente = o?.ascending !== false;
+            return cadeia;
+          },
+          limit: (n: number) => {
+            limite = n;
+            return cadeia;
+          },
           then: (resolve: any) => {
             const base: MensagemMock[] = opts?.mensagens ?? [
               {
@@ -245,9 +257,10 @@ function montarMundoDeFerramenta(opts?: MundoOpts) {
                 created_at: "2026-09-27T10:01:00.000Z",
               },
             ];
-            const linhas = base.filter((m) =>
-              Object.entries(filtros).every(([col, val]) => m[col as keyof MensagemMock] === val),
-            );
+            const linhas = base
+              .filter((m) => Object.entries(filtros).every(([col, val]) => m[col as keyof MensagemMock] === val))
+              .sort((a, b) => (crescente ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at)))
+              .slice(0, Math.min(limite, opts?.corteDoServidor ?? Number.POSITIVE_INFINITY));
             return Promise.resolve({ data: linhas, error: null }).then(resolve);
           },
         };
@@ -759,6 +772,40 @@ describe("crm_draft_proposal", () => {
     expect(r.error).toContain(FRASE_PADRAO);
     expect(r.error).toMatch(/não repita a ferramenta com a mesma frase/);
     expect(mundo.propostaCriada).toBeNull();
+  });
+
+  it("v1.9.44 ⭐ conversa LONGA acima do corte do servidor: o turno atual (no fim) ainda é achado", async () => {
+    // Antes: ordem crescente sem limite + corte de 1.000 → só as 1.000 mais ANTIGAS voltavam, o turno
+    // atual sumia e a confirmação "não era encontrada" numa conversa longa (a maior tem 2.183).
+    const ORG = "22222222-2222-4222-8222-222222222222";
+    const CONV = "55555555-5555-4555-8555-555555555555";
+    const base = Date.parse("2026-09-01T00:00:00.000Z");
+    const antigas: MensagemMock[] = Array.from({ length: 1500 }, (_, i) => ({
+      organization_id: ORG,
+      conversation_id: CONV,
+      direction: i % 2 === 0 ? "inbound" : "outbound",
+      sent_via: i % 2 === 0 ? "external_device" : "ai",
+      body: `mensagem antiga ${i}`,
+      media_derived_text: null,
+      created_at: new Date(base + i * 60_000).toISOString(),
+    }));
+    const turno: MensagemMock[] = [
+      { organization_id: ORG, conversation_id: CONV, direction: "outbound", sent_via: "ai", body: "Posso mandar o resumo?", media_derived_text: null, created_at: "2026-09-27T10:00:00.000Z" },
+      { organization_id: ORG, conversation_id: CONV, direction: "inbound", sent_via: "external_device", body: FRASE_PADRAO, media_derived_text: null, created_at: "2026-09-27T10:01:00.000Z" },
+    ];
+    const mundo = montarMundoDeFerramenta({ mensagens: [...antigas, ...turno], corteDoServidor: 1000 });
+    const r = (await crmDraftProposal.handler(
+      {
+        lead_id: mundo.leadId,
+        conversation_id: mundo.conversationId,
+        titulo: "Proposta",
+        itens: [{ descricao: "Site", quantidade: 1 }],
+        briefing: briefingCompleto(),
+      } as never,
+      mundo.ctx,
+    )) as { error?: string; motivo?: string };
+    expect(r.motivo).toBeUndefined();
+    expect(mundo.propostaCriada).not.toBeNull();
   });
 
   it("áudio sem transcrição no lote: transcricao_pendente", async () => {

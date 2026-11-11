@@ -178,6 +178,8 @@ function banco(linhas: Linha[]) {
         const naoNulos: string[] = [];
         let dentro: [string, string[]] | null = null;
         let teto: number | null = null;
+        // v1.9.44: a leitura dos contatos é paginada (order + range).
+        let pagina: [number, number] | null = null;
         const q: Record<string, unknown> = {
           eq: (col: string, val: unknown) => {
             filtros.push([col, val]);
@@ -197,6 +199,10 @@ function banco(linhas: Linha[]) {
           },
           select: () => q,
           order: () => q,
+          range: (de: number, ate: number) => {
+            pagina = [de, ate];
+            return q;
+          },
           limit: (n: number) => {
             teto = n;
             return q;
@@ -204,6 +210,7 @@ function banco(linhas: Linha[]) {
           then: (r: (v: unknown) => unknown) => {
             let achadas = casar(filtros, dentro, faixas, naoNulos);
             if (teto !== null) achadas = achadas.slice(0, teto);
+            if (pagina !== null) achadas = achadas.slice(pagina[0], pagina[1] + 1);
             if (modo === "update") {
               aplicar(tabela, patch, achadas);
               return Promise.resolve({ error: null }).then(r);
@@ -380,7 +387,9 @@ describe("varredura: a retomada acontece sem ninguém clicar", () => {
     const cliente = {
       from: () => ({
         select: () => ({
-          eq: () => ({ limit: () => Promise.resolve({ data: null, error: { message: "sem permissão" } }) }),
+          eq: () => ({
+            order: () => ({ range: () => Promise.resolve({ data: null, error: { message: "sem permissão" } }) }),
+          }),
         }),
       }),
     } as unknown as ClienteDaCascata;
@@ -705,5 +714,45 @@ describe("a varredura não derruba a poda junto com ela", () => {
     expect(resposta.status, "a poda foi reportada como falha por causa da varredura").toBe(200);
     const acoes = auditou.mock.calls.map((c) => (c[0] as { action: string }).action);
     expect(acoes).not.toContain("retention.sweep_run");
+  });
+});
+
+// ia.vek v1.9.44 (P3 da Lupa): a leitura dos contatos anonimizados passa do corte do servidor.
+describe("v1.9.44: varredura acima do corte do servidor", () => {
+  it("⭐ com corte de 3 por resposta e 7 contatos, examina os 7 (não para no corte)", async () => {
+    const CORTE = 3;
+    const contatos = Array.from({ length: 7 }, (_, i) => ({ id: `c-${i}`, organization_id: ORG }));
+    const vazio = () => {
+      const q: Record<string, unknown> = {};
+      Object.assign(q, {
+        eq: () => q, in: () => q, not: () => q, limit: () => q, order: () => q, range: () => q,
+        then: (r: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(r),
+      });
+      return q;
+    };
+    const cliente = {
+      from: (t: string) => ({
+        select: () => {
+          if (t !== "contacts") return vazio();
+          let faixa: [number, number] = [0, Number.MAX_SAFE_INTEGER];
+          let paginado = false;
+          const q: Record<string, unknown> = {};
+          Object.assign(q, {
+            eq: () => q, in: () => q, not: () => q, limit: () => q, order: () => q,
+            range: (de: number, ate: number) => ((faixa = [de, ate]), (paginado = true), q),
+            then: (r: (v: unknown) => unknown) => {
+              const linhas = paginado ? contatos.slice(faixa[0], faixa[1] + 1) : contatos;
+              return Promise.resolve({ data: linhas.slice(0, CORTE), error: null }).then(r);
+            },
+          });
+          return q;
+        },
+        update: () => vazio(),
+      }),
+    } as unknown as ClienteDaCascata;
+
+    const r = await varrerRedacoesIncompletas(cliente);
+    expect(r.examinados).toBe(7);
+    expect(r.falhas).toEqual([]);
   });
 });

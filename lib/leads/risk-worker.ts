@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { registraFalhaDeAtividade } from "@/lib/leads/activity-write-failure";
@@ -86,10 +87,17 @@ export async function observaTravessias(
 ): Promise<ResultadoDaObservacao> {
   const atuais = await calculaBucketsAtuais(admin, organizationId, now);
 
-  const { data: gravados, error } = await admin
-    .from("crm_lead_risk_states")
-    .select("lead_id, bucket")
-    .eq("organization_id", organizationId);
+  // ia.vek v1.9.44 (P2 da Lupa): a leitura sem paginar parava no corte do servidor (3.000 linhas na
+  // produção; 1.354 em 11/11). Quem ficasse de fora virava `de = null` e ganhava uma travessia FALSA
+  // ("esfriou" de novo, a cada passada). Paginado e com ordem estável, ninguém fica de fora.
+  const { data: gravados, error } = await lerTudo<EstadoGravado>((de, ate) =>
+    admin
+      .from("crm_lead_risk_states")
+      .select("lead_id, bucket")
+      .eq("organization_id", organizationId)
+      .order("lead_id")
+      .range(de, ate),
+  );
   if (error) throw new Error(`observador de risco: ${error.message}`);
   const anterior = new Map<string, RiskBucket>(
     ((gravados ?? []) as EstadoGravado[]).map((g) => [g.lead_id, g.bucket]),

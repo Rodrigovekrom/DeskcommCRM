@@ -21,6 +21,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { progresso, taxasDaCampanha, type ContagemDaCampanha } from "@/lib/campanhas/metricas";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
+import { lerTudo } from "@/lib/supabase/paginas";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +39,18 @@ export async function GET(
   const { id } = await ctx.params;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("campaign_recipients")
-    .select("status, eligibility_status, sent_at, delivered_at, read_at, replied_at, opted_out_at")
-    .eq("organization_id", authz.org.orgId)
-    .eq("campaign_id", id)
-    .limit(TETO);
+  // ia.vek v1.9.44 (Lupa): `.limit(20_000)` sozinho parava no corte do servidor (3.000 na produção):
+  // as métricas de uma campanha grande contavam só uma parte e o `parcial` não avisava. Paginado.
+  const { data, error } = await lerTudo((de, ate) =>
+    supabase
+      .from("campaign_recipients")
+      .select("id, status, eligibility_status, sent_at, delivered_at, read_at, replied_at, opted_out_at")
+      .eq("organization_id", authz.org.orgId)
+      .eq("campaign_id", id)
+      .order("id")
+      .range(de, ate),
+    { teto: TETO, paraNoTeto: true },
+  );
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
   const linhas = (data ?? []) as unknown as Array<{

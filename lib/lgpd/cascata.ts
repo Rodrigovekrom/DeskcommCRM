@@ -93,6 +93,9 @@ export interface Filtravel<T> extends PromiseLike<T> {
   in(coluna: string, valores: string[]): Filtravel<T>;
   not(coluna: string, operador: "is", valor: null): Filtravel<T>;
   limit(n: number): Filtravel<T>;
+  /** ia.vek v1.9.44: paginação de verdade (o corte do servidor é de 3.000 linhas na produção). */
+  order(coluna: string): Filtravel<T>;
+  range(de: number, ate: number): Filtravel<T>;
 }
 
 export interface ClienteDaCascata {
@@ -528,6 +531,8 @@ export const MAX_CONTATOS_POR_VARREDURA = 200;
  * 100 UUIDs já dão ~3,7 KB de URL — perto do que proxies costumam recusar.
  */
 export const CONTATOS_POR_BLOCO = 100;
+/** ia.vek v1.9.44: o tamanho de cada página da leitura dos contatos (abaixo do corte do servidor). */
+export const PAGINA_DE_CONTATOS = 1000;
 
 export interface ContatoCompletado {
   contactId: string;
@@ -621,14 +626,28 @@ export async function varrerRedacoesIncompletas(
     falhas,
   });
 
-  const { data, error } = await db
-    .from("contacts")
-    .select("id, organization_id")
-    .eq("is_anonymized", true)
-    .limit(MAX_CONTATOS_EXAMINADOS);
-  if (error) return vazio([`contacts: ${error.message}`]);
-
-  const contatos = (data ?? []) as { id: string; organization_id: string }[];
+  // ia.vek v1.9.44 (P3 da Lupa): `.limit(5000)` sozinho parava no corte do servidor (3.000 na
+  // produção), e o `temResto` (contatos.length >= 5000) respondia "não tem resto" com contatos de
+  // fora. Agora a leitura é paginada, em ordem estável, até o teto de verdade.
+  const contatos: { id: string; organization_id: string }[] = [];
+  for (;;) {
+    const de = contatos.length;
+    const ate = Math.min(de + PAGINA_DE_CONTATOS, MAX_CONTATOS_EXAMINADOS) - 1;
+    const { data, error } = await db
+      .from("contacts")
+      .select("id, organization_id")
+      .eq("is_anonymized", true)
+      .order("id")
+      .range(de, ate);
+    if (error) return vazio([`contacts: ${error.message}`]);
+    const pagina = (data ?? []) as { id: string; organization_id: string }[];
+    if (pagina.length === 0) break;
+    contatos.push(...pagina);
+    if (contatos.length >= MAX_CONTATOS_EXAMINADOS) {
+      contatos.length = MAX_CONTATOS_EXAMINADOS;
+      break;
+    }
+  }
   const orgDe = new Map(contatos.map((c) => [c.id, c.organization_id]));
   const falhas: string[] = [];
   const pendentes: string[] = [];

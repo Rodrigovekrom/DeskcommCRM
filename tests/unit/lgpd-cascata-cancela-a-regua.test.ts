@@ -115,6 +115,8 @@ function banco(linhas: Linha[]) {
         const filtros: Array<[string, unknown]> = [];
         let dentro: [string, string[]] | null = null;
         let teto: number | null = null;
+        // v1.9.44: a leitura dos contatos é paginada (order + range).
+        let pagina: [number, number] | null = null;
         const q: Record<string, unknown> = {
           eq: (col: string, val: unknown) => {
             filtros.push([col, val]);
@@ -127,6 +129,11 @@ function banco(linhas: Linha[]) {
           // `.not(col, "is", null)` do passo da transcrição (0497): este arquivo
           // não planta mensagem, então a tabela nunca casa e o filtro só precisa existir.
           not: () => q,
+          order: () => q,
+          range: (de: number, ate: number) => {
+            pagina = [de, ate];
+            return q;
+          },
           limit: (n: number) => {
             teto = n;
             return q;
@@ -134,6 +141,7 @@ function banco(linhas: Linha[]) {
           then: (r: (v: unknown) => unknown) => {
             let achadas = casar(filtros, dentro);
             if (teto !== null) achadas = achadas.slice(0, teto);
+            if (pagina !== null) achadas = achadas.slice(pagina[0], pagina[1] + 1);
             if (modo === "update") {
               aplicar(tabela, patch, achadas);
               return Promise.resolve({ error: null }).then(r);

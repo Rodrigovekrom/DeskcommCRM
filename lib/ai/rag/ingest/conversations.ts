@@ -35,6 +35,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const CONV_MAX_CHARS = 1600;
 const CONV_OVERLAP_CHARS = 200;
 const VALIDATOR_MIN_MSGS = 10;
+/** ia.vek v1.9.44: as mais recentes de cada conversa, abaixo de qualquer corte do servidor. */
+export const MENSAGENS_POR_CONVERSA = 1000;
 
 export interface IngestConversationsArgs {
   organizationId: string;
@@ -118,6 +120,27 @@ interface MsgRow {
   body: string | null;
   direction: string;
   sent_at: string;
+}
+
+/**
+ * ia.vek v1.9.44 (P3 da Lupa): as mensagens de UMA conversa, as mais recentes, na ordem do tempo.
+ * Em ordem CRESCENTE sem limite, o corte do servidor (3.000 na produção) devolvia só o COMEÇO de uma
+ * conversa longa (a maior tem 2.183 mensagens). Agora: decrescente com limite, depois invertida.
+ */
+export async function mensagensRecentesDaConversa(
+  admin: Pick<ReturnType<typeof createAdminClient>, "from">,
+  organizationId: string,
+  conversationId: string,
+): Promise<{ data: MsgRow[]; error: { message: string } | null }> {
+  const { data, error } = await admin
+    .from("messages")
+    .select("body, direction, sent_at")
+    .eq("organization_id", organizationId)
+    .eq("conversation_id", conversationId)
+    .order("sent_at", { ascending: false })
+    .limit(MENSAGENS_POR_CONVERSA);
+  if (error) return { data: [], error: { message: error.message } };
+  return { data: ((data ?? []) as MsgRow[]).slice().reverse(), error: null };
 }
 
 function buildTranscript(messages: MsgRow[]): string {
@@ -252,12 +275,7 @@ export async function ingestConversationsBatch(
     }
 
     // a. Load messages (filter org).
-    const { data: msgRows, error: msgErr } = await admin
-      .from("messages")
-      .select("body, direction, sent_at")
-      .eq("organization_id", organizationId)
-      .eq("conversation_id", conv.id)
-      .order("sent_at", { ascending: true });
+    const { data: msgRows, error: msgErr } = await mensagensRecentesDaConversa(admin, organizationId, conv.id);
 
     if (msgErr) {
       console.warn(
@@ -269,7 +287,7 @@ export async function ingestConversationsBatch(
       continue;
     }
 
-    const msgs = (msgRows ?? []) as MsgRow[];
+    const msgs = msgRows;
     const transcript = buildTranscript(msgs);
     if (!transcript) {
       skipped++;

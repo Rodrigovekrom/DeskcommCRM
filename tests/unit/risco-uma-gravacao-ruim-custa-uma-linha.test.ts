@@ -79,7 +79,8 @@ function adminDuble() {
       }
       if (tabela === "crm_lead_risk_states") {
         return {
-          select: () => ({ eq: async () => ({ data: [], error: null }) }),
+          // v1.9.44: a leitura dos estados gravados é paginada (eq → order → range).
+          select: () => ({ eq: () => ({ order: () => ({ range: async () => ({ data: [], error: null }) }) }) }),
           upsert: async (linha: { lead_id: string }) => {
             if (linha.lead_id === recusarLead) return { error: { message: RECUSA } };
             gravados.push(linha.lead_id);

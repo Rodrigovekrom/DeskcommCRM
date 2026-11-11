@@ -102,3 +102,23 @@ describe("estadoDeEnvio conta o dia no fuso que recebe", () => {
     expect(estado.enviadasHoje).toBe(0);
   });
 });
+
+// ia.vek v1.9.44 (Lupa): o teto diário conta TODOS os envios do dia, mesmo acima do corte do servidor.
+describe("v1.9.44: enviadasHoje acima do corte do servidor", () => {
+  it("⭐ 3.500 envios hoje com corte de 3.000: enviadasHoje = 3.500 (o count do banco), não 3.000", async () => {
+    const agora = new Date("2026-11-11T18:00:00.000Z");
+    const envios = Array.from({ length: 3500 }, (_, i) => new Date(agora.getTime() - (i + 1) * 5_000).toISOString());
+    let pediuCount = false;
+    const consulta: Record<string, unknown> = {
+      select: (_c: string, o?: { count?: string }) => ((pediuCount = o?.count === "exact"), consulta),
+      eq: () => consulta,
+      not: () => consulta,
+      gte: () => consulta,
+      order: async () => ({ data: envios.slice(0, 3000).map((sent_at) => ({ sent_at })), count: pediuCount ? envios.length : null }),
+    };
+    const r = await estadoDeEnvio({ from: () => consulta } as never, "camp", agora, "America/Sao_Paulo");
+    expect(r.enviadasHoje).toBe(3500);
+    expect(r.ultimoEnvio?.toISOString()).toBe(envios[0]);
+    expect(r.enviadasNaUltimaHora).toBe(720); // um envio a cada 5 s na última hora
+  });
+});
