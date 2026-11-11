@@ -121,7 +121,7 @@ describe("POST /api/v1/agenda/agendamentos — sessão de navegador", () => {
     const { POST } = await import("./route");
     const res = await POST(postReq({ ...BODY, iavek_cep: "18050-123", iavek_numero: " 45 ", iavek_km: 1 }));
     expect(res.status).toBe(201);
-    const entrada = vi.mocked(marcarAgendamentoHandler).mock.calls[0]?.[2] as Record<string, unknown>;
+    const entrada = vi.mocked(marcarAgendamentoHandler).mock.calls[0]?.[2] as unknown as Record<string, unknown>;
     expect(entrada).toMatchObject({ iavek_cep: "18050123", iavek_numero: "45" });
     expect(entrada).not.toHaveProperty("iavek_km"); // o km é do servidor
     vi.mocked(marcarAgendamentoHandler).mockClear();
