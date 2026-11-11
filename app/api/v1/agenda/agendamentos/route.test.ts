@@ -116,6 +116,20 @@ describe("POST /api/v1/agenda/agendamentos — sessão de navegador", () => {
     expect(vi.mocked(marcarAgendamentoHandler).mock.calls[0]?.[2]).not.toHaveProperty("title");
   });
 
+  it("ia.vek v1.9.45 (CRM-280): o CEP chega normalizado, o número passa, e um km mandado pela TELA nunca chega ao handler", async () => {
+    sessaoOk();
+    const { POST } = await import("./route");
+    const res = await POST(postReq({ ...BODY, iavek_cep: "18050-123", iavek_numero: " 45 ", iavek_km: 1 }));
+    expect(res.status).toBe(201);
+    const entrada = vi.mocked(marcarAgendamentoHandler).mock.calls[0]?.[2] as Record<string, unknown>;
+    expect(entrada).toMatchObject({ iavek_cep: "18050123", iavek_numero: "45" });
+    expect(entrada).not.toHaveProperty("iavek_km"); // o km é do servidor
+    vi.mocked(marcarAgendamentoHandler).mockClear();
+    const ruim = await POST(postReq({ ...BODY, iavek_cep: "1805" }));
+    expect(ruim.status).toBe(422);
+    expect(marcarAgendamentoHandler).not.toHaveBeenCalled();
+  });
+
   it("ia.vek 0613: NO modo agendamento (clínica), o atendente segue recusado (gerente em diante)", async () => {
     sessaoOk();
     modo.ligado = true;

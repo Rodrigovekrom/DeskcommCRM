@@ -93,6 +93,9 @@ const marcarSchema = z.object({
   description: z.string().max(2000).optional(),
   location_details: z.string().max(300).optional(),
   guest_email: emailDoConvidado.optional(),
+  // ia.vek v1.9.45 (CRM-280): o CEP (8 dígitos, com ou sem traço) e o número do "Ir até o cliente".
+  iavek_cep: z.preprocess((v) => (typeof v === "string" ? v.replace(/\D/g, "") : v), z.string().regex(/^\d{8}$/, "CEP inválido.")).optional(),
+  iavek_numero: z.string().trim().max(20).optional(),
 });
 
 const alterarSchema = z

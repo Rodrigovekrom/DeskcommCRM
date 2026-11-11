@@ -1,4 +1,5 @@
 import { cabeMaisUm } from "@/lib/iavek/capacidade-da-agenda";
+import { kmDaLojaAte } from "@/lib/iavek/km/km-da-loja";
 import { statusDaMarcacaoDaIa } from "@/lib/iavek/agenda-da-ia";
 import { agendaDaIaDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { randomUUID } from "node:crypto";
@@ -90,6 +91,9 @@ export interface MarcarInput {
    * vazio — quem apagou o que o tipo sugeria quis apagar, não herdar de novo.
    */
   location_details?: string;
+  /** ia.vek v1.9.45 (CRM-280): o CEP (8 dígitos) e o número do cliente; o km é calculado AQUI, no servidor. */
+  iavek_cep?: string;
+  iavek_numero?: string;
   /**
    * Convidado externo, digitado na tela. `""` limpa; ausente não mexe.
    *
@@ -420,12 +424,20 @@ async function executarCriacaoDeAgendamento(
       : tipo.requires_confirmation
       ? "pending"
       : "confirmed";
+  // ia.vek v1.9.45 (CRM-280): o km de carro da loja até o cliente, calculado pelo SERVIDOR (nunca vem da
+  // tela). Com teto de tempo: a marcação nunca espera mais que alguns segundos; sem chave, o km fica nulo.
+  const kmDoCliente = input.iavek_cep
+    ? await kmDaLojaAte(supabase, ctx.organization_id, { cep: input.iavek_cep, numero: input.iavek_numero ?? null }).catch(() => null)
+    : null;
   const { data: criado, error: erroInsert } = await supabase
     .from("calendar_appointments")
     .insert({
       organization_id: ctx.organization_id,
       event_type_id: tipo.id,
       title: input.title ?? tipo.name,
+      iavek_cep: input.iavek_cep ?? null,
+      iavek_numero: input.iavek_cep ? input.iavek_numero?.trim() || null : null,
+      iavek_km: kmDoCliente?.km ?? null,
       starts_at: inicio.toISOString(),
       ends_at: fim.toISOString(),
       // O fuso do compromisso é campo de primeira classe: é o da JORNADA, onde
@@ -438,9 +450,10 @@ async function executarCriacaoDeAgendamento(
       meeting_delivery: delivery as unknown as Json,
       location_kind: tipo.location_kind,
       location_details:
-        input.location_details !== undefined
-          ? input.location_details.trim() || null
-          : tipo.location_details,
+        input.location_details !== undefined && input.location_details.trim()
+          ? input.location_details.trim()
+          : // ia.vek v1.9.45 (CRM-280): sem endereço digitado, vale o do CEP (ViaCEP), quando há.
+            kmDoCliente?.endereco ?? (input.location_details !== undefined ? null : tipo.location_details),
       description: input.description !== undefined ? input.description.trim() || null : null,
       notes: input.notes ?? null,
       // `|| null` e não `?? null`: a rota deixa passar `""` (o campo limpo na
