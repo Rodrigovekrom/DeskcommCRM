@@ -32,7 +32,8 @@ import { PRIORIDADES_DA_TAREFA, type PrioridadeDaTarefa } from "@/lib/tarefas/ti
  * `dono_do_lead` é a forma nominal — quem monta a regra não sabe (nem deve
  * saber) o uuid de quem vai atender amanhã; o dono muda, a regra não.
  */
-export type AtribuicaoDaTarefa = "dono_do_lead" | { usuario_id: string };
+/** ia.vek v1.9.45: "ninguem" = nasce sem responsável (só com aceitaSemResponsavel), sem cair no dono do lead. */
+export type AtribuicaoDaTarefa = "dono_do_lead" | "ninguem" | { usuario_id: string };
 
 export interface PedidoDeTarefa {
   organizationId: string;
@@ -149,7 +150,11 @@ export async function criarTarefaInterna(
   }
 
   const assignedTo =
-    typeof pedido.atribuirA === "object" ? pedido.atribuirA.usuario_id : (lead?.owner_user_id ?? null);
+    typeof pedido.atribuirA === "object"
+      ? pedido.atribuirA.usuario_id
+      : pedido.atribuirA === "ninguem"
+        ? null
+        : (lead?.owner_user_id ?? null);
   if (!assignedTo && !pedido.aceitaSemResponsavel) {
     return { ok: false, codigo: "sem_dono" };
   }
