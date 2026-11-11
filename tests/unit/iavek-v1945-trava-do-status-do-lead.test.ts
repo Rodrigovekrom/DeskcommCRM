@@ -26,6 +26,7 @@ const DECIDIDAS = [
   "fn_iavek_faixa_de_ajuda",
   "fn_iavek_lead_segue_a_conversa",
   "fn_iavek_notifica_mudanca_do_lead",
+  "fn_iavek_notifica_tarefa_vencida", // 0621: só avisa tarefa de lead 'open' (future, perdido e ganho não avisam)
   "fn_iavek_preco_do_carro_mudou",
   "fn_iavek_rodizio_distribuir",
   "fn_iavek_trava_guardiao_do_lead",
@@ -48,8 +49,9 @@ function ultimasDefinicoes(sql: string): Map<string, string> {
   return funcs;
 }
 
+// v1.9.45 (0621): também o "is [not] distinct from 'open'" — a 1ª versão da trava não pegava essa forma.
 const COMPARA_STATUS_DE_LEAD =
-  /(?:\b(?:l|v_lead|new|old)\.)?status\s*(?:=|<>|!=)\s*'(?:open|won|lost)'|status\s+(?:not\s+)?in\s*\([^)]*'(?:open|won|lost)'[^)]*\)/i;
+  /(?:\b(?:l|v_lead|new|old)\.)?status\s*(?:=|<>|!=)\s*'(?:open|won|lost)'|status\s+(?:not\s+)?in\s*\([^)]*'(?:open|won|lost)'[^)]*\)|status\w*\s+is\s+(?:not\s+)?distinct\s+from\s+'(?:open|won|lost)'/i;
 
 describe("v1.9.45: a trava do status do lead (toda comparação de status foi decidida)", () => {
   const funcs = ultimasDefinicoes(BASELINE);

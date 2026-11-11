@@ -164,3 +164,11 @@ status do quadro, para o gerente achar esses leads.
 Mês passado e ninguém agiu: o lead **não** volta sozinho a `open`. Ele aparece numa visão
 para o gerente. É **barato**: é uma leitura (`status = 'future'` e `compra_futura_mes`
 anterior ao mês atual) e uma seção no painel do gerente. Entra junto.
+
+## 0621 (v1.9.45): as tarefas do lead fechado
+- `fn_iavek_cancela_tarefas_do_lead_fechado` (gatilho em `crm_leads`, AFTER UPDATE OF status): ao ir para `lost`,
+  `won` ou **`future`**, as tarefas pendentes do lead são canceladas, com a linha `task_cancelled` "lead fechado".
+  Reabrir não as traz de volta.
+- `fn_iavek_notifica_tarefa_vencida`: só avisa tarefa de lead `open`. O **`future`** não avisa, decidido de propósito,
+  igual a perdido e ganho. Entrou na lista da trava do status, que agora também pega `is distinct from 'open'`.
+
