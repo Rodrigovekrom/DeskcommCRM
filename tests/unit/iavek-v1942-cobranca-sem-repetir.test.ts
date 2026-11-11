@@ -74,3 +74,89 @@ describe("v1.9.42: cobrancasFeitas pergunta ao banco só os pares distintos", ()
     expect(corpo).not.toContain(".from(");
   });
 });
+
+/**
+ * Pedido da Lupa (11/11): reproduzir o CORTE de verdade. A tabela de atividades tem centenas de cobranças
+ * antigas por tarefa; a API devolve só as K primeiras linhas. Com a leitura ANTIGA (todas as linhas pela
+ * API, em lotes), a tarefa que fica fora do corte parece "nunca cobrada" e é COBRADA DE NOVO. Com a leitura
+ * NOVA (pares distintos no banco), o mesmo caso não repete.
+ */
+import { rodarEsteira, type DepsDaEsteira, type LigacaoPendente } from "@/lib/esteira/rodada";
+import { PADRAO_DA_ESTEIRA, type ConfigDaEsteira } from "@/lib/esteira/config";
+import { buscaEmLotes } from "@/lib/supabase/em-lotes";
+
+describe("v1.9.42: o corte do max_rows, reproduzido", () => {
+  const K = 1000; // o max_rows padrão do PostgREST
+  const AGORA = new Date("2026-11-11T15:00:00Z");
+  // 3 tarefas vencidas há dias (os 2 níveis já devidos). A 1ª e a 2ª têm 1.200 cobranças antigas de nível 2
+  // cada (o lixo acumulado); a 3ª tem 1 só. Todas JÁ foram cobradas no nível 2: nada deveria ser cobrado.
+  const tarefas: LigacaoPendente[] = ["t-a", "t-b", "t-c"].map((id) => ({
+    id, lead_id: `l-${id}`, contact_id: null, title: "Ligar (L3)", due_date: "2026-11-05T12:00:00Z", assigned_to: null,
+  }));
+  const tabela: Array<{ source_id: string; payload: { task_id: string; nivel: number } }> = [
+    ...Array.from({ length: 1200 }, () => ({ source_id: "t-a", payload: { task_id: "t-a", nivel: 2 } })),
+    ...Array.from({ length: 1200 }, () => ({ source_id: "t-b", payload: { task_id: "t-b", nivel: 2 } })),
+    { source_id: "t-c", payload: { task_id: "t-c", nivel: 2 } },
+  ];
+
+  /** A leitura ANTIGA (v1.9.19.2 até v1.9.41): todas as linhas pela API, em lotes, com o corte em K. */
+  async function cobrancasFeitasAntiga(ids: string[]) {
+    const { data } = await buscaEmLotes(ids, async (lote) => ({
+      data: tabela.filter((r) => lote.includes(r.source_id)).slice(0, K), // a API corta em K linhas
+      error: null,
+    }));
+    const mapa = new Map<string, Set<number>>();
+    for (const r of data) {
+      if (!mapa.has(r.payload.task_id)) mapa.set(r.payload.task_id, new Set());
+      mapa.get(r.payload.task_id)!.add(r.payload.nivel);
+    }
+    return mapa;
+  }
+
+  function deps(cobrancasFeitas: DepsDaEsteira["cobrancasFeitas"], cobradas: string[]): DepsDaEsteira {
+    return {
+      agora: () => AGORA,
+      leadsAbertos: async () => [],
+      passarParaFollowup: async () => ({ ok: false, erro: "não usado" }),
+      mover: async () => true,
+      comHandoff: async () => new Set(),
+      clienteFalouDesde: async () => false,
+      ultimoReengajo: async () => null,
+      marcarReengajou: async () => {},
+      ligacoesJaCriadas: async () => new Map(),
+      criarLigacao: async () => true,
+      perderSemRetorno: async () => true,
+      ligacoesVencidas: async () => tarefas,
+      cobrancasFeitas,
+      cobrar: async (t, nivel) => {
+        cobradas.push(`${t.id}:${nivel}`);
+      },
+    };
+  }
+  const cfg: ConfigDaEsteira = {
+    ...PADRAO_DA_ESTEIRA,
+    funis: {
+      entrada: { pipeline_id: "00000000-0000-4000-8000-0000000000e1", horas: 72, etapas_de_compromisso: [] },
+      followup: { pipeline_id: "00000000-0000-4000-8000-0000000000f1", fases: [{ ate_dia: 90, etapa_id: "00000000-0000-4000-8000-000000000201" }], etapa_reengajou: "00000000-0000-4000-8000-000000000205" },
+    },
+  };
+
+  it("com a leitura ANTIGA, a tarefa fora do corte é cobrada DE NOVO (o defeito)", async () => {
+    const cobradas: string[] = [];
+    await rodarEsteira(cfg, deps(cobrancasFeitasAntiga, cobradas));
+    // As 1.000 primeiras linhas são todas da t-a: t-b e t-c ficam de fora e parecem "nunca cobradas".
+    expect(cobradas.sort()).toEqual(["t-b:2", "t-c:2"]);
+  });
+
+  it("com a leitura NOVA (pares distintos no banco), ninguém é cobrado de novo", async () => {
+    // O banco responde o DISTINCT sobre a tabela inteira, sem corte.
+    consultas.linhas = [...new Set(tabela.map((r) => `${r.source_id}|${r.payload.nivel}`))].map((k) => {
+      const [task_id, nivel] = k.split("|");
+      return { task_id: task_id!, nivel: Number(nivel) };
+    });
+    const nova = depsReaisDaEsteira(admin, ORG, () => AGORA);
+    const cobradas: string[] = [];
+    await rodarEsteira(cfg, deps((ids) => nova.cobrancasFeitas(ids), cobradas));
+    expect(cobradas).toEqual([]);
+  });
+});
