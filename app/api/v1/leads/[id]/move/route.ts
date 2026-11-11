@@ -9,6 +9,8 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * Status transitions are driven by trigger `fn_crm_lead_close_on_stage` (P-02);
  * this endpoint NEVER sets `status` directly.
  */
+import { createAdminClient } from "@/lib/supabase/admin";
+import { avisarGuardiaoDaCompraFutura } from "@/lib/iavek/compra-futura/avisar-guardiao";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
@@ -382,6 +384,18 @@ export async function POST(
       ...(input.via ? { via: input.via } : {}),
     },
   });
+
+  // ia.vek v1.9.45 (CRM-294, decisão (c), desligada até o ok do Rodrigo): avisa o guardião da Compra futura.
+  if ((stage as { is_compra_futura?: boolean }).is_compra_futura && lead.stage_id !== input.stage_id) {
+    void avisarGuardiaoDaCompraFutura(createAdminClient(), {
+      orgId: lead.organization_id,
+      leadId,
+      titulo: String((lead as { title?: string }).title ?? ""),
+      guardiaoId: (lead as { sdr_user_id?: string | null }).sdr_user_id ?? null,
+      quemMoveu: user.id,
+      mes: input.compra_futura_mes ? `${input.compra_futura_mes}-01` : null,
+    });
+  }
 
   return ok(finalLead, { requestId });
 }

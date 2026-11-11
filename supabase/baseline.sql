@@ -49036,6 +49036,101 @@ grant execute on function public.fn_iavek_compra_futura_ligada(uuid, text) to au
 comment on function public.fn_iavek_compra_futura_ligada(uuid, text) is
   'ia.vek v1.9.45 (CRM-294): lê settings.iavek.compra_futura.<chave> (acorda_com_mensagem, aviso_de_preco, avisar_guardiao). Ausente = desligado.';
 
+-- 6. As decisões (a) e (b) do Rodrigo, prontas e DESLIGADAS (cada uma pelo seu interruptor)
+-- (b) aviso_de_preco: o preço do carro de interesse que muda vale também para o lead em Compra futura.
+create or replace function public.fn_iavek_preco_do_carro_mudou()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.crm_leads l
+     set value_cents = new.preco_cents
+   where l.organization_id = new.organization_id
+     and (l.status = 'open'
+          or (l.status = 'future' and public.fn_iavek_compra_futura_ligada(l.organization_id, 'aviso_de_preco')))
+     and l.custom_fields->>'carro_interesse' = new.id::text
+     and l.value_cents is distinct from new.preco_cents;
+  return null;
+end;
+$$;
+
+-- (a) acorda_com_mensagem: o cliente em Compra futura que volta a escrever ACORDA o lead dele (volta à 1ª
+-- etapa aberta do funil, com o MESMO dono; o gatilho reabre). Não nasce lead novo no ciclo de 72h.
+create or replace function public.fn_nascer_lead_da_conversa(
+  p_org uuid,
+  p_contact uuid,
+  p_pipeline uuid,
+  p_stage uuid,
+  p_title text,
+  p_source text,
+  p_source_metadata jsonb default '{}'::jsonb,
+  p_tags text[] default '{}'::text[]
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_id uuid;
+  v_futuro record;
+  v_etapa uuid;
+begin
+  -- Serializa por (organização, contato). Transaction-scoped: liberado no
+  -- commit, sem risco de lock vazado.
+  perform pg_advisory_xact_lock(hashtextextended(p_org::text || ':' || p_contact::text, 0));
+
+  -- ia.vek 0620 (CRM-294, decisão (a), desligada até o ok do Rodrigo): acorda o lead em Compra futura.
+  if public.fn_iavek_compra_futura_ligada(p_org, 'acorda_com_mensagem') then
+    select id, pipeline_id into v_futuro
+      from public.crm_leads
+     where organization_id = p_org and contact_id = p_contact and status = 'future'
+     order by updated_at desc
+     limit 1;
+    if v_futuro.id is not null then
+      select s.id into v_etapa
+        from public.crm_stages s
+       where s.pipeline_id = v_futuro.pipeline_id
+         and not s.is_won and not s.is_lost and not s.is_compra_futura and not s.is_archived
+       order by s.position asc
+       limit 1;
+      if v_etapa is not null then
+        update public.crm_leads set stage_id = v_etapa, updated_at = now()
+         where id = v_futuro.id and organization_id = p_org;
+      end if;
+    end if;
+  end if;
+
+  select id into v_id
+    from public.crm_leads
+   where organization_id = p_org
+     and contact_id = p_contact
+     and status = 'open'
+   limit 1;
+
+  -- NULL significa "já existe", e quem chama traduz isso para `ja_existe`. Não é
+  -- erro: é o desfecho correto da segunda mensagem.
+  if v_id is not null then
+    return null;
+  end if;
+
+  -- A moeda é a da organização. Sem ela o negócio pegava o default da coluna
+  -- ('BRL') em QUALQUER organização, e o valor que o assistente grava depois
+  -- saía para a plataforma de anúncio como real: ₲125.000 viravam R$ 125.000.
+  insert into public.crm_leads
+    (organization_id, pipeline_id, stage_id, contact_id, title, source, source_metadata, tags, currency)
+  values
+    (p_org, p_pipeline, p_stage, p_contact, p_title, p_source, coalesce(p_source_metadata, '{}'::jsonb), coalesce(p_tags, '{}'::text[]),
+     coalesce((select o.currency from public.organizations o where o.id = p_org), 'BRL'))
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+grant execute on function public.fn_nascer_lead_da_conversa(uuid, uuid, uuid, uuid, text, text, jsonb, text[]) to authenticated, service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
