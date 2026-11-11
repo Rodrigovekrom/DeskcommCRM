@@ -35,3 +35,5 @@ Com a ordem do Rodrigo e a revisão da Lupa, o docker-compose.prod.yml DO SERVID
   fixo, então um override não seria lido numa troca. E não no .env: o .env também alimenta o worker (teto 512m).
 - O `trocar-producao.sh` (ops) confere estes 4 valores depois de toda troca e avisa se mudarem.
 - Numa atualização do upstream que traga um docker-compose.prod.yml novo, estas 2 edições têm de ser refeitas.
+- (11/11, saúde do servidor) O worker ganhou `logging: *default-logging` (era o único serviço sem rotação de log).
+  Backup em /root/iavek-backups/logs-worker-20261111T201203Z; o diff do `docker compose config` mostrou só esse bloco.
