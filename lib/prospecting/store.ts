@@ -71,6 +71,11 @@ export interface Candidate {
  * conexão só para os dois faria o `commit` do `fn` soltar a trava no meio, e um erro no fim desfaria
  * gravações que já tinham de ter ficado (a campanha criada antes da busca paga no provedor).
  *
+ * ⚠️ (Lupa, 11/11) A conexão da trava fica "idle in transaction" enquanto o `fn` trabalha (inclusive
+ * durante a busca paga no provedor). Hoje `idle_in_transaction_session_timeout = 0` na produção (medido),
+ * então ela não é derrubada. Se um dia esse timeout for ligado, a trava pode cair no meio de uma operação
+ * longa e outra da mesma organização entrar junto: ajuste o timeout desta conexão (SET LOCAL) antes.
+ *
  * A conexão da trava vem de um pool PRÓPRIO e pequeno (`poolDasTravas`). Do mesmo pool do trabalho,
  * duas operações de organizações diferentes podiam cada uma segurar uma conexão de trava e esperar,
  * para sempre, a segunda (o canário roda com DB_POOL_MAX=2). Separados, quem espera a trava nunca
