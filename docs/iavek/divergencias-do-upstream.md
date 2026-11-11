@@ -37,3 +37,18 @@ Com a ordem do Rodrigo e a revisão da Lupa, o docker-compose.prod.yml DO SERVID
 - Numa atualização do upstream que traga um docker-compose.prod.yml novo, estas 2 edições têm de ser refeitas.
 - (11/11, saúde do servidor) O worker ganhou `logging: *default-logging` (era o único serviço sem rotação de log).
   Backup em /root/iavek-backups/logs-worker-20261111T201203Z; o diff do `docker compose config` mostrou só esse bloco.
+
+### ⚠️ Para quem rodar o update.sh do kit (Lupa, 11/11)
+`/root/deskcommcrm` é um checkout git, e o `docker-compose.prod.yml` está modificado (`M`). O nosso
+`trocar-producao.sh` não usa o `update.sh`: troca só a imagem, e não há risco. Já o `update.sh` do kit faz `git checkout <tag>`.
+Se o `prod.yml` da tag nova for diferente, o checkout PARA ("would be overwritten"), e o update trava. O caminho:
+
+    cd /root/deskcommcrm
+    git diff docker-compose.prod.yml > /root/iavek-backups/compose-iavek.patch   # (já existe uma cópia de 11/11)
+    git stash push docker-compose.prod.yml
+    git checkout <tag>                 # ou deixe o update.sh seguir
+    git apply --3way /root/iavek-backups/compose-iavek.patch   # reaplica os 3 blocos do ia.vek
+    docker compose -f docker-compose.prod.yml config -q && git stash drop
+
+E confira depois com o `trocar-producao.sh` (a conferência dos limites). Lembrete: o botão/fluxo "Atualizar agora"
+(o update.sh) NUNCA é usado no ia.vek (desfaz a marca).
