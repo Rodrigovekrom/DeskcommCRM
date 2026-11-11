@@ -27,6 +27,10 @@ fora sem entrar no contêiner, então o `anon` do app é o termômetro.
   mesmo contêiner), morto por falta de memória (`OOMKilled`);
 - o WhatsApp: as sessões do WAHA em WORKING (pela API dele; a chave fica no `.env` do servidor e nunca é impressa).
 
+**Para ler os números:** a vigia mostra o `anon` do cgroup, que sai ABAIXO do `docker stats`. O `docker stats`
+soma também o cache de disco. Em 11/11, 20:50Z: app 297 contra ~340 no `docker stats`, WAHA 282 contra ~400. Os
+limites do plano foram pensados sobre o `anon`.
+
 ## O semáforo
 
 Os limites são EXATAMENTE os do plano de contingência da Lupa, [`contingencia-memoria.md`](contingencia-memoria.md)
