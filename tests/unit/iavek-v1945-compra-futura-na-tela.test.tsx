@@ -14,11 +14,19 @@ import { moveLeadSchema } from "@/lib/schemas/leads";
 afterEach(cleanup);
 
 describe("v1.9.45 (CRM-294): a janela da Compra futura", () => {
+  it("⭐ SEM mês confirma (o mês é opcional desde 11/11) e manda null", () => {
+    const onConfirm = vi.fn();
+    render(<CompraFuturaDialog open onOpenChange={() => {}} onConfirm={onConfirm} />);
+    const confirmar = screen.getByRole("button", { name: "Confirmar" }) as HTMLButtonElement;
+    expect(confirmar.disabled).toBe(false);
+    fireEvent.click(confirmar);
+    expect(onConfirm).toHaveBeenCalledWith(null);
+  });
+
   it("⭐ mês passado não confirma; mês futuro confirma com 'AAAA-MM'", () => {
     const onConfirm = vi.fn();
     render(<CompraFuturaDialog open onOpenChange={() => {}} onConfirm={onConfirm} />);
     const confirmar = screen.getByRole("button", { name: "Confirmar" }) as HTMLButtonElement;
-    expect(confirmar.disabled).toBe(true); // sem mês
     fireEvent.change(screen.getByTestId("compra-futura-mes"), { target: { value: "2020-01" } });
     expect(confirmar.disabled).toBe(true);
     expect(screen.getByRole("alert").textContent).toContain("não pode estar no passado");

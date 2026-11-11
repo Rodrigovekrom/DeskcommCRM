@@ -29,24 +29,25 @@ export function CompraFuturaDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onConfirm: (mes: string) => void;
+  onConfirm: (mes: string | null) => void;
   pending?: boolean;
 }) {
   const t = useT();
   const [mes, setMes] = useState("");
   const minimo = mesAtual();
-  const valido = mesValido(mes);
+  // o mês é OPCIONAL (Rodrigo, 11/11): vazio pode; preenchido, não pode estar no passado
+  const valido = mes === "" || mesValido(mes);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("Compra futura")}</DialogTitle>
           <DialogDescription>
-            {t("O cliente quer comprar mais para frente. Escolha o mês e o ano previstos: 7 dias antes, você ganha uma tarefa para ligar.")}
+            {t("O cliente quer comprar mais para frente. Se souber, anote o mês e o ano previstos (opcional).")}
           </DialogDescription>
         </DialogHeader>
         <label className="text-sm font-medium" htmlFor="compra-futura-mes">
-          {t("Mês e ano previstos")}
+          {t("Mês e ano previstos (opcional)")}
         </label>
         <input
           id="compra-futura-mes"
@@ -66,7 +67,7 @@ export function CompraFuturaDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t("Cancelar")}
           </Button>
-          <Button disabled={!valido || pending} onClick={() => onConfirm(mes)}>
+          <Button disabled={!valido || pending} onClick={() => onConfirm(mes || null)}>
             {t("Confirmar")}
           </Button>
         </DialogFooter>

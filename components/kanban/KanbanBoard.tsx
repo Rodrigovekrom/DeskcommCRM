@@ -684,7 +684,7 @@ export function KanbanBoard({
           onConfirm={(mes) => {
             const { args, lead, etapa } = compraFuturaPendente;
             moveCard.mutate(
-              { ...args, compraFuturaMes: mes },
+              { ...args, ...(mes ? { compraFuturaMes: mes } : {}) },
               {
                 onSuccess: () => {
                   setCompraFuturaPendente(null);

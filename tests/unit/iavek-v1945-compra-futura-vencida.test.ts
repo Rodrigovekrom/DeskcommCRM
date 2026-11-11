@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-const e = vi.hoisted(() => ({ filtros: [] as Array<[string, string, unknown]>, papel: "" }));
+const e = vi.hoisted(() => ({ filtros: [] as Array<[string, string, unknown]>, papel: "", settings: { iavek: { compra_futura: { faixa_vencida: true } } } as unknown }));
 vi.mock("@/lib/auth/require-role", () => ({
   requireRole: vi.fn(async (papel: string) => ((e.papel = papel), { ok: true, user: { idioma: "pt-BR" }, org: { orgId: "org" } })),
 }));
@@ -22,6 +22,7 @@ vi.mock("@/lib/supabase/server", () => ({
         lt: (c: string, v: unknown) => (e.filtros.push(["lt", c, v]), q),
         order: () => q,
         limit: () => q,
+        maybeSingle: async () => ({ data: { settings: e.settings }, error: null }),
         then: (r: (v: unknown) => unknown) =>
           Promise.resolve({
             data: [{ id: "l1", title: "Lead", pipeline_id: "f", compra_futura_mes: "2026-09-01", compra_futura_vendedor_id: "v1", contacts: { name: "Cliente X", display_name: null, phone_number: null } }],
@@ -38,7 +39,16 @@ import { GET } from "@/app/api/v1/iavek/compra-futura/vencidas/route";
 import { inicioDoMesAtual } from "@/lib/iavek/compra-futura/rodada";
 
 describe("v1.9.45 (CRM-294): Compra futura vencida", () => {
-  it("⭐ só o GERENTE vê; filtra 'future' com o mês ANTES do mês atual; traz o vendedor", async () => {
+  it("⭐ DESLIGADA de fábrica (Rodrigo simplificou em 11/11): sem o interruptor, a rota não lista nada e a faixa some", async () => {
+    e.settings = {};
+    e.filtros = [];
+    const corpo = (await (await GET()).json()) as { data: { ativo: boolean; total: number; itens: unknown[] } };
+    expect(corpo.data).toEqual({ ativo: false, total: 0, itens: [] });
+    expect(e.filtros).not.toContainEqual(["eq", "status", "future"]);
+    e.settings = { iavek: { compra_futura: { faixa_vencida: true } } };
+  });
+
+  it("⭐ LIGADA: só o GERENTE vê; filtra 'future' com o mês ANTES do mês atual; traz o vendedor", async () => {
     const res = await GET();
     const corpo = (await res.json()) as { data: { total: number; itens: Array<Record<string, unknown>> } };
     expect(e.papel).toBe("manager");

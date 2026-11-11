@@ -1,9 +1,11 @@
 /**
  * GET /api/v1/iavek/compra-futura/vencidas — ia.vek v1.9.45 (CRM-294, condição 3 do Maestro).
  *
- * Os leads em Compra futura cujo MÊS PREVISTO JÁ PASSOU e ninguém agiu. Eles NÃO voltam sozinhos a
+ * Os leads em Compra futura cujo MÊS PREVISTO JÁ PASSOU e ninguém agiu. Só com o interruptor faixa_vencida (desligado
+ * de fábrica desde 11/11). Leads sem mês nunca entram. Eles NÃO voltam sozinhos a
  * aberto: aparecem aqui, para o gerente decidir (reabrir, mudar o mês, ou perder com motivo).
  */
+import { compraFuturaLigada } from "@/lib/iavek/compra-futura/interruptores";
 import { randomUUID } from "node:crypto";
 
 import { fail, ok } from "@/lib/api/wrappers";
@@ -24,6 +26,11 @@ export async function GET(): Promise<Response> {
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const supabase = await createClient();
+  // Desde 11/11 (Rodrigo simplificou), a faixa só existe com o interruptor ligado; desligada, a tela não mostra nada.
+  const { data: org } = await supabase.from("organizations").select("settings").eq("id", authz.org.orgId).maybeSingle();
+  if (!compraFuturaLigada((org as { settings?: unknown } | null)?.settings, "faixa_vencida")) {
+    return ok({ ativo: false, total: 0, itens: [] }, { requestId });
+  }
   const { data, error, count } = await supabase
     .from("crm_leads")
     .select("id, title, pipeline_id, compra_futura_mes, compra_futura_vendedor_id, contacts(name, display_name, phone_number)", { count: "exact" })
@@ -50,5 +57,5 @@ export async function GET(): Promise<Response> {
       vendedor: l.compra_futura_vendedor_id ? (nomes.get(l.compra_futura_vendedor_id) ?? null) : null,
     };
   });
-  return ok({ total: count ?? itens.length, itens }, { requestId });
+  return ok({ ativo: true, total: count ?? itens.length, itens }, { requestId });
 }

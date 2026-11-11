@@ -9,6 +9,7 @@
  * Só toca organização com `settings.esteira.ativa = true` e os dois funis
  * declarados — desligada é o padrão. Rodada sem efeito não audita.
  */
+import { compraFuturaLigada } from "@/lib/iavek/compra-futura/interruptores";
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       erro?: string;
       pulada?: "rodada_em_curso";
       /** ia.vek v1.9.45 (CRM-294): as ligações dos 7 dias antes da Compra futura. */
-      compra_futura?: ResumoDaCompraFutura | { erro: string };
+      compra_futura?: ResumoDaCompraFutura | { erro: string } | { desligada: true };
     }
   > = [];
   // ia.vek v1.9.43: uma rodada por organização de cada vez (lib/esteira/trava-da-rodada.ts).
@@ -63,9 +64,12 @@ export async function GET(req: NextRequest): Promise<Response> {
         const resumo = await rodarEsteira(cfg, depsReaisDaEsteira(admin, org.id, () => new Date()));
         // ia.vek v1.9.45 (CRM-294): na MESMA trava, as ligações dos 7 dias antes da Compra futura. Um erro
         // aqui não derruba a esteira: fica registrado no resultado da rodada.
-        const compraFutura = await rodarCompraFutura(admin, org.id).catch((e: unknown) => ({
-          erro: e instanceof Error ? e.message.slice(0, 200) : String(e),
-        }));
+        // Desde 11/11 (Rodrigo simplificou), a tarefa dos 7 dias antes só roda com o interruptor ligado.
+        const compraFutura = compraFuturaLigada(org.settings, "ligacao_7_dias")
+          ? await rodarCompraFutura(admin, org.id).catch((e: unknown) => ({
+              erro: e instanceof Error ? e.message.slice(0, 200) : String(e),
+            }))
+          : ({ desligada: true } as const);
         return { resumo, compraFutura };
       });
       if (!travada.rodou) {

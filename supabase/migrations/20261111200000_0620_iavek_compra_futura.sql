@@ -1,7 +1,9 @@
--- manifest: ia.vek v1.9.45 (0620, CRM-294) — Compra futura: o lead ganha o status 'future' (não é Perdido nem aberto), com o mês/ano previsto obrigatório; a etapa marcada is_compra_futura dá o status, e sair dela reabre
+-- manifest: ia.vek v1.9.45 (0620, CRM-294) — Compra futura: o lead ganha o status 'future' (não é Perdido nem aberto), com o mês/ano previsto OPCIONAL (Rodrigo, 11/11; obrigatório só com o interruptor mes_obrigatorio); a etapa marcada is_compra_futura dá o status, e sair dela reabre
 --
 -- POR QUÊ: o Rodrigo (11/11): "uma nova categoria, além do perdido, para compras futuras... eles não são
--- perdidos". Aprovado com as 2 recomendações: o mês e o ano previstos são OBRIGATÓRIOS, e o mesmo vendedor
+-- perdidos". Aprovado com as 2 recomendações (o mês obrigatório e o mesmo vendedor); SIMPLIFICADO pelo Rodrigo em 11/11
+-- (19:48Z): "só o lead organizado naquela coluna do Kanban; é só para visão". O mês passou a OPCIONAL, e a tarefa dos 7
+-- dias, a faixa da vencida e os avisos ficaram atrás de interruptores DESLIGADOS. O mesmo vendedor
 -- liga 7 dias antes (ou o guardião, se ele saiu da loja). A esteira não cobra nem move, e nunca conta como
 -- Perdido. Desenho B (status novo), com o ok do Maestro e a revisão da Lupa; o impacto, lugar por lugar,
 -- está em docs/iavek/compra-futura-impacto.md, e a divergência do upstream em docs/iavek/divergencias-do-upstream.md.
@@ -59,7 +61,8 @@ alter table public.crm_leads add constraint crm_leads_closed_at_consistency
 alter table public.crm_leads drop constraint if exists crm_leads_compra_futura_mes_coerente;
 alter table public.crm_leads add constraint crm_leads_compra_futura_mes_coerente
   check (
-    (status = 'future') = (compra_futura_mes is not null)
+    -- o mês só existe no lead em Compra futura; e é OPCIONAL (Rodrigo, 11/11: "é só para visão e organizar")
+    (compra_futura_mes is null or status = 'future')
     and (compra_futura_mes is null or extract(day from compra_futura_mes) = 1)
   );
 
@@ -97,13 +100,15 @@ begin
       new.lost_from_stage_id := coalesce(new.lost_from_stage_id, old.stage_id);
     end if;
   elsif v_is_futura then
-    -- ia.vek 0620 (CRM-294): Compra futura. O mês é OBRIGATÓRIO e não pode estar no passado.
-    if new.compra_futura_mes is null then
+    -- ia.vek 0620 (CRM-294): Compra futura. O mês é OPCIONAL (Rodrigo, 11/11); só é exigido se a empresa ligar o
+    -- interruptor settings.iavek.compra_futura.mes_obrigatorio. Se vier, não pode estar no passado.
+    if new.compra_futura_mes is null and public.fn_iavek_compra_futura_ligada(new.organization_id, 'mes_obrigatorio') then
       raise exception 'compra_futura_mes_required' using errcode = '23514',
         hint = 'Informe o mês e o ano previstos da compra.';
     end if;
     new.compra_futura_mes := date_trunc('month', new.compra_futura_mes)::date;
-    if new.compra_futura_mes < date_trunc('month', (now() at time zone 'America/Sao_Paulo'))::date
+    if new.compra_futura_mes is not null
+       and new.compra_futura_mes < date_trunc('month', (now() at time zone 'America/Sao_Paulo'))::date
        and (tg_op = 'INSERT' or old.compra_futura_mes is distinct from new.compra_futura_mes or old.status is distinct from 'future') then
       raise exception 'compra_futura_mes_no_passado' using errcode = '23514',
         hint = 'O mês previsto não pode estar no passado.';
@@ -135,7 +140,10 @@ create trigger trg_crm_lead_close_on_stage
   before insert or update of stage_id, compra_futura_mes on public.crm_leads
   for each row execute function public.fn_crm_lead_close_on_stage();
 
--- 5. Os interruptores das 3 decisões do Rodrigo (todos DESLIGADOS até o ok)
+-- 5. Os interruptores (todos DESLIGADOS de fábrica). Rodrigo, 11/11: a Compra futura é "só o lead organizado naquela
+--    coluna do Kanban; não precisa avisar nem informar valor". Por isso, desligados: acorda_com_mensagem,
+--    aviso_de_preco, avisar_guardiao, ligacao_7_dias (a tarefa 7 dias antes), faixa_vencida (a visão do gerente) e
+--    mes_obrigatorio (o mês é opcional).
 create or replace function public.fn_iavek_compra_futura_ligada(p_org uuid, p_chave text)
 returns boolean
 language sql
