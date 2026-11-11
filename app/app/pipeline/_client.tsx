@@ -146,6 +146,9 @@ export function CarteiraClient({
         <FaixaDePedidosDeAjuda pipelineId={entrada.id} />
       )}
 
+      {/* ia.vek v1.9.45 (CRM-294): o mês previsto passou e ninguém agiu; o gerente decide. */}
+      {(activeOrg?.role === "manager" || activeOrg?.role === "admin") && <FaixaCompraFuturaVencida />}
+
       <AvisosDoCartaoContext.Provider value={painel.data ? { comTarefa } : null}>
         {funis.length === 1 ? (
           <QuadroDoFunil
@@ -484,6 +487,48 @@ function FaixaSemDono({ pipelineId, quadroAtualizadoEm }: { pipelineId: string; 
             >
               {t("Assumir")}
             </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+type CompraFuturaVencida = { id: string; titulo: string; cliente: string | null; mes: string; vendedor: string | null };
+
+/** ia.vek v1.9.45 (CRM-294, condição 3): a Compra futura vencida, para o gerente. Some quando não há nenhuma. */
+function FaixaCompraFuturaVencida() {
+  const t = useT();
+  const idioma = useTagDeIdioma();
+  const { data } = useQuery({
+    queryKey: ["iavek", "compra-futura", "vencidas"],
+    queryFn: () =>
+      apiClient
+        .get<ApiSuccess<{ total: number; itens: CompraFuturaVencida[] }>>("/api/v1/iavek/compra-futura/vencidas")
+        .then((r) => r.data),
+    refetchInterval: 5 * 60_000,
+  });
+  const total = data?.total ?? 0;
+  if (!data || total === 0) return null;
+  const mesPorExtenso = (iso: string) =>
+    new Date(`${iso}T12:00:00Z`).toLocaleDateString(idioma, { month: "long", year: "numeric", timeZone: "UTC" });
+  return (
+    <section className="rounded-lg border border-border bg-muted p-3" data-testid="faixa-compra-futura-vencida" aria-label={t("Compra futura vencida")}>
+      <div className="mb-2 flex items-center gap-2">
+        <h2 className="text-sm font-semibold">{t("Compra futura vencida")}</h2>
+        <span className="rounded-full bg-accent px-2 text-xs font-semibold text-accent-foreground" data-testid="contador-compra-futura-vencida">
+          {total}
+        </span>
+        <span className="text-xs text-muted-foreground">{t("O mês previsto passou: reabra, mude o mês ou marque como perdido.")}</span>
+      </div>
+      <ul className="flex gap-2 overflow-x-auto pb-1">
+        {data.itens.map((l) => (
+          <li key={l.id} className="flex w-56 shrink-0 flex-col gap-0.5 rounded-md border bg-surface p-2 text-sm" data-testid="lead-compra-futura-vencida">
+            <span className="truncate font-medium">{l.cliente ?? l.titulo}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("Previsto para")} {mesPorExtenso(l.mes)}
+            </span>
+            {l.vendedor ? <span className="truncate text-xs text-muted-foreground">{l.vendedor}</span> : null}
           </li>
         ))}
       </ul>

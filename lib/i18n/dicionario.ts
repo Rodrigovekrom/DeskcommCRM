@@ -10437,6 +10437,9 @@ export const DICIONARIO: Traducoes = {
   "Apenas versões 'draft' podem ser editadas.": { es: "Solo se pueden editar las versiones 'draft'." },
   "Arquivo acima de 50 MB.": { es: "El archivo supera los 50 MB." },
   // ia.vek v1.9.45 (CRM-294): Compra futura
+  "Compra futura vencida": { es: "Compra futura vencida" },
+  "O mês previsto passou: reabra, mude o mês ou marque como perdido.": { es: "El mes previsto pasó: reabra, cambie el mes o márquelo como perdido." },
+  "Previsto para": { es: "Previsto para" },
   "Compra futura": { es: "Compra futura" },
   "O cliente quer comprar mais para frente. Escolha o mês e o ano previstos: 7 dias antes, você ganha uma tarefa para ligar.": {
     es: "El cliente quiere comprar más adelante. Elija el mes y el año previstos: 7 días antes, recibirá una tarea para llamar.",

@@ -23,6 +23,11 @@ export function hojeEmSaoPaulo(agora: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(agora);
 }
 
+/** O 1º dia do mês atual (SP): o mês previsto ANTES dele já venceu (a "Compra futura vencida"). */
+export function inicioDoMesAtual(agora: Date = new Date()): string {
+  return `${hojeEmSaoPaulo(agora).slice(0, 7)}-01`;
+}
+
 /** O último mês cuja ligação já vence: o mês previsto ≤ hoje + 7 dias. */
 export function limiteDoMes(agora: Date): string {
   const d = new Date(`${hojeEmSaoPaulo(agora)}T12:00:00Z`);
@@ -87,7 +92,8 @@ export async function rodarCompraFutura(
     const vendedor = l.compra_futura_vendedor_id && ativos.has(l.compra_futura_vendedor_id) ? l.compra_futura_vendedor_id : null;
     const guardiao = !vendedor && l.sdr_user_id && ativos.has(l.sdr_user_id) ? l.sdr_user_id : null;
     const quem = vendedor ?? guardiao;
-    const mes = new Date(`${l.compra_futura_mes}T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+    // "MM/AAAA": sem idioma fixo (a tarefa é lida por quem for, no idioma de cada um)
+    const mes = `${l.compra_futura_mes.slice(5, 7)}/${l.compra_futura_mes.slice(0, 4)}`;
     const tarefa = await criarTarefaInterna(admin, {
       organizationId: orgId,
       titulo: `📅 Compra futura (${mes}): ligar para {{contact.name}}`,
