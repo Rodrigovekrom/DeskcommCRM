@@ -60,7 +60,7 @@ type Linha = Record<string, unknown>;
 function fakePool(candidatos: Linha[]) {
   const updates: { sql: string; params: unknown[] }[] = [];
   const responder = (sql: string): Linha[] => {
-    if (sql.includes("pg_try_advisory_lock")) return [{ locked: true }];
+    if (sql.includes("pg_try_advisory")) return [{ locked: true }];
     if (sql.includes("from ai_agents a join ai_agent_versions"))
       return [{ tool_ids: ["crm_move_lead_stage"], pipeline_ids: [PIPE] }];
     if (sql.includes("from channel_sessions")) return [{ provider: "waha", status: "WORKING" }];

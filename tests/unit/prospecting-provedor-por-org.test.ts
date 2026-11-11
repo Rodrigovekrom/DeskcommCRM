@@ -56,7 +56,7 @@ function fakeDb(porOrg: Record<string, Record<string, unknown> | null>) {
   const log: { sql: string; params?: unknown[] }[] = [];
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     log.push({ sql, params });
-    if (sql.includes("pg_try_advisory_lock")) return { rows: [{ locked: true }] };
+    if (sql.includes("pg_try_advisory")) return { rows: [{ locked: true }] };
     if (sql.includes("pg_advisory_unlock")) return { rows: [{ locked: true }] };
     if (sql.includes("select settings from organizations")) {
       const settings = porOrg[String(params[0])] ?? null;

@@ -1,4 +1,4 @@
-import type pg from "pg";
+import pg from "pg";
 import { ZodError } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createContactHandler } from "@/app/api/v1/contacts/_handler";
@@ -55,19 +55,56 @@ export interface Candidate {
   service_boundary: unknown;
   message_id: string;
 }
-/** Session-scoped PostgreSQL lock shared by commands and worker; no process-local lock. */
+/**
+ * Trava por organização da prospecção, compartilhada pelos comandos e pelo worker (no Postgres, não
+ * na memória do processo).
+ *
+ * ia.vek v1.9.44 (Lupa/Maestro): era uma trava de SESSÃO (pg_try_advisory_lock + unlock). Pelo pooler
+ * em modo TRANSAÇÃO (6543, o SUPABASE_DB_URL da produção), fora de uma transação o lock e o unlock
+ * podem cair em backends diferentes: a trava ficaria PRESA e a prospecção daquela organização
+ * responderia "operação em andamento" para sempre. Agora é `pg_try_advisory_xact_lock` dentro de
+ * `begin`…`rollback`, numa conexão SÓ DA TRAVA, que o pooler prende num backend só; a trava sai no
+ * rollback ou se a conexão cair.
+ *
+ * O trabalho (`fn`) recebe OUTRA conexão, sem transação, como antes: cada comando dele grava na hora,
+ * e as transações que ele mesmo abre (`begin`/`commit` em store.ts e worker.ts) continuam dele. Uma
+ * conexão só para os dois faria o `commit` do `fn` soltar a trava no meio, e um erro no fim desfaria
+ * gravações que já tinham de ter ficado (a campanha criada antes da busca paga no provedor).
+ *
+ * A conexão da trava vem de um pool PRÓPRIO e pequeno (`poolDasTravas`). Do mesmo pool do trabalho,
+ * duas operações de organizações diferentes podiam cada uma segurar uma conexão de trava e esperar,
+ * para sempre, a segunda (o canário roda com DB_POOL_MAX=2). Separados, quem espera a trava nunca
+ * segura uma conexão de trabalho, e não há espera em círculo.
+ */
+const POOLS_DAS_TRAVAS = new WeakMap<object, pg.Pool>();
+const CONEXOES_DE_TRAVA = 2;
+function poolDasTravas(pool: pg.Pool): Pick<pg.Pool, "connect"> {
+  const url = (pool as { options?: { connectionString?: string } }).options?.connectionString;
+  if (!url) return pool; // dublês de teste e pools sem URL: o mesmo pool
+  let p = POOLS_DAS_TRAVAS.get(pool);
+  if (!p) {
+    p = new pg.Pool({ connectionString: url, max: CONEXOES_DE_TRAVA });
+    p.on("connect", (c) => c.on("error", () => undefined));
+    p.on("error", () => undefined);
+    POOLS_DAS_TRAVAS.set(pool, p);
+  }
+  return p;
+}
+
 export async function withProspectingLock<T>(
   pool: pg.Pool,
   org: string,
   fn: (db: pg.PoolClient) => Promise<T>,
 ): Promise<T> {
-  const db = await pool.connect();
-  let locked = false;
+  const trava = await poolDasTravas(pool).connect();
+  let aberta = false;
   try {
-    locked =
+    await trava.query("begin");
+    aberta = true;
+    const locked =
       (
-        await db.query<{ locked: boolean }>(
-          "select pg_try_advisory_lock(hashtextextended($1,0)) as locked",
+        await trava.query<{ locked: boolean }>(
+          "select pg_try_advisory_xact_lock(hashtextextended($1,0)) as locked",
           [`prospecting:${org}`],
         )
       ).rows[0]?.locked === true;
@@ -76,13 +113,18 @@ export async function withProspectingLock<T>(
         "Uma operação está em andamento. Tente novamente em alguns segundos.",
         409,
       );
-    return await fn(db);
-  } finally {
+    const db = await pool.connect();
     try {
-      if (locked)
-        await db.query("select pg_advisory_unlock(hashtextextended($1,0))", [`prospecting:${org}`]);
+      return await fn(db);
     } finally {
       db.release();
+    }
+  } finally {
+    try {
+      // A transação da trava não escreve nada: o rollback só solta a trava.
+      if (aberta) await trava.query("rollback");
+    } finally {
+      trava.release();
     }
   }
 }

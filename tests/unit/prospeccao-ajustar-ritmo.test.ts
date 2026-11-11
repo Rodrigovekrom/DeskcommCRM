@@ -120,7 +120,7 @@ function poolDeMentira(campanha: Linha | null, atualiza = true) {
   const cliente = {
     query: vi.fn(async (texto: string, params: unknown[] = []) => {
       consultas.push({ texto, params });
-      if (texto.includes("pg_try_advisory_lock")) return { rows: [{ locked: true }] };
+      if (texto.includes("pg_try_advisory")) return { rows: [{ locked: true }] };
       if (texto.startsWith("select status, config")) return { rows: campanha ? [campanha] : [] };
       if (texto === AJUSTE_DE_RITMO_SQL) return { rows: atualiza ? [{ id: CAMPANHA }] : [] };
       return { rows: [] };
