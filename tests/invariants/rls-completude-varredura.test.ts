@@ -76,6 +76,11 @@ interface Excecao {
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
   {
+    tabela: "iavek_0622_retencao_antes",
+    razao:
+      "tests/invariants/iavek-retencao-antes-so-do-servidor.test.ts — a lista da volta da 0622 (v1.9.46), exclusiva do servidor: SELECT/UPDATE/DELETE com JWT authenticated recusados para o admin da própria organização e para o de outra; RLS ligada, zero policies, grants revogados.",
+  },
+  {
     tabela: "iavek_preferencias_de_tela",
     razao:
       "tests/invariants/iavek-preferencias-de-tela.test.ts — ia.vek 0587: por JWT, o vendedor grava e lê só a própria linha; o colega da MESMA organização lê zero e não altera; ninguém grava com user_id alheio; quem é de OUTRA organização lê zero e não grava na nossa.",
