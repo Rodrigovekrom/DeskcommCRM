@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowsClockwise, Copy, DotsThree, Warning } from "@/lib/ui/icons";
 import { copyToClipboard } from "@/lib/clipboard";
+import { rotuloDaEntrega } from "@/lib/email/entrega-na-tela";
 import type { StatusConvite } from "@/lib/team/convite-status";
 
 interface Props {
@@ -125,13 +126,15 @@ export function TeamInvitesClient({ canManage }: Props) {
                       <Badge variant={BADGE_VARIANT[inv.status]}>{STATUS_LABEL[inv.status]}</Badge>
                     </TableCell>
                     <TableCell>
-                      {inv.email_dispatched ? (
-                        <span className="text-sm text-muted-foreground">{t("Sim")}</span>
+                      {inv.email_dispatched && !rotuloDaEntrega(inv.entrega).problema ? (
+                        <span className="text-sm text-muted-foreground" data-testid="entrega-do-convite">
+                          {t(rotuloDaEntrega(inv.entrega).texto)}
+                        </span>
                       ) : (
                         <div className="flex flex-col gap-1">
                           <span className="flex items-center gap-1 text-sm text-destructive">
                             <Warning size={14} weight="fill" />
-                            {t("Não saiu")}
+                            {inv.email_dispatched ? t(rotuloDaEntrega(inv.entrega).texto) : t("Não saiu")}
                           </span>
                           {emAberto && inv.accept_url ? (
                             <Button

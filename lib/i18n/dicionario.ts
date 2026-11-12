@@ -12786,6 +12786,11 @@ export const DICIONARIO: Traducoes = {
   "Convidado por": { es: "Invitado por" },
   "Expirado": { es: "Expirada" },
   "Não saiu": { es: "No se envió" },
+  // ia.vek v1.9.47 (0627): a entrega do convite (webhook da Resend)
+  "Entrega atrasada": { es: "Entrega retrasada" },
+  "Voltou (endereço não recebe)": { es: "Rebotó (la dirección no recibe)" },
+  "Marcado como spam": { es: "Marcado como spam" },
+  "Não foi entregue": { es: "No se entregó" },
   "reenviado": { es: "reenviado" },
   "Revogar convite": { es: "Revocar invitación" },
   "não poderá mais usar este convite para entrar. Você pode enviar um novo depois.": {

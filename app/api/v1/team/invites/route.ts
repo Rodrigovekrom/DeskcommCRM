@@ -14,6 +14,8 @@ import type { NextRequest } from "next/server";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import type { EntregaDoConvite } from "@/lib/email/entrega-na-tela";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   conviteEstaEmAberto,
@@ -23,6 +25,28 @@ import {
 } from "@/lib/team/convites";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * ia.vek v1.9.47 (0627): a entrega mais recente de cada convite. A tabela é só do servidor (RLS sem policy), então
+ * a leitura é pelo admin client, SEMPRE filtrada pela organização ativa (e por tipo e pelos ids desta lista). Um
+ * erro aqui não derruba a lista: a tela só deixa de mostrar a entrega.
+ */
+async function entregasDosConvites(orgId: string, ids: string[]): Promise<Map<string, EntregaDoConvite>> {
+  const mapa = new Map<string, EntregaDoConvite>();
+  if (ids.length === 0) return mapa;
+  const { data, error } = await createAdminClient()
+    .from("iavek_entregas_de_email")
+    .select("recurso_id, estado, detalhe, enviado_em")
+    .eq("organization_id", orgId)
+    .eq("tipo", "team_invite")
+    .in("recurso_id", ids.slice(0, 500))
+    .order("enviado_em", { ascending: false });
+  if (error || !data) return mapa;
+  for (const r of data as Array<{ recurso_id: string; estado: EntregaDoConvite["estado"]; detalhe: string | null }>) {
+    if (!mapa.has(r.recurso_id)) mapa.set(r.recurso_id, { estado: r.estado, detalhe: r.detalhe });
+  }
+  return mapa;
+}
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
@@ -42,12 +66,16 @@ export async function GET(_req: NextRequest): Promise<Response> {
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
   const now = Date.now();
-  const invites = ((rows ?? []) as ConviteDeTime[]).map((row) => {
+  const lista = (rows ?? []) as ConviteDeTime[];
+  const entregas = await entregasDosConvites(activeOrg.orgId, lista.map((r) => r.id));
+  const invites = lista.map((row) => {
     const status = statusConvite(row, now);
     return {
       ...row,
       status,
       accept_url: conviteEstaEmAberto(row, now) ? linkDeAceite(row) : null,
+      // ia.vek v1.9.47 (0627): a entrega do ÚLTIMO e-mail deste convite (o webhook da Resend), ou null
+      entrega: entregas.get(row.id) ?? null,
     };
   });
 

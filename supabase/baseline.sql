@@ -49642,6 +49642,82 @@ end;
 $$;
 revoke execute on function public.fn_iavek_cancela_tarefas_do_lead_fechado() from public, anon, authenticated;
 
+-- ---- ia.vek: a ligação da Compra futura avisa quando vence (migration 0626, v1.9.47) ----
+-- ⚠️ ANTES DA VARREDURA anon: substitui função. Ver o cabeçalho de supabase/migrations/20261112030000_0626_iavek_aviso_da_ligacao_da_compra_futura.sql.
+create or replace function public.fn_iavek_notifica_tarefa_vencida()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_task record;
+  v_sdr uuid;
+  v_status_do_lead text;
+begin
+  select t.id, t.organization_id, t.assigned_to, t.lead_id, t.status, t.source_kind
+    into v_task
+    from public.crm_tasks t
+   where t.id = new.entity_id
+     and t.organization_id = new.organization_id;
+  if not found then
+    return null;
+  end if;
+
+  -- ia.vek 0621: tarefa que não está mais pendente não vence (cancelada ou feita)
+  if v_task.status not in ('pending', 'in_progress') then
+    return null;
+  end if;
+
+  if v_task.lead_id is not null then
+    select l.status, l.sdr_user_id into v_status_do_lead, v_sdr
+      from public.crm_leads l
+     where l.id = v_task.lead_id and l.organization_id = v_task.organization_id;
+    -- ia.vek 0621: tarefa de lead que não está 'open' (perdido, ganho ou em Compra futura) não avisa.
+    -- ia.vek 0626: menos a ligação dos 7 dias antes da Compra futura, que nasce de propósito no lead 'future'.
+    if v_status_do_lead is distinct from 'open'
+       and not (v_status_do_lead = 'future' and v_task.source_kind = 'ligacao:compra_futura') then
+      return null;
+    end if;
+  end if;
+
+  if v_task.assigned_to is not null then
+    insert into public.notificacoes (organization_id, user_id, tipo, lead_id, task_id)
+    values (v_task.organization_id, v_task.assigned_to, 'tarefa_vencida', v_task.lead_id, v_task.id);
+  end if;
+
+  if v_sdr is not null and v_sdr is distinct from v_task.assigned_to then
+    insert into public.notificacoes (organization_id, user_id, tipo, lead_id, task_id)
+    values (v_task.organization_id, v_sdr, 'guardiao_tarefa_vencida', v_task.lead_id, v_task.id);
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_notifica_tarefa_vencida() from public, anon, authenticated;
+
+-- ---- ia.vek: a entrega dos e-mails da Resend (migration 0627, v1.9.47) ----
+-- Só tabela (sem função). Ver o cabeçalho de supabase/migrations/20261112031000_0627_iavek_entrega_dos_emails.sql.
+create table if not exists public.iavek_entregas_de_email (
+  mensagem_id text primary key check (length(mensagem_id) between 1 and 200),
+  provedor text not null default 'resend' check (provedor in ('resend')),
+  organization_id uuid references public.organizations(id) on delete cascade,
+  tipo text check (tipo is null or length(tipo) <= 60),
+  recurso_id text check (recurso_id is null or length(recurso_id) <= 100),
+  estado text not null default 'enviado'
+    check (estado in ('enviado', 'atrasado', 'entregue', 'voltou', 'spam', 'falhou')),
+  detalhe text check (detalhe is null or length(detalhe) <= 300),
+  enviado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+comment on table public.iavek_entregas_de_email is
+  'ia.vek v1.9.47 (0627): a entrega de cada e-mail aceito pela Resend (o webhook atualiza o estado). Só do servidor.';
+create index if not exists iavek_entregas_de_email_recurso
+  on public.iavek_entregas_de_email (organization_id, tipo, recurso_id, enviado_em desc);
+
+alter table public.iavek_entregas_de_email enable row level security;
+revoke all on public.iavek_entregas_de_email from public, anon, authenticated;
+grant select, insert, update, delete on public.iavek_entregas_de_email to service_role;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

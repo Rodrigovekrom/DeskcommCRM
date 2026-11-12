@@ -36,6 +36,7 @@
  * convite. Nenhum chamador precisa saber qual transporte respondeu.
  */
 import { getSmtpConfig } from "@/lib/email/config";
+import { registrarEnvioDeEmail, type Rastreio } from "@/lib/email/entregas";
 import { isEmailConfigured as resendConfigurada, sendEmail as enviarPelaResend } from "@/lib/email/resend";
 import { isSmtpConfigured, sendEmail as enviarPorSmtp } from "@/lib/email/smtp";
 
@@ -72,6 +73,17 @@ interface SendArgs {
   replyTo?: string;
   fromName?: string;
   tags?: { name: string; value: string }[];
+  /**
+   * ia.vek v1.9.47 (0627): a quem este e-mail pertence, para acompanhar a ENTREGA (só no caminho da Resend).
+   * Ausente, sai das tags `org` e `kind`, quando existem. Nunca vai para o provedor.
+   */
+  rastreio?: Rastreio;
+}
+
+/** As tags `org` e `kind` que os envios já põem, como rastreio. */
+function rastreioDasTags(tags: SendArgs["tags"]): Rastreio {
+  const t = new Map((tags ?? []).map((x) => [x.name, x.value]));
+  return { organizationId: t.get("org") ?? null, tipo: t.get("kind") ?? null, recursoId: null };
 }
 
 /**
@@ -109,6 +121,13 @@ export async function transporteEmVigor(): Promise<TransporteDeEmail | "nenhum">
 
 export async function sendEmail(args: SendArgs): Promise<EmailSendResult> {
   const via = await transporteDeEmail();
-  const resultado = via === "smtp" ? await enviarPorSmtp(args) : await enviarPelaResend(args);
+  const { rastreio, ...envio } = args;
+  const resultado = via === "smtp" ? await enviarPorSmtp(envio) : await enviarPelaResend(envio);
+  // ia.vek v1.9.47 (0627): o e-mail ACEITO pela Resend ganha a linha da entrega (o webhook conta se chegou).
+  // Não lança e não atrasa o desfecho além de uma escrita: o envio já deu certo.
+  if (via === "resend" && resultado.ok && resultado.id) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    await registrarEnvioDeEmail(createAdminClient(), resultado.id, { ...rastreioDasTags(args.tags), ...(rastreio ?? {}) });
+  }
   return { ...resultado, via };
 }

@@ -76,6 +76,11 @@ interface Excecao {
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
   {
+    tabela: "iavek_entregas_de_email",
+    razao:
+      "tests/invariants/iavek-entregas-de-email-so-do-servidor.test.ts — a entrega de cada e-mail da Resend (0627, v1.9.47), exclusiva do servidor: SELECT/INSERT/UPDATE/DELETE com JWT authenticated recusados para o admin da própria organização e para o de outra, anon recusado; controle positivo do service_role; RLS ligada, zero policies, grants revogados.",
+  },
+  {
     tabela: "iavek_0622_retencao_antes",
     razao:
       "tests/invariants/iavek-retencao-antes-so-do-servidor.test.ts — a lista da volta da 0622 (v1.9.46), exclusiva do servidor: SELECT/UPDATE/DELETE com JWT authenticated recusados para o admin da própria organização e para o de outra; RLS ligada, zero policies, grants revogados.",

@@ -2,6 +2,7 @@
 import type { InterfaceSettings } from "@/lib/navigation/interface";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import type { EntregaDoConvite } from "@/lib/email/entrega-na-tela";
 import type { StatusConvite } from "@/lib/team/convite-status";
 
 export interface TeamInvite {
@@ -21,6 +22,8 @@ export interface TeamInvite {
   revoked_at: string | null;
   status: StatusConvite;
   accept_url: string | null;
+  /** ia.vek v1.9.47 (0627): a entrega do último e-mail (webhook da Resend); null = sem notícia. */
+  entrega?: EntregaDoConvite | null;
 }
 
 export function useTeamInvites(opts?: { enabled?: boolean }) {

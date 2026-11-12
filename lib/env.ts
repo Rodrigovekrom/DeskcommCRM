@@ -391,6 +391,12 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional().default(""),
   RESEND_FROM_EMAIL: z.string().optional().default(""),
   /**
+   * ia.vek v1.9.47 (0627): o segredo de assinatura (Svix, `whsec_…`) do webhook de entrega da Resend
+   * (POST /api/v1/webhooks/resend). SEGREDO: vai servidor a servidor no .env, nunca no chat. Vazio = o webhook
+   * recusa tudo (503), e os e-mails seguem saindo; só a entrega fica sem acompanhar.
+   */
+  RESEND_WEBHOOK_SECRET: z.string().optional().default(""),
+  /**
    * Estoque da revenda no Altimus (ia.vek D2): URL do feed JSON, com a chave de
    * acesso na query string — SEGREDO. O lugar normal dela é o banco (Admin ›
    * Configuração › Integrações, cifrada); aqui é só o piso de instalação.

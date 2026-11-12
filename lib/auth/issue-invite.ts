@@ -59,6 +59,7 @@ export async function issueInvite(input: {
    */
   let deliveryError: EmailDeliveryError | undefined;
   let via: TransporteDeEmail | undefined;
+  let emailId: string | null = null;
   // Falhas de infraestrutura não desfazem a organização já criada nem o link.
   if (input.dispatch !== false) {
     try {
@@ -79,7 +80,10 @@ export async function issueInvite(input: {
           { name: "kind", value: "team_invite" },
           { name: "org", value: input.organizationId },
         ],
+        // ia.vek v1.9.47 (0627): a entrega fica presa ao CONVITE (a tela de time mostra se chegou)
+        rastreio: { organizationId: input.organizationId, tipo: "team_invite", recursoId: inviteId },
       });
+      emailId = result.ok ? (result.id ?? null) : null;
       dispatched = result.ok;
       deliveryError = result.ok ? undefined : result.error;
       via = result.via;
@@ -100,6 +104,7 @@ export async function issueInvite(input: {
         email_dispatched: dispatched,
         email_error: deliveryError ?? null,
         email_via: via ?? null,
+        email_id: emailId,
       },
     });
   }
