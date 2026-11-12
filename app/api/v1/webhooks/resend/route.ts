@@ -4,14 +4,15 @@
  * Público na borda (`/api/v1/webhooks/` em lib/auth/public-paths.ts): a autenticação é a ASSINATURA Svix, conferida
  * aqui com o RESEND_WEBHOOK_SECRET do servidor. Sem o segredo, recusa tudo (503: a Resend reentrega mais tarde).
  * Assinatura errada ou relógio fora de 5 min: 401, nada é lido. Evento de um e-mail que não é nosso: 200 e
- * ignorado (nunca cria linha de fora). O corpo NUNCA vai para o log (tem o endereço de quem recebe).
+ * ignorado (nunca cria linha de fora). v1.9.49: id desconhecido com o EVENTO recente (10 min, pelo created_at do
+ * corpo assinado): 409, a corrida do envio — a Resend reentrega. O corpo NUNCA vai para o log (tem o endereço de quem recebe).
  */
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { env } from "@/lib/env";
-import { aplicarEventoDeEntrega, conferirAssinaturaDoWebhook, type EventoDaResend } from "@/lib/email/entregas";
+import { aplicarEventoDeEntrega, conferirAssinaturaDoWebhook, eventoRecente, type EventoDaResend } from "@/lib/email/entregas";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -49,6 +50,12 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (!desfecho.aplicado && desfecho.motivo === "erro") {
     // 500: a Resend reentrega; o estado não se perde
     return fail("internal_error", "Não deu para gravar agora.", 500, { requestId });
+  }
+  // v1.9.49 (Lupa): o id ainda não gravado de um evento RECENTE é a corrida do envio — 409, a Resend reentrega.
+  // A idade é a do EVENTO (corpo assinado), nunca a do svix-timestamp (eventoRecente, lib/email/entregas.ts).
+  if (!desfecho.aplicado && desfecho.motivo === "id_desconhecido" && eventoRecente(evento)) {
+    logger.info("resend_webhook", { tipo: typeof evento.type === "string" ? evento.type.slice(0, 40) : null, adiado: "id_ainda_nao_gravado" });
+    return fail("conflict", "O e-mail ainda não foi registrado; reentregue.", 409, { requestId });
   }
   logger.info("resend_webhook", {
     tipo: typeof evento.type === "string" ? evento.type.slice(0, 40) : null,

@@ -117,7 +117,30 @@ export function conferirAssinaturaDoWebhook(p: {
 
 export interface EventoDaResend {
   type?: unknown;
+  /** A hora do EVENTO, no corpo ASSINADO (v1.9.49). Não confundir com o svix-timestamp, que é a da entrega. */
+  created_at?: unknown;
   data?: { email_id?: unknown; bounce?: { message?: unknown } | null; failed?: { reason?: unknown } | null } | null;
+}
+
+/**
+ * ia.vek v1.9.49 (nota (c) da Lupa, 033156/033232): a CORRIDA do id desconhecido. O envio grava a linha da entrega
+ * DEPOIS de a Resend aceitar o e-mail; o webhook do 1º evento pode chegar antes disso e achar o id desconhecido. Se o
+ * EVENTO é recente, o webhook responde 409 e a Resend reentrega (a linha já estará lá); se é velho, é e-mail que não
+ * é nosso (200 e ignorado).
+ *
+ * A idade vem do created_at do EVENTO, no corpo ASSINADO — NUNCA do svix-timestamp: ele RENOVA a cada reentrega, e
+ * um e-mail de outro sistema na mesma conta viraria reentrega eterna. Sem created_at válido (ausente, ilegível, ou
+ * no futuro além da folga do relógio): NÃO é recente (200 e ignora).
+ */
+export const JANELA_DO_EVENTO_RECENTE_MS = 10 * 60_000;
+const FOLGA_DO_RELOGIO_MS = 5 * 60_000;
+
+export function eventoRecente(evento: Pick<EventoDaResend, "created_at">, agora: number = Date.now()): boolean {
+  if (typeof evento.created_at !== "string" || evento.created_at.length > 64) return false;
+  const t = Date.parse(evento.created_at);
+  if (!Number.isFinite(t)) return false;
+  if (t > agora + FOLGA_DO_RELOGIO_MS) return false;
+  return agora - t <= JANELA_DO_EVENTO_RECENTE_MS;
 }
 
 export type DesfechoDoEvento =
