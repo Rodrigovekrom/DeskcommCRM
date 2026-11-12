@@ -7,7 +7,7 @@
 -- O QUE MUDA (aditiva):
 --   1. iavek_rodizio_registros.origem aceita 'sdr_followup' (o histórico da vez; nenhuma linha muda);
 --   2. fn_iavek_sdr_followup_da_vez(p_org, p_lead): escolhe, entre os membros ATIVOS da organização com a função
---      'sdr_followup', o que recebeu há mais tempo (pela vez PRÓPRIA, 'sdr_followup'), registra a vez e devolve o id.
+--      'sdr_followup' e o papel 'agent', o que recebeu há mais tempo (pela vez PRÓPRIA, 'sdr_followup'), registra a vez e devolve o id.
 --      Sem nenhum: devolve NULL e não registra nada — a esteira segue a regra de antes (o guardião).
 --      NÃO grava o lead: quem grava o dono é a esteira (passarParaFollowup), no mesmo update de sempre.
 --      Só o servidor chama (service_role). A trava por organização é a mesma do rodízio (0585/0623/0628).
@@ -36,6 +36,7 @@ begin
    where uo.organization_id = p_org
      and uo.revoked_at is null
      and uo.accepted_at is not null
+     and uo.role = 'agent'  -- (Lupa 153805) a mesma régua de quem vê: admin ou gerente marcado com a função não entra
      and uo.interface_settings->>'funcao' = 'sdr_followup'
    order by (select max(r.created_at) from public.iavek_rodizio_registros r
               where r.organization_id = p_org and r.user_id = uo.user_id and r.origem = 'sdr_followup') asc nulls first,

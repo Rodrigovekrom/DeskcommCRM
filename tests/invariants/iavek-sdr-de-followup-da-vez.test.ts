@@ -77,6 +77,12 @@ describe("0634 — a vez do SDR de Follow-up", () => {
     expect(vezes).not.toContain(SDR);
   });
 
+  it("(Lupa 153805) um ADMIN marcado com a função não entra no rodízio (só o papel 'agent', a régua de quem vê)", () => {
+    funcao(ADMIN, "sdr_followup");
+    const vezes = [daVez(lead("fu-admin1")), daVez(lead("fu-admin2")), daVez(lead("fu-admin3"))];
+    expect(vezes).not.toContain(ADMIN);
+  });
+
   it("o convite ainda não aceito não recebe", () => {
     sql(`update public.user_organizations set accepted_at = null where organization_id = '${ORG}' and user_id = '${FU2}';`);
     expect([daVez(lead("fu8")), daVez(lead("fu9"))]).toEqual([FU1, FU1]);

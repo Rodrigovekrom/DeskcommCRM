@@ -166,6 +166,9 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
           organization_id: orgId,
           lead_id: clone.id,
           erro: (erroDoGuardiao ?? erroDoClone)?.message,
+          // (Lupa 153805) a vez do SDR de Follow-up já foi registrada pela 0630: com o update falhando, ela fica gasta
+          // sem lead. Inofensivo (uma vez fora da ordem), mas o log diz qual, para a contagem do rodízio não confundir.
+          ...(sdrDeFollowup ? { vez_gasta_sem_lead: sdrDeFollowup } : {}),
         });
       }
       if (guardiao) clone.owner_user_id = guardiao;

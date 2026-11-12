@@ -49913,6 +49913,7 @@ begin
    where uo.organization_id = p_org
      and uo.revoked_at is null
      and uo.accepted_at is not null
+     and uo.role = 'agent'  -- (Lupa 153805) a mesma régua de quem vê: admin ou gerente marcado com a função não entra
      and uo.interface_settings->>'funcao' = 'sdr_followup'
    order by (select max(r.created_at) from public.iavek_rodizio_registros r
               where r.organization_id = p_org and r.user_id = uo.user_id and r.origem = 'sdr_followup') asc nulls first,
