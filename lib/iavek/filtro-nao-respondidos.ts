@@ -36,8 +36,10 @@ export function ultimaEhDoCliente(c: Pick<NonNullable<Lead["conversa"]>, "last_i
   return entrou > respondeu;
 }
 
+/** Sem conversa = nenhuma conversa, ou uma conversa SEM mensagem nenhuma (ninguém falou com o lead ainda). */
 export function semConversa(l: Filtravel): boolean {
-  return l.conversa == null;
+  const c = l.conversa;
+  return c == null || (!c.last_message_at && !c.last_inbound_at && !c.ultima_resposta_em && !c.ultima_resposta_humana_em);
 }
 
 export function naoRespondido(l: Filtravel): boolean {

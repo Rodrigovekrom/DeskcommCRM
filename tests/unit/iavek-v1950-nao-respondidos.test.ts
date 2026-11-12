@@ -10,7 +10,7 @@ import { lerPreferenciasDoPipeline, PIPELINE_PADRAO, preferenciasDoPipelineSchem
 const conversa = (o: { entrou?: string | null; resposta?: string | null; humana?: string | null }) => ({
   id: "c1",
   preview: null,
-  last_message_at: null,
+  last_message_at: null as string | null,
   unread: 0,
   last_inbound_at: o.entrou ?? null,
   ultima_resposta_em: o.resposta ?? null,
@@ -49,6 +49,16 @@ describe("a régua do 'não respondido'", () => {
     expect(semConversa(lead("open", null))).toBe(true);
     expect(naoRespondido(lead("open", null))).toBe(true);
     expect(naoRespondido(lead("open", undefined))).toBe(true);
+  });
+  it("uma conversa SEM mensagem nenhuma conta como 'sem conversa' (aparece)", () => {
+    const vazia = { ...conversa({}), last_message_at: null };
+    expect(semConversa(lead("open", vazia))).toBe(true);
+    expect(naoRespondido(lead("open", vazia))).toBe(true);
+  });
+  it("conversa só com mensagem NOSSA (o cliente nunca escreveu) não é 'sem conversa' nem 'não respondido'", () => {
+    const so_nossa = { ...conversa({ resposta: "2026-11-12T10:00:00Z" }), last_message_at: "2026-11-12T10:00:00Z" };
+    expect(semConversa(lead("open", so_nossa))).toBe(false);
+    expect(naoRespondido(lead("open", so_nossa))).toBe(false);
   });
   it("lead fechado (ganho/perdido) nunca entra", () => {
     expect(naoRespondido(lead("won", conversa({ entrou: "2026-11-12T10:00:00Z" })))).toBe(false);
