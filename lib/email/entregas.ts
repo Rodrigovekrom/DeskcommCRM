@@ -69,7 +69,8 @@ export async function registrarEnvioDeEmail(
   try {
     if (!mensagemId || mensagemId.length > 200) return;
     const org = rastreio.organizationId && UUID.test(rastreio.organizationId) ? rastreio.organizationId : null;
-    const { error } = await admin.from(TABELA_DAS_ENTREGAS).upsert(
+    // o nome LITERAL aqui: a varredura do onConflict (tests/invariants/on-conflict-aponta-para-constraint-real) confere a constraint pela tabela do .from("...")
+    const { error } = await admin.from("iavek_entregas_de_email").upsert(
       {
         mensagem_id: mensagemId,
         provedor: "resend",
