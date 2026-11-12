@@ -122,6 +122,10 @@ export function recusaReabertura(p: {
 }): RecusaDeReabertura | null {
   if (p.modo !== "novo_negocio") return null;
   if ((p.statusAtual ?? "open") === "open") return null;
+  // ia.vek v1.9.47 (nota 4 da Lupa na v1.9.45): a Compra futura ('future') NÃO é um negócio encerrado. Tirar o
+  // lead dela para uma etapa comum é a volta do MESMO lead (fn_crm_lead_close_on_stage o reabre, 0620), e não a
+  // reabertura de um fechado: no modo novo_negocio isso não pode virar 409 nem criar um lead novo.
+  if (p.statusAtual === "future") return null;
   if (p.etapaDestino.is_won || p.etapaDestino.is_lost) return null;
   return {
     codigo: CODIGO_REABERTURA_CRIA_NOVO,
