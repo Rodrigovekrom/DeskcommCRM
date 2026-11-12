@@ -140,9 +140,18 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         .eq("organization_id", orgId)
         .eq("id", clone.id)
         .maybeSingle();
+      // v1.9.52 (0634, CRM-254 a/b): o dono no Follow-up é o SDR DE FOLLOW-UP da vez (rodízio entre os ativos), e as
+      // ligações L3-L7 vêm junto (vão para o dono). Sem nenhum SDR de Follow-up ativo, a regra de antes: o guardião;
+      // no lote antigo sem guardião, o dono do rodízio. O guardião (sdr_user_id) do clone NÃO é mexido aqui.
+      const { data: daVez, error: erroDaVez } = await admin.rpc("fn_iavek_sdr_followup_da_vez" as never, {
+        p_org: orgId,
+        p_lead: clone.id,
+      } as never);
+      if (erroDaVez) logger.warn("esteira_sdr_followup_da_vez_falhou", { organization_id: orgId, lead_id: clone.id, codigo: erroDaVez.code ?? null });
+      const sdrDeFollowup = typeof daVez === "string" ? daVez : null;
       // v1.9.41: no lote antigo, sem guardião, o dono é o do rodízio (nunca fica sem dono).
       const guardiao =
-        (comGuardiao as { sdr_user_id: string | null } | null)?.sdr_user_id ?? loteAntigo?.dono ?? null;
+        sdrDeFollowup ?? (comGuardiao as { sdr_user_id: string | null } | null)?.sdr_user_id ?? loteAntigo?.dono ?? null;
       const { error: erroDoClone } = await admin
         .from("crm_leads")
         .update({
