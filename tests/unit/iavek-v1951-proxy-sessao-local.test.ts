@@ -57,3 +57,15 @@ describe("aba escondida não vai ao banco (Maestro 214930, item 2)", () => {
     expect(s).toContain('document.removeEventListener("visibilitychange", aoVoltar);');
   });
 });
+
+describe("o tempo real recarrega SÓ o quadro (item 3: a cascata de consultas)", () => {
+  it("as invalidações do useBoard são exatas (não levam a faixa sem dono nem a carteira junto)", () => {
+    const s = readFileSync("hooks/kanban/useBoard.ts", "utf8");
+    expect(s.match(/invalidateQueries\(\{ queryKey \}\)/g)).toBeNull();
+    expect((s.match(/invalidateQueries\(\{ queryKey, exact: true \}\)/g) ?? []).length).toBe(3);
+  });
+  it("a faixa sem dono segue recarregando quando o quadro recarrega (pelo próprio efeito)", () => {
+    const s = readFileSync("app/app/pipeline/_client.tsx", "utf8");
+    expect(s).toContain("if (anterior?.funil === pipelineId) void qc.invalidateQueries({ queryKey: chave });");
+  });
+});

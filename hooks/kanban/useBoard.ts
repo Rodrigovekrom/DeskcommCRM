@@ -118,6 +118,9 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
 
   const onChange = useCallback(
     (payload: unknown) => {
+      // ia.vek v1.9.51 (CPU): `exact`: o tempo real recarrega SÓ este quadro. Sem ele, a chave ["board", id] casava como
+      // prefixo a faixa sem dono (["board", id, "sem-dono"]) e a carteira do mesmo funil, que iam ao banco a cada evento
+      // (a faixa já recarrega pelo próprio efeito, quando o quadro recarrega: ia 2 vezes).
       // Conservative: invalidate the board on any change. Optimistic patches
       // arrive faster via useMoveCard's onMutate; this just reconciles
       // cross-user changes within ~250ms.
@@ -125,11 +128,11 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
         if (!agrupador.current) {
           agrupador.current = setTimeout(() => {
             agrupador.current = null;
-            void qc.invalidateQueries({ queryKey });
+            void qc.invalidateQueries({ queryKey, exact: true });
           }, agruparEventosMs);
         }
       } else {
-        qc.invalidateQueries({ queryKey });
+        qc.invalidateQueries({ queryKey, exact: true });
       }
 
       const leadId = idDoEvento(payload);
@@ -223,7 +226,7 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
       if (agrupadorDaConversa.current) return;
       agrupadorDaConversa.current = setTimeout(() => {
         agrupadorDaConversa.current = null;
-        void qc.invalidateQueries({ queryKey });
+        void qc.invalidateQueries({ queryKey, exact: true });
       }, Math.max(agruparEventosMs, 30_000));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo
