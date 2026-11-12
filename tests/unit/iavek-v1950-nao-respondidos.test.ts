@@ -103,6 +103,11 @@ describe("as duas telas do quadro usam o filtro (a do funil e o Pipeline da loja
       expect(s).toContain("<MostrarNaoRespondidos");
     });
   }
+  it("o cartão: sem conversa, o botão diz 'Começar conversa' e a linha 'Ainda sem conversa' não repete a marca", () => {
+    const c = readFileSync("components/iavek/CartaoIavek.tsx", "utf8");
+    expect(c).toContain('marcaSemConversa ? t("Começar conversa") : t("Abrir conversa")');
+    expect(c).toContain("(falou || !marcaSemConversa)");
+  });
   it("o quadro traz a última RESPOSTA da conversa (0633)", () => {
     expect(readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8")).toContain("ultima_resposta_em");
   });

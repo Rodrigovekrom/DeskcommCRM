@@ -145,7 +145,8 @@ export function CorpoDoCartaoIavek({ lead, pipelineId, nomeDaEtapa }: { lead: Le
         data-testid="botao-abrir-conversa"
       >
         <ChatCircle size={16} aria-hidden />
-        {podeAbrir ? t("Abrir conversa") : t("Sem contato")}
+        {/* v1.9.50 (Maestro 225521): sem conversa (ou conversa vazia), o botão COMEÇA a conversa */}
+        {podeAbrir ? (marcaSemConversa ? t("Começar conversa") : t("Abrir conversa")) : t("Sem contato")}
         {naoLidas > 0 && (
           <span
             className="rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white tabular-nums"
