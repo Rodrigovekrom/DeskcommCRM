@@ -28,6 +28,8 @@ let gravados: Gravado[];
 let rpcs: Array<{ nome: string; args: Record<string, unknown> }>;
 let leadDaSessao: Record<string, unknown> | null;
 let marcaDireto: boolean;
+let ehSdr: boolean;
+let etapaMovida: number;
 let avisosAoDono: unknown[];
 let avisosAoVendedor: unknown[];
 let compromissos: Array<Record<string, unknown>>;
@@ -69,7 +71,7 @@ function montarMocks() {
     requireRole: async () => ({ ok: true, org: { orgId: ORG, role: "agent" }, user: { id: EU, idioma: "pt-BR" } }),
   }));
   vi.doMock("@/lib/iavek/sdr-marca-direto", () => ({
-    marcaDiretoNaLoja: async () => ({ marcaDireto, ehSdr: false }),
+    marcaDiretoNaLoja: async () => ({ marcaDireto, ehSdr }),
     vendedoresDaLoja: async () => [
       { id: EU, nome: "Eu" },
       { id: DONO, nome: "Dono" },
@@ -78,10 +80,12 @@ function montarMocks() {
   vi.doMock("@/lib/iavek/perfil-da-empresa-servidor", () => ({ modoAgendamentoDaOrg: async () => !marcaDireto }));
   vi.doMock("@/lib/supabase/admin", () => ({
     createAdminClient: () =>
-      banco((t) => (t === "contacts" ? { name: "Cliente", display_name: null, phone_number: null } : t === "crm_leads" ? { owner_user_id: DONO, id: LEAD } : null)),
+      // v1.9.48 (Lupa 132538): o lead é lido pelo SERVIDOR (admin), não pela sessão
+      banco((t) => (t === "contacts" ? { name: "Cliente", display_name: null, phone_number: null } : t === "crm_leads" ? leadDaSessao : null)),
   }));
   vi.doMock("@/lib/supabase/server", () => ({
-    createClient: async () => banco((t) => (t === "crm_leads" ? leadDaSessao : null)),
+    // a SESSÃO não enxerga lead nenhum (o pior caso: o SDR e o lead sem dono de antes de 02/11)
+    createClient: async () => banco(() => null),
   }));
   vi.doMock("@/lib/iavek/pedidos-de-agendamento", async (orig) => ({
     ...(await orig<Record<string, unknown>>()),
@@ -99,7 +103,10 @@ function montarMocks() {
   vi.doMock("@/lib/iavek/passagem-servidor", () => ({
     anotarCampos: async () => null,
     lerLeadDaPassagem: async () => ({ id: LEAD, organization_id: ORG, contact_id: CONTATO, pipeline_id: "p", stage_id: "s" }),
-    moverParaAEtapaDaPassagem: async () => true,
+    moverParaAEtapaDaPassagem: async () => {
+      etapaMovida += 1;
+      return true;
+    },
     passarAConversa: async () => {
       gravados.push({ tabela: "conversa", op: "update", valores: { passou: true } });
     },
@@ -140,6 +147,8 @@ beforeEach(() => {
   compromissos = [];
   pedidosGravados = 0;
   marcaDireto = true;
+  ehSdr = false;
+  etapaMovida = 0;
   montarMocks();
 });
 
@@ -180,6 +189,20 @@ describe("(2) o lead SEM dono: quem agenda fica dono, e o guardião vem do rodí
     expect(donoMexido().map((g) => g.valores.owner_user_id)).toContain(EU);
     expect(rpcs).toEqual([{ nome: "fn_iavek_guardiao_do_agendamento", args: { p_org: ORG, p_lead: LEAD, p_ator: EU } }]);
     expect(avisosAoDono).toEqual([]); // não havia dono para avisar
+  });
+});
+
+describe("Lupa 132538: o SDR e o lead SEM dono que a SESSÃO dele não enxerga (antes de 02/11)", () => {
+  it("o lead passa ao vendedor, o SDR fica de guardião, vai para Agendado — nada calado", async () => {
+    ehSdr = true;
+    leadDaSessao = { id: LEAD, custom_fields: {}, owner_user_id: null, sdr_user_id: null };
+    const res = await agendar({ vendedor_id: DONO });
+    expect(res.status).toBe(201);
+    const mudancas = donoMexido().map((g) => g.valores);
+    expect(mudancas.some((v) => v.owner_user_id === DONO && v.sdr_user_id === EU)).toBe(true);
+    expect(etapaMovida).toBe(1);
+    expect(rpcs).toEqual([]); // é SDR: ela mesma é a guardiã, sem rodízio
+    expect(avisosAoVendedor).toEqual([expect.objectContaining({ vendedorId: DONO, atorId: EU })]);
   });
 });
 

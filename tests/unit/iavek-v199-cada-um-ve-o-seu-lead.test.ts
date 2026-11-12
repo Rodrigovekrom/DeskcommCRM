@@ -92,8 +92,10 @@ describe("v1.9.9-seg (parte 2) — as rotas que usam a chave de serviço", () =>
     // dono — a regra acima deixou de travar o agendamento (ver iavek-v1948-livre-para-todos).
     expect(rota).not.toMatch(/podePassarOLead\(/);
     expect(rota).toContain("const deOutraPessoa = negocio !== null && negocio.owner_user_id !== null && negocio.owner_user_id !== authz.user.id;");
-    // O negócio é lido pela SESSÃO, e a escrita pelo servidor só com o dono conferido.
-    expect(rota).toMatch(/async function leadDoCliente\([^)]*\)[\s\S]{0,200}const sessao = await createClient\(\)/);
+    // v1.9.48 (Lupa 132538): o negócio é lido pelo SERVIDOR (a leitura pela sessão era só a guarda do 403, que saiu,
+    // e escondia do SDR o lead sem dono de antes de 02/11); nada do lead volta na resposta. A escrita pelo servidor
+    // segue só com o dono conferido.
+    expect(rota).toMatch(/async function leadDoCliente\(\s*admin: ReturnType<typeof createAdminClient>,[\s\S]{0,200}let consulta = admin/);
     expect(rota).toMatch(/peloServidor\.eq\("owner_user_id", lead\.owner_user_id\) : peloServidor\.is\("owner_user_id", null\)/);
   });
 

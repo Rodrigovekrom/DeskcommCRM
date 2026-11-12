@@ -214,10 +214,10 @@ async function sdrMarca(
   // lead que enxerga — e o de outra pessoa da loja (nem dono, nem guardião) só a
   // gerência passa. Antes, a leitura era pela chave de serviço e o SDR tomava o
   // lead de um colega.
-  const negocio = await leadDoCliente(orgId, input.lead_id ?? null, input.contact_id);
+  const negocio = await leadDoCliente(admin, orgId, input.lead_id ?? null, input.contact_id);
   // v1.9.48 (decisão do Rodrigo, Notion 12/11 12:48Z, Maestro 125050): "livre para todos", SEM TRAVA. Agendar no lead
   // de OUTRA pessoa passa, e NÃO tira o lead do dono (antes: 403, "peça à gerência"). O lead SEM dono (ou o da própria
-  // pessoa) segue a passagem de sempre. Sem lead que a sessão enxergue, o compromisso nasce só no contato.
+  // pessoa) segue a passagem de sempre. Sem lead aberto do contato, o compromisso nasce só no contato.
   const deOutraPessoa = negocio !== null && negocio.owner_user_id !== null && negocio.owner_user_id !== authz.user.id;
   // ia.vek 0613 (CRM-255/257): marcar pede só o lead, o dia e a hora. Os campos que vierem seguem
   // gravados no negócio; o que faltar NÃO trava mais o agendamento.
@@ -350,16 +350,14 @@ async function sdrMarca(
     .eq("id", pedido.contact_id)
     .maybeSingle();
   const contatoNome = contato ? rotuloDoContato(contato as never, t) : null;
-  // v1.9.48: o DONO do lead (quando é outra pessoa) é avisado: "Fulano agendou ... no seu lead". Se a sessão não
-  // enxerga o lead, o servidor acha SÓ o dono para o aviso (nada do lead volta para quem agendou).
-  const donoAvisado = deOutraPessoa ? negocio?.owner_user_id ?? null : negocio ? null : await donoDoLeadAberto(admin, orgId, pedido.contact_id, authz.user.id);
-  if (donoAvisado) {
-    const leadDoAviso = negocio?.id ?? (await idDoLeadAberto(admin, orgId, pedido.contact_id, donoAvisado));
-    if (leadDoAviso) await avisarDonoDoAgendamento(admin, {
+  // v1.9.48: o DONO do lead (quando é outra pessoa) é avisado: "Fulano agendou ... no seu lead".
+  const donoAvisado = deOutraPessoa ? (negocio?.owner_user_id ?? null) : null;
+  if (donoAvisado && negocio) {
+    await avisarDonoDoAgendamento(admin, {
       orgId,
       donoId: donoAvisado,
       atorId: authz.user.id,
-      leadId: leadDoAviso,
+      leadId: negocio.id,
       appointmentId,
       quando: new Date(pedido.quando).toISOString(),
       titulo: typeof compromisso.title === "string" ? compromisso.title : null,
@@ -386,10 +384,21 @@ interface NegocioDoCliente {
   sdr_user_id: string | null;
 }
 
-/** O negócio aberto do cliente (o do pedido, ou o mais recente) — o que a SESSÃO enxerga. */
-async function leadDoCliente(orgId: string, leadId: string | null, contactId: string): Promise<NegocioDoCliente | null> {
-  const sessao = await createClient();
-  let consulta = sessao
+/**
+ * O negócio aberto do cliente (o do pedido, ou o mais recente).
+ *
+ * v1.9.48 (Lupa 132538): lido pelo SERVIDOR. A leitura pela sessão existia só para a guarda do 403 ("o lead de um
+ * colega, só a gerência"), que saiu com o "livre para todos". Pela sessão, o SDR não enxergava o lead SEM DONO de antes
+ * do corte guardiao_ve_sem_dono_desde (02/11; 520 dos 702 sem dono da Fenômenos, MEDIDO): o compromisso nascia, mas o
+ * lead não passava ao vendedor, não ganhava guardião nem ia para Agendado — calado. Nada do lead volta na resposta.
+ */
+async function leadDoCliente(
+  admin: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  leadId: string | null,
+  contactId: string,
+): Promise<NegocioDoCliente | null> {
+  let consulta = admin
     .from("crm_leads")
     .select("id, custom_fields, owner_user_id, sdr_user_id")
     .eq("organization_id", orgId)
@@ -442,49 +451,6 @@ async function passarOLeadAoVendedor(
   peloServidor = lead.owner_user_id ? peloServidor.eq("owner_user_id", lead.owner_user_id) : peloServidor.is("owner_user_id", null);
   const { data } = await peloServidor.select("id").maybeSingle();
   return data ? lead.id : null;
-}
-
-/**
- * v1.9.48: o DONO do lead aberto do contato (o mais recente com dono), quando a sessão de quem agendou não enxerga o
- * lead. Serve SÓ para o aviso ao dono; nada do lead é devolvido a quem agendou. O próprio (eu) não conta.
- */
-async function donoDoLeadAberto(
-  admin: ReturnType<typeof createAdminClient>,
-  orgId: string,
-  contactId: string,
-  eu: string,
-): Promise<string | null> {
-  const { data } = await admin
-    .from("crm_leads")
-    .select("owner_user_id")
-    .eq("organization_id", orgId)
-    .eq("contact_id", contactId)
-    .eq("status", "open")
-    .not("owner_user_id", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const dono = (data as { owner_user_id: string | null } | null)?.owner_user_id ?? null;
-  return dono && dono !== eu ? dono : null;
-}
-
-async function idDoLeadAberto(
-  admin: ReturnType<typeof createAdminClient>,
-  orgId: string,
-  contactId: string,
-  dono: string,
-): Promise<string | null> {
-  const { data } = await admin
-    .from("crm_leads")
-    .select("id")
-    .eq("organization_id", orgId)
-    .eq("contact_id", contactId)
-    .eq("status", "open")
-    .eq("owner_user_id", dono)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as { id: string } | null)?.id ?? null;
 }
 
 /** Sem tipo escolhido: o único tipo ativo da empresa, se houver um só. */
