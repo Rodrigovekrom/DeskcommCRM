@@ -74,7 +74,7 @@ describe("v1.9.45 (CRM-294): a ligação dos 7 dias antes", () => {
     e.leads = [lead("a")];
     const r = await rodarCompraFutura(bancoFalso(), "org", AGORA);
     expect(r).toMatchObject({ tarefas: 1, paraOVendedor: 1 });
-    expect(e.tarefas[0]).toMatchObject({ atribuirA: { usuario_id: "vendedor" }, leadId: "a", sourceKind: "ligacao" });
+    expect(e.tarefas[0]).toMatchObject({ atribuirA: { usuario_id: "vendedor" }, leadId: "a", sourceKind: "ligacao:compra_futura" });
     expect(e.leads[0]).toMatchObject({ status: "future" });
     expect(e.leads[0]!.compra_futura_tarefa_em).not.toBeNull();
   });

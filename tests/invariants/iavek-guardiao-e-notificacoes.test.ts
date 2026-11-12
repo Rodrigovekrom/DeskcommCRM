@@ -41,6 +41,9 @@ const LEAD = "05790000-7777-4000-8000-000000000001";
 const LEAD_SEM_SDR = "05790000-7777-4000-8000-000000000002";
 const CONTATO_2 = "05790000-3333-4000-8000-000000000002";
 const TAREFA = "05790000-8888-4000-8000-000000000001";
+// ia.vek v1.9.47 (0626): duas tarefas num lead em Compra futura, uma comum e a ligação da Compra futura
+const TAREFA_COMUM_NO_FUTURO = "05790000-8888-4000-8000-000000000002";
+const TAREFA_DA_COMPRA_FUTURA = "05790000-8888-4000-8000-000000000003";
 
 function comoMembro(userId: string): string {
   return `set role authenticated;
@@ -258,6 +261,27 @@ describe("avisos", () => {
     `);
     expect(notificacoes(VENDEDOR, "tarefa_vencida")).toBe(1);
     expect(notificacoes(SDR, "guardiao_tarefa_vencida")).toBe(1);
+  });
+
+  it("ia.vek v1.9.47 (0626): no lead em Compra futura, SÓ a ligação da Compra futura avisa quando vence", () => {
+    // o lead vai para 'future' só pelo status (sem trocar a etapa, o gatilho BEFORE não mexe); as 2 tarefas nascem
+    // DEPOIS (como a da rodada dos 7 dias, que nasce com o lead já em 'future')
+    sql(`
+      update public.crm_leads set status = 'future', compra_futura_mes = date_trunc('month', now() + interval '2 month')::date,
+             lost_reason = null, closed_at = null where id = '${LEAD}';
+      insert into public.crm_tasks (id, organization_id, title, lead_id, assigned_to, due_date, status, source_kind)
+        values ('${TAREFA_COMUM_NO_FUTURO}', '${ORG}', 'Outra', '${LEAD}', '${VENDEDOR}', now() - interval '1 hour', 'pending', 'ligacao:L2'),
+               ('${TAREFA_DA_COMPRA_FUTURA}', '${ORG}', 'Compra futura', '${LEAD}', '${VENDEDOR}', now() - interval '1 hour', 'pending', 'ligacao:compra_futura');
+    `);
+    expect(valor(`select status from public.crm_leads where id = '${LEAD}'`)).toBe("future");
+    sql(`insert into public.event_log (organization_id, event_type, entity_kind, entity_id, payload)
+           values ('${ORG}', 'task.overdue', 'crm_task', '${TAREFA_COMUM_NO_FUTURO}', '{}'::jsonb);`);
+    expect(notificacoes(VENDEDOR, "tarefa_vencida")).toBe(1); // a comum segue calada (como na 0621)
+    expect(notificacoes(SDR, "guardiao_tarefa_vencida")).toBe(1);
+    sql(`insert into public.event_log (organization_id, event_type, entity_kind, entity_id, payload)
+           values ('${ORG}', 'task.overdue', 'crm_task', '${TAREFA_DA_COMPRA_FUTURA}', '{}'::jsonb);`);
+    expect(notificacoes(VENDEDOR, "tarefa_vencida")).toBe(2); // a da Compra futura avisa o vendedor
+    expect(notificacoes(SDR, "guardiao_tarefa_vencida")).toBe(2); // e o guardião
   });
 });
 

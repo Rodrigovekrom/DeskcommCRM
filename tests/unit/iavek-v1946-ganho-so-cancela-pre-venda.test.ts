@@ -30,7 +30,8 @@ describe("v1.9.46 (0625): o ganho só cancela a pré-venda", () => {
 
   it("a regra no TypeScript: na dúvida, a tarefa FICA", () => {
     expect(eTarefaDaPreVenda("ligacao:L3")).toBe(true);
-    expect(eTarefaDaPreVenda("ligacao")).toBe(true); // a dos 7 dias da Compra futura
+    expect(eTarefaDaPreVenda("ligacao")).toBe(true);
+    expect(eTarefaDaPreVenda("ligacao:compra_futura")).toBe(true); // a dos 7 dias da Compra futura (0626)
     expect(eTarefaDaPreVenda("followup")).toBe(true);
     expect(eTarefaDaPreVenda("promised_proposal")).toBe(true);
     expect(eTarefaDaPreVenda(null)).toBe(false); // à mão (ex.: "entregar o documento")

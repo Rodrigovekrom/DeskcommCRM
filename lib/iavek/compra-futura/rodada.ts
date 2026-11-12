@@ -18,6 +18,13 @@ import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
 
 export const DIAS_ANTES_DA_COMPRA_FUTURA = 7;
 
+/**
+ * ia.vek v1.9.47 (0626): o source_kind PRÓPRIO da ligação da Compra futura (antes, 'ligacao', igual à esteira).
+ * É por ele que fn_iavek_notifica_tarefa_vencida avisa esta tarefa mesmo com o lead em 'future'. Começa com
+ * 'ligacao' de propósito: para a 0625 (o ganho cancela a pré-venda) ela continua pré-venda.
+ */
+export const FONTE_DA_LIGACAO_DA_COMPRA_FUTURA = "ligacao:compra_futura";
+
 /** Hoje no fuso de São Paulo, "AAAA-MM-DD". */
 export function hojeEmSaoPaulo(agora: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(agora);
@@ -104,7 +111,7 @@ export async function rodarCompraFutura(
       prioridade: "high",
       leadId: l.id,
       origem: "iavek:compra_futura",
-      sourceKind: "ligacao",
+      sourceKind: FONTE_DA_LIGACAO_DA_COMPRA_FUTURA,
       aceitaSemResponsavel: true,
       agora,
     }).catch((e: unknown) => ({ ok: false as const, codigo: "falha" as const, erro: String(e) }));
