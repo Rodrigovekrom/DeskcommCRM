@@ -108,15 +108,21 @@ export async function GET(req: Request): Promise<Response> {
 
   // Tarefas abertas: as dos meus leads (para o "sem tarefa") e, para os
   // números de hoje e atrasadas, também as atribuídas a mim sem lead da carteira.
+  // ia.vek v1.9.49 (incidente 12/11, o 2º do pg_stat_statements: 801 leituras em ~35 min, média 50 ms): na visão
+  // da LOJA, a 3ª leitura abaixo já traz TODAS as tarefas abertas da organização, com a mesma RLS, então a busca
+  // por lead em lotes era repetida (~10 consultas por recarga, cada uma pagando o "leads que vejo" da policy). Ela
+  // só roda na CARTEIRA, onde a tarefa do meu lead pode estar atribuída a outra pessoa.
   const [tarefasDosLeads, tarefasMinhas, visitas] = await Promise.all([
-    buscaEmLotes(idsDosLeads, (lote) =>
-      supabase
-        .from("crm_tasks")
-        .select("id, lead_id, due_date")
-        .eq("organization_id", orgId)
-        .in("status", [...TAREFA_ABERTA])
-        .in("lead_id", lote),
-    ),
+    recorte.tipo === "carteira"
+      ? buscaEmLotes(idsDosLeads, (lote) =>
+          supabase
+            .from("crm_tasks")
+            .select("id, lead_id, due_date")
+            .eq("organization_id", orgId)
+            .in("status", [...TAREFA_ABERTA])
+            .in("lead_id", lote),
+        )
+      : Promise.resolve({ data: [] as Array<{ id: string; lead_id: string | null; due_date: string | null }>, error: null }),
     recorte.tipo === "carteira"
       ? lerTudo((de, ate) =>
           supabase
