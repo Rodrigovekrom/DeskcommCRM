@@ -8,6 +8,8 @@ import { AvisosDoCartaoContext } from "@/components/iavek/AvisosDoCartao";
 import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
 import { DadosDaCompraNoCardContext } from "@/components/iavek/DadosDaCompraNoCard";
 import { usePreferenciasDoPipeline, VistaDoPipeline } from "@/components/iavek/VistaDoPipeline";
+import { MostrarNaoRespondidos } from "@/components/iavek/MostrarNaoRespondidos";
+import { aplicarMostrar } from "@/lib/iavek/filtro-nao-respondidos";
 import { usePreCarregarRespostas } from "@/hooks/inbox/useMessageTemplates";
 import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
 import { BuscaDoQuadro, useNomeDoCarroDaBusca } from "@/components/iavek/BuscaDoQuadro";
@@ -314,6 +316,8 @@ function QuadroDoFunil({
   // CRM-244 (Fase 4): a busca acha por nome, telefone e carro (o catálogo só é lido quando há busca).
   const nomeDoCarro = useNomeDoCarroDaBusca(Boolean(filtros.search?.trim()));
   const leads = useMemo(() => (data ? applyFilters(data.leads, filtros, { nomeDoCarro }) : []), [data, filtros, nomeDoCarro]);
+  // v1.9.50 (Rodrigo): o padrão é mostrar só os NÃO RESPONDIDOS, em todos os funis; "Todos" é a escolha de cada pessoa.
+  const vista = useMemo(() => aplicarMostrar(leads, prefs.mostrar), [leads, prefs.mostrar]);
   useEffect(() => {
     aoAchar?.(pipelineId, leads.length);
   }, [aoAchar, pipelineId, leads.length]);
@@ -343,6 +347,14 @@ function QuadroDoFunil({
             {data ? ` — ${leads.length} ${leads.length === 1 ? t("cliente") : t("clientes")}` : ""}
           </p>
         )}
+        {data && (
+          <MostrarNaoRespondidos
+            mostrar={prefs.mostrar}
+            naoRespondidos={vista.naoRespondidos}
+            todos={vista.todos}
+            onMudar={(mostrar) => gravar({ ...prefs, mostrar })}
+          />
+        )}
         {data && <VistaDoPipeline etapas={data.stages} prefs={prefs} gravar={gravar} />}
         {data && <SemRespostaPorVendedor leads={leads} stages={data.stages} />}
       </div>
@@ -359,7 +371,7 @@ function QuadroDoFunil({
           <KanbanBoard
             pipelineId={pipelineId}
             stages={data.stages}
-            leads={leads}
+            leads={vista.visiveis}
             leadsDosTotais={data.leads}
             pulses={pulses}
             pipeline={data.pipeline}

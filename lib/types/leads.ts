@@ -83,6 +83,8 @@ export interface Lead {
     /** v1.9.18: a última mensagem do lead e a última resposta de uma pessoa pelo sistema. */
     last_inbound_at?: string | null;
     ultima_resposta_humana_em?: string | null;
+    /** v1.9.50: a última mensagem ENVIADA, de qualquer origem (CRM, celular, Venda.IA): o filtro "Não respondidos". */
+    last_outbound_at?: string | null;
     /**
      * CRM-244 (Fase 2): as não lidas DE QUEM ESTÁ OLHANDO (vem só para a conversa que espera
      * resposta de pessoa) e o "já vi" do admin. Ausente = 0 / não.

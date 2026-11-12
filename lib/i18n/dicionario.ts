@@ -12024,6 +12024,12 @@ export const DICIONARIO: Traducoes = {
   "encontrado": { es: "encontrado" },
   "encontrados": { es: "encontrados" },
   "Limpar busca": { es: "Limpiar búsqueda" },
+  // v1.9.50: o filtro "Não respondidos | Todos" do Pipeline.
+  "Não respondidos": { es: "Sin responder" },
+  "Mostrar": { es: "Mostrar" },
+  "mostrando": { es: "mostrando" },
+  "só os não respondidos": { es: "solo los sin responder" },
+  "sem conversa": { es: "sin conversación" },
   "Buscar por nome, telefone ou carro…": { es: "Buscar por nombre, teléfono o auto…" },
   "Você ainda não tem respostas rápidas.": { es: "Todavía no tienes respuestas rápidas." },
   "Nenhuma resposta com esse nome.": { es: "Ninguna respuesta con ese nombre." },

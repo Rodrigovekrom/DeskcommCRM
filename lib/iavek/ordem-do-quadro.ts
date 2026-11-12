@@ -101,6 +101,7 @@ export function aplicarConversaNoQuadro<L extends Pick<Lead, "contact_id" | "con
     id: string;
     contact_id: string;
     last_inbound_at?: string | null;
+    last_outbound_at?: string | null;
     ultima_resposta_humana_em?: string | null;
     last_message_at?: string | null;
     last_message_preview?: string | null;
@@ -130,6 +131,8 @@ export function aplicarConversaNoQuadro<L extends Pick<Lead, "contact_id" | "con
         unread: c.unread_count_for_assignee ?? l.conversa?.unread ?? 0,
         last_inbound_at: c.last_inbound_at ?? l.conversa?.last_inbound_at ?? null,
         ultima_resposta_humana_em: c.ultima_resposta_humana_em ?? l.conversa?.ultima_resposta_humana_em ?? null,
+        // v1.9.50: o filtro "Não respondidos" — a resposta pelo celular tira o lead da lista na hora.
+        last_outbound_at: c.last_outbound_at ?? l.conversa?.last_outbound_at ?? null,
       },
     };
   });

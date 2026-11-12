@@ -1,5 +1,6 @@
 "use client";
 import { MarcaDeNovaMensagem } from "@/components/iavek/MarcaDeNovaMensagem";
+import { MarcaSemConversa } from "@/components/iavek/MostrarNaoRespondidos";
 import { MoverParaColuna } from "@/components/kanban/mover-no-quadro";
 import { esperandoDesde } from "@/lib/iavek/ordem-do-quadro";
 
@@ -82,6 +83,8 @@ export function CorpoDoCartaoIavek({ lead, pipelineId, nomeDaEtapa }: { lead: Le
   return (
     <div className="mt-1 flex flex-col gap-1.5 text-xs" data-testid="cartao-iavek" data-lead-id={lead.id}>
       {espera !== null && <MarcaDeNovaMensagem desde={espera} />}
+      {/* v1.9.50: lead aberto sem conversa nenhuma (o filtro "Não respondidos" o mostra) */}
+      {lead.status === "open" && lead.conversa == null && <MarcaSemConversa />}
       {jaVi && (
         <p className="text-[11px] text-text-muted" data-testid="ja-vi">
           ✓ {t("Já vi")}

@@ -21,6 +21,8 @@ function formatError(err: unknown, t: (texto: string) => string): string {
   return String(err);
 }
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
+import { MostrarNaoRespondidos } from "@/components/iavek/MostrarNaoRespondidos";
+import { aplicarMostrar } from "@/lib/iavek/filtro-nao-respondidos";
 import { CartaoIavekContext } from "@/components/iavek/CartaoIavek";
 import { FilterBar } from "@/components/kanban/FilterBar";
 import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
@@ -85,6 +87,8 @@ export function PipelinePageClient({
   // CRM-244 (Fase 4): a busca acha por nome, telefone e carro (o catálogo só é lido quando há busca).
   const nomeDoCarro = useNomeDoCarroDaBusca(Boolean(filters.search?.trim()));
   const filteredLeads = data ? applyFilters(data.leads, filters, { categoriaDo, nomeDoCarro }) : [];
+  // v1.9.50 (Rodrigo): o padrão é mostrar só os NÃO RESPONDIDOS; "Todos" é a escolha de cada pessoa.
+  const vista = aplicarMostrar(filteredLeads, prefs.mostrar);
   // NÃO é a conta do FilterBar: o seletor de filtro lista as três caixas
   // (`marcadoresDoCard`: negócio, contato e conversa), e esta lista, a da tag em
   // lote, só `lead.tags` — é lá que a ação em lote grava (#852). O `useMemo` é o
@@ -168,6 +172,14 @@ export function PipelinePageClient({
       {filters.search?.trim() && data && (
         <ResultadoDaBusca encontrados={filteredLeads.length} onLimpar={() => setFilters({ ...filters, search: undefined })} />
       )}
+      {data && (
+        <MostrarNaoRespondidos
+          mostrar={prefs.mostrar}
+          naoRespondidos={vista.naoRespondidos}
+          todos={vista.todos}
+          onMudar={(mostrar) => gravar({ ...prefs, mostrar })}
+        />
+      )}
       {data && <VistaDoPipeline etapas={data.stages} prefs={prefs} gravar={gravar} />}
       {data && <SemRespostaPorVendedor leads={filteredLeads} stages={data.stages} />}
       <FilterBar
@@ -190,7 +202,7 @@ export function PipelinePageClient({
         <KanbanBoard
           pipelineId={pipelineId}
           stages={data.stages}
-          leads={filteredLeads}
+          leads={vista.visiveis}
           leadsDosTotais={data.leads}
           pulses={pulses}
           pipeline={data.pipeline}

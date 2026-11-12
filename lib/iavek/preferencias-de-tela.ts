@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { MOSTRAR_DO_PIPELINE, MOSTRAR_PADRAO } from "@/lib/iavek/filtro-nao-respondidos";
 import { ORDEM_PADRAO, ORDENS_DO_QUADRO, type OrdemDoQuadro } from "@/lib/iavek/ordem-do-quadro";
 
 /**
@@ -24,11 +25,13 @@ export const preferenciasDoPipelineSchema = z
     v: z.literal(2).optional(),
     ocultas: z.array(z.uuid()).max(50).default([]),
     recolhidas: z.array(z.uuid()).max(50).default([]),
+    // v1.9.50: "Não respondidos" (o padrão para todo mundo) ou "Todos"; a escolha é de cada pessoa.
+    mostrar: z.enum(MOSTRAR_DO_PIPELINE).default(MOSTRAR_PADRAO),
   })
   .strict();
 export type PreferenciasDoPipeline = z.infer<typeof preferenciasDoPipelineSchema>;
 
-export const PIPELINE_PADRAO: PreferenciasDoPipeline = { ordem: ORDEM_PADRAO, ocultas: [], recolhidas: [] };
+export const PIPELINE_PADRAO: PreferenciasDoPipeline = { ordem: ORDEM_PADRAO, ocultas: [], recolhidas: [], mostrar: MOSTRAR_PADRAO };
 
 /** Lê o que veio do banco; valor estranho volta ao padrão em vez de quebrar a tela. */
 export function lerPreferenciasDoPipeline(valor: unknown): PreferenciasDoPipeline {
