@@ -20,6 +20,12 @@ on:
       - "scripts/test-db.sh"
       - "scripts/test-update-com-dados.sh"
       - ".github/workflows/iavek-banco.yml"
+      # (v1.9.47) as invariantes também VARREM o código (ex.: on-conflict-aponta-para-constraint-real lê lib/app/workers/scripts):
+      # um push só em lib/ passava sem rodar o banco, e o furo do .from(constante) só apareceu porque o mesmo push mexia em supabase/
+      - "lib/**"
+      - "app/**"
+      - "workers/**"
+      - "scripts/**"
   workflow_dispatch: {}
 
 concurrency:
