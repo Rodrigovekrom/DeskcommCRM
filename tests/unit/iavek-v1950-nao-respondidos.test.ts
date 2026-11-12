@@ -120,4 +120,14 @@ describe("UMA régua só (Maestro 211923): a marca do cartão, o bloco do topo e
     expect(m).toContain("in ('user', 'external_device', 'ai')");
     expect(m).not.toMatch(/in \([^)]*'(system|automation)'/);
   });
+  it("a 0633 usa a HORA DO WHATSAPP (sent_at), a mesma do last_inbound_at (Lupa 215411)", () => {
+    const m = readFileSync("supabase/migrations/20261112050000_0633_iavek_ultima_resposta_de_gente.sql", "utf8");
+    expect(m).toContain("coalesce(new.sent_at, new.created_at)");
+    expect(m).toContain("max(coalesce(sent_at, created_at))");
+  });
+  it("a resposta do celular de ANTES da mensagem do cliente, chegando DEPOIS (reentrega), não responde", () => {
+    // o cliente escreveu às 19:30; o vendedor respondeu pelo celular às 19:20 (a data guardada é a do WhatsApp)
+    const l = { status: "open", conversa: conversa({ entrou: "2026-11-12T19:30:00Z", resposta: "2026-11-12T19:20:00Z" }) } as never;
+    expect(naoRespondido(l)).toBe(true);
+  });
 });

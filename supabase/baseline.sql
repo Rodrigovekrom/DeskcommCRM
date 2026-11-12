@@ -49861,8 +49861,10 @@ begin
        set ultima_resposta_humana_em = case when v_humana
              then greatest(coalesce(ultima_resposta_humana_em, new.created_at), new.created_at)
              else ultima_resposta_humana_em end,
+           -- (Lupa 215411) a HORA DO WHATSAPP (sent_at), a mesma régua do last_inbound_at: a reentrega atrasada
+           -- (o retry do WAHA, até ~63 min) não pode fazer uma resposta antiga parecer mais nova que a do cliente.
            ultima_resposta_em = case when v_resposta
-             then greatest(coalesce(ultima_resposta_em, new.created_at), new.created_at)
+             then greatest(coalesce(ultima_resposta_em, coalesce(new.sent_at, new.created_at)), coalesce(new.sent_at, new.created_at))
              else ultima_resposta_em end
      where id = new.conversation_id;
   end if;
@@ -49880,7 +49882,7 @@ create trigger trg_iavek_marca_resposta_humana
 
 update public.conversations c
    set ultima_resposta_em = m.em
-  from (select conversation_id, max(created_at) em
+  from (select conversation_id, max(coalesce(sent_at, created_at)) em
           from public.messages
          where direction = 'outbound'
            and (sent_by_user_id is not null or sent_via::text in ('user', 'external_device', 'ai'))
