@@ -76,6 +76,8 @@ export function CorpoDoCartaoIavek({ lead, pipelineId, nomeDaEtapa }: { lead: Le
   const podeAbrir = lead.conversa != null || temAlvoParaAbrir(lead.contact_id, lead.contact_phone);
   const parar = (e: React.SyntheticEvent) => e.stopPropagation();
   const espera = esperandoDesde(lead, nomeDaEtapa);
+  // v1.9.50: a marca "sem conversa" substitui a linha "Ainda sem conversa" (Lupa 224739: o mesmo texto 2 vezes).
+  const marcaSemConversa = lead.status === "open" && semConversa(lead);
   // CRM-244 (Fase 2): as não lidas DE QUEM OLHA (o admin abrir não zera as do vendedor) e o
   // "já vi" discreto, só do admin. Respondido por pessoa: não há o que ler.
   const naoLidas = espera !== null ? (lead.conversa?.nao_lidas ?? 0) : 0;
@@ -85,21 +87,23 @@ export function CorpoDoCartaoIavek({ lead, pipelineId, nomeDaEtapa }: { lead: Le
     <div className="mt-1 flex flex-col gap-1.5 text-xs" data-testid="cartao-iavek" data-lead-id={lead.id}>
       {espera !== null && <MarcaDeNovaMensagem desde={espera} />}
       {/* v1.9.50: lead aberto sem conversa nenhuma (o filtro "Não respondidos" o mostra) */}
-      {lead.status === "open" && semConversa(lead) && <MarcaSemConversa />}
+      {marcaSemConversa && <MarcaSemConversa />}
       {jaVi && (
         <p className="text-[11px] text-text-muted" data-testid="ja-vi">
           ✓ {t("Já vi")}
         </p>
       )}
-      <p className="text-text-muted" data-testid="ultimo-horario">
-        {falou ? (
-          <>
-            {t("Falou")}: <span className="font-medium text-text">{falou}</span>
-          </>
-        ) : (
-          t("Ainda sem conversa")
-        )}
-      </p>
+      {(falou || !marcaSemConversa) && (
+        <p className="text-text-muted" data-testid="ultimo-horario">
+          {falou ? (
+            <>
+              {t("Falou")}: <span className="font-medium text-text">{falou}</span>
+            </>
+          ) : (
+            t("Ainda sem conversa")
+          )}
+        </p>
+      )}
       {/* ia.vek v1.9.5 (CRM-196): responsável com a função, guardião e objetivo atual. */}
       {lojaDeCarros && (
         <ResponsavelNoCartao
