@@ -79,8 +79,8 @@ describe("o tempo real tira o lead da lista quando respondem pelo celular", () =
   it("aplicarConversaNoQuadro leva o ultima_resposta_em", () => {
     const antes = [{ contact_id: "k1", conversa: conversa({ entrou: "2026-11-12T10:00:00Z" }) }] as never[];
     const [depois] = aplicarConversaNoQuadro(antes, { id: "c1", contact_id: "k1", ultima_resposta_em: "2026-11-12T10:05:00Z" }) as Array<{ status?: string; conversa: ReturnType<typeof conversa> }>;
-    expect(depois.conversa.ultima_resposta_em).toBe("2026-11-12T10:05:00Z");
-    expect(naoRespondido({ status: "open", conversa: depois.conversa } as never)).toBe(false);
+    expect(depois?.conversa.ultima_resposta_em).toBe("2026-11-12T10:05:00Z");
+    expect(naoRespondido({ status: "open", conversa: depois?.conversa } as never)).toBe(false);
   });
 });
 
