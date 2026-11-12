@@ -12009,8 +12009,6 @@ export const DICIONARIO: Traducoes = {
   "Só gerente e admin corrigem o valor e a data da venda.": { es: "Solo el gerente y el admin corrigen el valor y la fecha de la venta." },
   "A data da venda não pode estar no futuro.": { es: "La fecha de la venta no puede estar en el futuro." },
   "Guardião Leads": { es: "Guardián de Leads" },
-  "SDR de Follow-up": { es: "SDR de Seguimiento" },
-  "Leads do Follow-up": { es: "Leads del Seguimiento" },
   "Carro do anúncio": { es: "Coche del anuncio" },
   "Carros anunciados (30 dias)": { es: "Coches anunciados (30 días)" },
   "Nenhum lead com carro do anúncio nos últimos 30 dias.": { es: "Ningún lead con coche del anuncio en los últimos 30 días." },

@@ -77,8 +77,6 @@ export const ROTULOS_FUNCAO_PADRAO: Record<Funcao, string> = {
   gerente: "Gerente de Negócios",
   // ia.vek v1.7.8: o analista de ficha não fala com o cliente.
   analista_ficha: "Análise de crédito",
-  // ia.vek v1.9.50 (CRM-254): o SDR de Follow-up fala com o cliente como o SDR (configurável por organização).
-  sdr_followup: "Relacionamento",
 };
 
 /**
