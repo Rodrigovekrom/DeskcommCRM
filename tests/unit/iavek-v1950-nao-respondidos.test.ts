@@ -2,18 +2,18 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { aplicarMostrar, MOSTRAR_PADRAO, naoRespondido, semConversa, ultimaEhDoCliente } from "@/lib/iavek/filtro-nao-respondidos";
-import { aplicarConversaNoQuadro } from "@/lib/iavek/ordem-do-quadro";
+import { aplicarConversaNoQuadro, esperandoDesde } from "@/lib/iavek/ordem-do-quadro";
 import { lerPreferenciasDoPipeline, PIPELINE_PADRAO, preferenciasDoPipelineSchema } from "@/lib/iavek/preferencias-de-tela";
 
 /** ia.vek v1.9.50 (Rodrigo, Maestro 211138): o Pipeline mostra por padrão só os NÃO RESPONDIDOS. */
 
-const conversa = (o: { entrou?: string | null; saiu?: string | null; humana?: string | null }) => ({
+const conversa = (o: { entrou?: string | null; resposta?: string | null; humana?: string | null }) => ({
   id: "c1",
   preview: null,
   last_message_at: null,
   unread: 0,
   last_inbound_at: o.entrou ?? null,
-  last_outbound_at: o.saiu ?? null,
+  ultima_resposta_em: o.resposta ?? null,
   ultima_resposta_humana_em: o.humana ?? null,
 });
 const lead = (status: string, c: ReturnType<typeof conversa> | null | undefined) => ({ status, conversa: c }) as never;
@@ -34,16 +34,16 @@ describe("o PADRÃO é 'Não respondidos' (fica vermelho se mudar)", () => {
 
 describe("a régua do 'não respondido'", () => {
   it("a última mensagem é do CLIENTE => não respondido", () => {
-    expect(naoRespondido(lead("open", conversa({ entrou: "2026-11-12T10:00:00Z", saiu: "2026-11-12T09:00:00Z" })))).toBe(true);
+    expect(naoRespondido(lead("open", conversa({ entrou: "2026-11-12T10:00:00Z", resposta: "2026-11-12T09:00:00Z" })))).toBe(true);
   });
-  it("resposta pelo CELULAR ou pela Venda.IA (saída sem usuário) responde", () => {
-    expect(naoRespondido(lead("open", conversa({ entrou: "2026-11-12T10:00:00Z", saiu: "2026-11-12T10:05:00Z" })))).toBe(false);
+  it("resposta pelo CELULAR ou pela Venda.IA (ultima_resposta_em, 0633) responde", () => {
+    expect(naoRespondido(lead("open", conversa({ entrou: "2026-11-12T10:00:00Z", resposta: "2026-11-12T10:05:00Z" })))).toBe(false);
   });
-  it("resposta de pessoa pelo CRM responde, mesmo sem o last_outbound_at (payload antigo)", () => {
+  it("resposta de pessoa pelo CRM responde, mesmo sem o ultima_resposta_em (quadro de antes da 0633)", () => {
     expect(naoRespondido(lead("open", conversa({ entrou: "2026-11-12T10:00:00Z", humana: "2026-11-12T10:05:00Z" })))).toBe(false);
   });
   it("conversa sem mensagem do cliente não é 'não respondido'", () => {
-    expect(ultimaEhDoCliente(conversa({ saiu: "2026-11-12T10:05:00Z" }))).toBe(false);
+    expect(ultimaEhDoCliente(conversa({ resposta: "2026-11-12T10:05:00Z" }))).toBe(false);
   });
   it("lead SEM conversa aparece (ninguém falou com ele ainda)", () => {
     expect(semConversa(lead("open", null))).toBe(true);
@@ -59,7 +59,7 @@ describe("a régua do 'não respondido'", () => {
 describe("aplicarMostrar: o que o quadro mostra e as contagens", () => {
   const leads = [
     lead("open", conversa({ entrou: "2026-11-12T10:00:00Z" })), // não respondido
-    lead("open", conversa({ entrou: "2026-11-12T10:00:00Z", saiu: "2026-11-12T11:00:00Z" })), // respondido
+    lead("open", conversa({ entrou: "2026-11-12T10:00:00Z", resposta: "2026-11-12T11:00:00Z" })), // respondido
     lead("open", null), // sem conversa
   ];
   it("'Não respondidos': só os 2; os contadores N de M", () => {
@@ -76,10 +76,10 @@ describe("aplicarMostrar: o que o quadro mostra e as contagens", () => {
 });
 
 describe("o tempo real tira o lead da lista quando respondem pelo celular", () => {
-  it("aplicarConversaNoQuadro leva o last_outbound_at", () => {
+  it("aplicarConversaNoQuadro leva o ultima_resposta_em", () => {
     const antes = [{ contact_id: "k1", conversa: conversa({ entrou: "2026-11-12T10:00:00Z" }) }] as never[];
-    const [depois] = aplicarConversaNoQuadro(antes, { id: "c1", contact_id: "k1", last_outbound_at: "2026-11-12T10:05:00Z" }) as Array<{ status?: string; conversa: ReturnType<typeof conversa> }>;
-    expect(depois.conversa.last_outbound_at).toBe("2026-11-12T10:05:00Z");
+    const [depois] = aplicarConversaNoQuadro(antes, { id: "c1", contact_id: "k1", ultima_resposta_em: "2026-11-12T10:05:00Z" }) as Array<{ status?: string; conversa: ReturnType<typeof conversa> }>;
+    expect(depois.conversa.ultima_resposta_em).toBe("2026-11-12T10:05:00Z");
     expect(naoRespondido({ status: "open", conversa: depois.conversa } as never)).toBe(false);
   });
 });
@@ -93,7 +93,31 @@ describe("as duas telas do quadro usam o filtro (a do funil e o Pipeline da loja
       expect(s).toContain("<MostrarNaoRespondidos");
     });
   }
-  it("o quadro traz a última SAÍDA da conversa", () => {
-    expect(readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8")).toContain("last_outbound_at");
+  it("o quadro traz a última RESPOSTA da conversa (0633)", () => {
+    expect(readFileSync("app/api/v1/pipelines/[id]/board/route.ts", "utf8")).toContain("ultima_resposta_em");
+  });
+});
+
+describe("UMA régua só (Maestro 211923): a marca do cartão, o bloco do topo e o 'Sem resposta por vendedor'", () => {
+  const entrou = "2026-11-12T10:00:00Z";
+  it("a marca APAGA quando a equipe responde pelo celular (antes acendia)", () => {
+    const l = { status: "open", conversa: conversa({ entrou, resposta: "2026-11-12T10:05:00Z" }) } as never;
+    expect(esperandoDesde(l, "Em atendimento")).toBeNull();
+    expect(naoRespondido(l)).toBe(false);
+  });
+  it("sem resposta: a marca e o filtro concordam", () => {
+    const l = { status: "open", conversa: conversa({ entrou }) } as never;
+    expect(esperandoDesde(l, "Em atendimento")).toBe(Date.parse(entrou));
+    expect(naoRespondido(l)).toBe(true);
+  });
+  it("a coluna da IA: o filtro inclui; a marca segue de fora (lá quem atende é a IA)", () => {
+    const l = { status: "open", conversa: conversa({ entrou }) } as never;
+    expect(naoRespondido(l)).toBe(true);
+    expect(esperandoDesde(l, "IA Atendendo")).toBeNull();
+  });
+  it("a migration 0633 NÃO conta as automáticas do sistema", () => {
+    const m = readFileSync("supabase/migrations/20261112050000_0633_iavek_ultima_resposta_de_gente.sql", "utf8");
+    expect(m).toContain("in ('user', 'external_device', 'ai')");
+    expect(m).not.toMatch(/in \([^)]*'(system|automation)'/);
   });
 });

@@ -273,7 +273,7 @@ async function withConversas(
   const { data, error } = await buscaEmLotes(contactIds, (lote) =>
     supabase
       .from("conversations")
-      .select("id, contact_id, last_message_preview, last_message_at, last_inbound_at, last_outbound_at, ultima_resposta_humana_em, unread_count_for_assignee, tags")
+      .select("id, contact_id, last_message_preview, last_message_at, last_inbound_at, ultima_resposta_em, ultima_resposta_humana_em, unread_count_for_assignee, tags")
       .eq("organization_id", organizationId)
       .in("contact_id", lote)
       .order("last_message_at", { ascending: false, nullsFirst: false }),
@@ -288,7 +288,7 @@ async function withConversas(
     last_message_preview: string | null;
     last_message_at: string | null;
     last_inbound_at: string | null;
-    last_outbound_at: string | null;
+    ultima_resposta_em: string | null;
     ultima_resposta_humana_em: string | null;
     unread_count_for_assignee: number | null;
     tags: string[] | null;
@@ -308,7 +308,7 @@ async function withConversas(
       unread: row.unread_count_for_assignee ?? 0,
       last_inbound_at: row.last_inbound_at,
       ultima_resposta_humana_em: row.ultima_resposta_humana_em,
-      last_outbound_at: row.last_outbound_at,
+      ultima_resposta_em: row.ultima_resposta_em,
     });
   }
 

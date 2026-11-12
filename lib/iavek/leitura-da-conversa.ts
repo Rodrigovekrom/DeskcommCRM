@@ -122,7 +122,11 @@ type ConversaDoCartao = {
   id: string;
   last_inbound_at?: string | null;
   ultima_resposta_humana_em?: string | null;
+  ultima_resposta_em?: string | null;
 };
+/** v1.9.50: a última resposta pela MESMA régua da marca (tela, celular, IA; não as automáticas). */
+const respostaDe = (c: ConversaDoCartao): string | null =>
+  ms(c.ultima_resposta_em) >= ms(c.ultima_resposta_humana_em) ? (c.ultima_resposta_em ?? null) : (c.ultima_resposta_humana_em ?? null);
 
 /**
  * As não lidas DE QUEM PEDE (e o "já vi" quando quem pede é admin), por lead. Só as conversas que
@@ -175,7 +179,7 @@ export async function leiturasDoQuadro(
 
   // As mensagens do cliente depois do corte mais antigo; cada conversa conta com o próprio corte.
   const corte = (l: { id: string; conversa: ConversaDoCartao }) =>
-    Math.max(ms(l.conversa.ultima_resposta_humana_em), ms(visto.get(l.id)));
+    Math.max(ms(respostaDe(l.conversa)), ms(visto.get(l.id)));
   const desde = new Date(Math.min(...esperando.map(corte))).toISOString();
   const conversas = [...new Set(esperando.map((l) => l.conversa.id))];
   // Paginado: uma conversa longa sem resposta não pode passar do teto de linhas e cortar a conta calada.
@@ -207,7 +211,7 @@ export async function leiturasDoQuadro(
     entradas.set(m.conversation_id, lista);
   }
   for (const l of esperando) {
-    const nao_lidas = naoLidasDaPessoa(entradas.get(l.conversa.id) ?? [], l.conversa.ultima_resposta_humana_em, visto.get(l.id));
+    const nao_lidas = naoLidasDaPessoa(entradas.get(l.conversa.id) ?? [], respostaDe(l.conversa), visto.get(l.id));
     porLead.set(l.id, ehAdmin ? { nao_lidas, ja_vi: jaViu(visto.get(l.id), l.conversa.last_inbound_at) } : { nao_lidas });
   }
   return { porLead, error: null };

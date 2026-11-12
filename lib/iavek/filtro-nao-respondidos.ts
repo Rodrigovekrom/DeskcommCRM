@@ -23,14 +23,17 @@ const instanteDe = (v: string | null | undefined): number => {
 type Filtravel = Pick<Lead, "status" | "conversa">;
 
 /**
- * A régua, num lugar só: a última ENTRADA é mais nova que a última SAÍDA (qualquer saída responde:
- * pelo CRM, pelo celular ou pela Venda.IA, que chegam como mensagem enviada).
+ * A RÉGUA, num lugar só (o filtro, a marca "sem resposta" do cartão, o bloco do topo e o "Sem resposta por
+ * vendedor" leem DAQUI): a última mensagem do CLIENTE é mais nova que a última RESPOSTA. Responde: a tela do CRM,
+ * o celular (e a Venda.IA, que fala pelo celular) e a IA do CRM (`ultima_resposta_em`, 0633). NÃO responde: a
+ * mensagem automática do sistema (lembrete, aviso), porque ninguém falou com o cliente. O `ultima_resposta_humana_em`
+ * entra no máximo só para o quadro de antes da 0633 (é um subconjunto: a resposta pela tela).
  */
-export function ultimaEhDoCliente(c: NonNullable<Lead["conversa"]>): boolean {
+export function ultimaEhDoCliente(c: Pick<NonNullable<Lead["conversa"]>, "last_inbound_at" | "ultima_resposta_em" | "ultima_resposta_humana_em">): boolean {
   const entrou = instanteDe(c.last_inbound_at);
   if (!entrou) return false;
-  const saiu = Math.max(instanteDe(c.last_outbound_at), instanteDe(c.ultima_resposta_humana_em));
-  return entrou > saiu;
+  const respondeu = Math.max(instanteDe(c.ultima_resposta_em), instanteDe(c.ultima_resposta_humana_em));
+  return entrou > respondeu;
 }
 
 export function semConversa(l: Filtravel): boolean {

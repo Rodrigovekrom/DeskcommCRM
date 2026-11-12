@@ -1,3 +1,4 @@
+import { ultimaEhDoCliente } from "@/lib/iavek/filtro-nao-respondidos";
 import type { Lead } from "@/lib/types/leads";
 
 /**
@@ -25,14 +26,15 @@ export function ultimaDoLead(l: Pick<Lead, "created_at" | "conversa">): number {
 }
 
 /**
- * A mensagem do lead que espera resposta de uma pessoa, em ms, ou null.
- * Só resposta de pessoa pelo sistema apaga: uma saída de fora do sistema não conta.
+ * A mensagem do lead que espera resposta, em ms, ou null.
+ * v1.9.50 (Rodrigo, Maestro 211923): a MESMA régua do filtro "Não respondidos" (`ultimaEhDoCliente`): a resposta
+ * pela tela, pelo CELULAR (e a Venda.IA) ou pela IA do CRM apaga; a mensagem automática do sistema não. Antes, só a
+ * resposta pela tela apagava, e a marca acendia mesmo com a equipe tendo respondido pelo celular.
+ * A coluna da IA segue sem marca (lá quem atende é a IA); o filtro a inclui.
  */
 export function esperandoDesde(l: Pick<Lead, "status" | "conversa">, nomeDaEtapa: string | null | undefined): number | null {
-  if (l.status !== "open" || ehColunaDaIa(nomeDaEtapa)) return null;
-  const entrou = instanteDe(l.conversa?.last_inbound_at);
-  if (!entrou) return null;
-  return entrou > instanteDe(l.conversa?.ultima_resposta_humana_em) ? entrou : null;
+  if (l.status !== "open" || ehColunaDaIa(nomeDaEtapa) || !l.conversa) return null;
+  return ultimaEhDoCliente(l.conversa) ? instanteDe(l.conversa.last_inbound_at) : null;
 }
 
 export function tempoDeEspera(ms: number): string {
@@ -101,7 +103,7 @@ export function aplicarConversaNoQuadro<L extends Pick<Lead, "contact_id" | "con
     id: string;
     contact_id: string;
     last_inbound_at?: string | null;
-    last_outbound_at?: string | null;
+    ultima_resposta_em?: string | null;
     ultima_resposta_humana_em?: string | null;
     last_message_at?: string | null;
     last_message_preview?: string | null;
@@ -131,8 +133,8 @@ export function aplicarConversaNoQuadro<L extends Pick<Lead, "contact_id" | "con
         unread: c.unread_count_for_assignee ?? l.conversa?.unread ?? 0,
         last_inbound_at: c.last_inbound_at ?? l.conversa?.last_inbound_at ?? null,
         ultima_resposta_humana_em: c.ultima_resposta_humana_em ?? l.conversa?.ultima_resposta_humana_em ?? null,
-        // v1.9.50: o filtro "Não respondidos" — a resposta pelo celular tira o lead da lista na hora.
-        last_outbound_at: c.last_outbound_at ?? l.conversa?.last_outbound_at ?? null,
+        // v1.9.50: a resposta pelo celular tira o lead do "Não respondidos" (e apaga a marca) na hora.
+        ultima_resposta_em: c.ultima_resposta_em ?? l.conversa?.ultima_resposta_em ?? null,
       },
     };
   });
