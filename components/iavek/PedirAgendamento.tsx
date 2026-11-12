@@ -6,12 +6,17 @@
  *
  * ia.vek v1.9.3: o SDR DA LOJA MARCA direto (decisão do Rodrigo, 27/10): a
  * janela vira "Marcar agendamento", ele escolhe o VENDEDOR, e o compromisso
- * nasce confirmado — o vendedor é avisado no sino. Para os demais, igual.
+ * nasce confirmado — o vendedor é avisado no sino.
+ *
+ * ia.vek v1.9.48: na LOJA, TODOS marcam assim (decisão de 06/11 e 10/11: "todos agendam, sem passo
+ * intermediário"). Quem marca é o SERVIDOR que diz (`marca_direto` do /agenda-do-sdr); esta tela NÃO
+ * olha a função de ninguém. O vendedor já vem escolhido como ele mesmo. Na clínica, segue o pedido.
  */
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { useAuth } from "@/hooks/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -64,6 +69,7 @@ export function PedirAgendamento({
   aoEnviar?: () => void;
 }) {
   const t = useT();
+  const { user } = useAuth();
   const [aberto, setAberto] = useState(false);
   const [quando, setQuando] = useState("");
   const [abertoEm, setAbertoEm] = useState(0);
@@ -114,7 +120,8 @@ export function PedirAgendamento({
     setQuando(paraCampoLocal(new Date(agora + 24 * 3600_000)));
     setObservacao("");
     setTituloEditado(null);
-    setVendedorId("");
+    // v1.9.48: o vendedor que marca o próprio cliente já vem escolhido; os demais escolhem.
+    setVendedorId(vendedores.some((v) => v.id === user.id) ? user.id : "");
     setContexto("");
     setAberto(true);
     if (marcaDireto && leadId) {

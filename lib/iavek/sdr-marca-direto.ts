@@ -5,22 +5,26 @@ import { ehLojaDeCarros, lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empres
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 
 /**
- * ia.vek v1.9.3 — O SDR MARCA DIRETO (decisão do Rodrigo, 27/10, CRM-208).
+ * ia.vek v1.9.48 — NA LOJA, TODOS MARCAM DIRETO (decisão do Rodrigo, 06/11 e 10/11, CRM-255/257:
+ * "todos agendam, sem passo intermediário").
  *
- * Na LOJA (perfil loja de carros, fora do modo agendamento), quem tem a função
- * "sdr" marca o agendamento escolhendo o VENDEDOR: o compromisso nasce
- * confirmado, sem passar pelo admin, e o vendedor é avisado no sino. Não segura
- * horário (a loja não tem trava). Muda a regra de 21/10 SÓ para o SDR: o
- * vendedor, o gerente, o SDR de suporte e a IA continuam PEDINDO, e o admin
- * confirma. A clínica (modo agendamento) segue a regra dela.
+ * Antes (v1.9.3, 27/10, CRM-208) só a função "sdr" marcava: o vendedor, o gerente e o apoio caíam no
+ * PEDIDO e esperavam um admin (achado de 12/11: 2 pedidos de vendedor pendentes há um dia). A 0613
+ * abriu a Agenda e a decisão do pedido para a equipe, mas o botão "Agendar horário" seguia esta regra.
  *
- * A função vem do VÍNCULO no banco (que só o admin grava), nunca do corpo.
+ * Agora: na LOJA (perfil loja de carros, fora do modo agendamento), QUALQUER membro ativo marca direto
+ * — escolhe o vendedor, o compromisso nasce confirmado. A CLÍNICA (modo agendamento) segue a regra
+ * dela, e a IA segue PEDINDO (`IA_AGENDA_SOZINHA`, lib/mcp/tools/agendamento.ts). NÃO volte a olhar a
+ * função aqui: tests/unit/iavek-v1948-todos-agendam.test.ts fica vermelho.
+ *
+ * `ehSdr` NÃO decide quem marca: só diz se quem marcou vira o GUARDIÃO do lead (o guardião é sempre
+ * quem tem a função "sdr", como no gatilho 0579). O vínculo e a função vêm do banco, nunca do corpo.
  */
-export async function sdrMarcaDireto(
+export async function marcaDiretoNaLoja(
   admin: SupabaseClient,
   orgId: string,
   userId: string,
-): Promise<boolean> {
+): Promise<{ marcaDireto: boolean; ehSdr: boolean }> {
   const [{ data: vinculo }, { data: org }] = await Promise.all([
     admin
       .from("user_organizations")
@@ -31,10 +35,10 @@ export async function sdrMarcaDireto(
       .maybeSingle(),
     admin.from("organizations").select("settings").eq("id", orgId).maybeSingle(),
   ]);
-  const funcao = funcaoDaTela((vinculo?.interface_settings as { funcao?: unknown } | null)?.funcao);
-  if (funcao !== "sdr") return false;
+  if (!vinculo) return { marcaDireto: false, ehSdr: false };
+  const ehSdr = funcaoDaTela((vinculo.interface_settings as { funcao?: unknown } | null)?.funcao) === "sdr";
   const perfil = lerPerfilDaEmpresa((org as { settings?: unknown } | null)?.settings);
-  return ehLojaDeCarros(perfil) && !perfil.modo_agendamento;
+  return { marcaDireto: ehLojaDeCarros(perfil) && !perfil.modo_agendamento, ehSdr };
 }
 
 export interface VendedorDaLoja {

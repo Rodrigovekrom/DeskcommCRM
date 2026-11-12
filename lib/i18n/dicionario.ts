@@ -1659,7 +1659,7 @@ export const DICIONARIO: Traducoes = {
   "Vendidos": { es: "Vendidos" },
   "Os seus resultados no período: agendamentos, visitas, vendas e o que ficou pelo caminho.": { es: "Sus resultados en el período: citas, visitas, ventas y lo que quedó en el camino." },
   "{who} marcou um agendamento de {lead} para você: {when}": { es: "{who} agendó una cita de {lead} para usted: {when}" },
-  "Só o guardião da loja marca direto. Envie um pedido de agendamento.": { es: "Solo el guardián de la tienda agenda directo. Envíe una solicitud de cita." },
+  "Nesta empresa o agendamento passa pelo administrador. Envie um pedido de agendamento.": { es: "En esta empresa la cita pasa por el administrador. Envíe una solicitud de cita." },
   "Escolha um vendedor da loja.": { es: "Elija un vendedor de la tienda." },
   "Escolha o tipo de agendamento.": { es: "Elija el tipo de cita." },
   "Há etapa que não é deste funil.": { es: "Hay una etapa que no es de este embudo." },

@@ -84,23 +84,27 @@ describe("v1.9.3 — agenda: o SDR da loja marca direto (decisão B)", () => {
   it("só com a autorização conferida no banco; o compromisso nasce confirmado para o vendedor", () => {
     const r = ler("app/api/v1/iavek/pedidos-de-agendamento/route.ts");
     expect(r).toContain("if (vendedorId) return sdrMarca(authz, input, { vendedorId, campos, contexto }, requestId);");
-    expect(r).toMatch(/if \(!\(await sdrMarcaDireto\(admin, orgId, authz\.user\.id\)\)\)/);
+    // v1.9.48: a autorização é a da LOJA (todos marcam), conferida no banco; ver iavek-v1948-todos-agendam.
+    expect(r).toContain("const { marcaDireto, ehSdr } = await marcaDiretoNaLoja(admin, orgId, authz.user.id);");
+    expect(r).toContain("if (!marcaDireto) {");
     expect(r).toContain("iavekSdrMarcaParaVendedor: true,");
     expect(r).toContain("avisarAdmins: false,");
     expect(r).toContain("avisarVendedorDoAgendamento(admin,");
     // Decisão do Rodrigo (27/10): o lead passa para o vendedor, e o SDR fica de guardião.
     expect(r).toContain("const leadPassado = await passarOLeadAoVendedor(admin, {");
-    expect(r).toContain("const guardiao = lead.sdr_user_id ?? args.sdrId;"); // v1.9.9-seg: o lead vem tipado da sessão
+    // v1.9.48: o guardião novo só vem de quem marcou se ele for SDR.
+    expect(r).toContain("const guardiao = lead.sdr_user_id ?? args.guardiaoNovo;");
+    expect(r).toContain("guardiaoNovo: ehSdr ? authz.user.id : null,");
     expect(r).toContain("owner_user_id: args.vendedorId,");
     const h = ler("app/api/v1/agenda/agendamentos/_handler.ts");
     expect(h).toContain("if (!ctx.iavekSdrMarcaParaVendedor && !ctx.iavekAgendaLivre && aOpcaoPodeRecortar(");
     expect(h).toMatch(/ctx\.iavekSdrMarcaParaVendedor\s*\?\s*"confirmed"/);
   });
 
-  it("só a função SDR, só na loja e fora do modo agendamento", () => {
+  it("v1.9.48: só na loja e fora do modo agendamento — a função NÃO decide mais (decisão de 06/11 e 10/11)", () => {
     const s = ler("lib/iavek/sdr-marca-direto.ts");
-    expect(s).toContain('if (funcao !== "sdr") return false;');
-    expect(s).toContain("return ehLojaDeCarros(perfil) && !perfil.modo_agendamento;");
+    expect(s).not.toContain('if (funcao !== "sdr") return false;');
+    expect(s).toContain("return { marcaDireto: ehLojaDeCarros(perfil) && !perfil.modo_agendamento, ehSdr };");
   });
 
   it("o vendedor é avisado no sino: o tipo novo está no banco (0595) e no baseline", () => {

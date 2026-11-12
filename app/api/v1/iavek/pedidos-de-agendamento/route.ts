@@ -6,10 +6,11 @@
  *       Não reserva horário. Os admins são avisados no sino.
  *       ia.vek v1.9.3: com `vendedor_id`, o SDR DA LOJA marca direto — o
  *       compromisso nasce confirmado para o vendedor escolhido, sem o admin, e o
- *       vendedor é avisado no sino (`sdrMarcaDireto`). Quem não é SDR da loja e
- *       manda `vendedor_id` recebe 403: segue pedindo, como sempre.
+ *       vendedor é avisado no sino. v1.9.48: na LOJA, QUALQUER membro marca assim
+ *       (`marcaDiretoNaLoja`, decisão de 06/11 e 10/11); na clínica, `vendedor_id` dá 403.
  * GET   o admin vê os PENDENTES da organização (e os decididos nos últimos 30
- *       dias); os demais veem os PRÓPRIOS pedidos.
+ *       dias); os demais veem os PRÓPRIOS pedidos. v1.9.48: na LOJA (agenda livre, 0613) todos
+ *       veem os PENDENTES da organização e podem decidir — a mesma regra do POST [id].
  *
  * Decidir (confirmar, recusar, cancelar) é `POST /pedidos-de-agendamento/[id]`.
  */
@@ -34,7 +35,8 @@ import {
   tituloDoCompromisso,
   type PedidoGravado,
 } from "@/lib/iavek/pedidos-de-agendamento";
-import { sdrMarcaDireto, vendedoresDaLoja } from "@/lib/iavek/sdr-marca-direto";
+import { modoAgendamentoDaOrg } from "@/lib/iavek/perfil-da-empresa-servidor";
+import { marcaDiretoNaLoja, vendedoresDaLoja } from "@/lib/iavek/sdr-marca-direto";
 import {
   CAMPOS_DA_PASSAGEM,
   camposDaPassagemSchema,
@@ -69,6 +71,8 @@ export async function GET(): Promise<Response> {
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId;
   const ehAdmin = roleAtLeast(authz.org.role, "admin");
+  // v1.9.48: na loja, quem decide é a equipe (a mesma conta do POST /pedidos-de-agendamento/[id]).
+  const podeDecidir = ehAdmin || !(await modoAgendamentoDaOrg(orgId));
   const supabase = await createClient();
 
   const desde = new Date(Date.now() - 30 * DIA).toISOString();
@@ -78,10 +82,16 @@ export async function GET(): Promise<Response> {
       "id, contact_id, lead_id, conversation_id, quando, event_type_id, observacao, titulo, origem, pedido_por, status, decidido_em, motivo_da_recusa, appointment_id, created_at, contacts(name, display_name, phone_number)",
     )
     .eq("organization_id", orgId)
-    .or(`status.eq.pendente,created_at.gte.${desde}`)
+    .or(
+      ehAdmin
+        ? `status.eq.pendente,created_at.gte.${desde}`
+        : podeDecidir
+          ? `status.eq.pendente,and(pedido_por.eq.${authz.user.id},created_at.gte.${desde})`
+          : `status.eq.pendente,created_at.gte.${desde}`,
+    )
     .order("quando", { ascending: true })
     .limit(200);
-  if (!ehAdmin) consulta = consulta.eq("pedido_por", authz.user.id);
+  if (!podeDecidir) consulta = consulta.eq("pedido_por", authz.user.id);
   const { data, error } = await consulta;
   if (error) return fail("internal_error", error.message, 500, { requestId });
 
@@ -106,7 +116,7 @@ export async function GET(): Promise<Response> {
         l.origem === "ia" ? t("IA") : l.pedido_por ? (nomes.get(l.pedido_por) ?? null) : null,
     };
   });
-  return ok({ pedidos, pode_decidir: ehAdmin }, { requestId });
+  return ok({ pedidos, pode_decidir: podeDecidir }, { requestId });
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -168,8 +178,9 @@ async function sdrMarca(
   const t = (s: string) => traduzir(s, authz.user.idioma);
   const orgId = authz.org.orgId;
   const admin = createAdminClient();
-  if (!(await sdrMarcaDireto(admin, orgId, authz.user.id))) {
-    return fail("forbidden_role", t("Só o guardião da loja marca direto. Envie um pedido de agendamento."), 403, {
+  const { marcaDireto, ehSdr } = await marcaDiretoNaLoja(admin, orgId, authz.user.id);
+  if (!marcaDireto) {
+    return fail("forbidden_role", t("Nesta empresa o agendamento passa pelo administrador. Envie um pedido de agendamento."), 403, {
       requestId,
     });
   }
@@ -262,9 +273,11 @@ async function sdrMarca(
   const appointmentId = typeof compromisso.id === "string" ? compromisso.id : null;
   // Decisão do Rodrigo (27/10): ao marcar, o LEAD passa para o vendedor e o SDR
   // fica de GUARDIÃO — o cliente aparece no Pipeline do vendedor.
+  const mudouDeMaos = negocio.owner_user_id !== vendedorId;
   const leadPassado = await passarOLeadAoVendedor(admin, {
     orgId,
-    sdrId: authz.user.id,
+    // v1.9.48: o guardião é sempre um SDR. Quem marca sem ser SDR não vira guardião (fica o que já havia).
+    guardiaoNovo: ehSdr ? authz.user.id : null,
     vendedorId,
     lead: negocio,
   });
@@ -274,7 +287,8 @@ async function sdrMarca(
     const ctxDoSdr = { organization_id: orgId, actor: { type: "user" as const, id: authz.user.id, role: authz.org.role }, requestId };
     await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");
     await passarAConversa(admin, { orgId, contactId: lido.contact_id, para: vendedorId, actor: ctxDoSdr.actor, motivo: "Agendou e passou o lead ao vendedor" });
-    await registrarPassagem(admin, {
+    // v1.9.48: só é PASSAGEM quando o lead muda de mãos; o vendedor que marca o próprio cliente não passa nada.
+    if (mudouDeMaos) await registrarPassagem(admin, {
       lead: lido,
       actor: ctxDoSdr.actor,
       tipo: "agendamento",
@@ -314,7 +328,8 @@ async function sdrMarca(
     .eq("organization_id", orgId)
     .eq("id", pedido.contact_id)
     .maybeSingle();
-  await avisarVendedorDoAgendamento(admin, {
+  // v1.9.48: quem marcou para si mesmo não recebe aviso de si mesmo.
+  if (vendedorId !== authz.user.id) await avisarVendedorDoAgendamento(admin, {
     orgId,
     vendedorId,
     contatoNome: contato ? rotuloDoContato(contato as never, t) : null,
@@ -358,11 +373,11 @@ async function leadDoCliente(orgId: string, leadId: string | null, contactId: st
  */
 async function passarOLeadAoVendedor(
   admin: ReturnType<typeof createAdminClient>,
-  args: { orgId: string; sdrId: string; vendedorId: string; lead: NegocioDoCliente },
+  args: { orgId: string; guardiaoNovo: string | null; vendedorId: string; lead: NegocioDoCliente },
 ): Promise<string | null> {
   const { lead } = args;
   if (lead.owner_user_id === args.vendedorId) return lead.id;
-  const guardiao = lead.sdr_user_id ?? args.sdrId;
+  const guardiao = lead.sdr_user_id ?? args.guardiaoNovo;
   const mudanca = {
     owner_user_id: args.vendedorId,
     owner_kind: "user",
