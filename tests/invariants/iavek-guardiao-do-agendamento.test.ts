@@ -122,4 +122,11 @@ describe("0628 — o guardião do lead sem guardião agendado por quem não é S
     expect(lastLine(sql(`select coalesce(public.fn_iavek_guardiao_do_agendamento('${ORG}', gen_random_uuid(), '${VENDEDOR}')::text, 'NULO');`))).toBe("NULO");
     expect(registros()).toBe(antes);
   });
+
+  it("0629: o sino aceita o aviso 'agendamento_no_seu_lead' (o dono avisado quando outra pessoa agenda no lead dele)", () => {
+    const l = lead("ga-aviso-do-dono");
+    sql(`insert into public.notificacoes (organization_id, user_id, tipo, lead_id, ator_user_id, dados)
+           values ('${ORG}', '${VENDEDOR}', 'agendamento_no_seu_lead', '${l}', '${DAIANE}', '{"quando":"2030-01-01T13:00:00Z"}'::jsonb);`);
+    expect(lastLine(sql(`select count(*) from public.notificacoes where organization_id = '${ORG}' and tipo = 'agendamento_no_seu_lead';`))).toBe("1");
+  });
 });

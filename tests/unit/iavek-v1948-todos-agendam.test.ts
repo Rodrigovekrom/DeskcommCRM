@@ -119,9 +119,9 @@ describe("v1.9.48 — o que muda quando quem marca NÃO é SDR", () => {
   });
 
   it("o vendedor que marca o próprio cliente: sem 'passagem' para si mesmo e sem aviso de si mesmo", () => {
-    expect(r).toContain("const mudouDeMaos = negocio.owner_user_id !== vendedorId;");
+    expect(r).toContain("const mudouDeMaos = negocio !== null && !deOutraPessoa && negocio.owner_user_id !== vendedorId;");
     expect(r).toContain("if (mudouDeMaos) await registrarPassagem(admin, {");
-    expect(r).toContain("if (vendedorId !== authz.user.id) await avisarVendedorDoAgendamento(admin, {");
+    expect(r).toContain("if (vendedorId !== authz.user.id && vendedorId !== donoAvisado) await avisarVendedorDoAgendamento(admin, {");
     // e na tela ele já vem escolhido como vendedor
     expect(ler("components/iavek/PedirAgendamento.tsx")).toContain(
       'setVendedorId(vendedores.some((v) => v.id === user.id) ? user.id : "");',
@@ -129,7 +129,7 @@ describe("v1.9.48 — o que muda quando quem marca NÃO é SDR", () => {
   });
 
   it("0628 (Maestro 113810): o lead SEM dono e SEM guardião agendado por quem não é SDR ganha guardião do rodízio", () => {
-    expect(r).toContain("if (leadPassado && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {");
+    expect(r).toContain("if (leadPassado && negocio && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {");
     expect(r).toContain('await admin.rpc("fn_iavek_guardiao_do_agendamento" as never, {');
     const m = ler("supabase/migrations/20261112040000_0628_iavek_guardiao_do_agendamento.sql");
     // a lista é a MESMA do aviso do grupo (0623), e o lead que já tem guardião fica como está
@@ -146,8 +146,8 @@ describe("v1.9.48 — o que muda quando quem marca NÃO é SDR", () => {
     expect(get).not.toContain("createAdminClient()");
   });
 
-  it("o lead de outra pessoa da loja segue só com a gerência (podePassarOLead não mudou)", () => {
-    expect(r).toContain("if (!gerencia && !podePassarOLead(negocio, authz.user.id)) {");
+  it("v1.9.48 (12/11 12:48Z): o lead de outra pessoa PASSA, sem trava; o comportamento está em iavek-v1948-livre-para-todos", () => {
+    expect(r).not.toContain("Peça à gerência para passar.");
   });
 
   it("os PEDIDOS que existirem: na loja, a equipe vê os pendentes e decide (a mesma regra do POST [id])", () => {

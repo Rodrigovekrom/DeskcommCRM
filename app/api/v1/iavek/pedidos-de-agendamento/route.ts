@@ -25,11 +25,10 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { requireRole } from "@/lib/auth/require-role";
-import { podePassarOLead } from "@/lib/iavek/sdr-marca-direto";
 import { roleAtLeast } from "@/lib/auth/types";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { avisarVendedorDoAgendamento } from "@/lib/iavek/avisos-da-proposta";
+import { avisarDonoDoAgendamento, avisarVendedorDoAgendamento } from "@/lib/iavek/avisos-da-proposta";
 import {
   gravarPedidoDeAgendamento,
   pedidoDeAgendamentoSchema,
@@ -140,6 +139,18 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const { vendedor_id: vendedorId, campos, contexto, ...input } = parsed.data;
   if (vendedorId) return sdrMarca(authz, input, { vendedorId, campos, contexto }, requestId);
+  // v1.9.48 (decisão do Rodrigo, 12/11 12:48Z): na LOJA, pessoa da equipe NUNCA cria pedido pendente — nem quando a
+  // tela, sem conseguir ler o /agenda-do-sdr, cai no "Pedir agendamento". O vendedor marca para ele mesmo; quem não é
+  // vendedor escolhe o vendedor (422). A clínica segue pedindo, e a IA não passa por aqui (ela pede pelo MCP).
+  {
+    const admin = createAdminClient();
+    if ((await marcaDiretoNaLoja(admin, authz.org.orgId, authz.user.id)).marcaDireto) {
+      if ((await vendedoresDaLoja(admin, authz.org.orgId)).some((v) => v.id === authz.user.id)) {
+        return sdrMarca(authz, input, { vendedorId: authz.user.id, campos, contexto }, requestId);
+      }
+      return fail("validation_failed", t("Escolha o vendedor."), 422, { requestId });
+    }
+  }
 
   const r = await gravarPedidoDeAgendamento(createAdminClient(), {
     orgId: authz.org.orgId,
@@ -204,18 +215,13 @@ async function sdrMarca(
   // gerência passa. Antes, a leitura era pela chave de serviço e o SDR tomava o
   // lead de um colega.
   const negocio = await leadDoCliente(orgId, input.lead_id ?? null, input.contact_id);
-  if (!negocio) {
-    return fail("validation_failed", t("O cliente não tem negócio aberto para passar ao vendedor."), 422, { requestId });
-  }
-  const gerencia = roleAtLeast(authz.org.role, "manager");
-  if (!gerencia && !podePassarOLead(negocio, authz.user.id)) {
-    return fail("forbidden_role", t("Este cliente está com outra pessoa da loja. Peça à gerência para passar."), 403, {
-      requestId,
-    });
-  }
+  // v1.9.48 (decisão do Rodrigo, Notion 12/11 12:48Z, Maestro 125050): "livre para todos", SEM TRAVA. Agendar no lead
+  // de OUTRA pessoa passa, e NÃO tira o lead do dono (antes: 403, "peça à gerência"). O lead SEM dono (ou o da própria
+  // pessoa) segue a passagem de sempre. Sem lead que a sessão enxergue, o compromisso nasce só no contato.
+  const deOutraPessoa = negocio !== null && negocio.owner_user_id !== null && negocio.owner_user_id !== authz.user.id;
   // ia.vek 0613 (CRM-255/257): marcar pede só o lead, o dia e a hora. Os campos que vierem seguem
   // gravados no negócio; o que faltar NÃO trava mais o agendamento.
-  const campos = (await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields;
+  const campos = negocio ? ((await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields) : null;
 
   const r = await gravarPedidoDeAgendamento(admin, {
     orgId,
@@ -276,8 +282,9 @@ async function sdrMarca(
   const appointmentId = typeof compromisso.id === "string" ? compromisso.id : null;
   // Decisão do Rodrigo (27/10): ao marcar, o LEAD passa para o vendedor e o SDR
   // fica de GUARDIÃO — o cliente aparece no Pipeline do vendedor.
-  const mudouDeMaos = negocio.owner_user_id !== vendedorId;
-  const leadPassado = await passarOLeadAoVendedor(admin, {
+  // O lead só muda de mãos quando é da própria pessoa ou não tem dono; o de outra pessoa fica com o dono (v1.9.48).
+  const mudouDeMaos = negocio !== null && !deOutraPessoa && negocio.owner_user_id !== vendedorId;
+  const leadPassado = negocio === null ? null : deOutraPessoa ? negocio.id : await passarOLeadAoVendedor(admin, {
     orgId,
     // v1.9.48: o guardião é sempre um SDR. Quem marca sem ser SDR não vira guardião (fica o que já havia).
     guardiaoNovo: ehSdr ? authz.user.id : null,
@@ -286,7 +293,7 @@ async function sdrMarca(
   });
   // v1.9.48 (0628, Maestro 113810): o lead SEM DONO e SEM GUARDIÃO que alguém de fora do SDR agenda ganha guardião
   // da LISTA do rodízio (a mesma do aviso do grupo, 0623). Quem agendou fica dono; lead que já tinha guardião não muda.
-  if (leadPassado && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {
+  if (leadPassado && negocio && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {
     const { error: erroDoGuardiao } = await admin.rpc("fn_iavek_guardiao_do_agendamento" as never, {
       p_org: orgId,
       p_lead: leadPassado,
@@ -299,7 +306,8 @@ async function sdrMarca(
   if (lido) {
     const ctxDoSdr = { organization_id: orgId, actor: { type: "user" as const, id: authz.user.id, role: authz.org.role }, requestId };
     await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");
-    await passarAConversa(admin, { orgId, contactId: lido.contact_id, para: vendedorId, actor: ctxDoSdr.actor, motivo: "Agendou e passou o lead ao vendedor" });
+    // o lead de outra pessoa fica com o dono: a conversa também (v1.9.48)
+    if (!deOutraPessoa) await passarAConversa(admin, { orgId, contactId: lido.contact_id, para: vendedorId, actor: ctxDoSdr.actor, motivo: "Agendou e passou o lead ao vendedor" });
     // v1.9.48: só é PASSAGEM quando o lead muda de mãos; o vendedor que marca o próprio cliente não passa nada.
     if (mudouDeMaos) await registrarPassagem(admin, {
       lead: lido,
@@ -333,7 +341,7 @@ async function sdrMarca(
     resourceType: "calendar_appointment",
     resourceId: appointmentId ?? pedido.id,
     requestId,
-    metadata: { pedido_id: pedido.id, vendedor_id: vendedorId, lead_passado: leadPassado },
+    metadata: { pedido_id: pedido.id, vendedor_id: vendedorId, lead_passado: mudouDeMaos ? leadPassado : null, lead_de_outra_pessoa: deOutraPessoa },
   });
   const { data: contato } = await admin
     .from("contacts")
@@ -341,11 +349,28 @@ async function sdrMarca(
     .eq("organization_id", orgId)
     .eq("id", pedido.contact_id)
     .maybeSingle();
-  // v1.9.48: quem marcou para si mesmo não recebe aviso de si mesmo.
-  if (vendedorId !== authz.user.id) await avisarVendedorDoAgendamento(admin, {
+  const contatoNome = contato ? rotuloDoContato(contato as never, t) : null;
+  // v1.9.48: o DONO do lead (quando é outra pessoa) é avisado: "Fulano agendou ... no seu lead". Se a sessão não
+  // enxerga o lead, o servidor acha SÓ o dono para o aviso (nada do lead volta para quem agendou).
+  const donoAvisado = deOutraPessoa ? negocio?.owner_user_id ?? null : negocio ? null : await donoDoLeadAberto(admin, orgId, pedido.contact_id, authz.user.id);
+  if (donoAvisado) {
+    const leadDoAviso = negocio?.id ?? (await idDoLeadAberto(admin, orgId, pedido.contact_id, donoAvisado));
+    if (leadDoAviso) await avisarDonoDoAgendamento(admin, {
+      orgId,
+      donoId: donoAvisado,
+      atorId: authz.user.id,
+      leadId: leadDoAviso,
+      appointmentId,
+      quando: new Date(pedido.quando).toISOString(),
+      titulo: typeof compromisso.title === "string" ? compromisso.title : null,
+      contatoNome,
+    });
+  }
+  // v1.9.48: quem marcou para si mesmo não recebe aviso de si mesmo; e o dono, já avisado acima, não recebe dois.
+  if (vendedorId !== authz.user.id && vendedorId !== donoAvisado) await avisarVendedorDoAgendamento(admin, {
     orgId,
     vendedorId,
-    contatoNome: contato ? rotuloDoContato(contato as never, t) : null,
+    contatoNome,
     atorId: authz.user.id,
     leadId: pedido.lead_id,
     appointmentId,
@@ -417,6 +442,49 @@ async function passarOLeadAoVendedor(
   peloServidor = lead.owner_user_id ? peloServidor.eq("owner_user_id", lead.owner_user_id) : peloServidor.is("owner_user_id", null);
   const { data } = await peloServidor.select("id").maybeSingle();
   return data ? lead.id : null;
+}
+
+/**
+ * v1.9.48: o DONO do lead aberto do contato (o mais recente com dono), quando a sessão de quem agendou não enxerga o
+ * lead. Serve SÓ para o aviso ao dono; nada do lead é devolvido a quem agendou. O próprio (eu) não conta.
+ */
+async function donoDoLeadAberto(
+  admin: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  contactId: string,
+  eu: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("crm_leads")
+    .select("owner_user_id")
+    .eq("organization_id", orgId)
+    .eq("contact_id", contactId)
+    .eq("status", "open")
+    .not("owner_user_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const dono = (data as { owner_user_id: string | null } | null)?.owner_user_id ?? null;
+  return dono && dono !== eu ? dono : null;
+}
+
+async function idDoLeadAberto(
+  admin: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  contactId: string,
+  dono: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("crm_leads")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("contact_id", contactId)
+    .eq("status", "open")
+    .eq("owner_user_id", dono)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
 }
 
 /** Sem tipo escolhido: o único tipo ativo da empresa, se houver um só. */

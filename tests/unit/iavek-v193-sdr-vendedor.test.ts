@@ -91,7 +91,8 @@ describe("v1.9.3 — agenda: o SDR da loja marca direto (decisão B)", () => {
     expect(r).toContain("avisarAdmins: false,");
     expect(r).toContain("avisarVendedorDoAgendamento(admin,");
     // Decisão do Rodrigo (27/10): o lead passa para o vendedor, e o SDR fica de guardião.
-    expect(r).toContain("const leadPassado = await passarOLeadAoVendedor(admin, {");
+    // v1.9.48: o lead de OUTRA pessoa não passa (o dono fica); o próprio e o sem dono, sim.
+    expect(r).toContain("const leadPassado = negocio === null ? null : deOutraPessoa ? negocio.id : await passarOLeadAoVendedor(admin, {");
     // v1.9.48: o guardião novo só vem de quem marcou se ele for SDR.
     expect(r).toContain("const guardiao = lead.sdr_user_id ?? args.guardiaoNovo;");
     expect(r).toContain("guardiaoNovo: ehSdr ? authz.user.id : null,");

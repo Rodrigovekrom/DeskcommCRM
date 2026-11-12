@@ -88,7 +88,10 @@ describe("v1.9.9-seg (parte 2) — as rotas que usam a chave de serviço", () =>
     expect(podePassarOLead({ owner_user_id: "colega", sdr_user_id: null }, "eu")).toBe(false);
     expect(podePassarOLead({ owner_user_id: "colega", sdr_user_id: "outro" }, "eu")).toBe(false);
     const rota = readFileSync("app/api/v1/iavek/pedidos-de-agendamento/route.ts", "utf8");
-    expect(rota).toMatch(/!gerencia && !podePassarOLead\(negocio, authz\.user\.id\)/);
+    // v1.9.48 (decisão do Rodrigo, 12/11 12:48Z): agendar no lead de um colega PASSA, sem trava, e o lead NÃO muda de
+    // dono — a regra acima deixou de travar o agendamento (ver iavek-v1948-livre-para-todos).
+    expect(rota).not.toMatch(/podePassarOLead\(/);
+    expect(rota).toContain("const deOutraPessoa = negocio !== null && negocio.owner_user_id !== null && negocio.owner_user_id !== authz.user.id;");
     // O negócio é lido pela SESSÃO, e a escrita pelo servidor só com o dono conferido.
     expect(rota).toMatch(/async function leadDoCliente\([^)]*\)[\s\S]{0,200}const sessao = await createClient\(\)/);
     expect(rota).toMatch(/peloServidor\.eq\("owner_user_id", lead\.owner_user_id\) : peloServidor\.is\("owner_user_id", null\)/);

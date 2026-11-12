@@ -45,7 +45,8 @@ describe("v1.9.2 — como a IA marca", () => {
     const h = ler("app/api/v1/agenda/agendamentos/_handler.ts");
     expect(h).toContain('const agendaDaIa = ctx.actor.type !== "user" ? await agendaDaIaDaOrg(ctx.organization_id) : null;');
     // v1.9.3: entre os dois, o SDR da loja que marca para o vendedor (nasce confirmado).
-    expect(h).toMatch(/agendaDaIa\?\.modo\s*\?\s*statusDaMarcacaoDaIa\(agendaDaIa\.config\)\s*:\s*ctx\.iavekSdrMarcaParaVendedor\s*\?\s*"confirmed"\s*:\s*tipo\.requires_confirmation/);
+    // v1.9.48: na LOJA (agenda livre) a pessoa já deixa marcado; fora dela, a regra do tipo, como sempre.
+    expect(h).toMatch(/agendaDaIa\?\.modo\s*\?\s*statusDaMarcacaoDaIa\(agendaDaIa\.config\)\s*:\s*ctx\.iavekSdrMarcaParaVendedor\s*\?\s*"confirmed"\s*:[\s\S]{0,260}ctx\.iavekAgendaLivre && ctx\.actor\.type === "user"\s*\?\s*"confirmed"\s*:\s*tipo\.requires_confirmation/);
   });
 });
 

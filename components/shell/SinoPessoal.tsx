@@ -100,6 +100,11 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
         "{when}",
         quandoDoAviso(n.dados.quando),
       );
+    // ia.vek v1.9.48 (0629): alguém agendou no lead desta pessoa; o lead segue dela.
+    case "agendamento_no_seu_lead":
+      return troca("{who} agendou {what} no seu lead {lead}, para {when}")
+        .replace("{what}", typeof n.dados.titulo === "string" && n.dados.titulo ? `“${n.dados.titulo}”` : t("um compromisso"))
+        .replace("{when}", quandoDoAviso(n.dados.quando));
     // ia.vek v1.9.13: a IA travou, com o motivo (o canal de orientação, 0601).
     case "ia_travou":
       return troca("A IA travou em {lead}: {reason}");

@@ -84,7 +84,8 @@ describe("v1.9.4 — a marcação do SDR passa pela trava", () => {
   it("marca sem cobrar os campos; o lead vai para Agendado e o resumo fica gravado", () => {
     const r = ler("app/api/v1/iavek/pedidos-de-agendamento/route.ts");
     expect(r).not.toContain("const faltam = camposQueFaltam(campos);");
-    expect(r).toContain("const campos = (await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields;");
+    // v1.9.48: sem lead que a sessão enxergue, o compromisso nasce só no contato (sem trava).
+    expect(r).toContain("const campos = negocio ? ((await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields) : null;");
     expect(r).toContain('await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");');
     expect(r).toContain('tipo: "agendamento",');
   });

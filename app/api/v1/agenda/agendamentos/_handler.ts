@@ -421,7 +421,11 @@ async function executarCriacaoDeAgendamento(
     ? statusDaMarcacaoDaIa(agendaDaIa.config)
     : ctx.iavekSdrMarcaParaVendedor
       ? "confirmed"
-      : tipo.requires_confirmation
+      : // ia.vek v1.9.48 (decisão do Rodrigo, 12/11 12:48Z: "não tem que precisar confirmar ou aceitar nada"): na LOJA
+        // (agenda livre), a pessoa da equipe que agenda já deixa MARCADO, qualquer que seja o tipo.
+        ctx.iavekAgendaLivre && ctx.actor.type === "user"
+        ? "confirmed"
+        : tipo.requires_confirmation
       ? "pending"
       : "confirmed";
   // ia.vek v1.9.45 (CRM-280): o km de carro da loja até o cliente, calculado pelo SERVIDOR (nunca vem da

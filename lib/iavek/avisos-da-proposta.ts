@@ -15,7 +15,8 @@ type Tipo =
   | "pedido_de_agendamento"
   | "pedido_de_agendamento_confirmado"
   | "pedido_de_agendamento_recusado"
-  | "agendamento_para_voce";
+  | "agendamento_para_voce"
+  | "agendamento_no_seu_lead";
 
 /** Os membros ativos da organização com um destes papéis. */
 export async function membrosComPapel(
@@ -172,6 +173,36 @@ export async function avisarVendedorDoAgendamento(
       lead_id: args.leadId,
       ator_user_id: args.atorId,
       dados: { appointment_id: args.appointmentId, quando: args.quando, contato_nome: args.contatoNome },
+    },
+  ]);
+}
+
+/**
+ * ia.vek v1.9.48 (0629, decisão do Rodrigo 12/11 12:48Z): alguém da loja agendou no lead de OUTRA pessoa. O lead NÃO
+ * muda de dono, e o DONO é avisado no sino ("Fulano agendou ... no seu lead"). Quem agendou é o "{who}" (ator).
+ */
+export async function avisarDonoDoAgendamento(
+  db: SupabaseClient,
+  args: {
+    orgId: string;
+    donoId: string;
+    atorId: string;
+    leadId: string;
+    appointmentId: string | null;
+    quando: string;
+    titulo: string | null;
+    contatoNome: string | null;
+  },
+): Promise<void> {
+  if (args.donoId === args.atorId) return;
+  await gravar(db, [
+    {
+      organization_id: args.orgId,
+      user_id: args.donoId,
+      tipo: "agendamento_no_seu_lead",
+      lead_id: args.leadId,
+      ator_user_id: args.atorId,
+      dados: { appointment_id: args.appointmentId, quando: args.quando, titulo: args.titulo, contato_nome: args.contatoNome },
     },
   ]);
 }

@@ -51963,7 +51963,9 @@ alter table public.notificacoes add constraint notificacoes_tipo_check check (ti
   -- ia.vek v1.9.12 (migration 0600): aviso a toda a loja, sem dado de lead.
   'aviso_da_loja',
   -- ia.vek v1.9.13 (migration 0601): a IA travou nesta conversa, com o motivo.
-  'ia_travou'
+  'ia_travou',
+  -- ia.vek v1.9.48 (migration 0629): alguém da loja agendou no lead de OUTRA pessoa; o dono é avisado.
+  'agendamento_no_seu_lead'
 ));
 
 
