@@ -23,6 +23,7 @@ import { ApiError } from "@/lib/api/types";
 
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 import { requireRole } from "@/lib/auth/require-role";
 import { podePassarOLead } from "@/lib/iavek/sdr-marca-direto";
 import { roleAtLeast } from "@/lib/auth/types";
@@ -111,7 +112,9 @@ export async function GET(): Promise<Response> {
       | undefined;
     return {
       ...l,
-      contato_nome: c ? rotuloDoContato(c as never, t) : null,
+      // v1.9.48 (Lupa 113800): o contato que a RLS da v1.9.9 esconde ("cada um vê o seu") NÃO é lido pelo servidor;
+      // a lista mostra o título do pedido e este rótulo no lugar do nome.
+      contato_nome: c ? rotuloDoContato(c as never, t) : l.pedido_por !== authz.user.id ? t("Cliente de outra pessoa da loja") : null,
       pedido_por_nome:
         l.origem === "ia" ? t("IA") : l.pedido_por ? (nomes.get(l.pedido_por) ?? null) : null,
     };
@@ -281,6 +284,16 @@ async function sdrMarca(
     vendedorId,
     lead: negocio,
   });
+  // v1.9.48 (0628, Maestro 113810): o lead SEM DONO e SEM GUARDIÃO que alguém de fora do SDR agenda ganha guardião
+  // da LISTA do rodízio (a mesma do aviso do grupo, 0623). Quem agendou fica dono; lead que já tinha guardião não muda.
+  if (leadPassado && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {
+    const { error: erroDoGuardiao } = await admin.rpc("fn_iavek_guardiao_do_agendamento" as never, {
+      p_org: orgId,
+      p_lead: leadPassado,
+      p_ator: authz.user.id,
+    } as never);
+    if (erroDoGuardiao) logger.warn("[iavek-agenda] o guardião do rodízio não foi gravado", { lead_id: leadPassado, codigo: erroDoGuardiao.code ?? null });
+  }
   // v1.9.4: o lead vai para "Agendado" e o RESUMO fica para o vendedor ler.
   const lido = leadPassado ? await lerLeadDaPassagem(admin, orgId, leadPassado) : null;
   if (lido) {

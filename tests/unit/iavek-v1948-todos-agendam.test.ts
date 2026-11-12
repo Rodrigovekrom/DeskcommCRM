@@ -128,6 +128,24 @@ describe("v1.9.48 — o que muda quando quem marca NÃO é SDR", () => {
     );
   });
 
+  it("0628 (Maestro 113810): o lead SEM dono e SEM guardião agendado por quem não é SDR ganha guardião do rodízio", () => {
+    expect(r).toContain("if (leadPassado && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {");
+    expect(r).toContain('await admin.rpc("fn_iavek_guardiao_do_agendamento" as never, {');
+    const m = ler("supabase/migrations/20261112040000_0628_iavek_guardiao_do_agendamento.sql");
+    // a lista é a MESMA do aviso do grupo (0623), e o lead que já tem guardião fica como está
+    expect(m).toContain("o.settings->'iavek'->'rodizio'->'participantes'");
+    expect(m).toContain("return v_atual;  -- já tem guardião: fica como está");
+    expect(m).toContain("where id = p_lead and organization_id = p_org and sdr_user_id is null;");
+    expect(ler("supabase/baseline.sql")).toContain("create or replace function public.fn_iavek_guardiao_do_agendamento(p_org uuid, p_lead uuid, p_ator uuid)");
+  });
+
+  it("a lista do GET: o contato que a RLS esconde vira 'Cliente de outra pessoa da loja' (sem ler pelo servidor)", () => {
+    expect(r).toContain('contato_nome: c ? rotuloDoContato(c as never, t) : l.pedido_por !== authz.user.id ? t("Cliente de outra pessoa da loja") : null,');
+    const get = r.slice(r.indexOf("export async function GET"), r.indexOf("export async function POST"));
+    expect(get).toContain("const supabase = await createClient();");
+    expect(get).not.toContain("createAdminClient()");
+  });
+
   it("o lead de outra pessoa da loja segue só com a gerência (podePassarOLead não mudou)", () => {
     expect(r).toContain("if (!gerencia && !podePassarOLead(negocio, authz.user.id)) {");
   });
