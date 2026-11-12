@@ -26,6 +26,14 @@ on:
       - "app/**"
       - "workers/**"
       - "scripts/**"
+      # (v1.9.49, Lupa 052149/052220) e também as pastas das TELAS e o resto que as invariantes leem. A lista é conferida
+      # por tests/unit/iavek-v1949-gatilho-do-banco.test.ts: pasta lida por uma invariante e fora daqui = vermelho.
+      - "components/**"
+      - "hooks/**"
+      - "docs/**"
+      - "hostgator-setup-kit/**"
+      - "loop/**"
+      - "tests/**"
   workflow_dispatch: {}
 
 concurrency:
