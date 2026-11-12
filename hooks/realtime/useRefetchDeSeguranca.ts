@@ -126,7 +126,11 @@ export function useRefetchDeSeguranca<T>({
 
   useEffect(() => {
     if (!enabled) return;
-    const timer = setInterval(() => void verificar(), intervaloMs);
+    // ia.vek v1.9.51 (Maestro 214930): com a aba ESCONDIDA, o intervalo não vai ao banco; a volta à aba refaz na hora
+    // (o `aoVoltar` abaixo), então a tela nunca fica velha para quem olha.
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") void verificar();
+    }, intervaloMs);
 
     // AO VOLTAR PARA A ABA, imediatamente: é o momento em que o usuário mais
     // acredita no que vê, e é justamente quando a tela pode estar mais velha —

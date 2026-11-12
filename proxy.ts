@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
+import { usuarioDoProxy } from "@/lib/auth/sessao-do-proxy";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { fetchDoServidor } from "@/lib/supabase/fetch-do-servidor";
@@ -92,10 +93,10 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // Validate JWT server-side (NEVER use getSession on backend per CLAUDE.md).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // ia.vek v1.9.51 (Maestro 214930, opção A): o proxy confere o JWT LOCALMENTE (assinatura pela chave pública + expiração,
+  // `getClaims`), sem ir ao Auth pela rede. As rotas e as páginas do servidor seguem com `getUser()` pela rede: a sessão
+  // revogada continua recusada NA HORA em todo dado. Ver lib/auth/sessao-do-proxy.ts. NUNCA `getSession()` sozinho.
+  const user = await usuarioDoProxy(supabase.auth);
 
   if (!user) {
     // API routes must respond with JSON envelope (contract: {error:{code,message}})

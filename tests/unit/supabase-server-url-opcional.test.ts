@@ -179,6 +179,7 @@ describe("urlDoSupabaseNoServidor — PRESENTE aponta o servidor para a URL nova
           return {
             auth: {
               getUser: async () => ({ data: { user: { id: "u1" } } }),
+              getClaims: async () => ({ data: { claims: { sub: "u1" }, header: { alg: "ES256", kid: "k1" } }, error: null }),
             },
             rpc: async () => ({ data: true }),
           };

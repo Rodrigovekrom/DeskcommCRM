@@ -115,10 +115,18 @@ export function AuthProvider({
       const result = await response.json();
       if (result.data.signature !== expected) window.location.reload();
     };
+    // ia.vek v1.9.51 (Maestro 214930): aba escondida não confere (ninguém olha); a volta à aba confere na hora.
     const timer = setInterval(() => {
-      void check();
+      if (document.visibilityState !== "hidden") void check();
     }, 15000);
-    return () => clearInterval(timer);
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
   }, [user.support]);
 
   // Refresh session every 40 minutes (JWT default 1h, with margin).
