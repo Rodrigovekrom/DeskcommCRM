@@ -56,13 +56,15 @@ beforeAll(() => {
       on conflict (id) do nothing;
     insert into public.organizations (id, slug, legal_name, display_name) values ('${ORG}', 'guardiao-agenda-inv', 'GA', 'GA')
       on conflict (id) do nothing;
-    insert into public.user_organizations (user_id, organization_id, role, accepted_at, interface_settings) values
-      ('${ADMIN}', '${ORG}', 'admin', now(), '{}'),
-      ('${DAIANE}', '${ORG}', 'agent', now(), '{"funcao":"sdr"}'),
-      ('${PALOMA}', '${ORG}', 'agent', now(), '{"funcao":"sdr"}'),
-      ('${VENDEDOR}', '${ORG}', 'agent', now(), '{"funcao":"vendedor"}'),
-      ('${SAIU}', '${ORG}', 'agent', now(), '{"funcao":"sdr"}')
+    insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
+      ('${ADMIN}', '${ORG}', 'admin', now()), ('${DAIANE}', '${ORG}', 'agent', now()), ('${PALOMA}', '${ORG}', 'agent', now()),
+      ('${VENDEDOR}', '${ORG}', 'agent', now()), ('${SAIU}', '${ORG}', 'agent', now())
       on conflict do nothing;
+    -- a função vai MESCLADA no interface_settings padrão (a forma exige o 'preset': user_organizations_interface_shape)
+    update public.user_organizations set interface_settings = coalesce(interface_settings, '{}'::jsonb) || '{"funcao":"sdr"}'::jsonb
+     where organization_id = '${ORG}' and user_id in ('${DAIANE}', '${PALOMA}', '${SAIU}');
+    update public.user_organizations set interface_settings = coalesce(interface_settings, '{}'::jsonb) || '{"funcao":"vendedor"}'::jsonb
+     where organization_id = '${ORG}' and user_id = '${VENDEDOR}';
     update public.user_organizations set revoked_at = now() where user_id = '${SAIU}' and organization_id = '${ORG}';
     update public.crm_pipelines set is_default = false where organization_id = '${ORG}';
     insert into public.crm_pipelines (id, organization_id, name, slug, is_default) values ('${FUNIL}', '${ORG}', 'Entrada', 'entrada-ga', true)
