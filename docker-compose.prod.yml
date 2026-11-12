@@ -23,7 +23,9 @@ services:
     # O teto não impede o pico legítimo; impede que UM serviço leve a máquina
     # inteira. Estourá-lo mata só quem estourou, e o `restart: unless-stopped`
     # o traz de volta — falha isolada em vez de queda geral.
-    mem_limit: 768m
+    # ia.vek 11/11 (incidente 19:05Z; divergência do upstream em docs/iavek): 768m -> 1024m, heap 576 MB
+    # (Lupa: ~450 MiB fora do heap; antes o Node escolhia 396 sozinho e estourou).
+    mem_limit: 1024m
     # Imagem GENÉRICA pré-buildada: o leigo só puxa (sobe em ~2min, roda em 2GB).
     # Os NEXT_PUBLIC_* reais vêm em RUNTIME (env_file abaixo) — o browser lê via
     # <PublicEnvScript/> e o servidor via lib/env.ts. Não precisa buildar no VPS.
@@ -37,7 +39,13 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
+      NODE_OPTIONS: "--max-old-space-size=576"
       SUPABASE_DB_ADMIN_URL: ""
+      # O `worker` deste arquivo drena o event_log em poucos segundos (2 s com
+      # fila, até 10 s parado); o webhook de mensagem não precisa mais drenar a
+      # fila de todas as organizações dentro da requisição
+      # (lib/dev/kick-local-pipeline.ts).
+      EVENT_LOG_WORKER_DRAINS: ${EVENT_LOG_WORKER_DRAINS:-true}
     depends_on:
       srh:
         condition: service_started
@@ -97,6 +105,8 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     restart: unless-stopped
+    # ia.vek 11/11 (saúde do servidor): o worker era o único sem rotação de log (divergência em docs/iavek).
+    logging: *default-logging
     env_file: .env
     environment:
       # dentro da rede do compose, o WAHA é o serviço 'waha' na porta interna 3000
@@ -153,6 +163,11 @@ services:
       # Nome EXATO da doc do WAHA (events#hmac-authentication): WHATSAPP_HOOK_HMAC
       # não existe nele — sem o _KEY ele ignora e nunca assina.
       WHATSAPP_HOOK_HMAC_KEY: ${WAHA_HMAC_SECRET}
+      # ia.vek (incidente 12/11): o retry do webhook. Padrão do WAHA = 15 × 2 s (~30 s quando o app responde 500 na
+      # hora). Políticas no WebhookSender.js: constant/linear/exponential (sem teto); o Retry-After do app é o piso.
+      WHATSAPP_HOOK_RETRIES_POLICY: "${WAHA_HOOK_RETRIES_POLICY:-linear}"
+      WHATSAPP_HOOK_RETRIES_DELAY_SECONDS: "${WAHA_HOOK_RETRIES_DELAY_SECONDS:-10}"
+      WHATSAPP_HOOK_RETRIES_ATTEMPTS: "${WAHA_HOOK_RETRIES_ATTEMPTS:-27}"
       # WAHA lê WHATSAPP_DEFAULT_ENGINE (NÃO WAHA_DEFAULT_ENGINE — o nome errado
       # fazia cair no default WEBJS, engine com browser que trava/corrompe a sessão
       # quando o WhatsApp Web atualiza; NOWEB é websocket direto, estável e leve).
@@ -163,6 +178,9 @@ services:
       # Reconectar. True retoma as que já existiam — não reloga, não pede QR.
       # Default do WAHA é False.
       WHATSAPP_RESTART_ALL_SESSIONS: "${WHATSAPP_RESTART_ALL_SESSIONS:-True}"
+      # ia.vek 11/11 (incidente 19:05Z; divergência do upstream registrada em docs/iavek): a imagem traz 16384 MB
+      # de heap num teto de 1280m e o Node nunca apertava a coleta. 900 MB, revisado pela Lupa.
+      NODE_OPTIONS: "--max-old-space-size=900"
     volumes:
       - waha-data:/app/.sessions          # sessões pareadas (QR) — perder = re-parear
       - waha-media:/app/.media
