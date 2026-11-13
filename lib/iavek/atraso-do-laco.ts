@@ -16,6 +16,8 @@ import { logger } from "@/lib/logger";
 export const JANELA_MS = 5_000;
 export const LIMIAR_MS = 50;
 export const JANELAS_POR_MINUTO = 12;
+/** (Lupa 202643) 10 ms: com 20 ms o p50 do app PARADO saía ~20 ms (a granularidade), e confundia a leitura. */
+export const RESOLUCAO_MS = 10;
 
 const ms = (ns: number) => Math.round((ns / 1e6) * 10) / 10;
 
@@ -32,8 +34,8 @@ let ligado = false;
 export function ligarAtrasoDoLaco(env: Record<string, string | undefined> = process.env): boolean {
   if (ligado || env.IAVEK_LACO_DO_APP === "0") return false;
   ligado = true;
-  const janela = monitorEventLoopDelay({ resolution: 20 });
-  const minuto = monitorEventLoopDelay({ resolution: 20 });
+  const janela = monitorEventLoopDelay({ resolution: RESOLUCAO_MS });
+  const minuto = monitorEventLoopDelay({ resolution: RESOLUCAO_MS });
   janela.enable();
   minuto.enable();
   let n = 0;

@@ -187,6 +187,10 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
         // local-echo, aberta pela mutação até ela assentar + a folga), a leva não recarrega o quadro: a própria ação
         // já recarrega no onSettled, DEPOIS do commit, e vê o mesmo dado. Um evento de fora (outro lead, outra pessoa,
         // ou sem id) na leva = recarrega como antes. MEDIDO no canário: era a 2ª ida do quadro em cada clique.
+        // O RISCO aceito (Lupa 202643): o onSettled da ação recarrega DEPOIS do commit, então uma mudança de OUTRA
+        // pessoa que entrou ANTES disso já vem junto. Só se perde a que entra entre o onSettled e o fim da folga do
+        // local-echo (~1 s), no MESMO lead, numa leva só de ecos; o quadro se corrige no próximo evento (ou ao voltar a
+        // aba). É a mesma janela que o pulso já aceita. Quem mexer aqui: não alongue a folga sem rever isto.
         const eco = !!leadId && ehEcoLocal(leadId);
         if (!agrupador.current) {
           soEcoNaLeva.current = eco;

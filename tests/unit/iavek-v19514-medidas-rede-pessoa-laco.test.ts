@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import { medidaParaRegistro, medidaSchema, redeDoNavegador } from "@/lib/iavek/medidas-de-tela";
 import { pessoaAnonima } from "@/lib/iavek/medidas-de-tela-servidor";
-import { LIMIAR_MS, resumirHistograma } from "@/lib/iavek/atraso-do-laco";
+import { LIMIAR_MS, RESOLUCAO_MS, resumirHistograma } from "@/lib/iavek/atraso-do-laco";
 
 describe("a rede do navegador", () => {
   it("navigator.connection vira {tipo, mbps, rtt_ms, economia}", () => {
@@ -65,6 +65,8 @@ describe("o atraso do laço", () => {
   });
   it("o limiar da linha de 5 s é 50 ms, e o register do Node liga a medida", () => {
     expect(LIMIAR_MS).toBe(50);
+    expect(RESOLUCAO_MS).toBe(10);
+    expect(readFileSync("lib/iavek/atraso-do-laco.ts", "utf8")).toMatch(/monitorEventLoopDelay\(\{ resolution: RESOLUCAO_MS \}\)/);
     const i = readFileSync("instrumentation.ts", "utf8");
     expect(i).toMatch(/NEXT_RUNTIME === "nodejs"[\s\S]*ligarAtrasoDoLaco\(\)/);
   });
