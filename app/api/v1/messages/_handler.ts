@@ -62,6 +62,7 @@ import { ehFuncao, type Funcao } from "@/lib/iavek/funcoes";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deveTranscreverAudioDaTela, pedirTranscricaoDoAudioDaTela } from "@/lib/iavek/transcricao-do-audio-da-tela";
 import type { Message } from "@/lib/types/messaging";
 
 type SB = SupabaseClient;
@@ -932,6 +933,12 @@ export async function sendMessageHandler(
     );
   }
   let message = created as unknown as Message;
+
+  // ia.vek v1.9.51.2 (Rodrigo 13/11): o áudio enviado PELA TELA também vira texto (lib/iavek/transcricao-do-audio-da-tela).
+  // Não bloqueia o envio: um pedido que falha só marca o status e segue.
+  if (deveTranscreverAudioDaTela(message)) {
+    await pedirTranscricaoDoAudioDaTela(createAdminClient(), message);
+  }
 
   // O canal vem da SESSÃO (migration 0087), não de um literal. O fallback só
   // alcança o caso em que o embed não trouxe a sessão — impossível hoje
