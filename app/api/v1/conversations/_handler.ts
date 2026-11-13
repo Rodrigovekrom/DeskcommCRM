@@ -648,16 +648,18 @@ export async function patchConversationHandler(
 // ---------------------------------------------------------------------------
 
 /**
- * ia.vek v1.9.53 (Rodrigo 13/11, Maestro 131135): SÓ O RESPONSÁVEL marca como lida.
+ * ia.vek v1.9.53 (Rodrigo 13/11, Maestro 131135/150521, opção A; Lupa 150342/150530): quem marca como lida.
  *
- * O contador `unread_count_for_assignee` é do RESPONSÁVEL pela conversa. Antes, qualquer ator com papel
- * agent ou acima o zerava ao abrir (o admin geral abria, o contador sumia e o vendedor perdia a marcação).
- * Agora quem abre e NÃO é o `assigned_to_user_id` (admin, gestor, guardião, outro vendedor) só VÊ: nada é
- * gravado. Conversa SEM responsável: ninguém zera ao abrir. A trava mora AQUI, no servidor (o front também
- * deixa de pedir, mas um pedido vindo de outro lugar não pode zerar). O filtro do UPDATE carrega a regra:
- * a linha só casa se o ator for o responsável NAQUELE instante, então não há janela entre conferir e gravar.
+ * O contador `unread_count_for_assignee` é do RESPONSÁVEL pela conversa. Antes, qualquer ator com papel agent ou
+ * acima o zerava ao abrir (o admin geral abria, o contador sumia e o vendedor perdia a marcação). Agora:
+ *  - COM responsável: só ELE zera. Admin, gestor, guardião, outro vendedor só VEEM: nada é gravado;
+ *  - SEM responsável: quem vê e abre zera, como antes (a AP Clinic e a ia.vek não usam responsável: sem isto o
+ *    contador e o filtro "não lidas" só cresceriam).
+ * A regra mora no FILTRO do próprio UPDATE (responsável = ator OU responsável nulo): se alguém virar responsável
+ * entre o abrir e o marcar, a linha não casa e o contador do novo responsável fica. Nada de ler e depois gravar.
  */
-export type MotivoDaLeituraNaoMarcada = "nao_e_o_responsavel" | "sem_responsavel";
+export type MotivoDaLeituraNaoMarcada = "nao_e_o_responsavel";
+const UUID_DO_ATOR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function markConversationReadHandler(
   supabase: SB,
@@ -665,6 +667,11 @@ export async function markConversationReadHandler(
   conversationId: string,
 ): Promise<{ conversation: Conversation; marcada: boolean; motivo?: MotivoDaLeituraNaoMarcada }> {
   const atorId = ctx.actor.type === "user" ? ctx.actor.id : null;
+  // (Lupa 151050) o id entra no TEXTO do filtro do .or(): só um uuid passa. Hoje ele vem da sessão; se um dia vier de
+  // outro lugar, nada que não seja uuid vira filtro no PostgREST (vírgula, ponto ou parêntese mudariam a regra).
+  if (atorId !== null && !UUID_DO_ATOR.test(atorId)) {
+    throw new ApiError(400, "validation_failed", undefined, ctx.requestId, traduzir("Campos inválidos.", ctx.idioma ?? "pt-BR"));
+  }
 
   if (atorId !== null) {
     const { data, error } = await supabase
@@ -672,7 +679,8 @@ export async function markConversationReadHandler(
       .update({ unread_count_for_assignee: 0 })
       .eq("id", conversationId)
       .eq("organization_id", ctx.organization_id)
-      .eq("assigned_to_user_id", atorId)
+      // atorId vem da sessão (uuid do Auth), nunca do corpo do pedido.
+      .or(`assigned_to_user_id.eq.${atorId},assigned_to_user_id.is.null`)
       .select(SELECT_COLS)
       .maybeSingle();
     if (error) {
@@ -681,7 +689,7 @@ export async function markConversationReadHandler(
     if (data) return { conversation: data as unknown as Conversation, marcada: true };
   }
 
-  // Não casou: ou a conversa não existe / não é visível (404), ou quem abriu não é o responsável. Só LEITURA.
+  // Não casou: ou a conversa não existe / não é visível (404), ou ela tem OUTRO responsável. Só LEITURA.
   const { data: atual, error: erroDaLeitura } = await supabase
     .from("conversations")
     .select(SELECT_COLS)
@@ -701,9 +709,7 @@ export async function markConversationReadHandler(
     );
   }
   const conversation = atual as unknown as Conversation;
-  return {
-    conversation,
-    marcada: false,
-    motivo: conversation.assigned_to_user_id ? "nao_e_o_responsavel" : "sem_responsavel",
-  };
+  return conversation.assigned_to_user_id
+    ? { conversation, marcada: false, motivo: "nao_e_o_responsavel" }
+    : { conversation, marcada: false };
 }

@@ -1,12 +1,12 @@
 /**
- * ia.vek v1.9.53 (Rodrigo 13/11, Maestro 131135): SÓ O RESPONSÁVEL marca a conversa como lida.
+ * ia.vek v1.9.53 (Rodrigo 13/11, Maestro 131135/150521 opção A; Lupa 150530): quem marca a conversa como lida.
  *
  * O defeito: o admin geral abria uma conversa com 3 mensagens do cliente sem ler e o contador sumia: o
  * `mark-read` zerava `unread_count_for_assignee` de QUALQUER ator com papel agent ou acima. O vendedor
  * perdia a marcação. A regra é por PAPEL na conversa, não por pessoa:
- *  - o responsável (`assigned_to_user_id` = quem abre) zera;
- *  - admin, gestor, guardião, outro vendedor: só visualizam, NADA é gravado;
- *  - conversa sem responsável: ninguém zera ao abrir.
+ *  - COM responsável: só ele (`assigned_to_user_id` = quem abre) zera; admin, gestor, guardião, outro vendedor
+ *    só visualizam, NADA é gravado;
+ *  - SEM responsável: quem vê e abre zera, como antes (a AP Clinic e a ia.vek não usam responsável).
  * A trava está no SERVIDOR (o banco de mentira abaixo aplica os filtros do UPDATE como o PostgREST) e no
  * FRONT (o hook nem pede). E a marca "nova mensagem desde" do cartão (esperandoDesde) não depende do
  * contador: segue depois de o admin abrir.
@@ -35,8 +35,19 @@ function banco(linha: Linha) {
     from(tabela: string) {
       expect(tabela).toBe("conversations");
       const filtros: Record<string, unknown> = {};
+      const ous: string[] = [];
       let valores: Record<string, unknown> | null = null;
-      const casa = () => Object.entries(filtros).every(([k, v]) => (linha as Record<string, unknown>)[k] === v);
+      // o .or do PostgREST: "col.eq.X,col.is.null" = casa se QUALQUER termo casa
+      const termo = (t: string) => {
+        const [col, op, ...resto] = t.split(".");
+        const v = (linha as Record<string, unknown>)[col!];
+        if (op === "eq") return v === resto.join(".");
+        if (op === "is" && resto.join(".") === "null") return v === null;
+        throw new Error(`termo não suportado: ${t}`);
+      };
+      const casa = () =>
+        Object.entries(filtros).every(([k, v]) => (linha as Record<string, unknown>)[k] === v) &&
+        ous.every((o) => o.split(",").some(termo));
       const q = {
         update(v: Record<string, unknown>) {
           valores = v;
@@ -49,10 +60,14 @@ function banco(linha: Linha) {
           filtros[col] = v;
           return q;
         },
+        or(expr: string) {
+          ous.push(expr);
+          return q;
+        },
         async maybeSingle() {
           if (!casa()) return { data: null, error: null };
           if (valores) {
-            escritas.push({ filtros: { ...filtros }, valores });
+            escritas.push({ filtros: { ...filtros, ou: ous.join(" & ") }, valores });
             Object.assign(linha, valores);
           }
           return { data: { ...linha }, error: null };
@@ -92,15 +107,44 @@ describe("servidor: markConversationReadHandler só zera para o RESPONSÁVEL", (
     expect(r.marcada).toBe(true);
     expect(b.linha.unread_count_for_assignee).toBe(0);
     expect(b.escritas).toHaveLength(1);
-    expect(b.escritas[0]?.filtros).toMatchObject({ id: CONVERSA, organization_id: ORG, assigned_to_user_id: VENDEDOR });
+    expect(b.escritas[0]?.filtros).toMatchObject({
+      id: CONVERSA,
+      organization_id: ORG,
+      ou: `assigned_to_user_id.eq.${VENDEDOR},assigned_to_user_id.is.null`,
+    });
   });
 
-  it("SEM responsável: ninguém zera ao abrir, nem o admin", async () => {
+  it("SEM responsável: o ADMIN abre e zera (como antes; a clínica não usa responsável)", async () => {
     const b = banco({ id: CONVERSA, organization_id: ORG, assigned_to_user_id: null, unread_count_for_assignee: 2 });
     const r = await markConversationReadHandler(b.supabase, ctx(ADMIN), CONVERSA);
+    expect(r.marcada).toBe(true);
+    expect(r.motivo).toBeUndefined();
+    expect(b.linha.unread_count_for_assignee).toBe(0);
+    expect(b.escritas).toHaveLength(1);
+  });
+
+  it("SEM responsável: o VENDEDOR abre e zera", async () => {
+    const b = banco({ id: CONVERSA, organization_id: ORG, assigned_to_user_id: null, unread_count_for_assignee: 2 });
+    const r = await markConversationReadHandler(b.supabase, ctx(VENDEDOR), CONVERSA);
+    expect(r.marcada).toBe(true);
+    expect(b.linha.unread_count_for_assignee).toBe(0);
+  });
+
+  it("CORRIDA: a tela abriu SEM responsável, mas alguém ASSUMIU antes do marcar: o admin NÃO zera o do novo responsável", async () => {
+    // o front viu responsável nulo e pediu; no banco, NA HORA do UPDATE, o vendedor já é o responsável
+    const b = banco({ id: CONVERSA, organization_id: ORG, assigned_to_user_id: null, unread_count_for_assignee: 3 });
+    b.linha.assigned_to_user_id = VENDEDOR;
+    const r = await markConversationReadHandler(b.supabase, ctx(ADMIN), CONVERSA);
     expect(r.marcada).toBe(false);
-    expect(r.motivo).toBe("sem_responsavel");
-    expect(b.linha.unread_count_for_assignee).toBe(2);
+    expect(r.motivo).toBe("nao_e_o_responsavel");
+    expect(b.linha.unread_count_for_assignee).toBe(3);
+    expect(b.escritas).toHaveLength(0);
+  });
+
+  it("(Lupa 151050) ator que não é uuid: 400 e NADA vai para o filtro (nem update, nem leitura)", async () => {
+    const b = banco({ id: CONVERSA, organization_id: ORG, assigned_to_user_id: null, unread_count_for_assignee: 3 });
+    await expect(markConversationReadHandler(b.supabase, ctx(`${VENDEDOR},assigned_to_user_id.not.is.null`), CONVERSA)).rejects.toMatchObject({ status: 400 });
+    expect(b.linha.unread_count_for_assignee).toBe(3);
     expect(b.escritas).toHaveLength(0);
   });
 
@@ -138,9 +182,9 @@ describe("front: useMarkAsRead só PEDE quando quem olha é o responsável", () 
     expect(post).not.toHaveBeenCalled();
   });
 
-  it("conversa sem responsável: nenhum POST", async () => {
+  it("conversa SEM responsável: o admin abre e PEDE (1 POST)", async () => {
     await abrir(ADMIN, null);
-    expect(post).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledTimes(1);
   });
 
   it("o responsável abre: 1 POST mark-read depois de 1,5 s", async () => {
