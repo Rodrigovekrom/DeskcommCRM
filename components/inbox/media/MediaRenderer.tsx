@@ -53,12 +53,13 @@ export function MediaRenderer({
       // e é o único sinal que o balão tem: sem ele o atendente vê o player e
       // não sabe se vai existir texto (#2133).
       const terminou = DERIVACAO_TERMINADA.has(message.media_derived_status ?? "");
-      // Mesmo critério do drain: só a mídia que a ingestão manda derivar
-      // (recebida, ou enviada pelo celular), pela idade em `created_at` — nunca
+      // Mesmo critério do drain: só a mídia que manda derivar (recebida, enviada pelo celular ou, desde a
+      // v1.9.51.2, o áudio enviado pela tela), pela idade em `created_at` — nunca
       // `sent_at`, que no inbound é o relógio do aparelho.
       const pendente =
         !terminou &&
-        (message.direction === "inbound" || message.sent_via === "external_device") &&
+        // v1.9.51.2: o áudio enviado pela TELA (sent_via 'user') também é transcrito agora.
+        (message.direction === "inbound" || message.sent_via === "external_device" || message.sent_via === "user") &&
         agora - new Date(message.created_at).getTime() < TETO_AVISO_TRANSCREVENDO_MS;
       return (
         <div className="flex flex-col gap-2">
