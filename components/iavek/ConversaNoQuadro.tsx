@@ -186,7 +186,8 @@ function PainelDaConversa({
   const assumir = useClaimConversation();
   const faltam = useContext(IncompletosNoCardContext)?.[lead.id] ?? [];
 
-  useMarkAsRead(conversa?.id ?? null, conversa?.unread_count_for_assignee ?? 0);
+  // ia.vek v1.9.53: só o RESPONSÁVEL zera o contador; admin, gestor e guardião só visualizam.
+  useMarkAsRead(conversa?.id ?? null, conversa?.unread_count_for_assignee ?? 0, conversa?.assigned_to_user_id ?? null);
   // CRM-244 (Fase 2): a leitura DESTA pessoa (não zera a de mais ninguém).
   useAberturaDaConversa(conversa?.id ?? null);
 

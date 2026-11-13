@@ -92,7 +92,7 @@ function Tela({
   naoLidas: number;
   barra: InboxFiltersValue;
 }) {
-  useMarkAsRead(conversa, naoLidas);
+  useMarkAsRead(conversa, naoLidas, "u-1");
   return <InboxFilters value={barra} onChange={() => {}} />;
 }
 

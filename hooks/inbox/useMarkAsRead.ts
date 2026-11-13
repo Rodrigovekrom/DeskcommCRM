@@ -9,10 +9,15 @@ const DEBOUNCE_MS = 1500;
 /**
  * Marca a conversa como lida após permanecer em foco (EPIC-03 S-03.10).
  * Só chama a API quando unread > 0 para evitar writes desnecessários.
+ *
+ * ia.vek v1.9.53 (Rodrigo 13/11): e SÓ quando quem olha é o RESPONSÁVEL (`responsavelId` = o
+ * `assigned_to_user_id` da conversa). Admin, gestor, guardião ou outro vendedor só visualizam; conversa
+ * sem responsável não é marcada por ninguém. O servidor tem a mesma trava (markConversationReadHandler).
  */
-export function useMarkAsRead(conversationId: string | null, unread: number) {
+export function useMarkAsRead(conversationId: string | null, unread: number, responsavelId: string | null | undefined) {
   const { user } = useAuth();
   const readonly = user.support?.access_mode === "support_readonly";
+  const souOResponsavel = !!responsavelId && responsavelId === user.id;
   const qc = useQueryClient();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -38,7 +43,7 @@ export function useMarkAsRead(conversationId: string | null, unread: number) {
       timerRef.current = null;
     }
 
-    if (readonly || !conversationId || unread <= 0) return;
+    if (readonly || !souOResponsavel || !conversationId || unread <= 0) return;
 
     timerRef.current = setTimeout(() => {
       mutate(conversationId);
@@ -47,5 +52,5 @@ export function useMarkAsRead(conversationId: string | null, unread: number) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [conversationId, unread, mutate, readonly]);
+  }, [conversationId, unread, mutate, readonly, souOResponsavel]);
 }
