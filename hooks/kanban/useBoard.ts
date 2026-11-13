@@ -95,6 +95,36 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
   const agrupador = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
+   * ia.vek v1.9.51 (Maestro 011542, CPU): com a aba ESCONDIDA, o evento do tempo real só MARCA o quadro como velho
+   * (sem ir ao banco); ao VOLTAR a aba, ele recarrega UMA vez e, até o dado novo chegar, `atualizandoAoVoltar` avisa a
+   * tela (que não mostra o velho como se fosse atual). MEDIDO no canário: com a aba escondida, o quadro e o painel
+   * recarregavam 44 + 44 vezes em 11 min, sem ninguém olhando. O que AVISA a pessoa (som, contador, notificação de
+   * mensagem nova e de lead passado, título da aba) NÃO passa por aqui e segue na hora.
+   */
+  const pendenteAoVoltar = useRef(false);
+  const [atualizandoAoVoltar, setAtualizandoAoVoltar] = useState(false);
+  const recarregar = useCallback(() => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      pendenteAoVoltar.current = true;
+      void qc.invalidateQueries({ queryKey, exact: true, refetchType: "none" });
+      return;
+    }
+    void qc.invalidateQueries({ queryKey, exact: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo/verComo
+  }, [qc, pipelineId, escopo, verComo]);
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible" || !pendenteAoVoltar.current) return;
+      pendenteAoVoltar.current = false;
+      setAtualizandoAoVoltar(true);
+      void qc.refetchQueries({ queryKey, exact: true }).finally(() => setAtualizandoAoVoltar(false));
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => document.removeEventListener("visibilitychange", aoVoltar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo/verComo
+  }, [qc, pipelineId, escopo, verComo]);
+
+  /**
    * Cards que acabaram de mudar POR EVENTO REMOTO — o pulso da Wave 3.
    *
    * Só entra aqui o que veio de fora: a própria ação já tem feedback (o card se
@@ -128,11 +158,11 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
         if (!agrupador.current) {
           agrupador.current = setTimeout(() => {
             agrupador.current = null;
-            void qc.invalidateQueries({ queryKey, exact: true });
+            recarregar();
           }, agruparEventosMs);
         }
       } else {
-        qc.invalidateQueries({ queryKey, exact: true });
+        recarregar();
       }
 
       const leadId = idDoEvento(payload);
@@ -169,7 +199,7 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo
-    [qc, pipelineId, escopo, agruparEventosMs],
+    [qc, pipelineId, escopo, agruparEventosMs, recarregar],
   );
 
   // O STATUS DO CANAL NÃO PODE SER DESCARTADO. `useRealtimeChannel` calcula
@@ -226,11 +256,11 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
       if (agrupadorDaConversa.current) return;
       agrupadorDaConversa.current = setTimeout(() => {
         agrupadorDaConversa.current = null;
-        void qc.invalidateQueries({ queryKey, exact: true });
+        recarregar();
       }, Math.max(agruparEventosMs, 30_000));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave é derivada de pipelineId/escopo
-    [qc, pipelineId, escopo, agruparEventosMs],
+    [qc, pipelineId, escopo, agruparEventosMs, recarregar],
   );
   useRealtimeChannel({
     name: pipelineId && orgDoQuadro ? `kanban-conversas-${pipelineId}${escopo ? `-${escopo}` : ""}` : "kanban-conversas-disabled",
@@ -278,5 +308,5 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
     enabled: !!pipelineId,
   });
 
-  return { ...query, pulses, realtimeStatus, seguranca };
+  return { ...query, pulses, realtimeStatus, seguranca, atualizandoAoVoltar };
 }

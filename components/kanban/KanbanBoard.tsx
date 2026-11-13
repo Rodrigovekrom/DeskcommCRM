@@ -1,4 +1,5 @@
 "use client";
+import { cn } from "@/lib/utils";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext, useKeyboardSensor, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
@@ -78,6 +79,8 @@ interface KanbanBoardProps {
   etapasOcultas?: ReadonlySet<string>;
   etapasRecolhidas?: ReadonlySet<string>;
   onAbrirEtapa?: (stageId: string) => void;
+  /** ia.vek v1.9.51: a aba voltou e o quadro está buscando o dado novo; o velho fica apagado, sem clique. */
+  atualizando?: boolean;
 }
 
 function groupLeadsByStage(
@@ -144,6 +147,7 @@ export function KanbanBoard({
   etapasOcultas,
   etapasRecolhidas,
   onAbrirEtapa,
+  atualizando = false,
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -541,8 +545,10 @@ export function KanbanBoard({
           contêiner e não cresceria com os cards. O `pb-4` mora no envelope
           (border-box), senão somaria aos 100% e o quadro rolaria 16px à toa. */}
       <div
-        className="min-h-0 flex-1 overflow-auto px-4"
+        className={cn("min-h-0 flex-1 overflow-auto px-4", atualizando && "pointer-events-none opacity-40 transition-opacity")}
         data-quadro-do-funil
+        aria-busy={atualizando || undefined}
+        data-atualizando={atualizando ? "" : undefined}
       >
         <div className="flex min-h-full w-max items-stretch gap-3 pb-4" data-colunas-do-quadro>
         {data.stages.map((stage, indice) =>

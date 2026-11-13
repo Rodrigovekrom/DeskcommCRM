@@ -62,7 +62,9 @@ describe("o tempo real recarrega SÓ o quadro (item 3: a cascata de consultas)",
   it("as invalidações do useBoard são exatas (não levam a faixa sem dono nem a carteira junto)", () => {
     const s = readFileSync("hooks/kanban/useBoard.ts", "utf8");
     expect(s.match(/invalidateQueries\(\{ queryKey \}\)/g)).toBeNull();
-    expect((s.match(/invalidateQueries\(\{ queryKey, exact: true \}\)/g) ?? []).length).toBe(3);
+    // v1.9.51 (aba escondida): os 3 caminhos do tempo real passam por recarregar(), que invalida SÓ este quadro (exact)
+    expect((s.match(/invalidateQueries\(\{ queryKey, exact: true(, refetchType: "none")? \}\)/g) ?? []).length).toBe(2);
+    expect((s.match(/^\s+recarregar\(\);$/gm) ?? []).length).toBe(3);
   });
   it("a faixa sem dono segue recarregando quando o quadro recarrega (pelo próprio efeito)", () => {
     const s = readFileSync("app/app/pipeline/_client.tsx", "utf8");
