@@ -32,6 +32,9 @@ export function useAgentInbox(status: "open" | "resolved" = "open") {
     // 30 s: é esta leitura que toca o som da etapa que avisa e do pedido de
     // pessoa (`useSonsDaCentral`) — um minuto de atraso num pedido de pessoa pesa.
     refetchInterval: 30_000,
+    // ia.vek v1.9.51 (Maestro 013808): o sino e o som chegam em até 30 s MESMO com a aba escondida (antes, o React
+    // Query pausava o intervalo e o aviso só vinha ao voltar à aba). Só a lista ABERTA (a do sino); a de resolvidos não.
+    refetchIntervalInBackground: status === "open",
     queryFn: () =>
       apiClient
         .get<{ data: AgentInboxData }>(`/api/v1/ai/inbox?status=${status}`)

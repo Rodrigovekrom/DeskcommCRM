@@ -124,3 +124,11 @@ describe("o que AVISA a pessoa segue na hora com a aba escondida (não passa pel
     });
   }
 });
+
+describe("o sino e o som com a aba ESCONDIDA (Maestro 013808): a Central segue buscando de 30 em 30 s", () => {
+  it("o useAgentInbox liga o refetchIntervalInBackground SÓ na lista aberta (a do sino)", () => {
+    const s = readFileSync("hooks/ai/useAgentInbox.ts", "utf8");
+    expect(s).toContain("refetchInterval: 30_000,");
+    expect(s).toContain('refetchIntervalInBackground: status === "open",');
+  });
+});
