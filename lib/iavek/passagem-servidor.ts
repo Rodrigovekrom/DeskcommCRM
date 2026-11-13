@@ -265,6 +265,22 @@ export async function registrarPassagem(
  * sem guardião, fica sem dono e aparece em "Chegaram agora — sem dono"). O
  * negócio do follow-up fecha, ligado ao novo (o clone da tela).
  */
+/** v1.9.52: o dono do lead do Follow-up, SE ele é um SDR de Follow-up ativo (role agent, sem revogação) na org. */
+export async function sdrDeFollowupQueCuidava(
+  db: Pick<SupabaseClient, "from">,
+  lead: { organization_id: string; owner_user_id: string | null },
+): Promise<string | null> {
+  if (!lead.owner_user_id) return null;
+  const { data } = await db
+    .from("user_organizations")
+    .select("user_id, role, revoked_at, interface_settings")
+    .eq("organization_id", lead.organization_id)
+    .eq("user_id", lead.owner_user_id)
+    .maybeSingle();
+  const v = data as { role?: string; revoked_at?: string | null; interface_settings?: { funcao?: string } | null } | null;
+  return v && v.role === "agent" && !v.revoked_at && v.interface_settings?.funcao === "sdr_followup" ? lead.owner_user_id : null;
+}
+
 export async function reativarLead(
   admin: SupabaseClient,
   ctx: HandlerCtx,
@@ -288,7 +304,10 @@ export async function reativarLead(
   const r = await clonarLeadParaFunil(admin, ctx, lead.id, { pipeline_id: entrada.pipeline_id, stage_id: etapa });
   if (!r.ok) return { ok: false, erro: r.code };
   const novo = r.clone as { id: string };
-  const guardiao = lead.sdr_user_id;
+  // ia.vek v1.9.52 (CRM-254, resposta 1 do Rodrigo): se quem cuidava do lead no Follow-up é um SDR DE FOLLOW-UP ativo
+  // (o dono do lead do Follow-up), ELE fica com o reativado, como dono E guardião, para passar ao vendedor como o
+  // guardião faz (muda a regra de 27/10, que devolvia ao guardião de antes). Sem SDR de Follow-up, a regra de antes.
+  const guardiao = (await sdrDeFollowupQueCuidava(admin, lead)) ?? lead.sdr_user_id;
   const agora = new Date().toISOString();
   // Ciclo novo: o nascimento das 72h é AGORA (o clone pode herdar a marca do ciclo antigo).
   const { error: erroDoClone } = await admin
