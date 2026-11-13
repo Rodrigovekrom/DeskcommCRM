@@ -278,6 +278,21 @@ describe("a ROTA da esteira", () => {
     expect(estado.falhou).toEqual(["org-02"]);
   });
 
+  it("(Lupa 192756, v1.9.51.4) o AVISO de parada que LANÇA não derruba a rodada: as outras lojas têm resultado e o erro vai ao log", async () => {
+    vi.stubEnv("ESTEIRA_CONCORRENCIA", "4");
+    estado.orgs = orgs(5);
+    estado.falharOrg = "org-02";
+    const { esteiraFalhou } = await import("@/lib/esteira/aviso-de-parada");
+    vi.mocked(esteiraFalhou).mockImplementationOnce(async () => {
+      throw new Error("banco caiu no aviso");
+    });
+    const r = await terminar(chamar());
+    expect(r).toHaveLength(5);
+    expect(r).toContainEqual({ organization_id: "org-02", erro: "rodada falhou" });
+    expect(r.filter((x) => x.cobrancas === 1)).toHaveLength(4);
+    expect(estado.logs).toContainEqual({ msg: "esteira_aviso_de_parada_falhou", ctx: { organization_id: "org-02", error: "banco caiu no aviso" } });
+  });
+
   it("'rodada_em_curso' NÃO grava a hora: a loja pulada vai na FRENTE na rodada seguinte", async () => {
     estado.orgs = [{ id: "org-z", settings: {} }];
     const presa = chamar();

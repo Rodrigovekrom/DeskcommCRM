@@ -113,7 +113,16 @@ export async function GET(req: NextRequest): Promise<Response> {
       const erro = err instanceof Error ? err.message.slice(0, 200) : String(err);
       logger.error("esteira_rodada_falhou", { organization_id: org.id, error: erro });
       resultados.push({ organization_id: org.id, erro });
-      await esteiraFalhou(admin, org.id);
+      // ia.vek v1.9.51.4 (Lupa 192756): o aviso de parada também vai ao banco. Se ELE lançar, o erro subia pelo
+      // trabalhador e o Promise.all derrubava a rodada inteira (as lojas já feitas ficavam sem resultado). Só loga.
+      try {
+        await esteiraFalhou(admin, org.id);
+      } catch (errAviso) {
+        logger.error("esteira_aviso_de_parada_falhou", {
+          organization_id: org.id,
+          error: errAviso instanceof Error ? errAviso.message.slice(0, 200) : String(errAviso),
+        });
+      }
     }
   });
   for (const org of rodada.semTempo) {

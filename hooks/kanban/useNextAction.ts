@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/types";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
+import { invalidarQuadrosDoFunil } from "@/hooks/kanban/useBoard";
 import { liberarEcoLocal, marcarEcoLocal } from "@/lib/kanban/local-echo";
 
 interface DecidirArgs {
@@ -23,7 +24,6 @@ interface DecidirArgs {
  */
 export function useDecidirProximaAcao(pipelineId: string) {
   const qc = useQueryClient();
-  const queryKey = ["board", pipelineId] as const;
 
   return useMutation({
     mutationFn: async ({ leadId, decision, approvedSeq }: DecidirArgs) => {
@@ -39,13 +39,13 @@ export function useDecidirProximaAcao(pipelineId: string) {
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
         // A proposta mudou (ou sumiu): recarregar é o que mostra a nova.
-        qc.invalidateQueries({ queryKey });
+        void invalidarQuadrosDoFunil(qc, pipelineId);
       }
       showApiError(err);
     },
     onSettled: (_data, _err, args) => {
       liberarEcoLocal(args.leadId);
-      qc.invalidateQueries({ queryKey });
+      void invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
 }

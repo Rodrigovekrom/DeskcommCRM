@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { chamadasEmVoo } from "@/lib/api/client";
-import { caminhoSemDados, type Medida } from "@/lib/iavek/medidas-de-tela";
+import { caminhoSemDados, type Medida, redeDoNavegador } from "@/lib/iavek/medidas-de-tela";
 
 /**
  * ia.vek v1.9.16: a medição real por tela, no ar. Não desenha nada. Mede o tempo até a
@@ -17,7 +17,9 @@ const SELETOR_CARREGANDO = "main .animate-pulse";
 
 function enviar(m: Medida): void {
   try {
-    const corpo = new Blob([JSON.stringify(m)], { type: "application/json" });
+    // ia.vek v1.9.51.4 (Lupa 192902 b): a rede do navegador, quando ele conta (o Safari não conta: fica sem).
+    const rede = redeDoNavegador(typeof navigator === "undefined" ? null : navigator);
+    const corpo = new Blob([JSON.stringify(rede ? { ...m, rede } : m)], { type: "application/json" });
     if (!navigator.sendBeacon?.("/api/v1/iavek/medidas", corpo)) {
       void fetch("/api/v1/iavek/medidas", { method: "POST", body: corpo, keepalive: true }).catch(() => {});
     }

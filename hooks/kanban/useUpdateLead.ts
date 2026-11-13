@@ -2,6 +2,7 @@
 import type { VendaDaLoja } from "@/lib/iavek/venda-da-loja";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import { invalidarQuadrosDoFunil } from "@/hooks/kanban/useBoard";
 import { liberarEcoLocal, marcarEcoLocal } from "@/lib/kanban/local-echo";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { Lead } from "@/lib/types/leads";
@@ -65,7 +66,7 @@ export function useWinLead(pipelineId: string) {
     onError: showApiError,
     onSettled: (_data, _err, { leadId }) => {
       liberarEcoLocal(leadId);
-      qc.invalidateQueries({ queryKey });
+      void invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
 }
@@ -88,7 +89,7 @@ export function useLoseLead(pipelineId: string) {
     onError: showApiError,
     onSettled: (_data, _err, { leadId }) => {
       liberarEcoLocal(leadId);
-      qc.invalidateQueries({ queryKey });
+      void invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
 }
@@ -126,7 +127,7 @@ export function useMoveLeadToPipeline(pipelineId: string) {
     onError: showApiError,
     onSettled: (_data, _err, { leadId }) => {
       liberarEcoLocal(leadId);
-      qc.invalidateQueries({ queryKey });
+      void invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
 }
@@ -151,7 +152,7 @@ export function useEditLead(pipelineId: string) {
     onError: showApiError,
     onSettled: (_data, _err, { leadId }) => {
       liberarEcoLocal(leadId);
-      qc.invalidateQueries({ queryKey });
+      void invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
 }

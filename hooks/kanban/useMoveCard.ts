@@ -1,6 +1,7 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import { invalidarQuadrosDoFunil } from "@/hooks/kanban/useBoard";
 import { liberarEcoLocal, marcarEcoLocal } from "@/lib/kanban/local-echo";
 import { ApiError } from "@/lib/api/types";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -140,7 +141,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
       for (const [chave, dado] of ctx?.snapshots ?? []) qc.setQueryData(chave, dado);
       if (err instanceof ApiError && err.status === 409) {
         // Reconcile authoritative state — server already gave new updated_at.
-        qc.invalidateQueries({ queryKey });
+        void invalidarQuadrosDoFunil(qc, pipelineId);
       }
       if (err instanceof ApiError && err.code === "reabertura_cria_novo" && opcoes.onRetomada) {
         // NÃO toast: um "erro" genérico mentiria sobre uma recusa que tem
@@ -186,7 +187,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
       // A marca fecha com a AÇÃO, não com o relógio: daqui em diante só a folga
       // curta do último evento da cascata (ver lib/kanban/local-echo.ts).
       liberarEcoLocal(args.leadId);
-      qc.invalidateQueries({ queryKey });
+      void invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
 }

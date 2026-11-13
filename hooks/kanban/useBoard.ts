@@ -1,5 +1,5 @@
 "use client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ehEcoLocal } from "@/lib/kanban/local-echo";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
@@ -63,6 +63,17 @@ export function chaveDoQuadro(pipelineId: string | null) {
 }
 
 /**
+ * ia.vek v1.9.51.4 (Lupa 192902): o que uma AÇÃO recarrega depois de assentar: os quadros do funil (o da loja, a
+ * carteira), mas NÃO a faixa sem dono (["board", id, "sem-dono"]), que segue o painel, que segue o quadro. Pela
+ * chave-prefixo ["board", id] a faixa ia ao servidor 2 a 3 vezes por clique (MEDIDO no canário).
+ */
+export function invalidarQuadrosDoFunil(qc: QueryClient, pipelineId: string | null) {
+  return qc.invalidateQueries({
+    predicate: (q) => q.queryKey[0] === "board" && q.queryKey[1] === pipelineId && q.queryKey[2] !== "sem-dono",
+  });
+}
+
+/**
  * ia.vek v1.7.7: `"carteira"` = só os leads de que quem pede é dono (o Pipeline
  * do vendedor). A chave de cache COMEÇA pela do quadro (`["board", id, …]`), de
  * propósito: toda invalidação por `["board", id]` alcança as duas, e quem
@@ -96,6 +107,7 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
   const { escopo, agruparEventosMs = 0, verComo = null, esperar = false } = opcoes;
   const queryKey = escopo ? [...chaveDaCarteira(pipelineId), verComo] : chaveDoQuadro(pipelineId);
   const agrupador = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const soEcoNaLeva = useRef(false);
 
   /**
    * ia.vek v1.9.51 (Maestro 011542, CPU): com a aba ESCONDIDA, o evento do tempo real só MARCA o quadro como velho
@@ -169,18 +181,27 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
       // Conservative: invalidate the board on any change. Optimistic patches
       // arrive faster via useMoveCard's onMutate; this just reconciles
       // cross-user changes within ~250ms.
+      const leadId = idDoEvento(payload);
       if (agruparEventosMs > 0) {
+        // ia.vek v1.9.51.4 (Lupa 192902): se TODOS os eventos da leva são o eco de uma ação MINHA (a marca do
+        // local-echo, aberta pela mutação até ela assentar + a folga), a leva não recarrega o quadro: a própria ação
+        // já recarrega no onSettled, DEPOIS do commit, e vê o mesmo dado. Um evento de fora (outro lead, outra pessoa,
+        // ou sem id) na leva = recarrega como antes. MEDIDO no canário: era a 2ª ida do quadro em cada clique.
+        const eco = !!leadId && ehEcoLocal(leadId);
         if (!agrupador.current) {
+          soEcoNaLeva.current = eco;
           agrupador.current = setTimeout(() => {
             agrupador.current = null;
+            if (soEcoNaLeva.current) return;
             recarregar();
           }, agruparEventosMs);
+        } else if (!eco) {
+          soEcoNaLeva.current = false;
         }
       } else {
         recarregar();
       }
 
-      const leadId = idDoEvento(payload);
       // Janela, não marca gasta por evento: uma ação minha chega aqui em DUAS
       // parcelas (o movimento e o carimbo de `last_activity_at` da atividade).
       if (!leadId || ehEcoLocal(leadId)) return;

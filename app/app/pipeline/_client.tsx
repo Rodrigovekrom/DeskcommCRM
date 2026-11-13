@@ -19,7 +19,9 @@ import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
-import { useBoard } from "@/hooks/kanban/useBoard";
+import { invalidarQuadrosDoFunil, useBoard } from "@/hooks/kanban/useBoard";
+import { useRecargaAgrupada } from "@/lib/iavek/recarga-agrupada";
+import { liberarEcoLocal, marcarEcoLocal } from "@/lib/kanban/local-echo";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { recorteDaFuncao } from "@/lib/iavek/painel-do-pipeline";
 import { apiClient } from "@/lib/api/client";
@@ -266,7 +268,9 @@ function usePainelDoPipeline(verComo: string | null, pronto: boolean) {
     // Rede de segurança: o quadro já pede recarga quando o tempo real chega.
     refetchInterval: 60_000,
   });
-  const recarregar = useCallback(() => void qc.invalidateQueries({ queryKey: chave }), [qc]); // eslint-disable-line react-hooks/exhaustive-deps -- chave fixa
+  const recarregarJa = useCallback(() => void qc.invalidateQueries({ queryKey: chave }), [qc]); // eslint-disable-line react-hooks/exhaustive-deps -- chave fixa
+  // ia.vek v1.9.51.4: os quadros pedem o painel a cada recarga (a da ação e a do eco): UMA recarga por leva.
+  const recarregar = useRecargaAgrupada(recarregarJa);
   return { data, dataUpdatedAt, recarregar };
 }
 
@@ -324,14 +328,18 @@ function QuadroDoFunil({
   // ia.vek v1.9.16: só quando o quadro RECARREGA. Na primeira carga o selo e o painel
   // acabaram de ser pedidos, e pedir de novo só dobrava a abertura da tela.
   const cargaAnterior = useRef<{ funil: string; em: number } | null>(null);
+  // ia.vek v1.9.51.4: o selo recarrega UMA vez por leva de recargas do quadro (não uma por recarga).
+  const recarregarPadrao = useRecargaAgrupada(() => {
+    void qcPadrao.invalidateQueries({ queryKey: ["iavek", "padrao", escopoDoPadrao, pipelineId] });
+  });
   useEffect(() => {
     if (!dataUpdatedAt) return;
     const anterior = cargaAnterior.current;
     cargaAnterior.current = { funil: pipelineId, em: dataUpdatedAt };
     if (anterior?.funil !== pipelineId) return;
-    void qcPadrao.invalidateQueries({ queryKey: ["iavek", "padrao", escopoDoPadrao, pipelineId] });
+    recarregarPadrao();
     aoAtualizar();
-  }, [dataUpdatedAt, pipelineId, qcPadrao, escopoDoPadrao, aoAtualizar]);
+  }, [dataUpdatedAt, pipelineId, recarregarPadrao, aoAtualizar]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2" data-realtime-status={realtimeStatus.toLowerCase()} data-funil={pipelineId}>
@@ -411,7 +419,7 @@ function FaixaDePedidosDeAjuda({ pipelineId }: { pipelineId: string }) {
     onError: (erro) => showApiError(erro),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: chave });
-      void qc.invalidateQueries({ queryKey: ["board", pipelineId] });
+      invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
   const total = data?.total ?? 0;
@@ -467,11 +475,22 @@ function FaixaSemDono({ pipelineId, quadroAtualizadoEm }: { pipelineId: string; 
 
   const assumir = useMutation({
     mutationFn: (leadId: string) => apiClient.post(`/api/v1/iavek/pipeline/assumir`, { lead_id: leadId }),
+    // ia.vek v1.9.51.4: o eco desta ação pelo tempo real não recarrega o quadro de novo (a ação já recarrega), e o lead
+    // assumido sai da faixa NA HORA (a faixa volta ao servidor na próxima leva do painel, ou pelo erro).
+    onMutate: (leadId) => {
+      marcarEcoLocal(leadId);
+      qc.setQueryData<{ total: number; itens: LeadSemDono[] }>(chave, (atual) =>
+        atual ? { total: Math.max(0, atual.total - 1), itens: atual.itens.filter((l) => l.id !== leadId) } : atual,
+      );
+    },
     onError: (erro) => {
       showApiError(erro);
       void qc.invalidateQueries({ queryKey: chave });
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["board", pipelineId] }),
+    onSettled: (_d, _e, leadId) => {
+      liberarEcoLocal(leadId);
+      return invalidarQuadrosDoFunil(qc, pipelineId);
+    },
   });
 
   const total = data?.total ?? 0;
@@ -549,3 +568,4 @@ function FaixaCompraFuturaVencida() {
     </section>
   );
 }
+

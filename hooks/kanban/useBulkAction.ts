@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { BulkLeadActionInput } from "@/lib/schemas/leads";
+import { invalidarQuadrosDoFunil } from "@/hooks/kanban/useBoard";
 import { liberarEcoLocal, marcarEcoLocal } from "@/lib/kanban/local-echo";
 import { lotesDeIds } from "@/lib/kanban/selecao";
 
@@ -49,7 +50,7 @@ export function useBulkAction(pipelineId: string) {
     onError: showApiError,
     onSettled: (_data, _err, input) => {
       for (const leadId of input.lead_ids) liberarEcoLocal(leadId);
-      qc.invalidateQueries({ queryKey: ["board", pipelineId] });
+      void invalidarQuadrosDoFunil(qc, pipelineId);
     },
   });
 }

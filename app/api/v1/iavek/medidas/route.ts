@@ -12,6 +12,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { medidaParaRegistro, medidaSchema } from "@/lib/iavek/medidas-de-tela";
+import { pessoaAnonima } from "@/lib/iavek/medidas-de-tela-servidor";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -36,11 +37,14 @@ export async function POST(req: NextRequest): Promise<Response> {
   const medida = medidaSchema.safeParse(bruto);
   if (!medida.success) return fail("validation_failed", "Medida inválida.", 422, { requestId });
 
+  const pessoa = pessoaAnonima(authz.user.id);
   logger.info("[medida-de-tela]", {
     ...medidaParaRegistro(medida.data),
+    ...(pessoa ? { pessoa } : {}),
     org: authz.org.orgId,
     papel: authz.org.role,
     funcao: (authz.org.interface_settings as { funcao?: unknown } | null | undefined)?.funcao ?? null,
   });
   return ok({ recebida: true }, { requestId });
 }
+
