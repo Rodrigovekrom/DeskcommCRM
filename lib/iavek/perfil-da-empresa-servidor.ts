@@ -44,6 +44,29 @@ export async function semearFunilDaClinica(admin: SupabaseClient, organizationId
   return (data as string | null) ?? null;
 }
 
+export type ResultadoDoFunilDeLoja = "criado" | "ja_tinha" | "tem_funil_sem_esteira" | "falhou";
+
+/**
+ * ia.vek v1.9.54 (CRM-357): cria o funil de LOJA DE CARROS pronto (o de 72h, padrão, e o de Follow-up, com a esteira
+ * DESLIGADA), pela `fn_iavek_semear_funil_loja` (migration 0636: o retrato do modelo, idempotente, trava por org).
+ * NUNCA LANÇA: se falhar, a empresa fica como está, o erro vai ao log e o resultado é "falhou" (Lupa 193007 4).
+ */
+export async function semearFunilDaLoja(admin: SupabaseClient, organizationId: string): Promise<ResultadoDoFunilDeLoja> {
+  try {
+    const { data, error } = await admin.rpc("fn_iavek_semear_funil_loja", { p_org: organizationId });
+    if (error) throw new Error(error.message);
+    const r = (data as { resultado?: string } | null)?.resultado;
+    if (r === "criado" || r === "ja_tinha" || r === "tem_funil_sem_esteira") return r;
+    throw new Error(`resultado inesperado: ${String(r)}`);
+  } catch (e) {
+    logger.warn("[iavek-perfil] não consegui criar o funil da loja", {
+      organization_id: organizationId,
+      causa: e instanceof Error ? e.message.slice(0, 200) : String(e),
+    });
+    return "falhou";
+  }
+}
+
 /**
  * ia.vek v1.9.2 — o que a agenda da IA precisa saber da empresa: se está no
  * modo agendamento (a IA marca) e como marca. NUNCA LANÇA: erro de leitura vale

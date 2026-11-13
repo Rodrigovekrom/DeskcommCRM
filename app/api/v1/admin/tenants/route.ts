@@ -7,7 +7,7 @@ import { falhaDaEscritaDePlatformAdmin, requirePlatformAdmin, requirePlatformAdm
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lojaQuePrecisaLigarOAltimus } from "@/lib/estoque/org-dona";
 import { comPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
-import { semearFunilDaClinica } from "@/lib/iavek/perfil-da-empresa-servidor";
+import { semearFunilDaClinica, semearFunilDaLoja, type ResultadoDoFunilDeLoja } from "@/lib/iavek/perfil-da-empresa-servidor";
 import { valorDaInstalacao } from "@/lib/instalacao/config";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
@@ -219,6 +219,7 @@ export async function POST(req: NextRequest) {
     }
     return fail("internal_error", "Não foi possível criar a organização", 500, { requestId });
   }
+  let funilDeLoja: ResultadoDoFunilDeLoja | null = null;
   if (org.created && nicho) {
     const { data: linha } = await admin.from("organizations").select("settings").eq("id", org.id).maybeSingle();
     const { error: erroDoPerfil } = await admin
@@ -235,6 +236,9 @@ export async function POST(req: NextRequest) {
     }
     // v1.9.1: a clínica nasce com o funil padrão de clínica.
     if (nicho === "clinica") await semearFunilDaClinica(admin, org.id);
+    // v1.9.54 (CRM-357): a loja de carros nasce com o funil de loja pronto (72h + Follow-up, a esteira DESLIGADA).
+    // Se falhar, a empresa FICA criada e a resposta avisa (funil_de_loja: "falhou").
+    if (nicho === "loja_de_carros") funilDeLoja = await semearFunilDaLoja(admin, org.id);
   }
   if (org.created) {
     await audit({
@@ -252,6 +256,7 @@ export async function POST(req: NextRequest) {
         plan: request.plan,
         creator_role: "admin",
         iavek_nicho: nicho ?? null,
+        ...(funilDeLoja ? { funil_de_loja: funilDeLoja } : {}),
       },
     });
   }
@@ -278,6 +283,8 @@ export async function POST(req: NextRequest) {
       slug: org.slug,
       display_name: org.display_name,
       owner_invitation: ownerInvitation,
+      // v1.9.54 (CRM-357): só na loja de carros; "falhou" = a empresa foi criada SEM o funil (refazer à mão)
+      ...(funilDeLoja ? { funil_de_loja: funilDeLoja } : {}),
     },
     { status: 201, requestId },
   );
