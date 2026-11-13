@@ -77,7 +77,9 @@ services:
     # O teto não impede o pico legítimo; impede que UM serviço leve a máquina
     # inteira. Estourá-lo mata só quem estourou, e o `restart: unless-stopped`
     # o traz de volta — falha isolada em vez de queda geral.
-    mem_limit: 512m
+    # ia.vek v1.9.51 (Maestro 002807, Lupa 002724): 512m -> 768m, com o heap de 384 (abaixo). Fora do heap o worker usa
+    # ~150 a 330 MB; 384 + 330 = 714 < 768. Antes da troca, o trocar-v151 confere a RAM livre (para abaixo de 1 GB).
+    mem_limit: 768m
     # Imagem publicada — e não mais `build:` sozinho. O motivo é o modo de falha
     # que isso escondia: serviço build-only é PULADO por `docker compose pull`
     # ("Skipped - No image to be pulled") e imune a `up -d` sem `--build`. Ele era
@@ -112,10 +114,10 @@ services:
       # dentro da rede do compose, o WAHA é o serviço 'waha' na porta interna 3000
       WAHA_API_BASE_URL: http://waha:3000
       SUPABASE_DB_ADMIN_URL: ""
-      # ia.vek v1.9.51 (Maestro 002545, 13/11): o heap EXPLÍCITO. Sem ele o Node escolhia sozinho dentro dos 512m e
-      # coletava tarde (o salto de 230 para 392 MiB em 13/11 00:00Z). 320 + ~150-190 MB fora do heap cabe no teto de
-      # 512m; 384 não caberia (o kernel mataria antes de o Node coletar). No KVM 4: heap 1024 / teto 1536m.
-      NODE_OPTIONS: "--max-old-space-size=320"
+      # ia.vek v1.9.51 (Maestro 002807, a opção da Lupa 002724): o heap EXPLÍCITO de 384 com o teto de 768m (acima).
+      # Sem ele o Node escolhia sozinho e coletava tarde (o salto de 230 para 392 MiB em 13/11 00:00Z). Pela regra da
+      # Lupa (fora do heap ~150 a 330 MB), 320 dentro de 512 podia estourar (320 + 330 = 650). No KVM 4: 1024 / 1536m.
+      NODE_OPTIONS: "--max-old-space-size=384"
     networks:
       - internal
     healthcheck:
