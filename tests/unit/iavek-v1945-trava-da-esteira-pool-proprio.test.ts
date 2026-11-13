@@ -41,7 +41,7 @@ describe("v1.9.45: o pool só das travas da esteira", () => {
 
   it("⭐ a rota da esteira pega a trava no pool das travas, nunca direto no pool das requisições", () => {
     const rota = readFileSync("app/api/v1/cron/esteira-vendas/route.ts", "utf8");
-    expect(rota).toMatch(/const pool = poolDasTravasDaEsteira\(getRequestPool\(\)\);/);
+    expect(rota).toMatch(/const pool = poolDasTravasDaEsteira\(getRequestPool\(\), n\);/);
     expect(rota).not.toMatch(/const pool = getRequestPool\(\);/);
   });
 });

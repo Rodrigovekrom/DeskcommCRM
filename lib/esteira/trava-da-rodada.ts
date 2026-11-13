@@ -81,23 +81,35 @@ export function eTempoEsgotadoDaConexao(e: unknown): boolean {
   return e instanceof Error && /timeout exceeded when trying to connect/i.test(e.message);
 }
 
-/** Quantas conexões o pool das travas tem. 1 enquanto a esteira roda as organizações em fila. */
+/**
+ * Quantas conexões o pool das travas tem, no PADRÃO (1 = as organizações em fila, como sempre). CRM-354: com N lojas
+ * em paralelo, o pool tem N conexões (cada trabalhador segura a transação da trava da SUA loja pela rodada inteira;
+ * com 1 conexão e N trabalhadores, N-1 esperariam 5 s e sairiam 'rodada_em_curso' sem ser).
+ */
 export const CONEXOES_DAS_TRAVAS_DA_ESTEIRA = 1;
 export const NOME_DA_CONEXAO_DA_TRAVA = "iavek-trava-esteira";
-const POOLS_DAS_TRAVAS = new WeakMap<object, pg.Pool>();
+const POOLS_DAS_TRAVAS = new WeakMap<object, Map<number, pg.Pool>>();
 
 /**
  * O pool SÓ DAS TRAVAS da esteira, montado a partir do pool das requisições (a mesma URL), uma vez por processo.
  * Separado, a trava nunca tira uma conexão das telas. Dublês de teste e pools sem URL: o próprio pool.
  */
-export function poolDasTravasDaEsteira(base: Pick<pg.Pool, "connect">): Pick<pg.Pool, "connect"> {
+export function poolDasTravasDaEsteira(
+  base: Pick<pg.Pool, "connect">,
+  conexoes: number = CONEXOES_DAS_TRAVAS_DA_ESTEIRA,
+): Pick<pg.Pool, "connect"> {
   const url = (base as { options?: { connectionString?: string } }).options?.connectionString;
   if (!url) return base;
-  let p = POOLS_DAS_TRAVAS.get(base);
+  let porTamanho = POOLS_DAS_TRAVAS.get(base);
+  if (!porTamanho) {
+    porTamanho = new Map();
+    POOLS_DAS_TRAVAS.set(base, porTamanho);
+  }
+  let p = porTamanho.get(conexoes);
   if (!p) {
     p = new pg.Pool({
       connectionString: url,
-      max: CONEXOES_DAS_TRAVAS_DA_ESTEIRA,
+      max: conexoes,
       application_name: NOME_DA_CONEXAO_DA_TRAVA,
       // ia.vek v1.9.46 (nota 1 da Lupa): nunca esperar sem fim pela conexão. Os tetos de comando e de trava vão
       // por `set local` na transação (comTravaDaEsteira), não como parâmetro de partida (o pooler pode recusar).
@@ -105,7 +117,7 @@ export function poolDasTravasDaEsteira(base: Pick<pg.Pool, "connect">): Pick<pg.
     });
     p.on("connect", (c) => c.on("error", () => undefined));
     p.on("error", () => undefined);
-    POOLS_DAS_TRAVAS.set(base, p);
+    porTamanho.set(conexoes, p);
   }
   return p;
 }

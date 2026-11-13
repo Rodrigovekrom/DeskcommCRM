@@ -86,6 +86,7 @@ vi.mock("@/lib/agent-engine/db/request-pool", () => ({
 
 import { GET } from "@/app/api/v1/cron/esteira-vendas/route";
 import { chaveDaTravaDaEsteira } from "@/lib/esteira/trava-da-rodada";
+import { esquecerRodadas } from "@/lib/esteira/rodada-em-paralelo";
 
 const chamar = async () => {
   const res = await GET({} as never);
@@ -98,6 +99,8 @@ const soltarTodas = () => estado.liberar.splice(0).forEach((r) => r());
 
 afterEach(() => {
   soltarTodas();
+  // CRM-354: a ordem "a mais antiga primeiro" guarda a hora da última rodada EM MEMÓRIA; entre os casos, zera.
+  esquecerRodadas();
   Object.assign(estado, {
     orgs: [], travas: new Map(), conexoes: 0, soltas: 0, emCurso: new Map(),
     maxSimultaneoPorOrg: 0, liberar: [], falharOrg: null, rodadas: [], transacoes: new Set(),
@@ -143,12 +146,15 @@ describe("v1.9.43: trava da rodada da esteira por organização", () => {
     estado.orgs = [{ id: "org-a", settings: {} }, { id: "org-b", settings: {} }];
     const r2 = chamar();
     await esperarRodadas(2); // a org-b entrou, mesmo com a org-a travada
-    soltarTodas();
+    // CRM-354: a org-a já gravou a hora ao pegar a trava, então a org-b (que nunca rodou) vai PRIMEIRO. Solta SÓ a
+    // org-b: a 2ª chamada então tenta a org-a, que segue travada pela 1ª.
+    estado.liberar.splice(1, 1).forEach((r) => r());
     const segunda = await r2;
+    soltarTodas();
     await r1;
     expect(segunda).toEqual([
-      { organization_id: "org-a", pulada: "rodada_em_curso" },
       expect.objectContaining({ organization_id: "org-b", cobrancas: 1 }),
+      { organization_id: "org-a", pulada: "rodada_em_curso" },
     ]);
     expect(estado.travas.size).toBe(0);
   });

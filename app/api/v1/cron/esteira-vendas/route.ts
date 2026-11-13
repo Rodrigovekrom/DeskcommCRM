@@ -21,6 +21,7 @@ import { depsReaisDaEsteira } from "@/lib/esteira/deps-reais";
 import { esteiraFalhou, esteiraRodou } from "@/lib/esteira/aviso-de-parada";
 import { rodadaTeveEfeito, rodarEsteira, type ResumoDaRodada } from "@/lib/esteira/rodada";
 import { comTravaDaEsteira, poolDasTravasDaEsteira } from "@/lib/esteira/trava-da-rodada";
+import { concorrenciaDaEsteira, marcarQueRodou, ordenarPorJustica, rodarEmParalelo } from "@/lib/esteira/rodada-em-paralelo";
 import { rodarCompraFutura, type ResumoDaCompraFutura } from "@/lib/iavek/compra-futura/rodada";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { logger } from "@/lib/logger";
@@ -47,21 +48,29 @@ export async function GET(req: NextRequest): Promise<Response> {
   const resultados: Array<
     { organization_id: string } & Partial<ResumoDaRodada> & {
       erro?: string;
-      pulada?: "rodada_em_curso";
+      pulada?: "rodada_em_curso" | "sem_tempo";
       /** ia.vek v1.9.45 (CRM-294): as ligações dos 7 dias antes da Compra futura. */
       compra_futura?: ResumoDaCompraFutura | { erro: string } | { desligada: true };
     }
   > = [];
-  // ia.vek v1.9.43: uma rodada por organização de cada vez (lib/esteira/trava-da-rodada.ts).
-  // ia.vek v1.9.45: a trava num pool SÓ DELA (1 conexão), para não tirar uma das 4 conexões das telas por ~19 s.
-  const pool = poolDasTravasDaEsteira(getRequestPool());
-  for (const org of (orgs ?? []) as Array<{ id: string; settings: unknown }>) {
-    if (paradas.has(org.id)) continue;
-    const cfg = configDaEsteira(org.settings);
-    if (cfg.funis === null) continue;
+  // ia.vek v1.9.43: a trava por organização (lib/esteira/trava-da-rodada.ts); v1.9.45: num pool SÓ DELA.
+  // ia.vek CRM-354 (v1.9.51.3): N organizações ao mesmo tempo (ESTEIRA_CONCORRENCIA, padrão 1 = a fila de antes),
+  // o pool das travas com N conexões, a mais antiga primeiro e nenhuma NOVA depois de 240 s (lib/esteira/rodada-em-paralelo.ts).
+  const n = concorrenciaDaEsteira();
+  const pool = poolDasTravasDaEsteira(getRequestPool(), n);
+  const elegiveis = ((orgs ?? []) as Array<{ id: string; settings: unknown }>)
+    .filter((org) => !paradas.has(org.id))
+    .map((org) => ({ id: org.id, settings: org.settings, cfg: configDaEsteira(org.settings) }))
+    .filter((org) => org.cfg.funis !== null);
+
+  const rodada = await rodarEmParalelo(ordenarPorJustica(elegiveis), n, async (org) => {
     try {
       const travada = await comTravaDaEsteira(pool, org.id, async () => {
-        const resumo = await rodarEsteira(cfg, depsReaisDaEsteira(admin, org.id, () => new Date()));
+        // (Lupa 182714) a hora da justiça é gravada no COMEÇO de toda tentativa que PEGOU a trava, com sucesso OU com
+        // erro. Quem saiu 'rodada_em_curso' ou 'sem_tempo' não grava (vai na frente na próxima). Se só o sucesso
+        // gravasse, uma loja que falha devagar ficaria sempre em 1º e comeria o orçamento de todas as rodadas.
+        marcarQueRodou(org.id, Date.now());
+        const resumo = await rodarEsteira(org.cfg, depsReaisDaEsteira(admin, org.id, () => new Date()));
         // ia.vek v1.9.45 (CRM-294): na MESMA trava, as ligações dos 7 dias antes da Compra futura. Um erro
         // aqui não derruba a esteira: fica registrado no resultado da rodada.
         // Desde 11/11 (Rodrigo simplificou), a tarefa dos 7 dias antes só roda com o interruptor ligado.
@@ -76,7 +85,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         // A rodada anterior desta organização ainda está em curso: pula, não espera nem dobra.
         logger.info("esteira_rodada_pulada", { organization_id: org.id, motivo: "rodada_em_curso" });
         resultados.push({ organization_id: org.id, pulada: "rodada_em_curso" });
-        continue;
+        return;
       }
       const { resumo, compraFutura } = travada.valor;
       resultados.push({ organization_id: org.id, ...resumo, compra_futura: compraFutura });
@@ -98,6 +107,17 @@ export async function GET(req: NextRequest): Promise<Response> {
       resultados.push({ organization_id: org.id, erro });
       await esteiraFalhou(admin, org.id);
     }
+  });
+  for (const org of rodada.semTempo) {
+    logger.warn("esteira_rodada_sem_tempo", { organization_id: org.id });
+    resultados.push({ organization_id: org.id, pulada: "sem_tempo" });
   }
+  // Uma linha por rodada: a prova do canário (o máximo de juntas) e a medida da Lupa.
+  logger.info("esteira_rodada_paralela", {
+    concorrencia: n,
+    organizacoes: elegiveis.length,
+    max_juntas: rodada.maxJuntas,
+    sem_tempo: rodada.semTempo.length,
+  });
   return ok({ organizacoes: resultados }, { requestId });
 }
