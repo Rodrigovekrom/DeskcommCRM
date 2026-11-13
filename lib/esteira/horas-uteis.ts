@@ -41,14 +41,35 @@ interface PartesLocais {
   diaDaSemana: number;
 }
 
+// ia.vek v1.9.52.2 (Lupa 224739, Maestro 224758): criar um Intl.DateTimeFormat é CARO (~50–100 µs); a conta das
+// horas úteis criava ~8 por dia percorrido, e a cobrança da esteira percorre ~3.000 dias por rodada (619 tarefas
+// vencidas na Fenômenos, 13/11): ~25 mil criações SÍNCRONAS = o laço do app travado ~2 s no fim de cada rodada.
+// Agora UM formatador por (tipo, fuso), guardado. O resultado é o MESMO (o formatToParts não muda).
+const formatadores = new Map<string, Intl.DateTimeFormat>();
+function formatador(tipo: "partes" | "relogio", fuso: string): Intl.DateTimeFormat {
+  const chave = `${tipo}|${fuso}`;
+  let f = formatadores.get(chave);
+  if (!f) {
+    f =
+      tipo === "partes"
+        ? new Intl.DateTimeFormat("en-US", { timeZone: fuso, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" })
+        : new Intl.DateTimeFormat("en-US", {
+            timeZone: fuso,
+            hourCycle: "h23",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+    formatadores.set(chave, f);
+  }
+  return f;
+}
+
 function partesLocais(instante: Date, fuso: string): PartesLocais {
-  const f = new Intl.DateTimeFormat("en-US", {
-    timeZone: fuso,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-  });
+  const f = formatador("partes", fuso);
   const p = Object.fromEntries(f.formatToParts(instante).map((x) => [x.type, x.value]));
   const dias: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return { ano: Number(p.year), mes: Number(p.month), dia: Number(p.day), diaDaSemana: dias[p.weekday!] ?? 0 };
@@ -56,16 +77,7 @@ function partesLocais(instante: Date, fuso: string): PartesLocais {
 
 /** Diferença (ms) entre o relógio local do fuso e UTC naquele instante. */
 function deslocamento(instante: Date, fuso: string): number {
-  const f = new Intl.DateTimeFormat("en-US", {
-    timeZone: fuso,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const f = formatador("relogio", fuso);
   const p = Object.fromEntries(f.formatToParts(instante).map((x) => [x.type, x.value]));
   const comoUtc = Date.UTC(
     Number(p.year),

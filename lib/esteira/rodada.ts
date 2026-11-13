@@ -373,9 +373,14 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   // ── 5: cobrança de ligação vencida ──────────────────────────────────────────
   const vencidas = await deps.ligacoesVencidas(agora);
   const feitas = await deps.cobrancasFeitas(vencidas.map((t) => t.id));
+  let n = 0;
   for (const t of vencidas) {
-    const atraso = horasUteisEntre(new Date(t.due_date), agora, cfg.horario);
+    // ia.vek v1.9.52.2 (Lupa 224739): o laço cede a vez a cada 50 tarefas (as telas não esperam a rodada), e a tarefa
+    // já cobrada no nível 2 não tem mais nada a fazer: nem calcula o atraso.
+    if (++n % 50 === 0) await new Promise<void>((r) => setImmediate(r));
     const ja = feitas.get(t.id) ?? new Set<number>();
+    if (ja.has(2)) continue;
+    const atraso = horasUteisEntre(new Date(t.due_date), agora, cfg.horario);
     if (atraso >= cfg.escaladaHorasNivel2 && !ja.has(2)) {
       await deps.cobrar(t, 2, cfg.escaladaNivel2);
       resumo.cobrancas += 1;
