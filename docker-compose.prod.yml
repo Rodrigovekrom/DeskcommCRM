@@ -112,6 +112,10 @@ services:
       # dentro da rede do compose, o WAHA é o serviço 'waha' na porta interna 3000
       WAHA_API_BASE_URL: http://waha:3000
       SUPABASE_DB_ADMIN_URL: ""
+      # ia.vek v1.9.51 (Maestro 002545, 13/11): o heap EXPLÍCITO. Sem ele o Node escolhia sozinho dentro dos 512m e
+      # coletava tarde (o salto de 230 para 392 MiB em 13/11 00:00Z). 320 + ~150-190 MB fora do heap cabe no teto de
+      # 512m; 384 não caberia (o kernel mataria antes de o Node coletar). No KVM 4: heap 1024 / teto 1536m.
+      NODE_OPTIONS: "--max-old-space-size=320"
     networks:
       - internal
     healthcheck:
