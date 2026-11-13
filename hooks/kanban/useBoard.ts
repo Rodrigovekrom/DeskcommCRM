@@ -99,7 +99,8 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
    * (sem ir ao banco); ao VOLTAR a aba, ele recarrega UMA vez e, até o dado novo chegar, `atualizandoAoVoltar` avisa a
    * tela (que não mostra o velho como se fosse atual). MEDIDO no canário: com a aba escondida, o quadro e o painel
    * recarregavam 44 + 44 vezes em 11 min, sem ninguém olhando. O que AVISA a pessoa (som, contador, notificação de
-   * mensagem nova e de lead passado, título da aba) NÃO passa por aqui e segue na hora.
+   * mensagem nova e de lead passado, a central do sino pelo useAgentInbox) NÃO passa por aqui e segue na hora.
+   * A regra é por `visibilityState` (aba escondida/minimizada), NÃO por foco: a janela visível no 2º monitor segue ao vivo.
    */
   const pendenteAoVoltar = useRef(false);
   const [atualizandoAoVoltar, setAtualizandoAoVoltar] = useState(false);

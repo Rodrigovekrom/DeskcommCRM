@@ -1,7 +1,7 @@
 /**
  * ia.vek v1.9.51 (Maestro 011542): com a aba ESCONDIDA, o tempo real só MARCA o quadro como velho; ao VOLTAR a aba,
- * ele recarrega UMA vez, e a tela sabe que está atualizando. O que AVISA a pessoa (som, contador, notificação, título
- * da aba) não passa pelo quadro e não olha a aba: segue na hora.
+ * ele recarrega UMA vez, e a tela sabe que está atualizando. O que AVISA a pessoa (som, contador, notificação, o sino)
+ * não passa pelo quadro e não olha a aba: segue na hora. (O app não tem contador no título da aba.)
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -94,6 +94,7 @@ describe("o que AVISA a pessoa segue na hora com a aba escondida (não passa pel
     "hooks/notifications/useNotify.ts",
     "hooks/notifications/useSonsDaCentral.ts",
     "components/shell/AlertsBell.tsx",
+    "hooks/ai/useAgentInbox.ts",
   ];
   for (const f of AVISOS) {
     it(f, () => {
