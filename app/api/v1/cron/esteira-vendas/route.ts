@@ -69,7 +69,8 @@ export async function GET(req: NextRequest): Promise<Response> {
         // (Lupa 182714) a hora da justiça é gravada no COMEÇO de toda tentativa que PEGOU a trava, com sucesso OU com
         // erro. Quem saiu 'rodada_em_curso' ou 'sem_tempo' não grava (vai na frente na próxima). Se só o sucesso
         // gravasse, uma loja que falha devagar ficaria sempre em 1º e comeria o orçamento de todas as rodadas.
-        marcarQueRodou(org.id, Date.now());
+        const comecou = Date.now();
+        marcarQueRodou(org.id, comecou);
         const resumo = await rodarEsteira(org.cfg, depsReaisDaEsteira(admin, org.id, () => new Date()));
         // ia.vek v1.9.45 (CRM-294): na MESMA trava, as ligações dos 7 dias antes da Compra futura. Um erro
         // aqui não derruba a esteira: fica registrado no resultado da rodada.
@@ -79,6 +80,13 @@ export async function GET(req: NextRequest): Promise<Response> {
               erro: e instanceof Error ? e.message.slice(0, 200) : String(e),
             }))
           : ({ desligada: true } as const);
+        // (Lupa 184158) o início e o fim de CADA loja, para ver no log quais rodadas se sobrepuseram.
+        logger.info("esteira_rodada_da_loja", {
+          organization_id: org.id,
+          inicio: new Date(comecou).toISOString(),
+          fim: new Date().toISOString(),
+          ms: Date.now() - comecou,
+        });
         return { resumo, compraFutura };
       });
       if (!travada.rodou) {

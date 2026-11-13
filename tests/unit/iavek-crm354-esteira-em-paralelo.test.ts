@@ -227,6 +227,18 @@ describe("a ROTA da esteira", () => {
     expect(linha?.ctx).toMatchObject({ concorrencia: 1, organizacoes: 3, max_juntas: 1, sem_tempo: 0 });
   });
 
+  it("(Lupa 184158) cada loja deixa 1 linha com o INÍCIO e o FIM da sua rodada", async () => {
+    vi.stubEnv("ESTEIRA_CONCORRENCIA", "4");
+    estado.orgs = orgs(4);
+    await terminar(chamar());
+    const linhas = estado.logs.filter((l) => l.msg === "esteira_rodada_da_loja");
+    expect(linhas).toHaveLength(4);
+    for (const l of linhas) {
+      expect(l.ctx).toMatchObject({ organization_id: expect.any(String), inicio: expect.any(String), fim: expect.any(String), ms: expect.any(Number) });
+      expect(Date.parse(String(l.ctx.fim))).toBeGreaterThanOrEqual(Date.parse(String(l.ctx.inicio)));
+    }
+  });
+
   it("N = 4 com 10 lojas: as 10 rodam, no máximo 4 JUNTAS, e a trava fica limpa no fim", async () => {
     vi.stubEnv("ESTEIRA_CONCORRENCIA", "4");
     estado.orgs = orgs(10);
