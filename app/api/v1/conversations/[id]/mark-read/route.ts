@@ -4,6 +4,9 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  *
  * Disparado pelo inbox após 1,5s com a conversa em foco (EPIC-03 S-03.10).
  * RLS garante que só conversas visíveis ao ator são atualizadas.
+ *
+ * ia.vek v1.9.53: só zera quando QUEM PEDE é o responsável (assigned_to_user_id). Os outros recebem 200 com
+ * `marcada: false` e o motivo, e NADA é gravado (ver markConversationReadHandler).
  */
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
@@ -33,7 +36,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (!authz.ok) return authz.response;
 
   try {
-    const conv = await markConversationReadHandler(
+    const r = await markConversationReadHandler(
       supabase,
       {
         organization_id: authz.org.orgId,
@@ -43,7 +46,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
       },
       id,
     );
-    return ok(conv, { requestId });
+    return ok({ ...r.conversation, marcada: r.marcada, ...(r.motivo ? { motivo: r.motivo } : {}) }, { requestId });
   } catch (err) {
     if (err instanceof ApiError) {
       return fail(err.code, err.message, err.status, { requestId });

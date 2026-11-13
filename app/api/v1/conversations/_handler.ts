@@ -647,23 +647,51 @@ export async function patchConversationHandler(
 // mark read
 // ---------------------------------------------------------------------------
 
+/**
+ * ia.vek v1.9.53 (Rodrigo 13/11, Maestro 131135): SÓ O RESPONSÁVEL marca como lida.
+ *
+ * O contador `unread_count_for_assignee` é do RESPONSÁVEL pela conversa. Antes, qualquer ator com papel
+ * agent ou acima o zerava ao abrir (o admin geral abria, o contador sumia e o vendedor perdia a marcação).
+ * Agora quem abre e NÃO é o `assigned_to_user_id` (admin, gestor, guardião, outro vendedor) só VÊ: nada é
+ * gravado. Conversa SEM responsável: ninguém zera ao abrir. A trava mora AQUI, no servidor (o front também
+ * deixa de pedir, mas um pedido vindo de outro lugar não pode zerar). O filtro do UPDATE carrega a regra:
+ * a linha só casa se o ator for o responsável NAQUELE instante, então não há janela entre conferir e gravar.
+ */
+export type MotivoDaLeituraNaoMarcada = "nao_e_o_responsavel" | "sem_responsavel";
+
 export async function markConversationReadHandler(
   supabase: SB,
   ctx: HandlerCtx,
   conversationId: string,
-): Promise<Conversation> {
-  const { data, error } = await supabase
+): Promise<{ conversation: Conversation; marcada: boolean; motivo?: MotivoDaLeituraNaoMarcada }> {
+  const atorId = ctx.actor.type === "user" ? ctx.actor.id : null;
+
+  if (atorId !== null) {
+    const { data, error } = await supabase
+      .from("conversations")
+      .update({ unread_count_for_assignee: 0 })
+      .eq("id", conversationId)
+      .eq("organization_id", ctx.organization_id)
+      .eq("assigned_to_user_id", atorId)
+      .select(SELECT_COLS)
+      .maybeSingle();
+    if (error) {
+      throw new ApiError(500, "internal_error", undefined, ctx.requestId, error.message);
+    }
+    if (data) return { conversation: data as unknown as Conversation, marcada: true };
+  }
+
+  // Não casou: ou a conversa não existe / não é visível (404), ou quem abriu não é o responsável. Só LEITURA.
+  const { data: atual, error: erroDaLeitura } = await supabase
     .from("conversations")
-    .update({ unread_count_for_assignee: 0 })
+    .select(SELECT_COLS)
     .eq("id", conversationId)
     .eq("organization_id", ctx.organization_id)
-    .select(SELECT_COLS)
     .maybeSingle();
-
-  if (error) {
-    throw new ApiError(500, "internal_error", undefined, ctx.requestId, error.message);
+  if (erroDaLeitura) {
+    throw new ApiError(500, "internal_error", undefined, ctx.requestId, erroDaLeitura.message);
   }
-  if (!data) {
+  if (!atual) {
     throw new ApiError(
       404,
       "not_found",
@@ -672,5 +700,10 @@ export async function markConversationReadHandler(
       traduzir("Conversa não encontrada.", ctx.idioma ?? "pt-BR"),
     );
   }
-  return data as unknown as Conversation;
+  const conversation = atual as unknown as Conversation;
+  return {
+    conversation,
+    marcada: false,
+    motivo: conversation.assigned_to_user_id ? "nao_e_o_responsavel" : "sem_responsavel",
+  };
 }

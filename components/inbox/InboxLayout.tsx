@@ -370,9 +370,11 @@ export function InboxLayout({
 
   // A leitura da conversa aberta é do upstream e fica: sem ela o contador de
   // não-lidas nunca zera para quem abre a conversa.
+  // ia.vek v1.9.53: só o RESPONSÁVEL marca como lida; os outros só visualizam.
   useMarkAsRead(
     selectedConversation?.id ?? null,
     selectedConversation?.unread_count_for_assignee ?? 0,
+    selectedConversation?.assigned_to_user_id ?? null,
   );
 
   // Aceita `null`: é o VOLTAR do celular, que limpa a seleção e devolve a lista.
