@@ -29,3 +29,16 @@ describe("0635 — a RLS do SDR de Follow-up", () => {
     expect(M).toContain("when 'sdr_followup' then 'own'");
   });
 });
+
+describe("Lupa 021031/021102: a linha do tempo, as tarefas e o botão de passar ao vendedor", () => {
+  it("a linha do tempo e as tarefas do lead ganham a cláusula do Follow-up (cada uma tem a sua cópia da régua)", () => {
+    expect(M).toContain('create policy "crm_lead_activities_select" on public.crm_lead_activities');
+    expect(M).toContain("create policy crm_tasks_select on public.crm_tasks");
+    expect(M).toContain("or lead_id in (select l.id from public.crm_leads l where (l.organization_id, l.pipeline_id) in (select f.org_id, f.pipeline_id from public.fn_iavek_followups_que_cuido() f))");
+  });
+  it("o SDR de Follow-up, guardião do reativado, tem o 'negociar' (passar ao vendedor); o vendedor não ganhou", () => {
+    const r = readFileSync("app/api/v1/iavek/passagem/route.ts", "utf8");
+    expect(r).toContain('const sdr = c.funcao === "sdr" || c.funcao === "suporte" || c.funcao === "sdr_followup";');
+    expect(r).not.toMatch(/const sdr = [^;]*"vendedor"/);
+  });
+});

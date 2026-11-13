@@ -171,6 +171,37 @@ create policy "conversations_select" on public.conversations for select using (
   or ((organization_id, contact_id) in (select c.org_id, c.contato_id from public.fn_iavek_contatos_do_followup() c))
 );
 
+-- (Lupa 021031) a linha do tempo e as tarefas do lead têm a SUA cópia da régua: a mesma cláusula do Follow-up.
+drop policy if exists "crm_lead_activities_select" on public.crm_lead_activities;
+create policy "crm_lead_activities_select" on public.crm_lead_activities
+  for select using (
+    exists (
+      select 1 from public.crm_leads l
+       where l.id = crm_lead_activities.lead_id
+         and ((select public.fn_is_platform_admin())
+              or l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_tudo)
+              or (l.owner_user_id = (select auth.uid())
+                  and l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v))
+              or (l.owner_user_id is null
+                  and l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_sem_dono))
+              -- 0635 (Lupa 021031): a linha do tempo dos leads do Follow-up, para o SDR de Follow-up
+              or (l.organization_id, l.pipeline_id) in (select f.org_id, f.pipeline_id from public.fn_iavek_followups_que_cuido() f))
+    )
+  );
+
+drop policy if exists crm_tasks_select on public.crm_tasks;
+create policy crm_tasks_select on public.crm_tasks
+  for select using (
+    (select public.fn_is_platform_admin())
+    or organization_id in (select public.fn_iavek_orgs_com_todas_as_tarefas())
+    or (organization_id in (select public.fn_user_org_ids())
+        and (assigned_to = (select auth.uid())
+             or created_by = (select auth.uid())
+             or lead_id in (select public.fn_iavek_leads_das_minhas_tarefas())))
+    -- 0635 (Lupa 021031): as tarefas (as ligações L3-L7) dos leads do Follow-up, para o SDR de Follow-up
+    or lead_id in (select l.id from public.crm_leads l where (l.organization_id, l.pipeline_id) in (select f.org_id, f.pipeline_id from public.fn_iavek_followups_que_cuido() f))
+  );
+
 -- R3 (Lupa 014015): o DONO pela tela. Só para o UPDATE direto (current_user = 'authenticated'), só para quem é
 -- sdr_followup na org do lead e NÃO é gerente/admin lá. Os caminhos do servidor (funções security definer, como a
 -- passagem ao vendedor) passam: dentro delas o current_user é o dono da função.

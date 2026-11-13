@@ -47850,7 +47850,9 @@ create policy "crm_lead_activities_select" on public.crm_lead_activities
               or (l.owner_user_id = (select auth.uid())
                   and l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v))
               or (l.owner_user_id is null
-                  and l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_sem_dono)))
+                  and l.organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v where v.ve_sem_dono))
+              -- 0635 (Lupa 021031): a linha do tempo dos leads do Follow-up, para o SDR de Follow-up
+              or (l.organization_id, l.pipeline_id) in (select f.org_id, f.pipeline_id from public.fn_iavek_followups_que_cuido() f))
     )
   );
 
@@ -47981,6 +47983,8 @@ create policy crm_tasks_select on public.crm_tasks
         and (assigned_to = (select auth.uid())
              or created_by = (select auth.uid())
              or lead_id in (select public.fn_iavek_leads_das_minhas_tarefas())))
+    -- 0635 (Lupa 021031): as tarefas (as ligações L3-L7) dos leads do Follow-up, para o SDR de Follow-up
+    or lead_id in (select l.id from public.crm_leads l where (l.organization_id, l.pipeline_id) in (select f.org_id, f.pipeline_id from public.fn_iavek_followups_que_cuido() f))
   );
 
 drop policy if exists crm_tasks_update on public.crm_tasks;

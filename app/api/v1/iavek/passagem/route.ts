@@ -91,7 +91,8 @@ function permissoes(c: Contexto, eu: string) {
   const aberto = c.lead.status === "open";
   const souDono = c.lead.owner_user_id === eu;
   const souGuardiao = c.lead.sdr_user_id === eu;
-  const sdr = c.funcao === "sdr" || c.funcao === "suporte";
+  // v1.9.52 (Lupa 021102): o SDR de Follow-up, guardião do reativado, passa ao vendedor pelo mesmo botão do SDR.
+  const sdr = c.funcao === "sdr" || c.funcao === "suporte" || c.funcao === "sdr_followup";
   return {
     // v1.9.4 (28/10): o gerente também passa o lead para o vendedor, a qualquer momento.
     negociar: c.loja && aberto && !c.noFollowup && (c.souGestor || (sdr && (souDono || souGuardiao))),
