@@ -76,6 +76,26 @@ describe("aba escondida: o tempo real não vai ao banco; ao voltar, 1 recarga", 
     expect(get.mock.calls.length).toBe(antes + 1);
   });
 
+  it("(Lupa 012629) banco lento: a recarga demora 20 s; o clique volta aos 8 s, com o 'ainda atualizando'", async () => {
+    get.mockResolvedValue({ data: QUADRO });
+    const r = montar();
+    await waitFor(() => expect(r.result.current.isSuccess).toBe(true));
+    act(() => mudarAba("hidden"));
+    await act(async () => eventoDoQuadro()?.({ new: { id: "l1" } }));
+    let soltar!: (v: unknown) => void;
+    get.mockImplementationOnce(() => new Promise((ok) => (soltar = ok)));
+    const t0 = Date.now();
+    act(() => mudarAba("visible"));
+    await waitFor(() => expect(r.result.current.atualizandoAoVoltar).toBe(true));
+    await waitFor(() => expect(r.result.current.atualizandoAoVoltar).toBe(false), { timeout: 9_500 });
+    const passou = Date.now() - t0;
+    expect(passou).toBeGreaterThanOrEqual(7_900);
+    expect(passou).toBeLessThan(9_500);
+    expect(r.result.current.aindaAtualizando).toBe(true);
+    await act(async () => soltar({ data: QUADRO }));
+    await waitFor(() => expect(r.result.current.aindaAtualizando).toBe(false));
+  }, 15_000);
+
   it("voltar à aba SEM evento no meio não recarrega nada", async () => {
     get.mockResolvedValue({ data: QUADRO });
     const r = montar();

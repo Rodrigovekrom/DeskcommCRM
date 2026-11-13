@@ -81,6 +81,8 @@ interface KanbanBoardProps {
   onAbrirEtapa?: (stageId: string) => void;
   /** ia.vek v1.9.51: a aba voltou e o quadro está buscando o dado novo; o velho fica apagado, sem clique. */
   atualizando?: boolean;
+  /** (Lupa 012629) passou o teto e o dado novo ainda não chegou: o velho, com clique, e o aviso discreto. */
+  aindaAtualizando?: boolean;
 }
 
 function groupLeadsByStage(
@@ -148,6 +150,7 @@ export function KanbanBoard({
   etapasRecolhidas,
   onAbrirEtapa,
   atualizando = false,
+  aindaAtualizando = false,
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -544,6 +547,11 @@ export function KanbanBoard({
           que rola é BLOCO, não flex: filho de flex é esticado até a altura do
           contêiner e não cresceria com os cards. O `pb-4` mora no envelope
           (border-box), senão somaria aos 100% e o quadro rolaria 16px à toa. */}
+      {aindaAtualizando && (
+        <p className="px-4 pb-1 text-xs text-muted-foreground" role="status" data-testid="ainda-atualizando">
+          {t("ainda atualizando…")}
+        </p>
+      )}
       <div
         className={cn("min-h-0 flex-1 overflow-auto px-4", atualizando && "pointer-events-none opacity-40 transition-opacity")}
         data-quadro-do-funil

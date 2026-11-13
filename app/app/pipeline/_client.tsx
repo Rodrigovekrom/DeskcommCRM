@@ -293,7 +293,7 @@ function QuadroDoFunil({
   const t = useT();
   const pipelineId = funil.id;
   const { verComo, verComoPronto } = useAuth();
-  const { data, isLoading, error, pulses, realtimeStatus, dataUpdatedAt, atualizandoAoVoltar } = useBoard(pipelineId, {
+  const { data, isLoading, error, pulses, realtimeStatus, dataUpdatedAt, atualizandoAoVoltar, aindaAtualizando } = useBoard(pipelineId, {
     ...(recorte === "carteira" ? { escopo: "carteira" as const } : {}),
     verComo: recorte === "carteira" ? verComo : null,
     esperar: !verComoPronto,
@@ -380,6 +380,7 @@ function QuadroDoFunil({
             etapasRecolhidas={new Set(prefs.recolhidas)}
             onAbrirEtapa={(id) => gravar({ ...prefs, recolhidas: prefs.recolhidas.filter((x) => x !== id) })}
             atualizando={atualizandoAoVoltar}
+            aindaAtualizando={aindaAtualizando}
           />
         </CartaoIavekContext.Provider>
         </DadosDaCompraNoCardContext.Provider>

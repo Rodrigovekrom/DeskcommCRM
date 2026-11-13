@@ -51,7 +51,7 @@ export function PipelinePageClient({
   role: Role;
 }) {
   const t = useT();
-  const { data, isLoading, error, pulses, realtimeStatus, seguranca, atualizandoAoVoltar } = useBoard(pipelineId);
+  const { data, isLoading, error, pulses, realtimeStatus, seguranca, atualizandoAoVoltar, aindaAtualizando } = useBoard(pipelineId);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -215,6 +215,7 @@ export function PipelinePageClient({
           etapasRecolhidas={new Set(prefs.recolhidas)}
           onAbrirEtapa={(id) => gravar({ ...prefs, recolhidas: prefs.recolhidas.filter((x) => x !== id) })}
           atualizando={atualizandoAoVoltar}
+          aindaAtualizando={aindaAtualizando}
         />
         </CartaoIavekContext.Provider>
       )}

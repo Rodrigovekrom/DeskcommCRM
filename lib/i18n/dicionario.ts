@@ -1236,6 +1236,7 @@ export const DICIONARIO: Traducoes = {
 
   "Abrir conversa": { es: "Abrir conversación" },
   "Começar conversa": { es: "Empezar conversación" },
+  "ainda atualizando…": { es: "todavía actualizando…" },
   "sem telefone": { es: "sin teléfono" },
   "Sem telefone no contato: cadastre um telefone para abrir a conversa.": {
     es: "Sin teléfono en el contacto: agrega un teléfono para abrir la conversación.",

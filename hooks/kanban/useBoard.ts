@@ -88,6 +88,9 @@ export interface OpcoesDoQuadro {
   esperar?: boolean;
 }
 
+/** ia.vek v1.9.51 (Lupa 012629): o quadro apagado ao voltar a aba solta o clique depois disto, mesmo sem resposta. */
+export const TETO_DO_BLOQUEIO_MS = 8_000;
+
 export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {}) {
   const qc = useQueryClient();
   const { escopo, agruparEventosMs = 0, verComo = null, esperar = false } = opcoes;
@@ -104,6 +107,9 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
    */
   const pendenteAoVoltar = useRef(false);
   const [atualizandoAoVoltar, setAtualizandoAoVoltar] = useState(false);
+  // (Lupa 012629) com o banco lento, o quadro não fica travado: depois de TETO_DO_BLOQUEIO_MS ele volta a aceitar o
+  // clique, mostrando o velho com o aviso discreto 'ainda atualizando…' até o dado novo chegar.
+  const [aindaAtualizando, setAindaAtualizando] = useState(false);
   const recarregar = useCallback(() => {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       pendenteAoVoltar.current = true;
@@ -118,7 +124,15 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
       if (document.visibilityState !== "visible" || !pendenteAoVoltar.current) return;
       pendenteAoVoltar.current = false;
       setAtualizandoAoVoltar(true);
-      void qc.refetchQueries({ queryKey, exact: true }).finally(() => setAtualizandoAoVoltar(false));
+      const teto = setTimeout(() => {
+        setAtualizandoAoVoltar(false);
+        setAindaAtualizando(true);
+      }, TETO_DO_BLOQUEIO_MS);
+      void qc.refetchQueries({ queryKey, exact: true }).finally(() => {
+        clearTimeout(teto);
+        setAtualizandoAoVoltar(false);
+        setAindaAtualizando(false);
+      });
     };
     document.addEventListener("visibilitychange", aoVoltar);
     return () => document.removeEventListener("visibilitychange", aoVoltar);
@@ -309,5 +323,5 @@ export function useBoard(pipelineId: string | null, opcoes: OpcoesDoQuadro = {})
     enabled: !!pipelineId,
   });
 
-  return { ...query, pulses, realtimeStatus, seguranca, atualizandoAoVoltar };
+  return { ...query, pulses, realtimeStatus, seguranca, atualizandoAoVoltar, aindaAtualizando };
 }
