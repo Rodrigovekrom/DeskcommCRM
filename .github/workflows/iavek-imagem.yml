@@ -37,6 +37,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+      # (Maestro 030547) a imagem iavek-v1.9.X só sai se o rótulo do app for 1.9.X; falha em segundos, antes de tudo.
+      - name: versão do app = a do ramo
+        run: bash scripts/iavek-conferir-versao.sh "${{ github.ref_name }}"
       - uses: ./.github/actions/preparar-node
         timeout-minutes: 10
       - name: typecheck
