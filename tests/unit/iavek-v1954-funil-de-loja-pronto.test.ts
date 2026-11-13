@@ -36,10 +36,10 @@ describe("1. o modelo na migration", () => {
     expect(MODELO_TXT).not.toMatch(UUID);
     expect(MODELO_TXT.toLowerCase()).not.toMatch(/fen[oô]menos/);
   });
-  it("2 funis (72h com 21 etapas e padrão; Follow-up com 8), 1 ganho e 1 perda em cada", () => {
+  it("2 funis (72h com 17 etapas e padrão; Follow-up com 8), 1 ganho e 1 perda em cada", () => {
     const f72 = MODELO.funis.find((f) => f.slug === "loja-72h");
     const ffu = MODELO.funis.find((f) => f.slug === "loja-follow-up");
-    expect(f72?.etapas).toHaveLength(21);
+    expect(f72?.etapas).toHaveLength(17);
     expect(ffu?.etapas).toHaveLength(8);
     expect(f72?.is_default).toBe(true);
     for (const f of [f72, ffu]) {
@@ -56,8 +56,13 @@ describe("1. o modelo na migration", () => {
 describe("2. os slugs das regras", () => {
   it("as etapas que as regras usam existem no funil de 72h", () => {
     const slugs = new Set(MODELO.funis.find((f) => f.slug === "loja-72h")?.etapas.map((e) => e.slug));
-    for (const s of ["novo", "em-atendimento-ia", "carro-apresentado", "cta", "passado-ao-sdr", "troca", "agendado-video",
+    for (const s of ["novo", "em-atendimento-ia", "carro-apresentado", "agendado-video",
       "qualificado", "ligacao-de-video", "ficha-feita", "vendido"]) expect(slugs.has(s), s).toBe(true);
+  });
+  it("(Rodrigo CRM-172) as 4 etapas vazias NÃO vêm (nem arquivadas): CTA, Passado ao SDR, Troca, Muito longe", () => {
+    const slugs = MODELO.funis.flatMap((f) => f.etapas.map((e) => e.slug));
+    for (const s of ["cta", "passado-ao-sdr", "troca", "muito-longe"]) expect(slugs, s).not.toContain(s);
+    expect(MODELO.funis.flatMap((f) => f.etapas).filter((e) => (e as { is_archived?: boolean }).is_archived)).toEqual([]);
   });
 });
 
