@@ -19,7 +19,10 @@ import { ROLE_RANK } from "@/lib/auth/types";
 // ia.vek v1.7.8: "analista_ficha" — vê SÓ as fichas (Passar Ficha). Para este
 // vínculo o banco fecha o CRM inteiro (migration 0586: fn_user_org_ids e
 // fn_user_role_in_org não o contam), e o layout o leva para /fichas.
-export const FUNCOES = ["sdr", "suporte", "vendedor", "apoio", "gerente", "analista_ficha"] as const;
+// v1.9.50 (CRM-254, Rodrigo 11/11 "A sim, B sim, C sim, D sim"): "sdr_followup", o SDR de Follow-up. Dono dos leads do
+// funil Follow-up (a passagem das 72h vai para ele; as ligações L3-L7 vão para o dono), VÊ só o Follow-up, e o lead que
+// volta a falar fica com ele, que o passa ao vendedor como o guardião. NÃO dispara o guardião da 0579/0591 ('sdr' exato).
+export const FUNCOES = ["sdr", "suporte", "vendedor", "apoio", "gerente", "analista_ficha", "sdr_followup"] as const;
 export type Funcao = (typeof FUNCOES)[number];
 
 /**
@@ -29,6 +32,7 @@ export type Funcao = (typeof FUNCOES)[number];
  */
 export const FUNCOES_DE_ESCOLHA = [
   "sdr",
+  "sdr_followup",
   "vendedor",
   "gerente",
   "analista_ficha",
@@ -51,6 +55,7 @@ export const ROTULO_DA_FUNCAO: Record<Funcao, string> = {
   apoio: "Gerente de apoio",
   gerente: "Gerente",
   analista_ficha: "Analista de ficha",
+  sdr_followup: "SDR de Follow-up",
 };
 
 /**
@@ -95,6 +100,8 @@ export const DESTINOS_DA_FUNCAO: Record<Funcao, readonly string[]> = {
   apoio: MENU_GERENTE,
   /** v1.7.8: o analista não usa o /app — o layout o leva para /fichas. */
   analista_ficha: [],
+  /** v1.9.50 (CRM-254): o SDR de Follow-up — o dia, os leads do Follow-up, a agenda e os números dele. */
+  sdr_followup: ["/app/meu-dia", "/app/pipeline", "/app/agenda", "/app/meus-numeros"],
 };
 
 export function ehFuncao(v: unknown): v is Funcao {
@@ -145,6 +152,19 @@ export const MENU_DA_FUNCAO: Partial<
 > = {
   gerente: MENU_DO_GERENTE,
   apoio: MENU_DO_GERENTE,
+  // v1.9.50 (CRM-254): o SDR de Follow-up.
+  sdr_followup: [
+    {
+      id: "iavek-sdr-followup",
+      label: "Meu trabalho",
+      itens: [
+        { href: "/app/meu-dia", label: "Meu dia" },
+        { href: "/app/pipeline", label: "Leads do Follow-up" },
+        { href: "/app/agenda", label: "Agenda" },
+        { href: "/app/meus-numeros", label: "Meus dados" },
+      ],
+    },
+  ],
   sdr: [
     {
       id: "iavek-guardiao",

@@ -22,6 +22,7 @@ const DECIDIDAS = [
   "fn_emit_event_on_lead_change",
   "fn_iavek_assumir_da_faixa",
   "fn_iavek_avisar_trava",
+  "fn_iavek_contatos_do_followup", // 0635: o contato/conversa do SDR de Follow-up vem dos leads open E future (Compra futura segue no Follow-up)
   "fn_iavek_aviso_de_ajuda",
   "fn_iavek_faixa_de_ajuda",
   "fn_iavek_lead_segue_a_conversa",

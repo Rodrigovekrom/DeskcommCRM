@@ -44,6 +44,10 @@ export function recorteDaFuncao(funcao: unknown): Recorte {
   const f = funcaoDaTela(funcao);
   if (f === "sdr" || f === "suporte") return { tipo: "carteira", lado: "sdr" };
   if (f === "vendedor") return { tipo: "carteira", lado: "vendedor" };
+  // v1.9.50 (CRM-254, item c): o SDR de Follow-up vê TODO o funil Follow-up, inclusive os sem dono — a carteira
+  // (dono ou guardião = eu) esconderia os sem dono. Então o recorte é o da loja, e quem limita é a RLS da 0630: para
+  // ele, o banco só devolve o funil Follow-up e os leads de que é dono ou guardião (os que reativou).
+  if (f === "sdr_followup") return { tipo: "loja" };
   return { tipo: "loja" };
 }
 

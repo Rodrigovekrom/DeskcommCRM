@@ -259,7 +259,8 @@ describe("5. 'apoio' é apelido do gerente", () => {
     expect(funcaoDaTela("caixa")).toBeNull();
     expect(FUNCOES_DE_ESCOLHA).not.toContain("apoio");
     // v1.7.8: + "analista_ficha" (Passar Ficha).
-    expect([...FUNCOES_DE_ESCOLHA].sort()).toEqual(["analista_ficha", "gerente", "sdr", "vendedor"]);
+    // v1.9.50 (CRM-254): + o SDR de Follow-up.
+    expect([...FUNCOES_DE_ESCOLHA].sort()).toEqual(["analista_ficha", "gerente", "sdr", "sdr_followup", "vendedor"]);
   });
 
   it("menu e barra do apoio são EXATAMENTE os do gerente", () => {
@@ -283,6 +284,7 @@ describe("5. 'apoio' é apelido do gerente", () => {
     expect([...select.options].map((o) => o.value)).toEqual([
       "",
       "sdr",
+      "sdr_followup", // v1.9.50 (CRM-254)
       "vendedor",
       "gerente",
       "analista_ficha",
