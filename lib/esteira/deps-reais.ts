@@ -554,8 +554,12 @@ async function entregarAoSdrDeFollowup(
         .limit(1)
         .maybeSingle();
       if (conversa && (conversa as { assigned_to_user_id: string | null }).assigned_to_user_id == null) {
-        if ((await orgTemAutomatico(admin, orgId)) === false) {
+        const temIa = await orgTemAutomatico(admin, orgId);
+        if (temIa === false) {
           await passarAConversa(admin, { orgId, contactId: ids.contactId, para: sdr, actor: ctx.actor, motivo: MOTIVO_DA_CONVERSA_SEM_IA });
+        } else if (temIa === undefined) {
+          // (Lupa 003315) para saber se o caminho "não deu para saber" aparece na produção
+          logger.warn("conversa_sem_dono_ficou", { organization_id: orgId, lead_id: ids.cloneId, motivo: "org_sem_resposta_de_ia_definida" });
         }
       }
     }
