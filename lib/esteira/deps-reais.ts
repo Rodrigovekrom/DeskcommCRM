@@ -497,7 +497,7 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
  *     viram o SDR de Follow-up (decidido: o simples; Maestro 232320);
  *  c. a CONVERSA do contato segue o novo dono pela regra de sempre (`conversaSegueODono`: só a que está com uma
  *     PESSOA; a que a IA atende fica como está, para não calar a IA);
- *  d. as TAREFAS abertas dos 2 leads que estão com outra pessoa passam ao SDR de Follow-up.
+ *  d. as TAREFAS dos 2 leads que estão com outra pessoa (menos as 'done') passam ao SDR de Follow-up.
  * Nunca derruba a passagem (o lead já está no Follow-up): erro vai ao log, com o passo.
  */
 const MOTIVO_DA_CONVERSA_SEM_IA = "Conversa sem atendente passada ao SDR de Follow-up (a loja não tem atendimento automático no ar)";
@@ -533,7 +533,10 @@ async function entregarAoSdrDeFollowup(
       .update({ assigned_to: sdr })
       .eq("organization_id", orgId)
       .in("lead_id", [ids.originalId, ids.cloneId])
-      .in("status", ["pending", "in_progress"])
+      // (Maestro 050721, prova 05:05Z) também as CANCELADAS: o gatilho do lead fechado cancela as do original ANTES
+      // deste passo, e a cancelada com A/B dava a eles a tarefa E o contato (fn_iavek_contatos_do_vendedor olha a
+      // tarefa de qualquer status). Só as 'done' ficam com quem fez. Só o assigned_to muda.
+      .neq("status", "done")
       .not("assigned_to", "is", null)
       .neq("assigned_to", sdr),
   );
