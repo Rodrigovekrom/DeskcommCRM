@@ -459,7 +459,7 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
            select user_id from public.user_organizations
             where organization_id = $1 and revoked_at is null and role = 'agent' and interface_settings->>'funcao' = 'sdr_followup'),
          clones as (
-           select c.id, c.owner_user_id from public.crm_leads c
+           select c.id, c.owner_user_id, c.created_at from public.crm_leads c
             where c.organization_id = $1 and c.pipeline_id = $2 and c.owner_user_id in (select user_id from sdrs)
               and c.created_at > now() - interval '30 days'),
          g as (
@@ -480,6 +480,9 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
              from clones k
             where tk.organization_id = $1 and tk.status <> 'done'
               and tk.assigned_to is not null and tk.assigned_to is distinct from k.owner_user_id
+              -- (Lupa 051624, Maestro 051636) SÓ as tarefas que JÁ EXISTIAM na passagem (o clone nasce nela). A tarefa
+              -- criada DEPOIS é de quem a pessoa quis (o SDR de Follow-up ou o gerente pode DELEGAR a um vendedor).
+              and tk.created_at <= k.created_at
               and (tk.lead_id = k.id
                    or tk.lead_id in (select x2.id from public.crm_leads x2
                                       where x2.organization_id = $1 and x2.status = 'lost'
@@ -495,7 +498,7 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         // A saúde lê esta linha: > 0 = AMARELO (a entrega da passagem falhou em algum ponto e foi corrigida aqui).
         logger.warn("esteira_followup_reconciliados", { organization_id: orgId, guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas });
       }
-      return { guardioes: r.guardioes, originais: r.originais + r.tarefas };
+      return { guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas };
     },
 
     async cobrar(tarefa, nivel, destinatario) {

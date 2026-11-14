@@ -454,3 +454,12 @@ describe("v1.9.52.3: a reconciliação do Follow-up no fim da rodada (Lupa 00231
     expect(chamou).toBe(false);
   });
 });
+
+describe("v1.9.52.3 (Lupa 051624): a reconciliação conta as tarefas à parte", () => {
+  it("guardiões + originais + tarefas vão somados ao resumo", async () => {
+    const { deps } = montar({ entrada: [] });
+    deps.reconciliarFollowup = async () => ({ guardioes: 1, originais: 2, tarefas: 4 });
+    const r = await rodarEsteira(cfg, deps);
+    expect(r.reconciliadosFollowup).toBe(7);
+  });
+});
