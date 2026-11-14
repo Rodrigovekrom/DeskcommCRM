@@ -39,6 +39,11 @@ describe("0641: o texto da RLS", () => {
     expect(codigo.match(/\("organization_id", "id"\) not in \(select h\.org_id, h\.contato_id from public\.fn_iavek_contatos_escondidos_da_sdr\(\) h\)/g)).toHaveLength(2);
     expect(codigo).toContain("and (contact_id is null or (organization_id, contact_id) not in (select h.org_id, h.contato_id from public.fn_iavek_contatos_escondidos_da_sdr() h)))");
   });
+  it("(Maestro 222635) a cláusula do GUARDIÃO da conversations_select também tira os escondidos da SDR", () => {
+    const i = codigo.indexOf("fn_iavek_contatos_que_guardo() g(org_id, contato_id))");
+    expect(i).toBeGreaterThan(0);
+    expect(codigo.slice(i, i + 400)).toContain("and (organization_id, contact_id) not in (select h.org_id, h.contato_id from public.fn_iavek_contatos_escondidos_da_sdr() h))");
+  });
   it("as funções do servidor NÃO são do authenticated (só service_role)", () => {
     expect(codigo).toContain("revoke execute on function public.fn_iavek_escondidos_da_sdr(uuid) from public, anon, authenticated;");
     expect(codigo).toContain("revoke execute on function public.fn_iavek_contato_escondido_da_sdr(uuid, uuid, uuid) from public, anon, authenticated;");

@@ -10,7 +10,8 @@
 -- O número novo sem lead, e o contato que voltou (lead aberto fora do Follow-up), seguem visíveis.
 --
 -- Muda 3 políticas (o texto de antes + UMA cláusula): contacts read e write (0607) e conversations_select (0635), esta
--- só na parte da conversa SEM dono. A conversa com dono segue a 52.3/52.4. Nada muda para as outras funções.
+-- na parte da conversa SEM dono e na do GUARDIÃO (Maestro 222635: a SDR guardiã do lead do Follow-up, de antes da 52.3).
+-- A conversa com dono segue a 52.3/52.4. Nada muda para as outras funções.
 -- O conjunto escondido é calculado 1 vez por consulta (security definer stable, chamado como (select …); o NOT IN é
 -- descorrelacionado). Volta: voltar-0641.sql (ops): devolve as 3 políticas de antes e tira as funções.
 
@@ -118,7 +119,9 @@ create policy "conversations_select" on public.conversations for select using (
       and organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v(org_id, ve_tudo, ve_sem_dono) where v.ve_sem_dono)
       -- 0641: a conversa sem dono do contato escondido da SDR
       and (contact_id is null or (organization_id, contact_id) not in (select h.org_id, h.contato_id from public.fn_iavek_contatos_escondidos_da_sdr() h)))
-  or ((organization_id, contact_id) in (select g.org_id, g.contato_id from public.fn_iavek_contatos_que_guardo() g(org_id, contato_id)))
+  or ((organization_id, contact_id) in (select g.org_id, g.contato_id from public.fn_iavek_contatos_que_guardo() g(org_id, contato_id))
+      -- 0641 (Maestro 222635): a GUARDIÃ que é SDR também não vê a conversa do contato escondido dela (os passados antes da 52.3)
+      and (organization_id, contact_id) not in (select h.org_id, h.contato_id from public.fn_iavek_contatos_escondidos_da_sdr() h))
   -- 0635: o contato dos leads abertos do Follow-up
   or ((organization_id, contact_id) in (select c.org_id, c.contato_id from public.fn_iavek_contatos_do_followup() c))
 );

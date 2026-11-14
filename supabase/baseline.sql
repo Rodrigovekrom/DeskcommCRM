@@ -5657,7 +5657,9 @@ create policy "conversations_select" on public.conversations for select using (
       and organization_id in (select v.org_id from public.fn_iavek_visao_de_conversas() v(org_id, ve_tudo, ve_sem_dono) where v.ve_sem_dono)
       -- 0641: a conversa sem dono do contato escondido da SDR
       and (contact_id is null or (organization_id, contact_id) not in (select h.org_id, h.contato_id from public.fn_iavek_contatos_escondidos_da_sdr() h)))
-  or ((organization_id, contact_id) in (select g.org_id, g.contato_id from public.fn_iavek_contatos_que_guardo() g(org_id, contato_id)))
+  or ((organization_id, contact_id) in (select g.org_id, g.contato_id from public.fn_iavek_contatos_que_guardo() g(org_id, contato_id))
+      -- 0641 (Maestro 222635): a GUARDIÃ que é SDR também não vê a conversa do contato escondido dela (os passados antes da 52.3)
+      and (organization_id, contact_id) not in (select h.org_id, h.contato_id from public.fn_iavek_contatos_escondidos_da_sdr() h))
   -- 0635: o contato dos leads abertos do Follow-up
   or ((organization_id, contact_id) in (select c.org_id, c.contato_id from public.fn_iavek_contatos_do_followup() c))
 );
