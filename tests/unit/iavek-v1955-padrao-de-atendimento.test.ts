@@ -116,3 +116,41 @@ describe("v1.9.55: o PAPEL do item muda o relógio", () => {
     expect(lido.itens[0]!.minutos).toBeNull();
   });
 });
+
+describe("v1.9.55: os fatos de um lead, a partir do que o servidor buscou em lote (fatosDoLead)", () => {
+  const H = { fuso: "America/Sao_Paulo", dias: { 1: ["09:00", "18:00"] } } as const;
+  const chegou = "2026-11-11T13:00:00Z";
+
+  it("a 1ª resposta de gente conta só a partir da CHEGADA do lead", async () => {
+    const { fatosDoLead } = await import("@/lib/iavek/padrao-da-loja-servidor");
+    const f = fatosDoLead({ created_at: chegou }, { respostas: [Z("2026-11-10T13:00:00Z"), Z("2026-11-11T13:05:00Z")], visitas: [], fichaCompleta: null, horario: H as never, agora: Z("2026-11-11T14:00:00Z") });
+    expect(f.primeiraRespostaDeGente).toBe(Z("2026-11-11T13:05:00Z"));
+  });
+
+  it("visita: só a criada DEPOIS do lead conta para 'agendou'; a que vale é a próxima, senão a mais recente", async () => {
+    const { fatosDoLead } = await import("@/lib/iavek/padrao-da-loja-servidor");
+    const antiga = { inicio: Z("2026-11-01T18:00:00Z"), criada: Z("2026-10-30T12:00:00Z") };
+    expect(fatosDoLead({ created_at: chegou }, { respostas: [], visitas: [antiga], fichaCompleta: null, agora: Z("2026-11-12T12:00:00Z") }).temVisita).toBe(false);
+    const nova = { inicio: Z("2026-11-13T18:00:00Z"), criada: Z("2026-11-11T15:00:00Z") };
+    const f = fatosDoLead({ created_at: chegou }, { respostas: [], visitas: [antiga, nova], fichaCompleta: null, agora: Z("2026-11-12T12:00:00Z") });
+    expect(f.temVisita).toBe(true);
+    expect(f.visita!.inicio).toBe(nova.inicio);
+  });
+
+  it("confirmada na véspera = saída de gente no DIA ANTERIOR ao da visita (fuso da loja); no próprio dia não conta", async () => {
+    const { fatosDoLead } = await import("@/lib/iavek/padrao-da-loja-servidor");
+    const visita = { inicio: Z("2026-11-13T18:00:00Z"), criada: Z("2026-11-11T15:00:00Z") }; // sexta 15h SP
+    const base = { visitas: [visita], fichaCompleta: null, horario: H as never, agora: Z("2026-11-12T12:00:00Z") };
+    // quinta 12/11 às 20h SP (23:00Z): é a véspera
+    expect(fatosDoLead({ created_at: chegou }, { ...base, respostas: [Z("2026-11-12T23:00:00Z")] }).visita!.confirmadaNaVespera).toBe(true);
+    // sexta 13/11 às 8h SP (11:00Z): já é o dia da visita, não a véspera
+    expect(fatosDoLead({ created_at: chegou }, { ...base, respostas: [Z("2026-11-13T11:00:00Z")] }).visita!.confirmadaNaVespera).toBe(false);
+    // quinta 12/11 às 0h05 SP (03:05Z): véspera, logo no começo
+    expect(fatosDoLead({ created_at: chegou }, { ...base, respostas: [Z("2026-11-12T03:05:00Z")] }).visita!.confirmadaNaVespera).toBe(true);
+  });
+
+  it("a ficha vem do banco como está (null = não deu para ler; não vira 'feito')", async () => {
+    const { fatosDoLead } = await import("@/lib/iavek/padrao-da-loja-servidor");
+    expect(fatosDoLead({ created_at: chegou }, { respostas: [], visitas: [], fichaCompleta: null, agora: 0 }).fichaCompleta).toBeNull();
+  });
+});

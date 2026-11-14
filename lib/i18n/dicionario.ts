@@ -14284,6 +14284,7 @@ export const DICIONARIO: Traducoes = {
   "Não se aplica agora": { es: "No aplica por ahora" },
   "Responder em até N minutos": { es: "Responder en hasta N minutos" },
   "Ficha completa": { es: "Ficha completa" },
+  "Prazo em horas desde a chegada do lead": { es: "Plazo en horas desde la llegada del lead" },
   "Visita agendada": { es: "Visita agendada" },
   "Visita confirmada na véspera": { es: "Visita confirmada la víspera" },
   "De quem é o item": { es: "De quién es el ítem" },

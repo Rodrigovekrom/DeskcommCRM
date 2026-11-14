@@ -114,7 +114,7 @@ export function PadraoDaLojaConfig({ etapas }: { etapas: Array<{ id: string; nam
                 </label>
               )}
               <label className="flex items-center gap-1">
-                {t("Prazo em horas depois de assumir")}
+                {it.papel === "sdr" ? t("Prazo em horas desde a chegada do lead") : t("Prazo em horas depois de assumir")}
                 <input type="number" min={1} max={720} className="w-16 rounded-md border px-1" value={it.horas ?? ""} onChange={(e) => mudarItem(i, { horas: e.target.value ? Number(e.target.value) : null })} />
               </label>
               <label className="flex items-center gap-1">
