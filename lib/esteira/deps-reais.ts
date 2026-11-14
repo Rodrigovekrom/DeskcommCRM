@@ -471,16 +471,31 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
             where x.organization_id = $1 and x.status = 'lost' and x.lost_reason = 'moved_to_another_pipeline'
               and x.source_metadata->'movido_para'->>'lead_id' = k.id::text
               and (x.owner_user_id is distinct from k.owner_user_id or x.sdr_user_id is distinct from k.owner_user_id)
-           returning x.id)
-         select (select count(*) from g)::int as guardioes, (select count(*) from o)::int as originais`,
+           returning x.id),
+         -- (Lupa 050818, Maestro 050832) as TAREFAS dos 2 leads (o clone e o original) com outra pessoa, menos as 'done':
+         -- é a tarefa que abre o contato a quem a tem (fn_iavek_contatos_do_vendedor), então uma falha no passo (d) da
+         -- passagem não pode ficar calada.
+         t as (
+           update public.crm_tasks tk set assigned_to = k.owner_user_id
+             from clones k
+            where tk.organization_id = $1 and tk.status <> 'done'
+              and tk.assigned_to is not null and tk.assigned_to is distinct from k.owner_user_id
+              and (tk.lead_id = k.id
+                   or tk.lead_id in (select x2.id from public.crm_leads x2
+                                      where x2.organization_id = $1 and x2.status = 'lost'
+                                        and x2.lost_reason = 'moved_to_another_pipeline'
+                                        and x2.source_metadata->'movido_para'->>'lead_id' = k.id::text))
+           returning tk.id)
+         select (select count(*) from g)::int as guardioes, (select count(*) from o)::int as originais,
+                (select count(*) from t)::int as tarefas`,
         [orgId, followupPipelineId],
       );
-      const r = (rows[0] ?? { guardioes: 0, originais: 0 }) as { guardioes: number; originais: number };
-      if (r.guardioes + r.originais > 0) {
+      const r = (rows[0] ?? { guardioes: 0, originais: 0, tarefas: 0 }) as { guardioes: number; originais: number; tarefas: number };
+      if (r.guardioes + r.originais + r.tarefas > 0) {
         // A saúde lê esta linha: > 0 = AMARELO (a entrega da passagem falhou em algum ponto e foi corrigida aqui).
-        logger.warn("esteira_followup_reconciliados", { organization_id: orgId, guardioes: r.guardioes, originais: r.originais });
+        logger.warn("esteira_followup_reconciliados", { organization_id: orgId, guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas });
       }
-      return r;
+      return { guardioes: r.guardioes, originais: r.originais + r.tarefas };
     },
 
     async cobrar(tarefa, nivel, destinatario) {
