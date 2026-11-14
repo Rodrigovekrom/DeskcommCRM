@@ -50198,6 +50198,158 @@ $$;
 revoke execute on function public.fn_iavek_cancela_tarefas_do_lead_fechado() from public, anon, authenticated;
 
 
+-- ---- ia.vek: as ligações da esteira fecham sozinhas (migration 0640, v1.9.58) ----
+-- Ver o cabeçalho de supabase/migrations/20261114220000_0640_iavek_ligacoes_fecham_sozinhas.sql.
+create or replace function public.fn_iavek_cancela_ligacoes(
+  p_org uuid,
+  p_leads uuid[],
+  p_kinds text[],
+  p_motivo text,
+  p_antes timestamptz default null,
+  p_exceto uuid default null
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_n integer;
+begin
+  with canceladas as (
+    update public.crm_tasks t
+       set status = 'cancelled',
+           cancelada_motivo = p_motivo
+     where t.lead_id = any(p_leads)
+       and t.organization_id = p_org
+       and t.status in ('pending', 'in_progress')
+       and t.source_kind = any(p_kinds)
+       and (p_antes is null or t.created_at < p_antes)
+       and (p_exceto is null or t.id <> p_exceto)
+    returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind
+  ), log as (
+    insert into public.crm_lead_activities
+      (organization_id, lead_id, contact_id, source_module, source_id, type, actor_kind, reason, payload, metadata, performed_at)
+    select c.organization_id, c.lead_id, c.contact_id, 'tarefas', c.id, 'task_cancelled', 'rule',
+           'Ligação fechada sozinha: ' || p_motivo,
+           jsonb_build_object('motivo', p_motivo, 'ligacao', c.source_kind, 'titulo', left(c.title, 200)),
+           jsonb_build_object('origem', 'gatilho_0640'), now()
+      from canceladas c
+    returning 1
+  )
+  select count(*) into v_n from log;
+  return v_n;
+end;
+$$;
+revoke execute on function public.fn_iavek_cancela_ligacoes(uuid, uuid[], text[], text, timestamptz, uuid) from public, anon, authenticated;
+
+-- 1 e 2: nasce uma ligação
+create or replace function public.fn_iavek_ligacao_nasceu()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_k integer;
+  v_kinds text[];
+begin
+  begin
+    if new.lead_id is null then return null; end if;
+    if new.source_kind = 'ligacao:quente' then
+      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.lead_id],
+        array['ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7'], 'cliente_respondeu', null, new.id);
+    elsif new.source_kind ~ '^ligacao:L[2-7]$' then
+      v_k := substring(new.source_kind from 'L([2-7])$')::integer;
+      select array_agg('ligacao:L' || i) into v_kinds from generate_series(1, v_k - 1) i;
+      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.lead_id], v_kinds, 'proxima_ligacao', null, new.id);
+    end if;
+  exception when others then
+    raise warning 'fn_iavek_ligacao_nasceu (0640): % (tarefa %)', sqlerrm, new.id;
+  end;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_ligacao_nasceu() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_ligacao_nasceu on public.crm_tasks;
+create trigger trg_iavek_ligacao_nasceu
+  after insert on public.crm_tasks
+  for each row
+  when (new.source_kind like 'ligacao:%' and new.lead_id is not null)
+  execute function public.fn_iavek_ligacao_nasceu();
+
+-- 3: o lead entra numa etapa de compromisso
+create or replace function public.fn_iavek_ligacoes_na_etapa_de_compromisso()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_etapas jsonb;
+begin
+  begin
+    select o.settings -> 'esteira' -> 'entrada' -> 'etapas_de_compromisso' into v_etapas
+      from public.organizations o where o.id = new.organization_id;
+    if jsonb_typeof(v_etapas) = 'array'
+       and v_etapas ? new.stage_id::text
+       and not (old.stage_id is not null and v_etapas ? old.stage_id::text) then
+      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.id],
+        array['ligacao:L1','ligacao:L2','ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7',
+              'ligacao:quente','ligacao:retorno','ligacao:retentativa'],
+        'etapa_de_compromisso');
+    end if;
+  exception when others then
+    raise warning 'fn_iavek_ligacoes_na_etapa_de_compromisso (0640): % (lead %)', sqlerrm, new.id;
+  end;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_ligacoes_na_etapa_de_compromisso() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_ligacoes_na_etapa_de_compromisso on public.crm_leads;
+-- AFTER UPDATE com WHEN (e não "update of stage_id"), pela mesma razão da 0639: a etapa pode mudar por outro gatilho.
+create trigger trg_iavek_ligacoes_na_etapa_de_compromisso
+  after update on public.crm_leads
+  for each row
+  when (new.stage_id is distinct from old.stage_id and new.stage_id is not null)
+  execute function public.fn_iavek_ligacoes_na_etapa_de_compromisso();
+
+-- 4: uma pessoa da equipe responde
+create or replace function public.fn_iavek_quente_fecha_com_resposta_de_gente()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_leads uuid[];
+begin
+  begin
+    if new.contact_id is null then return null; end if;
+    select array_agg(l.id) into v_leads
+      from public.crm_leads l
+     where l.organization_id = new.organization_id and l.contact_id = new.contact_id;
+    if v_leads is not null then
+      perform public.fn_iavek_cancela_ligacoes(new.organization_id, v_leads, array['ligacao:quente'],
+        'equipe_respondeu', coalesce(new.created_at, now()));
+    end if;
+  exception when others then
+    raise warning 'fn_iavek_quente_fecha_com_resposta_de_gente (0640): % (mensagem %)', sqlerrm, new.id;
+  end;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_quente_fecha_com_resposta_de_gente() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_quente_fecha_com_resposta_de_gente on public.messages;
+create trigger trg_iavek_quente_fecha_com_resposta_de_gente
+  after insert on public.messages
+  for each row
+  when (new.direction = 'outbound' and new.sent_via::text = 'user' and new.sent_by_user_id is not null)
+  execute function public.fn_iavek_quente_fecha_com_resposta_de_gente();
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -52450,158 +52602,6 @@ end
 $$;
 comment on column public.iavek_pedidos_de_agendamento.titulo is
   'ia.vek v1.9.38 (CRM-256): título próprio do compromisso que o pedido vira. Nulo = o nome do tipo.';
-
--- ---- ia.vek: as ligações da esteira fecham sozinhas (migration 0640, v1.9.58) ----
--- Ver o cabeçalho de supabase/migrations/20261114220000_0640_iavek_ligacoes_fecham_sozinhas.sql.
-create or replace function public.fn_iavek_cancela_ligacoes(
-  p_org uuid,
-  p_leads uuid[],
-  p_kinds text[],
-  p_motivo text,
-  p_antes timestamptz default null,
-  p_exceto uuid default null
-)
-returns integer
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_n integer;
-begin
-  with canceladas as (
-    update public.crm_tasks t
-       set status = 'cancelled',
-           cancelada_motivo = p_motivo
-     where t.lead_id = any(p_leads)
-       and t.organization_id = p_org
-       and t.status in ('pending', 'in_progress')
-       and t.source_kind = any(p_kinds)
-       and (p_antes is null or t.created_at < p_antes)
-       and (p_exceto is null or t.id <> p_exceto)
-    returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind
-  ), log as (
-    insert into public.crm_lead_activities
-      (organization_id, lead_id, contact_id, source_module, source_id, type, actor_kind, reason, payload, metadata, performed_at)
-    select c.organization_id, c.lead_id, c.contact_id, 'tarefas', c.id, 'task_cancelled', 'rule',
-           'Ligação fechada sozinha: ' || p_motivo,
-           jsonb_build_object('motivo', p_motivo, 'ligacao', c.source_kind, 'titulo', left(c.title, 200)),
-           jsonb_build_object('origem', 'gatilho_0640'), now()
-      from canceladas c
-    returning 1
-  )
-  select count(*) into v_n from log;
-  return v_n;
-end;
-$$;
-revoke execute on function public.fn_iavek_cancela_ligacoes(uuid, uuid[], text[], text, timestamptz, uuid) from public, anon, authenticated;
-
--- 1 e 2: nasce uma ligação
-create or replace function public.fn_iavek_ligacao_nasceu()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_k integer;
-  v_kinds text[];
-begin
-  begin
-    if new.lead_id is null then return null; end if;
-    if new.source_kind = 'ligacao:quente' then
-      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.lead_id],
-        array['ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7'], 'cliente_respondeu', null, new.id);
-    elsif new.source_kind ~ '^ligacao:L[2-7]$' then
-      v_k := substring(new.source_kind from 'L([2-7])$')::integer;
-      select array_agg('ligacao:L' || i) into v_kinds from generate_series(1, v_k - 1) i;
-      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.lead_id], v_kinds, 'proxima_ligacao', null, new.id);
-    end if;
-  exception when others then
-    raise warning 'fn_iavek_ligacao_nasceu (0640): % (tarefa %)', sqlerrm, new.id;
-  end;
-  return null;
-end;
-$$;
-revoke execute on function public.fn_iavek_ligacao_nasceu() from public, anon, authenticated;
-
-drop trigger if exists trg_iavek_ligacao_nasceu on public.crm_tasks;
-create trigger trg_iavek_ligacao_nasceu
-  after insert on public.crm_tasks
-  for each row
-  when (new.source_kind like 'ligacao:%' and new.lead_id is not null)
-  execute function public.fn_iavek_ligacao_nasceu();
-
--- 3: o lead entra numa etapa de compromisso
-create or replace function public.fn_iavek_ligacoes_na_etapa_de_compromisso()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_etapas jsonb;
-begin
-  begin
-    select o.settings -> 'esteira' -> 'entrada' -> 'etapas_de_compromisso' into v_etapas
-      from public.organizations o where o.id = new.organization_id;
-    if jsonb_typeof(v_etapas) = 'array'
-       and v_etapas ? new.stage_id::text
-       and not (old.stage_id is not null and v_etapas ? old.stage_id::text) then
-      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.id],
-        array['ligacao:L1','ligacao:L2','ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7',
-              'ligacao:quente','ligacao:retorno','ligacao:retentativa'],
-        'etapa_de_compromisso');
-    end if;
-  exception when others then
-    raise warning 'fn_iavek_ligacoes_na_etapa_de_compromisso (0640): % (lead %)', sqlerrm, new.id;
-  end;
-  return null;
-end;
-$$;
-revoke execute on function public.fn_iavek_ligacoes_na_etapa_de_compromisso() from public, anon, authenticated;
-
-drop trigger if exists trg_iavek_ligacoes_na_etapa_de_compromisso on public.crm_leads;
--- AFTER UPDATE com WHEN (e não "update of stage_id"), pela mesma razão da 0639: a etapa pode mudar por outro gatilho.
-create trigger trg_iavek_ligacoes_na_etapa_de_compromisso
-  after update on public.crm_leads
-  for each row
-  when (new.stage_id is distinct from old.stage_id and new.stage_id is not null)
-  execute function public.fn_iavek_ligacoes_na_etapa_de_compromisso();
-
--- 4: uma pessoa da equipe responde
-create or replace function public.fn_iavek_quente_fecha_com_resposta_de_gente()
-returns trigger
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  v_leads uuid[];
-begin
-  begin
-    if new.contact_id is null then return null; end if;
-    select array_agg(l.id) into v_leads
-      from public.crm_leads l
-     where l.organization_id = new.organization_id and l.contact_id = new.contact_id;
-    if v_leads is not null then
-      perform public.fn_iavek_cancela_ligacoes(new.organization_id, v_leads, array['ligacao:quente'],
-        'equipe_respondeu', coalesce(new.created_at, now()));
-    end if;
-  exception when others then
-    raise warning 'fn_iavek_quente_fecha_com_resposta_de_gente (0640): % (mensagem %)', sqlerrm, new.id;
-  end;
-  return null;
-end;
-$$;
-revoke execute on function public.fn_iavek_quente_fecha_com_resposta_de_gente() from public, anon, authenticated;
-
-drop trigger if exists trg_iavek_quente_fecha_com_resposta_de_gente on public.messages;
-create trigger trg_iavek_quente_fecha_com_resposta_de_gente
-  after insert on public.messages
-  for each row
-  when (new.direction = 'outbound' and new.sent_via::text = 'user' and new.sent_by_user_id is not null)
-  execute function public.fn_iavek_quente_fecha_com_resposta_de_gente();
 
 
 notify pgrst, 'reload schema';
