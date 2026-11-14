@@ -44,6 +44,15 @@ describe("0640: as ligações fecham sozinhas", () => {
   it("a quente fecha só L3…L7 (L1/L2 seguem: resposta 2 do Rodrigo)", () => {
     const f = funcao("fn_iavek_ligacao_nasceu");
     expect(f).toContain("array['ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7'], 'cliente_respondeu'");
+  });
+
+  it("(Lupa 215050) a próxima e a quente NÃO filtram por hora (a mesma transação), só excluem a própria tarefa", () => {
+    const f = funcao("fn_iavek_ligacao_nasceu");
+    expect(f).toContain("'cliente_respondeu', null, new.id)");
+    expect(f).toContain("'proxima_ligacao', null, new.id)");
+    expect(funcao("fn_iavek_cancela_ligacoes")).toContain("and (p_exceto is null or t.id <> p_exceto)");
+    // a resposta de pessoa segue com o 'criada ANTES da mensagem'
+    expect(funcao("fn_iavek_quente_fecha_com_resposta_de_gente")).toContain("'equipe_respondeu', coalesce(new.created_at, now())");
     expect(f).not.toMatch(/'ligacao:L1'[^;]*'cliente_respondeu'/);
   });
 

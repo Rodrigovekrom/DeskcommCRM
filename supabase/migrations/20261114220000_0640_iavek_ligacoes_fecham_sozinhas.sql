@@ -18,6 +18,10 @@
 --                                                                                motivo 'equipe_respondeu'
 --   (o lead fechou = a 0639, sem mudança)
 --
+-- O TEMPO (Lupa 215050): 'proxima_ligacao' e 'cliente_respondeu' NÃO filtram por hora: a ordem L1…L7 já diz quem é
+-- anterior, e UMA rodada pode criar 2 ligações do mesmo lead na MESMA transação (o mesmo now(): a L4 não fecharia a L3).
+-- Só excluem a própria tarefa. O 'equipe_respondeu' mantém o 'criada ANTES da mensagem' (transações diferentes na vida real).
+--
 -- SEGURANÇA (Lupa 213835): os 3 gatilhos envolvem o trabalho em 'exception when others then raise warning; return':
 -- um erro aqui NUNCA derruba o INSERT da mensagem, a criação da ligação nem a troca de etapa.
 -- A busca é pelo lead_id (crm_tasks_lead_idx); do contato ao lead, pelo idx_crm_leads_org_contact (não há índice de
@@ -30,7 +34,8 @@ create or replace function public.fn_iavek_cancela_ligacoes(
   p_leads uuid[],
   p_kinds text[],
   p_motivo text,
-  p_antes timestamptz default null
+  p_antes timestamptz default null,
+  p_exceto uuid default null
 )
 returns integer
 language plpgsql
@@ -49,6 +54,7 @@ begin
        and t.status in ('pending', 'in_progress')
        and t.source_kind = any(p_kinds)
        and (p_antes is null or t.created_at < p_antes)
+       and (p_exceto is null or t.id <> p_exceto)
     returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind
   ), log as (
     insert into public.crm_lead_activities
@@ -64,7 +70,7 @@ begin
   return v_n;
 end;
 $$;
-revoke execute on function public.fn_iavek_cancela_ligacoes(uuid, uuid[], text[], text, timestamptz) from public, anon, authenticated;
+revoke execute on function public.fn_iavek_cancela_ligacoes(uuid, uuid[], text[], text, timestamptz, uuid) from public, anon, authenticated;
 
 -- 1 e 2: nasce uma ligação
 create or replace function public.fn_iavek_ligacao_nasceu()
@@ -81,11 +87,11 @@ begin
     if new.lead_id is null then return null; end if;
     if new.source_kind = 'ligacao:quente' then
       perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.lead_id],
-        array['ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7'], 'cliente_respondeu', new.created_at);
+        array['ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7'], 'cliente_respondeu', null, new.id);
     elsif new.source_kind ~ '^ligacao:L[2-7]$' then
       v_k := substring(new.source_kind from 'L([2-7])$')::integer;
       select array_agg('ligacao:L' || i) into v_kinds from generate_series(1, v_k - 1) i;
-      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.lead_id], v_kinds, 'proxima_ligacao', new.created_at);
+      perform public.fn_iavek_cancela_ligacoes(new.organization_id, array[new.lead_id], v_kinds, 'proxima_ligacao', null, new.id);
     end if;
   exception when others then
     raise warning 'fn_iavek_ligacao_nasceu (0640): % (tarefa %)', sqlerrm, new.id;
