@@ -39,7 +39,13 @@ function admin() {
       let feito: Record<string, unknown> | null = null;
       let alvo: unknown = null;
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "is", "not", "order", "limit", "neq"]) q[m] = () => q;
+      const filtros: Array<[string, string, unknown]> = [];
+      for (const m of ["select", "is", "not", "order", "limit"]) q[m] = () => q;
+      // v1.9.52.3 (Lupa 051041): o fake guarda os filtros de STATUS da tarefa (o neq/in) para o teste das canceladas
+      q.neq = (k: string, v: unknown) => {
+        filtros.push(["neq", k, v]);
+        return q;
+      };
       // v1.9.52.3: o fake guarda QUAL lead cada update atinge (o clone ou o original) e as tarefas.
       q.eq = (k: string, v: unknown) => {
         if (k === "id") alvo = v;
@@ -47,6 +53,7 @@ function admin() {
       };
       q.in = (k: string, v: unknown) => {
         if (k === "lead_id") alvo = v;
+        else filtros.push(["in", k, v]);
         return q;
       };
       q.update = (v: Record<string, unknown>) => {
@@ -54,7 +61,7 @@ function admin() {
         // o update é gravado no fim da cadeia (quando o alvo já foi dito), no then/maybeSingle
         queueMicrotask(() => {
           if (tabela === "crm_leads") updates.push({ ...v, __lead: alvo });
-          if (tabela === "crm_tasks") tarefas.push({ ...v, __leads: alvo });
+          if (tabela === "crm_tasks") tarefas.push({ ...v, __leads: alvo, __filtros: filtros.filter((f) => f[1] === "status") });
         });
         return q;
       };
@@ -125,7 +132,21 @@ describe("a passagem das 72h com o SDR de Follow-up", () => {
 
   it("52.3: as TAREFAS abertas dos 2 leads passam ao SDR de Follow-up", async () => {
     await passar();
-    expect(tarefas).toEqual([{ assigned_to: SDR_FU, __leads: ["lead-original", CLONE] }]);
+    expect(tarefas).toEqual([
+      { assigned_to: SDR_FU, __leads: ["lead-original", CLONE], __filtros: [["neq", "status", "done"]] },
+    ]);
+  });
+
+  // (Lupa 051041, Maestro 051051) a CANCELADA de A (o gatilho do lead fechado cancela as do original ANTES deste passo)
+  // passa a C; a 'done' de A fica com A. O filtro de status é SÓ 'não done': nenhum filtro que limite a pending/in_progress.
+  it("52.3: a tarefa CANCELADA de A passa a C; a 'done' de A fica com A (o filtro é só status <> 'done')", async () => {
+    await passar();
+    const filtros = tarefas[0]?.__filtros as Array<[string, string, unknown]>;
+    expect(filtros).toEqual([["neq", "status", "done"]]);
+    const casa = (status: string) => !filtros.some(([op, , v]) => op === "neq" && v === status) && !filtros.some(([op, , v]) => op === "in" && Array.isArray(v) && !v.includes(status));
+    expect(casa("cancelled")).toBe(true); // a cancelada de A entra no update -> vai a C
+    expect(casa("pending")).toBe(true);
+    expect(casa("done")).toBe(false); // a 'done' de A NÃO entra -> fica com A
   });
 
   it("vale também para o lote antigo: o SDR de Follow-up vem antes do dono do rodízio", async () => {
