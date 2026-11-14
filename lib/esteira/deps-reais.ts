@@ -7,6 +7,7 @@
  *
  * Service role: TODA consulta filtra `organization_id` (CLAUDE.md, multi-tenancy).
  */
+import { conversaSegueODono } from "@/lib/iavek/conversa-segue-o-dono";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { moveLeadHandler } from "@/app/api/v1/leads/_handler";
@@ -172,6 +173,9 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         });
       }
       if (guardiao) clone.owner_user_id = guardiao;
+      // ia.vek v1.9.52.3 (regra do Rodrigo 13/11 ~22:55Z; Maestro 225419/232223/232320; Lupa 225428/232234): com um SDR
+      // DE FOLLOW-UP ativo, o lead que passa a ele SOME para o vendedor e o SDR de antes. Sem SDR de Follow-up, nada muda.
+      if (sdrDeFollowup) await entregarAoSdrDeFollowup(admin, ctx, orgId, { originalId: lead.id, cloneId: clone.id, contactId: lead.contact_id ?? null }, sdrDeFollowup);
 
       // ia.vek v1.9.37 (CRM-229): o clone também procura o CARRO DO ANÚNCIO. Ele copia os campos do
       // original, e o original que nasceu antes da v1.9.32 não tinha carro: 29 dos 40 leads de anúncio
@@ -449,6 +453,59 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       await cobrarLigacao(admin, orgId, tarefa, nivel, destinatario);
     },
   };
+}
+
+/**
+ * ia.vek v1.9.52.3: entrega o lead passado das 72h ao SDR DE FOLLOW-UP por inteiro, para o vendedor (A) e o SDR (B) de
+ * antes deixarem de vê-lo:
+ *  a. o CLONE (Follow-up): o guardião (sdr_user_id) também vira o SDR de Follow-up (o dono já virou acima);
+ *  b. o ORIGINAL fechado (72h, 'moved_to_another_pipeline', que o Meus números não conta como perda): dono E guardião
+ *     viram o SDR de Follow-up (decidido: o simples; Maestro 232320);
+ *  c. a CONVERSA do contato segue o novo dono pela regra de sempre (`conversaSegueODono`: só a que está com uma
+ *     PESSOA; a que a IA atende fica como está, para não calar a IA);
+ *  d. as TAREFAS abertas dos 2 leads que estão com outra pessoa passam ao SDR de Follow-up.
+ * Nunca derruba a passagem (o lead já está no Follow-up): erro vai ao log, com o passo.
+ */
+async function entregarAoSdrDeFollowup(
+  admin: SupabaseClient,
+  ctx: HandlerCtx,
+  orgId: string,
+  ids: { originalId: string; cloneId: string; contactId: string | null },
+  sdr: string,
+): Promise<void> {
+  const passo = async (nome: string, f: () => PromiseLike<{ error: { message: string } | null }>) => {
+    try {
+      const { error } = await f();
+      if (error) logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.cloneId, passo: nome, erro: error.message });
+    } catch (e) {
+      logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.cloneId, passo: nome, erro: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  await passo("guardiao_do_clone", () =>
+    admin.from("crm_leads").update({ sdr_user_id: sdr }).eq("organization_id", orgId).eq("id", ids.cloneId),
+  );
+  await passo("original", () =>
+    admin
+      .from("crm_leads")
+      .update({ owner_user_id: sdr, owner_kind: "user", owner_agent_id: null, sdr_user_id: sdr })
+      .eq("organization_id", orgId)
+      .eq("id", ids.originalId),
+  );
+  await passo("tarefas", () =>
+    admin
+      .from("crm_tasks")
+      .update({ assigned_to: sdr })
+      .eq("organization_id", orgId)
+      .in("lead_id", [ids.originalId, ids.cloneId])
+      .in("status", ["pending", "in_progress"])
+      .not("assigned_to", "is", null)
+      .neq("assigned_to", sdr),
+  );
+  try {
+    await conversaSegueODono(admin, { orgId, contactId: ids.contactId, novoDono: sdr, actor: ctx.actor });
+  } catch (e) {
+    logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.cloneId, passo: "conversa", erro: e instanceof Error ? e.message : String(e) });
+  }
 }
 
 /** A cobrança: marca (atividade), aviso na Central e push para quem o destinatário alcança. */

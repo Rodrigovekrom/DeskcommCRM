@@ -12,6 +12,7 @@ const SDR_FU = "44444444-4444-4444-8444-444444444444";
 const DONO_DO_LOTE = "55555555-5555-4555-8555-555555555555";
 
 let updates: Array<Record<string, unknown>>;
+let tarefas: Array<Record<string, unknown>>;
 let rpcs: Array<{ nome: string; args: unknown }>;
 let respostaDaVez: { data: unknown; error: unknown };
 let guardiaoDoClone: string | null;
@@ -26,11 +27,25 @@ function admin() {
   return {
     from(tabela: string) {
       let feito: Record<string, unknown> | null = null;
+      let alvo: unknown = null;
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "is", "not", "order", "limit", "in"]) q[m] = () => q;
+      for (const m of ["select", "is", "not", "order", "limit", "neq"]) q[m] = () => q;
+      // v1.9.52.3: o fake guarda QUAL lead cada update atinge (o clone ou o original) e as tarefas.
+      q.eq = (k: string, v: unknown) => {
+        if (k === "id") alvo = v;
+        return q;
+      };
+      q.in = (k: string, v: unknown) => {
+        if (k === "lead_id") alvo = v;
+        return q;
+      };
       q.update = (v: Record<string, unknown>) => {
-        if (tabela === "crm_leads") updates.push(v);
         feito = v;
+        // o update é gravado no fim da cadeia (quando o alvo já foi dito), no then/maybeSingle
+        queueMicrotask(() => {
+          if (tabela === "crm_leads") updates.push({ ...v, __lead: alvo });
+          if (tabela === "crm_tasks") tarefas.push({ ...v, __leads: alvo });
+        });
         return q;
       };
       q.maybeSingle = async () => ({
@@ -54,9 +69,11 @@ async function passar(loteAntigo?: { dono: string; soL3: boolean }) {
 }
 
 const donoGravado = () => updates.map((u) => u.owner_user_id).filter(Boolean);
+const doLead = (id: string) => updates.filter((u) => u.__lead === id);
 
 beforeEach(() => {
   updates = [];
+  tarefas = [];
   rpcs = [];
   guardiaoDoClone = GUARDIAO;
   respostaDaVez = { data: SDR_FU, error: null };
@@ -67,18 +84,33 @@ describe("a passagem das 72h com o SDR de Follow-up", () => {
     const r = await passar();
     expect(r.ok).toBe(true);
     expect(rpcs).toEqual([{ nome: "fn_iavek_sdr_followup_da_vez", args: { p_org: ORG, p_lead: CLONE } }]);
-    expect(donoGravado()).toEqual([SDR_FU]);
+    expect(doLead(CLONE).some((u) => u.owner_user_id === SDR_FU)).toBe(true);
   });
 
-  it("o guardião do clone NÃO é mexido (nenhum update toca no sdr_user_id)", async () => {
+  // v1.9.52.3 (regra do Rodrigo 13/11): MUDOU. Antes o guardião do clone não era mexido; agora o lead some para o
+  // vendedor e o SDR de antes.
+  it("52.3: o guardião do CLONE também vira o SDR de Follow-up", async () => {
     await passar();
-    expect(updates.some((u) => "sdr_user_id" in u)).toBe(false);
+    expect(doLead(CLONE).some((u) => u.sdr_user_id === SDR_FU)).toBe(true);
+  });
+
+  it("52.3: o ORIGINAL fechado passa ao SDR de Follow-up (dono E guardião)", async () => {
+    await passar();
+    expect(doLead("lead-original")).toEqual([
+      { owner_user_id: SDR_FU, owner_kind: "user", owner_agent_id: null, sdr_user_id: SDR_FU, __lead: "lead-original" },
+    ]);
+  });
+
+  it("52.3: as TAREFAS abertas dos 2 leads passam ao SDR de Follow-up", async () => {
+    await passar();
+    expect(tarefas).toEqual([{ assigned_to: SDR_FU, __leads: ["lead-original", CLONE] }]);
   });
 
   it("vale também para o lote antigo: o SDR de Follow-up vem antes do dono do rodízio", async () => {
     guardiaoDoClone = null;
     await passar({ dono: DONO_DO_LOTE, soL3: false });
-    expect(donoGravado()).toEqual([SDR_FU]);
+    expect(doLead(CLONE).some((u) => u.owner_user_id === SDR_FU)).toBe(true);
+    expect(donoGravado().every((d) => d === SDR_FU)).toBe(true);
   });
 });
 
@@ -87,6 +119,14 @@ describe("sem SDR de Follow-up: a regra de antes, nada muda", () => {
     respostaDaVez = { data: null, error: null };
     await passar();
     expect(donoGravado()).toEqual([GUARDIAO]);
+  });
+
+  it("52.3: sem SDR de Follow-up, o ORIGINAL, o guardião e as TAREFAS ficam como estão", async () => {
+    respostaDaVez = { data: null, error: null };
+    await passar();
+    expect(doLead("lead-original")).toEqual([]);
+    expect(updates.some((u) => "sdr_user_id" in u)).toBe(false);
+    expect(tarefas).toEqual([]);
   });
 
   it("a escolha falha (erro do banco): o dono é o guardião, e a passagem não cai", async () => {
