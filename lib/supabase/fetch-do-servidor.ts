@@ -31,6 +31,8 @@
  * pública.
  */
 
+import { comRefreshUnico } from "@/lib/auth/refresh-unico";
+
 /** Tira a barra que o `.env` pode trazer: `https://x/` + `storage/…` viraria `//`. */
 function semBarraFinal(url: string): string {
   return url.trim().replace(/\/+$/, "");
@@ -50,6 +52,12 @@ function semBarraFinal(url: string): string {
  * fetch global e observar o destino sem tocar no SDK.
  */
 export function fetchDoServidor(urlInterna: string, urlPublica: string): typeof globalThis.fetch {
+  // ia.vek v1.9.55 (CRM-368): o refresh do login vira single-flight por refresh_token, num Map do PROCESSO, comum aos
+  // três clientes do servidor (proxy, rotas e admin): ver lib/auth/refresh-unico.ts. O resto passa intacto.
+  return comRefreshUnico(transporteDoServidor(urlInterna, urlPublica));
+}
+
+function transporteDoServidor(urlInterna: string, urlPublica: string): typeof globalThis.fetch {
   const interna = semBarraFinal(urlInterna);
   const publica = semBarraFinal(urlPublica);
 
