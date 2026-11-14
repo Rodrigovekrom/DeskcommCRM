@@ -71,13 +71,26 @@ export function PadraoDaLojaConfig({ etapas }: { etapas: Array<{ id: string; nam
               <select className="rounded-md border px-2 py-1" value={it.tipo} onChange={(e) => mudarItem(i, { tipo: e.target.value as ItemDoPadrao["tipo"] })} aria-label={t("Tipo do item")}>
                 <option value="marcacao">{t("O vendedor marca (1 toque)")}</option>
                 <option value="campo">{t("Campo do lead preenchido")}</option>
+                <option value="resposta">{t("Responder em até N minutos")}</option>
+                <option value="ficha">{t("Ficha completa")}</option>
+                <option value="agendamento">{t("Visita agendada")}</option>
+                <option value="confirmacao">{t("Visita confirmada na véspera")}</option>
+              </select>
+              <select className="rounded-md border px-2 py-1" value={it.papel} onChange={(e) => mudarItem(i, { papel: e.target.value as ItemDoPadrao["papel"] })} aria-label={t("De quem é o item")}>
+                <option value="sdr">{t("SDR")}</option>
+                <option value="vendedor">{t("Vendedor")}</option>
               </select>
               <button type="button" className="text-red-700 underline" onClick={() => setRascunho({ ...atual, itens: atual.itens.filter((_, j) => j !== i) })}>
                 {t("Remover")}
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              {it.tipo === "marcacao" ? (
+              {it.tipo === "resposta" ? (
+                <label className="flex items-center gap-1">
+                  {t("Minutos (no horário da loja)")}
+                  <input type="number" min={1} max={240} className="w-16 rounded-md border px-1" value={it.minutos ?? ""} onChange={(e) => mudarItem(i, { minutos: e.target.value ? Number(e.target.value) : null })} />
+                </label>
+              ) : it.tipo === "ficha" || it.tipo === "agendamento" || it.tipo === "confirmacao" ? null : it.tipo === "marcacao" ? (
                 <>
                   <label className="flex items-center gap-1">
                     {t("Mínimo de fotos enviadas")}
@@ -130,7 +143,7 @@ export function PadraoDaLojaConfig({ etapas }: { etapas: Array<{ id: string; nam
               ...atual,
               itens: [
                 ...atual.itens,
-                { id: `item_${Date.now().toString(36)}`, nome: t("Novo item"), tipo: "marcacao", minimo_de_fotos: 0, minimo_de_videos: 0, campo: null, ate_etapa: null, horas: 24 },
+                { id: `item_${Date.now().toString(36)}`, nome: t("Novo item"), tipo: "marcacao", papel: "vendedor", minutos: null, minimo_de_fotos: 0, minimo_de_videos: 0, campo: null, ate_etapa: null, horas: 24 },
               ],
             })
           }

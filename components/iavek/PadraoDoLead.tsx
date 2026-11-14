@@ -51,7 +51,8 @@ export function PadraoDoLead({ leadId }: { leadId: string }) {
   const av = data?.ativo ? data.leads?.[leadId] : undefined;
   if (!av) return null;
 
-  const rotulo = { feito: t("Feito"), pendente: t("Pendente"), fora_do_padrao: t("Fora do padrão") } as const;
+  const rotulo = { feito: t("Feito"), pendente: t("Pendente"), fora_do_padrao: t("Fora do padrão"), nao_se_aplica: t("Não se aplica agora") } as const;
+  const rotuloDoPapel = { sdr: t("SDR"), vendedor: t("Vendedor") } as const;
   return (
     <div className="space-y-2 text-xs" data-testid="padrao-do-lead">
       <p className="text-text-muted">
@@ -61,11 +62,13 @@ export function PadraoDoLead({ leadId }: { leadId: string }) {
         {av.itens.map((i) => (
           <li key={i.id} className="flex items-start justify-between gap-2" data-testid={`item-do-padrao-${i.id}`}>
             <div className="min-w-0">
-              <p className="font-medium">{i.nome}</p>
+              <p className="font-medium">
+                {i.nome} <span className="font-normal text-text-muted">· {rotuloDoPapel[i.papel]}</span>
+              </p>
               <p
                 className={cn(
                   i.situacao === "feito" && "text-emerald-700",
-                  i.situacao === "pendente" && "text-text-muted",
+                  (i.situacao === "pendente" || i.situacao === "nao_se_aplica") && "text-text-muted",
                   i.situacao === "fora_do_padrao" && "font-semibold text-red-700",
                 )}
                 data-testid="situacao-do-item"

@@ -14,12 +14,24 @@ const lead = (extra: Partial<Parameters<typeof avaliarLead>[1]> = {}) => ({
   custom_fields: {},
   ...extra,
 });
-const ligado: PadraoDaLoja = { ...PADRAO_INICIAL, ativo: true };
+// v1.9.55: o PADRAO_INICIAL do código passou a ser o da CRM-172; os testes da v1.8.0 seguem com o padrão de ANTES, aqui
+const PADRAO_V180: PadraoDaLoja = {
+  ativo: false,
+  itens: [
+    { id: "fotos_externas", nome: "6 fotos externas do carro", tipo: "marcacao", papel: "vendedor", minutos: null, minimo_de_fotos: 6, minimo_de_videos: 0, campo: null, ate_etapa: null, horas: 24 },
+    { id: "fotos_internas", nome: "2 fotos internas do carro", tipo: "marcacao", papel: "vendedor", minutos: null, minimo_de_fotos: 8, minimo_de_videos: 0, campo: null, ate_etapa: null, horas: 24 },
+    { id: "video_com_nome", nome: "Vídeo com o nome do cliente", tipo: "marcacao", papel: "vendedor", minutos: null, minimo_de_fotos: 0, minimo_de_videos: 1, campo: null, ate_etapa: null, horas: 48 },
+    { id: "forma_de_pagamento", nome: "Forma de pagamento definida", tipo: "campo", papel: "vendedor", minutos: null, minimo_de_fotos: 0, minimo_de_videos: 0, campo: "forma_pagamento", ate_etapa: null, horas: 48 },
+  ],
+};
+const ligado: PadraoDaLoja = { ...PADRAO_V180, ativo: true };
 
 describe("o padrão começa DESLIGADO e lê o que o admin gravou", () => {
   it("sem configuração: o padrão inicial, desligado", () => {
     expect(lerPadraoDaLoja({}).ativo).toBe(false);
-    expect(lerPadraoDaLoja({}).itens.map((i) => i.id)).toEqual(["fotos_externas", "fotos_internas", "video_com_nome", "forma_de_pagamento"]);
+    // v1.9.55 (CRM-172): o padrão de loja NOVA é o do Rodrigo (sem o item 7), e segue DESLIGADO
+    expect(lerPadraoDaLoja({}).itens.map((i) => i.id)).toEqual(["resposta_7_min", "fotos_e_video", "ficha_completa", "visita_agendada", "confirmou_vespera", "video_com_nome"]);
+    expect(PADRAO_INICIAL.ativo).toBe(false);
   });
 });
 
@@ -47,7 +59,7 @@ describe("avaliação de um lead", () => {
   it("prazo vencido (horas depois de assumir, ou passou da etapa) = fora do padrão", () => {
     const tarde = Date.parse("2026-10-24T12:00:00Z");
     expect(avaliarLead(ligado, lead(), { fotos: 0, videos: 0 }, ETAPAS, tarde).every((i) => i.situacao === "fora_do_padrao")).toBe(true);
-    const porEtapa: PadraoDaLoja = { ativo: true, itens: [{ ...PADRAO_INICIAL.itens[0]!, horas: null, ate_etapa: "e2" }] };
+    const porEtapa: PadraoDaLoja = { ativo: true, itens: [{ ...PADRAO_V180.itens[0]!, horas: null, ate_etapa: "e2" }] };
     expect(avaliarLead(porEtapa, lead({ stage_id: "e1" }), { fotos: 0, videos: 0 }, ETAPAS, AGORA)[0]!.situacao).toBe("pendente");
     expect(avaliarLead(porEtapa, lead({ stage_id: "e2" }), { fotos: 0, videos: 0 }, ETAPAS, AGORA)[0]!.situacao).toBe("fora_do_padrao");
   });
