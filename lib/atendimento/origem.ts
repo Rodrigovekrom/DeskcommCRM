@@ -7,6 +7,7 @@ import {
   type ServiceBoundary,
 } from "./fronteira";
 import { currentExecutionBoundary, guardServiceEffect } from "./fronteira-server";
+import { conversaSemDonoVoltaAoFollowup } from "@/lib/iavek/conversa-reaberta-volta-ao-followup";
 
 /** Leitura confiável reutilizada na origem e imediatamente antes do transporte. */
 export async function readServiceBoundarySupabase(
@@ -55,6 +56,8 @@ export async function beginServiceAtOrigin(
       ? { ...boundary, status: data.status, demanda_fechada_em: data.demanda_fechada_em }
       : null,
   );
+  // v1.9.52.4: a conversa (re)aberta que ficou sem dono volta na hora ao SDR de Follow-up do lead (nunca derruba)
+  await conversaSemDonoVoltaAoFollowup(admin, org, contact, boundary!.conversation_id);
   return boundary!;
 }
 export async function assertServiceBoundarySupabase(
@@ -121,5 +124,7 @@ export async function serviceForEvent(
   if (!boundary || boundary.organization_id !== org || boundary.contact_id !== contact)
     throw new Error("service_scope_mismatch");
   await assertServiceBoundarySupabase(admin, boundary);
+  // v1.9.52.4: o atendimento aberto por EVENTO ('cliente voltou', automações) que deixou a conversa sem dono
+  await conversaSemDonoVoltaAoFollowup(admin, org, contact, boundary.conversation_id);
   return boundary;
 }
