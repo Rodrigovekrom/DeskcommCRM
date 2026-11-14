@@ -31,6 +31,8 @@ export async function beginServiceAtOrigin(
   org: string,
   contact: string,
   session?: string,
+  // v1.9.52.4: a fronteira que o chamador CONFERIU; o banco recusa (service_stale, 40001) se a conversa escolhida mudou.
+  observed?: Record<string, unknown>,
 ): Promise<ServiceBoundary> {
   const inherited = currentExecutionBoundary();
   if (inherited) {
@@ -43,6 +45,7 @@ export async function beginServiceAtOrigin(
     p_org: org,
     p_contact: contact,
     ...(session ? { p_session: session } : {}),
+    ...(observed ? { p_observed: observed as never } : {}),
   });
   if (error) throw error;
   const boundary = parseServiceBoundary(data);

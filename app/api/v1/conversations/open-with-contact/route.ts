@@ -63,7 +63,9 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (jaExiste && !(await contatoNoAlcance(authz.supabase, authz.organizationId, jaExiste))) {
       return fail("not_found", t("Contato não encontrado."), 404, { requestId });
     }
-    const result = await openSharedContactConversation(admin, authz.organizationId, input)
+    // v1.9.52.4: pessoa abrindo pela tela leva a conferência da conversa de outra pessoa (o token dela, com RLS)
+    const chamador = authz.actor.type === "user" ? { userId: authz.actor.id, supabase: authz.supabase } : undefined;
+    const result = await openSharedContactConversation(admin, authz.organizationId, input, chamador)
     // Contato novo aberto por uma pessoa fica registrado como criado por ela.
     if (!jaExiste && authz.actor.type === "user") {
       await admin
@@ -84,6 +86,12 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
     if (msg === "invalid_phone") {
       return fail("validation_error", t("Telefone inválido."), 422, { requestId });
+    }
+    if (msg === "conversation_of_other") {
+      return fail("forbidden", t("Esta conversa é de outra pessoa."), 403, { requestId });
+    }
+    if (msg === "conversation_stale") {
+      return fail("conflict", t("A conversa mudou agora há pouco. Tente de novo."), 409, { requestId });
     }
     if (msg === "contact_personal") {
       return fail("forbidden", t("Contato marcado como pessoal."), 403, { requestId });

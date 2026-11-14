@@ -10501,6 +10501,8 @@ export const DICIONARIO: Traducoes = {
   "Devolve este contato à operação: a conversa volta ao inbox.": { es: "Devuelve este contacto a la operación: la conversación vuelve al inbox." },
   "Pessoais": { es: "Personales" },
   "Contato marcado como pessoal.": { es: "Contacto marcado como personal." },
+  "Esta conversa é de outra pessoa.": { es: "Esta conversación es de otra persona." },
+  "A conversa mudou agora há pouco. Tente de novo.": { es: "La conversación acaba de cambiar. Inténtalo de nuevo." },
   "Contato marcado como pessoal": { es: "Contacto marcado como personal" },
   "Não foi possível marcar o contato como pessoal.": { es: "No fue posible marcar el contacto como personal." },
   "Não foi possível desmarcar o contato como pessoal.": { es: "No fue posible desmarcar el contacto como personal." },

@@ -18,6 +18,16 @@ export interface OpenSharedContactInput {
   name?: string;
 }
 
+/**
+ * v1.9.52.4 (Maestro 071802, Lupa 052500/052543/052617): quem ABRE pela tela. Só pessoa: a rota passa; a tool MCP e
+ * os tokens de API não passam e seguem como antes.
+ */
+export interface ChamadorDaAbertura {
+  userId: string;
+  /** O cliente DO USUÁRIO (o token dele, com RLS). Nunca o admin. */
+  supabase: SupabaseClient;
+}
+
 export interface OpenSharedContactResult {
   conversation_id: string;
   contact_id: string;
@@ -95,6 +105,7 @@ export async function openSharedContactConversation(
   admin: Admin,
   organizationId: string,
   input: OpenSharedContactInput,
+  chamador?: ChamadorDaAbertura,
 ): Promise<OpenSharedContactResult> {
   const sessionId = input.channel_session_id ?? (await sessaoProntaParaEnvio(admin, organizationId));
   if (!sessionId) throw new Error("session_not_found");
@@ -122,11 +133,61 @@ export async function openSharedContactConversation(
   if ((alvo as { is_personal?: boolean } | null)?.is_personal === true) {
     throw new Error("contact_personal");
   }
-  const conversationId = await ensureConversation(
-    admin,
-    organizationId,
-    contactId,
-    sessionId,
-  );
+  const observada = chamador
+    ? await conferirConversaDoChamador(admin, organizationId, contactId, sessionId, chamador)
+    : undefined;
+  let conversationId: string;
+  try {
+    conversationId = await ensureConversation(admin, organizationId, contactId, sessionId, observada);
+  } catch (err) {
+    // a conversa mudou entre a conferência e a abertura: recusa, em vez de abrir uma conversa não conferida
+    if ((err as { code?: string } | null)?.code === "40001") throw new Error("conversation_stale");
+    throw err;
+  }
   return { conversation_id: conversationId, contact_id: contactId };
+}
+
+/**
+ * v1.9.52.4: a conversa que o banco ESCOLHERIA (o mesmo filtro e a mesma ordem do fn_service_begin). Se ela tem dono,
+ * o dono NÃO é o chamador e o chamador NÃO a vê pela RLS (o cliente dele), recusa: abrir reabriria a conversa de
+ * outra pessoa e, ao reabrir, o banco zera o dono (fn_service_stamp_status), e ela sairia de quem a tinha.
+ * Sem dono, do próprio chamador, ou de outro que ele vê (gerente, admin): segue como hoje. Devolve a fronteira
+ * observada, que vai ao fn_service_begin como p_observed (se a conversa mudar no meio, service_stale).
+ */
+async function conferirConversaDoChamador(
+  admin: Admin,
+  organizationId: string,
+  contactId: string,
+  sessionId: string,
+  chamador: ChamadorDaAbertura,
+): Promise<Record<string, unknown>> {
+  const { data: conversa, error } = await admin
+    .from("conversations")
+    .select("id, assigned_to_user_id")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("is_group", false)
+    .eq("channel_session_id", sessionId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const c = conversa as { id: string; assigned_to_user_id: string | null } | null;
+  if (!c) return { organization_id: organizationId, contact_id: contactId, absent: true };
+  const { data: fronteira, error: fErr } = await admin.rpc("fn_service_boundary", {
+    p_org: organizationId,
+    p_conversation: c.id,
+  });
+  if (fErr) throw new Error(fErr.message);
+  if (c.assigned_to_user_id && c.assigned_to_user_id !== chamador.userId) {
+    const { data: vista } = await chamador.supabase
+      .from("conversations")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("id", c.id)
+      .maybeSingle();
+    if (!vista) throw new Error("conversation_of_other");
+  }
+  return fronteira as Record<string, unknown>;
 }

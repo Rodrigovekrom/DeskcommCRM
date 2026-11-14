@@ -48,6 +48,7 @@ export async function ensureConversation(
   organizationId: string,
   contactId: string,
   channelSessionId: string,
+  observed?: Record<string, unknown>,
 ): Promise<string> {
-  return (await beginServiceAtOrigin(admin, organizationId, contactId, channelSessionId)).conversation_id;
+  return (await beginServiceAtOrigin(admin, organizationId, contactId, channelSessionId, observed)).conversation_id;
 }

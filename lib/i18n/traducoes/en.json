@@ -9080,6 +9080,8 @@
   "O telefone precisa estar gravado só com números, com ou sem o código do país ou o sinal + (5511999998888, 11999998888 ou +5511999998888).": "The phone must be stored as digits only, with or without the country code or the + sign (5511999998888, 11999998888 or +5511999998888).",
   "Nas conversas, o assistente consulta este banco sem limitar ao cliente que está falando. Escolha, em Editar, a coluna que identifica o cliente.": "In conversations, the assistant queries this database without limiting it to the customer who is talking. Choose, in Edit, the column that identifies the customer.",
   "Contato marcado como pessoal.": "Contact marked as personal.",
+  "Esta conversa é de outra pessoa.": "This conversation belongs to someone else.",
+  "A conversa mudou agora há pouco. Tente de novo.": "The conversation just changed. Please try again.",
   "Contato marcado como pessoal": "Contact marked as personal",
   "Não foi possível marcar o contato como pessoal.": "Could not mark the contact as personal.",
   "Não foi possível desmarcar o contato como pessoal.": "Could not unmark the contact as personal.",
