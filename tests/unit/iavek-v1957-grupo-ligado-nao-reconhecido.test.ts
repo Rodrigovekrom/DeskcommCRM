@@ -101,3 +101,21 @@ describe("v1.9.57: a entrada do grupo não muda", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe("v1.9.57 (Lupa 153452): o warn do parecido tem limite", () => {
+  it("50 mensagens do MESMO grupo parecido em 1 min = 1 warn; depois de 10 min, 1 de novo, com a contagem do intervalo", () => {
+    for (let i = 0; i < 50; i++) registrarDescarteDeGrupo("org-1", LIGADO.groupChatId, "sessao-b", [LIGADO], T0 + i * 1000);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![1]).toMatchObject({ mensagens_no_intervalo: 1 });
+    registrarDescarteDeGrupo("org-1", LIGADO.groupChatId, "sessao-b", [LIGADO], T0 + 10 * 60_000);
+    expect(warn).toHaveBeenCalledTimes(2);
+    // as 49 seguintes à 1ª + esta = 50
+    expect(warn.mock.calls[1]![1]).toMatchObject({ mensagens_no_intervalo: 50 });
+  });
+
+  it("o limite é por (org, grupo, motivo): outra org avisa à parte", () => {
+    registrarDescarteDeGrupo("org-1", LIGADO.groupChatId, "sessao-b", [LIGADO], T0);
+    registrarDescarteDeGrupo("org-2", LIGADO.groupChatId, "sessao-b", [LIGADO], T0);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+});

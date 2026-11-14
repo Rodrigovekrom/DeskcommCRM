@@ -46,10 +46,14 @@ export function parecidoComLigado(
 
 const JANELA_MS = 10 * 60_000;
 const contagem = new Map<string, { n: number; grupos: Set<string>; desde: number }>();
+// (Lupa 153452) o warn do parecido sai no máximo 1 vez por (org, grupo, motivo) a cada 10 min, com a contagem do
+// intervalo: um grupo ativo mal ligado não pode afogar o log que a saúde lê. O tamanho é limitado pelos grupos parecidos.
+const avisados = new Map<string, { ultimo: number; n: number }>();
 
 /** Só para o teste. */
 export function zerarContagemDeDescartes(): void {
   contagem.clear();
+  avisados.clear();
 }
 
 /**
@@ -67,13 +71,22 @@ export function registrarDescarteDeGrupo(
     if (ligados.length === 0) return "nada";
     const p = parecidoComLigado(chatId, sessao, ligados);
     if (p) {
+      const chave = `${org}|${hash(chatId)}|${p.motivo}`;
+      const a = avisados.get(chave);
+      if (a && agora - a.ultimo < JANELA_MS) {
+        a.n += 1;
+        return "contado";
+      }
       logger.warn("grupo_habilitado_nao_reconhecido", {
         organization_id: org,
         motivo: p.motivo,
         chat_hash: hash(chatId),
         ligado_hash: hash(p.ligado.groupChatId),
         mesma_sessao: p.ligado.channelSessionId === sessao,
+        // as mensagens deste grupo desde o aviso anterior (1 = a 1ª), para o tamanho do problema
+        mensagens_no_intervalo: (a?.n ?? 0) + 1,
       });
+      avisados.set(chave, { ultimo: agora, n: 0 });
       return "aviso";
     }
     const c = contagem.get(org) ?? { n: 0, grupos: new Set<string>(), desde: agora };
