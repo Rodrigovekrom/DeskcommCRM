@@ -10650,6 +10650,8 @@ export const DICIONARIO: Traducoes = {
   "Informe o novo horário.": { es: "Indica el nuevo horario." },
   "Já existe um fluxo com este nome.": { es: "Ya existe un flujo con este nombre." },
   "Já existe um contato com este telefone.": { es: "Ya existe un contacto con este teléfono." },
+  // ia.vek v1.9.59 (CRM-407): a resposta à SDR quando o cliente está com o SDR de Follow-up (sem nome nem id)
+  "Este cliente está com o SDR de Follow-up; ele foi avisado.": { es: "Este cliente está con el SDR de Follow-up; ya fue avisado." },
   "Janela inválida.": { es: "Ventana inválida." },
   "Janela inválida: 'from' deve ser anterior a 'to'.": { es: "Ventana inválida: 'from' debe ser anterior a 'to'." },
   "Lead não encontrado.": { es: "Lead no encontrado." },

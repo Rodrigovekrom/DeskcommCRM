@@ -153,7 +153,7 @@ export async function avisarFollowupSeEscondido(
       reason: titulo,
       payload: { origem: "sdr_pediu_contato" },
       metadata: { origem: "v1959_sdr_pediu_contato" },
-      performed_at: agora.toISOString(),
+      // performed_at: NÃO, o relógio é o do banco (a cerca performed-at-um-relogio-so)
     });
     return "avisado";
   } catch (e) {
