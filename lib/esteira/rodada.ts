@@ -200,7 +200,7 @@ export interface DepsDaEsteira {
    * originais passados cujo clone é do SDR de Follow-up e que ainda estão com outro dono/guardião (e o clone com o
    * guardião diferente do dono) são corrigidos e CONTADOS. Opcional (os testes antigos não a têm).
    */
-  reconciliarFollowup?(followupPipelineId: string): Promise<{ guardioes: number; originais: number; tarefas?: number }>;
+  reconciliarFollowup?(followupPipelineId: string): Promise<{ guardioes: number; originais: number; tarefas?: number; conversas?: number }>;
   cobrar(tarefa: LigacaoPendente, nivel: 1 | 2, destinatario: Destinatario): Promise<void>;
 }
 
@@ -401,7 +401,7 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   // ── 6 (v1.9.52.3): a reconciliação do Follow-up (privacidade: o lead do SDR de Follow-up não fica à vista de antes) ──
   if (deps.reconciliarFollowup) {
     const r = await deps.reconciliarFollowup(followup.pipeline_id);
-    resumo.reconciliadosFollowup = r.guardioes + r.originais + (r.tarefas ?? 0);
+    resumo.reconciliadosFollowup = r.guardioes + r.originais + (r.tarefas ?? 0) + (r.conversas ?? 0);
   }
   return resumo;
 }

@@ -494,11 +494,12 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         [orgId, followupPipelineId],
       );
       const r = (rows[0] ?? { guardioes: 0, originais: 0, tarefas: 0 }) as { guardioes: number; originais: number; tarefas: number };
-      if (r.guardioes + r.originais + r.tarefas > 0) {
+      const conversas = await reconciliarConversasDoFollowup(admin, orgId, followupPipelineId, ctx);
+      if (r.guardioes + r.originais + r.tarefas + conversas > 0) {
         // A saúde lê esta linha: > 0 = AMARELO (a entrega da passagem falhou em algum ponto e foi corrigida aqui).
-        logger.warn("esteira_followup_reconciliados", { organization_id: orgId, guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas });
+        logger.warn("esteira_followup_reconciliados", { organization_id: orgId, guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas, conversas });
       }
-      return { guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas };
+      return { guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas, conversas };
     },
 
     async cobrar(tarefa, nivel, destinatario) {
@@ -519,6 +520,51 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
  * Nunca derruba a passagem (o lead já está no Follow-up): erro vai ao log, com o passo.
  */
 const MOTIVO_DA_CONVERSA_SEM_IA = "Conversa sem atendente passada ao SDR de Follow-up (a loja não tem atendimento automático no ar)";
+const MOTIVO_DA_REABERTA = "Conversa reaberta sem dono devolvida ao SDR de Follow-up do lead (a loja não tem atendimento automático no ar)";
+
+/**
+ * ia.vek v1.9.52.4 (Maestro 072000/072027, Lupa 071958): a conversa que FICOU SEM DONO (a reabertura de uma conversa
+ * fechada zera o dono no banco: fn_service_stamp_status; medido no canário em 14/11) de um contato cujo lead ABERTO no
+ * Follow-up é de um SDR de Follow-up ATIVO volta para esse SDR, a cada rodada. Só quando a org NÃO tem atendimento
+ * automático no ar (`orgTemAutomatico === false`; indefinido = tem, não mexe: com IA, a conversa sem dono é da IA).
+ * Não mexe em: conversa com dono (a 'claimed' de outra pessoa), conversa com IA ativa (active_ai_agent_id), conversa
+ * fechada, contato sem lead aberto no Follow-up. No máximo 200 por rodada. Devolve quantas passou.
+ */
+async function reconciliarConversasDoFollowup(
+  admin: SupabaseClient,
+  orgId: string,
+  followupPipelineId: string,
+  ctx: HandlerCtx,
+): Promise<number> {
+  if ((await orgTemAutomatico(admin, orgId)) !== false) return 0;
+  const { rows } = await getRequestPool().query(
+    `with sdrs as (
+       select user_id from public.user_organizations
+        where organization_id = $1 and revoked_at is null and role = 'agent' and interface_settings->>'funcao' = 'sdr_followup'),
+     abertos as (
+       select distinct on (c.contact_id) c.contact_id, c.owner_user_id from public.crm_leads c
+        where c.organization_id = $1 and c.pipeline_id = $2 and c.status = 'open' and c.contact_id is not null
+          and c.owner_user_id in (select user_id from sdrs)
+        order by c.contact_id, c.created_at desc)
+     select distinct a.contact_id, a.owner_user_id from public.conversations v
+       join abertos a on a.contact_id = v.contact_id
+      where v.organization_id = $1 and not v.is_group
+        and v.assigned_to_user_id is null and v.active_ai_agent_id is null
+        and v.status not in ('closed', 'resolved', 'archived')
+      limit 200`,
+    [orgId, followupPipelineId],
+  );
+  let passadas = 0;
+  for (const linha of rows as Array<{ contact_id: string; owner_user_id: string }>) {
+    try {
+      await passarAConversa(admin, { orgId, contactId: linha.contact_id, para: linha.owner_user_id, actor: ctx.actor, motivo: MOTIVO_DA_REABERTA });
+      passadas++;
+    } catch (e) {
+      logger.error("esteira_followup_conversa_falhou", { organization_id: orgId, erro: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return passadas;
+}
 
 async function entregarAoSdrDeFollowup(
   admin: SupabaseClient,
