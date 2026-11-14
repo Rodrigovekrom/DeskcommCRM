@@ -195,6 +195,12 @@ export interface DepsDaEsteira {
   ligacoesVencidas(antesDe: Date): Promise<LigacaoPendente[]>;
   /** Níveis de cobrança já feitos por tarefa. */
   cobrancasFeitas(tarefaIds: string[]): Promise<Map<string, Set<number>>>;
+  /**
+   * ia.vek v1.9.52.3 (Lupa 002312, Maestro 002322): a RECONCILIAÇÃO do Follow-up, idempotente, a cada rodada. Os
+   * originais passados cujo clone é do SDR de Follow-up e que ainda estão com outro dono/guardião (e o clone com o
+   * guardião diferente do dono) são corrigidos e CONTADOS. Opcional (os testes antigos não a têm).
+   */
+  reconciliarFollowup?(followupPipelineId: string): Promise<{ guardioes: number; originais: number }>;
   cobrar(tarefa: LigacaoPendente, nivel: 1 | 2, destinatario: Destinatario): Promise<void>;
 }
 
@@ -213,6 +219,8 @@ export interface ResumoDaRodada {
   falhasSemRetorno: number;
   ligacoesCriadas: number;
   cobrancas: number;
+  /** v1.9.52.3: o que a reconciliação do Follow-up corrigiu nesta rodada (0 = a entrega na passagem funcionou). */
+  reconciliadosFollowup?: number;
 }
 
 export function rodadaTeveEfeito(r: ResumoDaRodada): boolean {
@@ -388,6 +396,12 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
       await deps.cobrar(t, 1, cfg.escalada);
       resumo.cobrancas += 1;
     }
+  }
+
+  // ── 6 (v1.9.52.3): a reconciliação do Follow-up (privacidade: o lead do SDR de Follow-up não fica à vista de antes) ──
+  if (deps.reconciliarFollowup) {
+    const r = await deps.reconciliarFollowup(followup.pipeline_id);
+    resumo.reconciliadosFollowup = r.guardioes + r.originais;
   }
   return resumo;
 }

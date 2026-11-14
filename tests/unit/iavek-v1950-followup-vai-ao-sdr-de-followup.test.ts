@@ -16,6 +16,16 @@ let tarefas: Array<Record<string, unknown>>;
 let rpcs: Array<{ nome: string; args: unknown }>;
 let respostaDaVez: { data: unknown; error: unknown };
 let guardiaoDoClone: string | null;
+// v1.9.52.3: a conversa sem dono e a IA da org
+let conversaDoContato: { assigned_to_user_id: string | null } | null;
+let iaNoAr: boolean | undefined;
+const passadas: Array<{ para: string | null }> = [];
+let seguiuODono = false;
+vi.mock("@/lib/iavek/conversa-segue-o-dono", () => ({ conversaSegueODono: async () => seguiuODono }));
+vi.mock("@/lib/ai/agents/org-tem-automatico", () => ({ orgTemAutomatico: async () => iaNoAr }));
+vi.mock("@/lib/iavek/passar-a-conversa", () => ({
+  passarAConversa: async (_a: unknown, args: { para: string | null }) => void passadas.push({ para: args.para }),
+}));
 
 vi.mock("@/lib/leads/clonar-lead-para-funil", () => ({
   clonarLeadParaFunil: async () => ({ ok: true, clone: { id: CLONE, organization_id: ORG, source_metadata: {}, owner_user_id: "dono-velho", contact_id: null } }),
@@ -49,7 +59,15 @@ function admin() {
         return q;
       };
       q.maybeSingle = async () => ({
-        data: feito ? null : tabela === "crm_stages" ? { pipeline_id: "funil-fu" } : tabela === "crm_leads" ? { sdr_user_id: guardiaoDoClone } : null,
+        data: feito
+          ? null
+          : tabela === "crm_stages"
+            ? { pipeline_id: "funil-fu" }
+            : tabela === "crm_leads"
+              ? { sdr_user_id: guardiaoDoClone }
+              : tabela === "conversations"
+                ? conversaDoContato
+                : null,
         error: null,
       });
       q.then = (ok: (r: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(ok);
@@ -62,10 +80,10 @@ function admin() {
   };
 }
 
-async function passar(loteAntigo?: { dono: string; soL3: boolean }) {
+async function passar(loteAntigo?: { dono: string; soL3: boolean }, contato: string | null = null) {
   const { depsReaisDaEsteira } = await import("@/lib/esteira/deps-reais");
   const deps = depsReaisDaEsteira(admin() as never, ORG, () => new Date("2026-11-13T15:00:00Z"));
-  return deps.passarParaFollowup({ id: "lead-original", contact_id: null, inicio: "2026-11-10T12:00:00Z" } as never, "etapa-fu", loteAntigo as never);
+  return deps.passarParaFollowup({ id: "lead-original", contact_id: contato, inicio: "2026-11-10T12:00:00Z" } as never, "etapa-fu", loteAntigo as never);
 }
 
 const donoGravado = () => updates.map((u) => u.owner_user_id).filter(Boolean);
@@ -76,6 +94,10 @@ beforeEach(() => {
   tarefas = [];
   rpcs = [];
   guardiaoDoClone = GUARDIAO;
+  conversaDoContato = null;
+  iaNoAr = undefined;
+  passadas.length = 0;
+  seguiuODono = false;
   respostaDaVez = { data: SDR_FU, error: null };
 });
 
@@ -141,5 +163,40 @@ describe("sem SDR de Follow-up: a regra de antes, nada muda", () => {
     guardiaoDoClone = null;
     await passar({ dono: DONO_DO_LOTE, soL3: false });
     expect(donoGravado()).toEqual([DONO_DO_LOTE]);
+  });
+});
+
+describe("52.3: a conversa SEM dono (Maestro 002322, Lupa 002339: pela MESMA função da Fila, orgTemAutomatico)", () => {
+  it("org SEM atendimento automático no ar: a conversa sem dono vai ao SDR de Follow-up", async () => {
+    conversaDoContato = { assigned_to_user_id: null };
+    iaNoAr = false;
+    await passar(undefined, "contato-1");
+    expect(passadas).toEqual([{ para: SDR_FU }]);
+  });
+  it("org COM atendimento automático: a conversa sem dono FICA com a IA (não cala)", async () => {
+    conversaDoContato = { assigned_to_user_id: null };
+    iaNoAr = true;
+    await passar(undefined, "contato-1");
+    expect(passadas).toEqual([]);
+  });
+  it("não deu para saber (indefinido): conta como 'tem IA' e não mexe", async () => {
+    conversaDoContato = { assigned_to_user_id: null };
+    iaNoAr = undefined;
+    await passar(undefined, "contato-1");
+    expect(passadas).toEqual([]);
+  });
+  it("a conversa com uma PESSOA segue pela regra de sempre (conversaSegueODono); a da IA não é tocada de novo", async () => {
+    seguiuODono = true;
+    conversaDoContato = { assigned_to_user_id: null };
+    iaNoAr = false;
+    await passar(undefined, "contato-1");
+    expect(passadas).toEqual([]);
+  });
+  it("sem SDR de Follow-up: nada disso roda", async () => {
+    respostaDaVez = { data: null, error: null };
+    conversaDoContato = { assigned_to_user_id: null };
+    iaNoAr = false;
+    await passar(undefined, "contato-1");
+    expect(passadas).toEqual([]);
   });
 });

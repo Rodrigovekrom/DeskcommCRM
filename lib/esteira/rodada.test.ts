@@ -425,3 +425,32 @@ describe("v1.9.41: o LOTE ANTIGO (nascidos antes de `desde`)", () => {
     expect(ler({ ativo: true, por_dia: 50, donos: [] }).funis).toBeNull();
   });
 });
+
+describe("v1.9.52.3: a reconciliação do Follow-up no fim da rodada (Lupa 002312, Maestro 002322)", () => {
+  it("chama a reconciliação com o funil Follow-up e soma o que corrigiu no resumo", async () => {
+    const { deps } = montar({ entrada: [] });
+    const chamadas: string[] = [];
+    deps.reconciliarFollowup = async (fu) => {
+      chamadas.push(fu);
+      return { guardioes: 1, originais: 2 };
+    };
+    const r = await rodarEsteira(cfg, deps);
+    expect(chamadas).toEqual([F]);
+    expect(r.reconciliadosFollowup).toBe(3);
+  });
+  it("sem a reconciliação nas deps (os testes e as orgs antigas): o resumo não ganha o campo", async () => {
+    const { deps } = montar({ entrada: [] });
+    const r = await rodarEsteira(cfg, deps);
+    expect(r.reconciliadosFollowup).toBeUndefined();
+  });
+  it("esteira desligada: não reconcilia", async () => {
+    const { deps } = montar({ entrada: [] });
+    let chamou = false;
+    deps.reconciliarFollowup = async () => {
+      chamou = true;
+      return { guardioes: 0, originais: 0 };
+    };
+    await rodarEsteira({ ...cfg, funis: null }, deps);
+    expect(chamou).toBe(false);
+  });
+});

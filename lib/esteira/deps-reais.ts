@@ -7,6 +7,8 @@
  *
  * Service role: TODA consulta filtra `organization_id` (CLAUDE.md, multi-tenancy).
  */
+import { orgTemAutomatico } from "@/lib/ai/agents/org-tem-automatico";
+import { passarAConversa } from "@/lib/iavek/passar-a-conversa";
 import { conversaSegueODono } from "@/lib/iavek/conversa-segue-o-dono";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -449,6 +451,38 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       return mapa;
     },
 
+    async reconciliarFollowup(followupPipelineId) {
+      // v1.9.52.3: idempotente; só com SDR de Follow-up ATIVO na org (sem ele, os conjuntos são vazios e nada muda).
+      // Janela de 30 dias de clones, para a consulta ficar barata.
+      const { rows } = await getRequestPool().query(
+        `with sdrs as (
+           select user_id from public.user_organizations
+            where organization_id = $1 and revoked_at is null and role = 'agent' and interface_settings->>'funcao' = 'sdr_followup'),
+         clones as (
+           select c.id, c.owner_user_id from public.crm_leads c
+            where c.organization_id = $1 and c.pipeline_id = $2 and c.owner_user_id in (select user_id from sdrs)
+              and c.created_at > now() - interval '30 days'),
+         g as (
+           update public.crm_leads c set sdr_user_id = c.owner_user_id
+             from clones k where c.id = k.id and c.sdr_user_id is distinct from c.owner_user_id returning c.id),
+         o as (
+           update public.crm_leads x set owner_user_id = k.owner_user_id, owner_kind = 'user', owner_agent_id = null, sdr_user_id = k.owner_user_id
+             from clones k
+            where x.organization_id = $1 and x.status = 'lost' and x.lost_reason = 'moved_to_another_pipeline'
+              and x.source_metadata->'movido_para'->>'lead_id' = k.id::text
+              and (x.owner_user_id is distinct from k.owner_user_id or x.sdr_user_id is distinct from k.owner_user_id)
+           returning x.id)
+         select (select count(*) from g)::int as guardioes, (select count(*) from o)::int as originais`,
+        [orgId, followupPipelineId],
+      );
+      const r = (rows[0] ?? { guardioes: 0, originais: 0 }) as { guardioes: number; originais: number };
+      if (r.guardioes + r.originais > 0) {
+        // A saúde lê esta linha: > 0 = AMARELO (a entrega da passagem falhou em algum ponto e foi corrigida aqui).
+        logger.warn("esteira_followup_reconciliados", { organization_id: orgId, guardioes: r.guardioes, originais: r.originais });
+      }
+      return r;
+    },
+
     async cobrar(tarefa, nivel, destinatario) {
       await cobrarLigacao(admin, orgId, tarefa, nivel, destinatario);
     },
@@ -466,6 +500,8 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
  *  d. as TAREFAS abertas dos 2 leads que estão com outra pessoa passam ao SDR de Follow-up.
  * Nunca derruba a passagem (o lead já está no Follow-up): erro vai ao log, com o passo.
  */
+const MOTIVO_DA_CONVERSA_SEM_IA = "Conversa sem atendente passada ao SDR de Follow-up (a loja não tem atendimento automático no ar)";
+
 async function entregarAoSdrDeFollowup(
   admin: SupabaseClient,
   ctx: HandlerCtx,
@@ -502,7 +538,27 @@ async function entregarAoSdrDeFollowup(
       .neq("assigned_to", sdr),
   );
   try {
-    await conversaSegueODono(admin, { orgId, contactId: ids.contactId, novoDono: sdr, actor: ctx.actor });
+    const seguiu = await conversaSegueODono(admin, { orgId, contactId: ids.contactId, novoDono: sdr, actor: ctx.actor });
+    // (Maestro 002322, Lupa 002339) a conversa SEM dono: vai ao SDR de Follow-up SÓ se a org NÃO tem atendimento
+    // automático no ar, pela MESMA função que a Fila e as contagens usam (`orgTemAutomatico`). Indefinido (não deu para
+    // saber) conta como "tem": não mexe (não cala uma IA que pode estar atendendo).
+    if (!seguiu && ids.contactId) {
+      const { data: conversa } = await admin
+        .from("conversations")
+        .select("assigned_to_user_id")
+        .eq("organization_id", orgId)
+        .eq("contact_id", ids.contactId)
+        .eq("is_group", false)
+        .neq("status", "archived")
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (conversa && (conversa as { assigned_to_user_id: string | null }).assigned_to_user_id == null) {
+        if ((await orgTemAutomatico(admin, orgId)) === false) {
+          await passarAConversa(admin, { orgId, contactId: ids.contactId, para: sdr, actor: ctx.actor, motivo: MOTIVO_DA_CONVERSA_SEM_IA });
+        }
+      }
+    }
   } catch (e) {
     logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.cloneId, passo: "conversa", erro: e instanceof Error ? e.message : String(e) });
   }
