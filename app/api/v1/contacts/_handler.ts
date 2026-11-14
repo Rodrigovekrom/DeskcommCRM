@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { avisarFollowupSeEscondido, MENSAGEM_A_SDR } from "@/lib/iavek/sdr-pediu-contato";
 import { observeServiceOrigin } from "@/lib/atendimento/origem";
 import { ApiError } from "@/lib/api/types";
 import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
@@ -521,6 +522,16 @@ export async function createContactHandler(
           ctx.requestId,
           traduzir("Já existe um contato com este telefone.", ctx.idioma ?? "pt-BR"),
         );
+      }
+      // ia.vek v1.9.59 (CRM-407, A1): o contato está ESCONDIDO desta SDR (o cliente foi para o Follow-up). Não perde o
+      // cliente nem conta a ela que ele existe: avisa o responsável (tarefa) e responde só a MENSAGEM_A_SDR, sem nome
+      // nem id. Qualquer falha cai na recusa de baixo, também sem id.
+      if (ctx.actor.type === "user" && /uniq_contacts_org_phone/.test(insErr.message ?? "")) {
+        const admin = createAdminClient();
+        const oculto = await encontrarContatoPorTelefone(admin, ctx.organization_id, telefoneDoInsert);
+        if (oculto && (await avisarFollowupSeEscondido(admin, ctx.organization_id, ctx.actor.id, oculto.id)) === "avisado") {
+          throw new ApiError(409, "contact_with_followup", undefined, ctx.requestId, traduzir(MENSAGEM_A_SDR, ctx.idioma ?? "pt-BR"));
+        }
       }
       // ia.vek v1.9.19.1: o contato é de outra pessoa. Recusa clara, sem o id dele.
       if (/uniq_contacts_org_phone/.test(insErr.message ?? "")) {

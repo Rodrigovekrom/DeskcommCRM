@@ -38,6 +38,9 @@ import { contactCreateSchemaDoPais } from "@/lib/schemas";
 import { perfilDaOrganizacao } from "@/lib/legal/perfil-do-pais";
 import { phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { encontrarContatoPorTelefone } from "@/lib/channels/contato-por-telefone";
+import { avisarFollowupSeEscondido } from "@/lib/iavek/sdr-pediu-contato";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +55,8 @@ interface ImportSummary {
   total_linhas: number;
   imported: number;
   skipped_duplicates: number;
+  /** ia.vek v1.9.59 (CRM-407): linhas de um cliente que está com o SDR de Follow-up: ele foi avisado (tarefa). Sem nome nem id. */
+  avisados_ao_followup?: number;
   errors: LinhaErro[];
 }
 
@@ -219,6 +224,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   // ─── Insert linha a linha com desfecho individual ─────────────────────────
   let imported = 0;
   let skippedDuplicates = 0;
+  let avisadosAoFollowup = 0;
 
   for (const { linha, contato } of candidatos) {
     const phone = contato.phone_number as string | undefined;
@@ -264,6 +270,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (insErr) {
       // Conflito de corrida com os índices únicos = duplicado, não erro.
       if (insErr.code === "23505") {
+        // ia.vek v1.9.59 (CRM-407, A1): o telefone é de um contato ESCONDIDO desta SDR (o cliente foi para o Follow-up):
+        // avisa o responsável. A linha conta como duplicada E como avisada; nada sobre o cliente volta a ela.
+        if (phone && /uniq_contacts_org_phone/.test(insErr.message ?? "")) {
+          const admin = createAdminClient();
+          const oculto = await encontrarContatoPorTelefone(admin, orgId, phone);
+          if (oculto && (await avisarFollowupSeEscondido(admin, orgId, user.id, oculto.id)) === "avisado") avisadosAoFollowup += 1;
+        }
         skippedDuplicates += 1;
         continue;
       }
@@ -316,6 +329,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     total_linhas: dataRows.length,
     imported,
     skipped_duplicates: skippedDuplicates,
+    ...(avisadosAoFollowup > 0 ? { avisados_ao_followup: avisadosAoFollowup } : {}),
     errors,
   };
   return ok(resumo, { requestId });
