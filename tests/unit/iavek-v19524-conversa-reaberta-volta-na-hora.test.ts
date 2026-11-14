@@ -143,3 +143,22 @@ describe("v1.9.52.4: a origem do atendimento chama a volta na hora", () => {
     expect(chamado).toHaveBeenCalledWith(expect.anything(), ORG, CONTATO, CONVERSA);
   });
 });
+
+// (Lupa 074351, Maestro 074400) a transferência acontece DEPOIS do begin, e a origem devolve a fronteira de ANTES. O
+// próximo passo (a automação enviando: assertServiceBoundarySupabase) compara campo a campo com a fronteira ATUAL; a
+// transferência (fn_conversation_assign) muda o dono e o status para 'claimed', NÃO a revisão nem a demanda. Então NÃO
+// dá stale. Aqui com a régua REAL (assertCurrentServiceBoundary), sem fake.
+describe("v1.9.52.4: a fronteira devolvida segue válida depois da transferência (sem service_stale)", () => {
+  it("a fronteira de antes x a atual depois do assign ('claimed', mesma revisão e demanda): NÃO lança", async () => {
+    const { assertCurrentServiceBoundary } = await vi.importActual<typeof import("@/lib/atendimento/fronteira")>("@/lib/atendimento/fronteira");
+    const antes = { organization_id: ORG, contact_id: CONTATO, conversation_id: CONVERSA, service_revision: 4, demanda_id: null, demanda_revision: null };
+    const depoisDoAssign = { ...antes, status: "claimed", demanda_fechada_em: null };
+    expect(() => assertCurrentServiceBoundary(antes as never, depoisDoAssign as never)).not.toThrow();
+  });
+
+  it("contra-prova da régua: se a REVISÃO mudasse, daria stale", async () => {
+    const { assertCurrentServiceBoundary } = await vi.importActual<typeof import("@/lib/atendimento/fronteira")>("@/lib/atendimento/fronteira");
+    const antes = { organization_id: ORG, contact_id: CONTATO, conversation_id: CONVERSA, service_revision: 4, demanda_id: null, demanda_revision: null };
+    expect(() => assertCurrentServiceBoundary(antes as never, { ...antes, service_revision: 5, status: "claimed", demanda_fechada_em: null } as never)).toThrow();
+  });
+});
