@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { marcarConversaComMensagem } from "@/lib/channels/marcar-conversa";
+import { registrarDescarteDeGrupo, type GrupoHabilitado } from "@/lib/grupos/descarte";
 import { logger } from "@/lib/logger";
 import { remetenteDeGrupoSchema, type RemetenteDeGrupo } from "@/lib/messaging/remetente-de-grupo";
 
@@ -54,6 +55,11 @@ export interface IngestDeGrupoDb {
    */
   reabrirSeFechada(org: string, conversationId: string): Promise<void>;
   /**
+   * v1.9.57: os grupos LIGADOS da org (todas as sessões), para registrar o grupo ligado que não foi reconhecido
+   * (lib/grupos/descarte.ts). Opcional: sem ele, o descarte segue calado, como antes.
+   */
+  gruposHabilitadosDaOrg?(org: string): Promise<GrupoHabilitado[]>;
+  /**
    * `direction` vai no fim porque o carimbo compartilhado
    * (`fn_mark_conversation_message`) move `last_inbound_at` OU `last_outbound_at`
    * e o contador de não lidas conforme o sentido — sem ele, o carimbo erraria.
@@ -73,7 +79,17 @@ export async function gravarMensagemDeGrupo(
 ): Promise<"gravada" | "grupo_desligado" | "duplicada" | "vazia"> {
   if (!e.body && !e.mediaUrl && !e.temMidia) return "vazia";
   const grupo = await db.grupoLigado(e.organizationId, e.channelSessionId, e.groupChatId);
-  if (!grupo) return "grupo_desligado";
+  if (!grupo) {
+    // v1.9.57: o descarte segue igual; só se REGISTRA quando a org tem grupo ligado (nunca derruba a entrada)
+    if (db.gruposHabilitadosDaOrg) {
+      try {
+        registrarDescarteDeGrupo(e.organizationId, e.groupChatId, e.channelSessionId, await db.gruposHabilitadosDaOrg(e.organizationId));
+      } catch {
+        /* o registro nunca derruba a entrada */
+      }
+    }
+    return "grupo_desligado";
+  }
 
   let contactId = grupo.contactId;
   let conversationId = grupo.conversationId;
@@ -116,8 +132,28 @@ export async function gravarMensagemDeGrupo(
 }
 
 /** Implementação real. `admin` é service role: toda consulta filtra `organization_id`. */
+const LIGADOS_TTL_MS = 60_000;
+const ligadosDaOrg = new Map<string, { t: number; lista: GrupoHabilitado[] }>();
+
 export function criarIngestDeGrupoDb(admin: SupabaseClient): IngestDeGrupoDb {
   return {
+    // v1.9.57: 1 leitura por org por minuto (no máximo), e só quando chega mensagem de grupo que não casou
+    async gruposHabilitadosDaOrg(org) {
+      const c = ligadosDaOrg.get(org);
+      if (c && Date.now() - c.t < LIGADOS_TTL_MS) return c.lista;
+      const { data, error } = await admin
+        .from("channel_session_groups")
+        .select("group_chat_id, channel_session_id")
+        .eq("organization_id", org)
+        .eq("enabled", true);
+      if (error) return [];
+      const lista = ((data ?? []) as Array<{ group_chat_id: string; channel_session_id: string }>).map((g) => ({
+        groupChatId: g.group_chat_id,
+        channelSessionId: g.channel_session_id,
+      }));
+      ligadosDaOrg.set(org, { t: Date.now(), lista });
+      return lista;
+    },
     async grupoLigado(org, session, chatId) {
       const { data, error } = await admin
         .from("channel_session_groups")
