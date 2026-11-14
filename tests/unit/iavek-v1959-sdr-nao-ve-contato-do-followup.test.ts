@@ -28,6 +28,13 @@ describe("0641: o texto da RLS", () => {
     expect(codigo).toContain("x.pipeline_id is distinct from m.fu");
     expect(codigo).toContain("l.contact_id not in (select d.c from dela d where d.c is not null)");
   });
+  it("(Maestro 222446) a regra 3 conta só o que está ABERTO hoje; o contato que ela criou não conta", () => {
+    expect(codigo).toContain("l.owner_user_id = p_user and l.contact_id is not null and l.status in ('open', 'future')");
+    expect(codigo).toContain("v.status not in ('closed', 'resolved', 'archived')");
+    expect(codigo).toContain("a.starts_at > now() and a.status in ('pending', 'confirmed')");
+    expect(codigo).toContain("t.status in ('pending', 'in_progress')");
+    expect(codigo).not.toContain("k.created_by_user_id = p_user");
+  });
   it("as 2 de contacts e a conversa SEM dono ganham a cláusula; o contact_id nulo segue como antes", () => {
     expect(codigo.match(/\("organization_id", "id"\) not in \(select h\.org_id, h\.contato_id from public\.fn_iavek_contatos_escondidos_da_sdr\(\) h\)/g)).toHaveLength(2);
     expect(codigo).toContain("and (contact_id is null or (organization_id, contact_id) not in (select h.org_id, h.contato_id from public.fn_iavek_contatos_escondidos_da_sdr() h)))");
@@ -141,10 +148,15 @@ describe("v1.9.59 (A1): quem recebe a tarefa do lead ÓRFÃO", () => {
     m.membros = [membro("fu-novo", "agent", "sdr_followup", "2026-11-10"), membro("fu-velho", "agent", "sdr_followup", "2026-10-01")];
     expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("fu-velho");
   });
-  it("órfão SEM SDR de Follow-up: o GERENTE mais antigo ('gerente' ou 'apoio')", async () => {
+  it("órfão SEM SDR de Follow-up: o GERENTE mais antigo; o 'apoio' NÃO entra (Maestro 222446)", async () => {
     const m = base();
     m.membros = [membro("ger", "manager", "gerente", "2026-10-05"), membro("apo", "agent", "apoio", "2026-10-02")];
-    expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("apo");
+    expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("ger");
+  });
+  it("só 'apoio', sem gerente: vai ao ADMIN da org (o apoio não recebe)", async () => {
+    const m = base();
+    m.membros = [membro("apo", "agent", "apoio", "2026-10-02"), membro("adm", "admin", "", "2026-10-09")];
+    expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("adm");
   });
   it("órfão SEM SDR de Follow-up e SEM gerente: o ADMIN da org, NUNCA o platform admin", async () => {
     const m = base();

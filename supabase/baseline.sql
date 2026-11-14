@@ -5599,11 +5599,15 @@ begin
          and uo.interface_settings->>'funcao' = 'sdr'
          and (o.settings->'esteira'->'followup'->>'pipeline_id') is not null
     ), dela as (
-      select l.contact_id c from public.crm_leads l where l.owner_user_id = p_user and l.contact_id is not null
-      union select v.contact_id from public.conversations v where v.assigned_to_user_id = p_user and v.contact_id is not null
-      union select a.contact_id from public.calendar_appointments a where a.owner_user_id = p_user and a.contact_id is not null
-      union select t.contact_id from public.crm_tasks t where t.assigned_to = p_user and t.contact_id is not null
-      union select k.id from public.contacts k where k.created_by_user_id = p_user
+      -- (Maestro 222446) só o que está ABERTO hoje: lead fechado e tarefa cancelada de antes NÃO devolvem o contato
+      select l.contact_id c from public.crm_leads l
+       where l.owner_user_id = p_user and l.contact_id is not null and l.status in ('open', 'future')
+      union select v.contact_id from public.conversations v
+       where v.assigned_to_user_id = p_user and v.contact_id is not null and v.status not in ('closed', 'resolved', 'archived')
+      union select a.contact_id from public.calendar_appointments a
+       where a.owner_user_id = p_user and a.contact_id is not null and a.starts_at > now() and a.status in ('pending', 'confirmed')
+      union select t.contact_id from public.crm_tasks t
+       where t.assigned_to = p_user and t.contact_id is not null and t.status in ('pending', 'in_progress')
     )
     select distinct l.organization_id, l.contact_id
       from minhas m
