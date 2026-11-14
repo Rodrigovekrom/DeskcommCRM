@@ -113,3 +113,33 @@ describe("v1.9.52.4: a conversa reaberta sem dono volta na hora ao SDR de Follow
     await expect(rodar()).resolves.toBe(false);
   });
 });
+
+// (Maestro 073121, Lupa 073050) o caminho do EVENTO ('cliente voltou', automações): o serviceForEvent chama a volta
+// na hora com a conversa que o banco abriu; e o beginServiceAtOrigin (o 'Abrir conversa', as automações) também.
+describe("v1.9.52.4: a origem do atendimento chama a volta na hora", () => {
+  const FRONT = { organization_id: ORG, contact_id: CONTATO, conversation_id: CONVERSA, service_revision: 2, demanda_id: null, demanda_revision: null, status: "open", demanda_fechada_em: null };
+  const chamado = vi.fn(async () => true);
+
+  async function origem() {
+    vi.resetModules();
+    vi.doMock("@/lib/iavek/conversa-reaberta-volta-ao-followup", () => ({ conversaSemDonoVoltaAoFollowup: chamado }));
+    vi.doMock("@/lib/atendimento/fronteira-server", () => ({ currentExecutionBoundary: () => null, guardServiceEffect: async () => undefined }));
+    return import("@/lib/atendimento/origem");
+  }
+  const adminDoBanco = () => ({ rpc: vi.fn(async () => ({ data: FRONT, error: null })) });
+
+  beforeEach(() => chamado.mockClear());
+
+  it("serviceForEvent (o begin por EVENTO): chama a volta na hora com a conversa aberta", async () => {
+    const { serviceForEvent } = await origem();
+    const b = await serviceForEvent(adminDoBanco() as never, ORG, "evento-1", CONTATO);
+    expect(b?.conversation_id).toBe(CONVERSA);
+    expect(chamado).toHaveBeenCalledWith(expect.anything(), ORG, CONTATO, CONVERSA);
+  });
+
+  it("beginServiceAtOrigin (o 'Abrir conversa', as automações): chama a volta na hora", async () => {
+    const { beginServiceAtOrigin } = await origem();
+    await beginServiceAtOrigin(adminDoBanco() as never, ORG, CONTATO, "sess-1");
+    expect(chamado).toHaveBeenCalledWith(expect.anything(), ORG, CONTATO, CONVERSA);
+  });
+});
