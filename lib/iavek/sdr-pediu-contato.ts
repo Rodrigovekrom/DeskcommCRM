@@ -32,8 +32,8 @@ async function maisAntigo(admin: Admin, org: string, quem: Quem): Promise<string
     .eq("organization_id", org)
     .is("revoked_at", null);
   if (quem === "sdr_followup") q = q.eq("role", "agent").eq("interface_settings->>funcao", "sdr_followup");
-  // (Maestro 222446) só a funcao 'gerente'; o 'apoio' NÃO entra
-  else if (quem === "gerente") q = q.eq("interface_settings->>funcao", "gerente");
+  // (Maestro 222507) 'gerente' OU 'apoio': a fn_iavek_funcao_na_org (0598) já trata o apoio como gerente no sistema todo
+  else if (quem === "gerente") q = q.in("interface_settings->>funcao", ["gerente", "apoio"]);
   else q = q.eq("role", "admin");
   const { data, error } = await q.order("created_at", { ascending: true }).order("user_id", { ascending: true });
   if (error || !data) return null;

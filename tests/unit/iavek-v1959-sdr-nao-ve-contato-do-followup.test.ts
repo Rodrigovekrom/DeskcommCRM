@@ -148,15 +148,15 @@ describe("v1.9.59 (A1): quem recebe a tarefa do lead ÓRFÃO", () => {
     m.membros = [membro("fu-novo", "agent", "sdr_followup", "2026-11-10"), membro("fu-velho", "agent", "sdr_followup", "2026-10-01")];
     expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("fu-velho");
   });
-  it("órfão SEM SDR de Follow-up: o GERENTE mais antigo; o 'apoio' NÃO entra (Maestro 222446)", async () => {
+  it("órfão SEM SDR de Follow-up: o GERENTE mais antigo, e o 'apoio' conta como gerente (Maestro 222507)", async () => {
     const m = base();
     m.membros = [membro("ger", "manager", "gerente", "2026-10-05"), membro("apo", "agent", "apoio", "2026-10-02")];
-    expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("ger");
+    expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("apo");
   });
-  it("só 'apoio', sem gerente: vai ao ADMIN da org (o apoio não recebe)", async () => {
+  it("só 'apoio', sem gerente: vai ao APOIO (antes do admin)", async () => {
     const m = base();
-    m.membros = [membro("apo", "agent", "apoio", "2026-10-02"), membro("adm", "admin", "", "2026-10-09")];
-    expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("adm");
+    m.membros = [membro("apo", "agent", "apoio", "2026-10-02"), membro("adm", "admin", "", "2026-09-01")];
+    expect(await responsavelDoPedido(adminDe(m).admin, "org-1", null)).toBe("apo");
   });
   it("órfão SEM SDR de Follow-up e SEM gerente: o ADMIN da org, NUNCA o platform admin", async () => {
     const m = base();
