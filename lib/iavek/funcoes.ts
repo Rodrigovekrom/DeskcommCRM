@@ -229,6 +229,21 @@ export function funcaoDoDia(funcao: unknown, role: string | null | undefined): F
 }
 
 /**
+ * ia.vek v1.9.52.5 (CRM-410, Rodrigo 15/11): o Meu dia PESSOAL (os meus leads, as minhas ligações de hoje, os
+ * meus próximos passos, as minhas propostas). O SDR de Follow-up caía no dia do GERENTE, que só tem contagens da
+ * loja: ele ficava sem a fila de ligações. Agora ele tem o dia do vendedor (o desenho do SDR, sem a fila das 72h
+ * e sem a meta de agendamentos, que são do SDR de entrada).
+ */
+export function temDiaPessoal(funcao: Funcao): boolean {
+  return funcao === "sdr" || funcao === "suporte" || funcao === "vendedor" || funcao === "sdr_followup";
+}
+
+/** A fila dos leads novos das 72h e a meta do dia: só o SDR de entrada (e o Suporte IA). */
+export function temFilaDoSdr(funcao: Funcao): boolean {
+  return funcao === "sdr" || funcao === "suporte";
+}
+
+/**
  * ia.vek v1.9.17: quem pode pedir o dia de qual função. Quem administra escolhe qualquer
  * uma (o "Ver como"); os demais, a própria.
  */

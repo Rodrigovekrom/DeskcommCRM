@@ -20,7 +20,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { requireRole } from "@/lib/auth/require-role";
 import { capacidadePorHorario } from "@/lib/iavek/capacidade-da-agenda";
 import { cronometroDoLead, entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
-import { FUNCOES, funcaoDaTela, podePedirODia } from "@/lib/iavek/funcoes";
+import { FUNCOES, funcaoDaTela, podePedirODia, temDiaPessoal, temFilaDoSdr } from "@/lib/iavek/funcoes";
 import {
   atrasosPorPessoa,
   limitesDoDia,
@@ -181,8 +181,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     // O SDR ganha, além disso, a fila dos leads novos das 72h e a meta do dia.
     // v1.7.1: o SDR de suporte tem o dia do SDR (com a fila das 72h); o
     // Gerente de apoio, o do vendedor — até a v1.7.5, quando virou o gerente.
-    if (funcao === "sdr" || funcao === "suporte" || funcao === "vendedor") {
-      const ehSdr = funcao === "sdr" || funcao === "suporte";
+    // v1.9.52.5: o SDR de Follow-up também tem o dia pessoal (temDiaPessoal); a fila das 72h é só do SDR de entrada.
+    if (temDiaPessoal(funcao)) {
+      const ehSdr = temFilaDoSdr(funcao);
       const [agenda, meus, ligacoes, passos, propostas, novos, agendadosHoje] = await Promise.all([
         supabase
           .from("calendar_appointments")
