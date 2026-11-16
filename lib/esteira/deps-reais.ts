@@ -19,6 +19,8 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { createLogger } from "@/lib/agent-engine/obs/logger";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
+import { encerraDemanda } from "@/lib/leads/encerramento";
+import { MOTIVO_DA_TRANSFERENCIA } from "@/lib/leads/motivo-da-perda";
 import { logger } from "@/lib/logger";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { lerTudo, todasAsPaginas } from "@/lib/supabase/paginas";
@@ -246,6 +248,62 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         }
       }
       return { ok: true, lead: paraLeadDaEsteira({ ...clone, source_metadata: metadata }) };
+    },
+
+    async leadAbertoNoFollowup(contactId, followupPipelineId) {
+      // ia.vek v1.9.59.2: o lead ABERTO do mesmo contato no funil de Follow-up (o mais antigo, se houver mais de um).
+      const { data, error } = await admin
+        .from("crm_leads")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("contact_id", contactId)
+        .eq("pipeline_id", followupPipelineId)
+        .eq("status", "open")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      // Um erro aqui não pode virar "não tem" em silêncio (seria outro clone): a rodada da loja para e avisa.
+      if (error) throw new Error(error.message);
+      return (data as { id: string } | null)?.id ?? null;
+    },
+
+    async fecharApontandoParaFollowup(lead, existenteId) {
+      // ia.vek v1.9.59.2: a origem fecha COMO a passagem fecha (o mesmo `encerraDemanda` do clone, Perdido com
+      // `moved_to_another_pipeline`, que não conta como perda), só que sem clone: o lead do Follow-up já existe.
+      const NOTA = "Já tinha lead aberto no Follow-up; não clonou de novo";
+      try {
+        await encerraDemanda(admin, ctx, {
+          leadId: lead.id,
+          desfecho: "lost",
+          motivo: MOTIVO_DA_TRANSFERENCIA,
+          razaoNaTimeline: "Levado para o funil de Follow-up (já tinha lead aberto lá)",
+          payloadNaTimeline: { lead_existente: existenteId },
+        });
+      } catch (err) {
+        logger.warn("esteira_fechar_sem_clone_falhou", {
+          organization_id: orgId,
+          lead_id: lead.id,
+          lead_existente: existenteId,
+          error: err instanceof Error ? err.message.slice(0, 200) : String(err),
+        });
+        return false;
+      }
+      const nota = await emitLeadActivity(admin, {
+        organizationId: orgId,
+        leadId: lead.id,
+        contactId: lead.contact_id,
+        type: "note",
+        sourceModule: "esteira",
+        sourceId: existenteId,
+        actor: ATOR_DA_ESTEIRA,
+        reason: NOTA,
+        payload: { lead_existente: existenteId },
+      });
+      if (!nota.ok) {
+        // A origem já fechou: a nota perdida não desfaz nada, fica no log.
+        logger.warn("esteira_nota_sem_clone_falhou", { organization_id: orgId, lead_id: lead.id, erro: nota.error });
+      }
+      return true;
     },
 
     async mover(lead, etapaId) {

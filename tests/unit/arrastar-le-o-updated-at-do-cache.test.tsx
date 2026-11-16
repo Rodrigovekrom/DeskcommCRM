@@ -17,7 +17,7 @@
  * produzem, sem depender de arrastar pixels no jsdom.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, renderHook, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -238,10 +238,14 @@ describe("mexer no negócio e arrastar em seguida", () => {
     await quadroRedesenhado(DEPOIS_DA_EDICAO);
 
     await arrastar();
+    // ia.vek v1.9.59.2: sair do Perdido para uma etapa aberta pede o motivo antes de mover.
+    fireEvent.change(await screen.findByTestId("motivo-reabertura"), { target: { value: "Voltou a falar" } });
+    fireEvent.click(screen.getByTestId("confirmar-reabertura"));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
 
     expect(post).toHaveBeenLastCalledWith(
       `/api/v1/leads/${LEAD}/move`,
-      expect.objectContaining({ expected_updated_at: DEPOIS_DA_EDICAO }),
+      expect.objectContaining({ expected_updated_at: DEPOIS_DA_EDICAO, motivo_reabertura: "Voltou a falar" }),
     );
   });
 
@@ -258,10 +262,15 @@ describe("mexer no negócio e arrastar em seguida", () => {
     await quadroRedesenhado(DEPOIS_DA_EDICAO);
 
     await arrastar();
+    // ia.vek v1.9.59.2 (desfazer depois de vendido): sair do Vendido para uma etapa aberta pede o motivo antes.
+    expect(await screen.findByText("Por que este lead sai do Vendido?")).toBeTruthy();
+    fireEvent.change(screen.getByTestId("motivo-reabertura"), { target: { value: "A venda não fechou" } });
+    fireEvent.click(screen.getByTestId("confirmar-reabertura"));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
 
     expect(post).toHaveBeenLastCalledWith(
       `/api/v1/leads/${LEAD}/move`,
-      expect.objectContaining({ expected_updated_at: DEPOIS_DA_EDICAO }),
+      expect.objectContaining({ expected_updated_at: DEPOIS_DA_EDICAO, motivo_reabertura: "A venda não fechou" }),
     );
   });
 });

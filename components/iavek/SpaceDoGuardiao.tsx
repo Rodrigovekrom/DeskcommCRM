@@ -239,8 +239,6 @@ function Linha({ l, agora, onPassar }: { l: LinhaDoSpace; agora: number; onPassa
             <Button size="sm" onClick={onPassar} data-testid="space-passar">
               {t("Passar a outro vendedor")}
             </Button>
-          ) : l.estado !== "followup" ? (
-            <span className="self-center text-xs text-muted-foreground">{t("Depois das 72h, só a gerência troca")}</span>
           ) : null}
         </div>
       </td>

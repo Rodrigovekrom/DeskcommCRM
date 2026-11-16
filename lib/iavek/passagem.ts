@@ -146,15 +146,15 @@ export function dentroDoPrazo(nascimento: string, agora: Date, horas = 72): bool
 }
 
 /**
- * Quem pode trocar o vendedor: o GUARDIÃO do lead dentro das 72h; a GERÊNCIA
- * (gerente e administrador) a qualquer momento — decisão do Rodrigo de 28/10:
- * o gerente fica livre para ajudar os vendedores. Depois das 72h, a restrição
- * vale para o guardião e o vendedor; nunca para a gerência.
+ * Quem pode trocar o vendedor: o GUARDIÃO do lead e a GERÊNCIA (gerente e administrador), a qualquer momento.
+ * ia.vek v1.9.59.2 (Rodrigo, 16/11, CRM-438 item e): depois das 72h o guardião também troca, sempre com o MOTIVO
+ * em texto livre (já obrigatório no pedido, vai à linha do tempo e ao aviso de quem perdeu o lead). Antes, depois
+ * das 72h só a gerência trocava. O `dentroDas72h` fica no contrato (a tela e a auditoria ainda o leem).
  */
 export function podeTrocarVendedor(args: {
   souGuardiao: boolean;
   souGestor: boolean;
   dentroDas72h: boolean;
 }): boolean {
-  return args.souGestor || (args.souGuardiao && args.dentroDas72h);
+  return args.souGestor || args.souGuardiao;
 }

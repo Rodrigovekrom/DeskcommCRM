@@ -30,6 +30,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { compararLeads, ehColunaDaIa, manterOrdem, semRespostaPrimeiro, type OrdemDoQuadro } from "@/lib/iavek/ordem-do-quadro";
 import { LoseLeadDialog } from "./LoseLeadDialog";
+import { ReabrirLeadDialog } from "./ReabrirLeadDialog";
 import { CompraFuturaDialog } from "./CompraFuturaDialog";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { ConversaNoQuadro, ConversaNoQuadroContext } from "@/components/iavek/ConversaNoQuadro";
@@ -173,7 +174,7 @@ export function KanbanBoard({
   } | null>(null);
   const { lojaDeCarros } = usePerfilDaEmpresa();
   const [vendaPendente, setVendaPendente] = useState<{
-    args: { leadId: string; stageId: string; positionInStage: number; expectedUpdatedAt: string };
+    args: { leadId: string; stageId: string; positionInStage: number; expectedUpdatedAt: string; via?: MoveArgs["via"] };
     valorCents: number | null;
   } | null>(null);
   // ia.vek v1.8.3: a trava da loja (0590) abre a janela do que falta.
@@ -181,11 +182,15 @@ export function KanbanBoard({
   const [focarCampos, setFocarCampos] = useState(false);
   // ia.vek v1.9.20 (0608): Agendado sem horário abre a janela de agendar; sem horário, não move.
   const [agendarAntes, setAgendarAntes] = useState<MoveArgs | null>(null);
+  // ia.vek v1.9.59.2: tirar do Perdido para uma etapa aberta pede o motivo (texto livre) antes de mover.
+  const [reaberturaPendente, setReaberturaPendente] = useState<MoveArgs | null>(null);
   const moveCard = useMoveCard(pipelineId, {
     onCamposFaltando: setRecusaDeCampos,
     onRetomada: setRetomada,
     onTravaDaLoja: setTravaDaLoja,
     onAgendadoSemHorario: setAgendarAntes,
+    // o servidor pediu o motivo (ex.: o Desfazer de uma perda): a mesma janela, com o mesmo movimento
+    onMotivoDaReabertura: setReaberturaPendente,
   });
   const { data: members } = useAssignableMembers(true);
   const ownerNames = useMemo(
@@ -323,7 +328,11 @@ export function KanbanBoard({
   );
 
   // ia.vek v1.9.18: "Movido para [coluna]. Desfazer", por 8 segundos. Desfazer é outro
-  // movimento, registrado como tal: nada é apagado. Em Vendido não há Desfazer.
+  // movimento, registrado como tal: nada é apagado.
+  // ia.vek v1.9.59.2 (desfazer depois de vendido): Vendido também tem Desfazer. O lead já está 'won', então o
+  // servidor pede o motivo (`motivo_da_reabertura_obrigatorio`) e a janela "Por que este lead sai do Vendido?"
+  // abre pelo `onMotivoDaReabertura`. E o Desfazer de quem SAIU do Vendido é vender de novo: na loja de carros ele
+  // abre a janela da venda (valor e data), como entrar no Vendido pelo quadro.
   const leadsAtuais = useRef<Lead[]>([]);
   useEffect(() => {
     leadsAtuais.current = data?.leads ?? [];
@@ -342,29 +351,32 @@ export function KanbanBoard({
   const avisarMovimento = useCallback(
     (lead: Lead, destino: Stage) => {
       const origem = { stageId: lead.stage_id, posicao: lead.position_in_stage };
-      if (destino.is_won) {
-        toast.success(`${t("Movido para")} ${destino.name}.`, { duration: 8000 });
-        return;
-      }
-      toast(`${t("Movido para")} ${destino.name}.`, {
+      const voltaParaOVendido = lead.status === "won" && !destino.is_won;
+      const aviso = destino.is_won ? toast.success : toast;
+      aviso(`${t("Movido para")} ${destino.name}.`, {
         duration: 8000,
         action: {
           label: t("Desfazer"),
           onClick: () => {
             const atual = leadsAtuais.current.find((l) => l.id === lead.id);
-            moveCard.mutate({
+            const args = {
               leadId: lead.id,
               stageId: origem.stageId,
               positionInStage: origem.posicao,
               expectedUpdatedAt: atual?.updated_at ?? lead.updated_at,
-              via: "desfazer",
-            });
+              via: "desfazer" as const,
+            };
+            if (voltaParaOVendido && lojaDeCarros) {
+              setVendaPendente({ args, valorCents: atual?.value_cents ?? lead.value_cents ?? null });
+              return;
+            }
+            moveCard.mutate(args);
           },
         },
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- moveCard é estável o bastante para o clique
-    [t],
+    [t, lojaDeCarros],
   );
 
   const moverPara = useCallback(
@@ -384,6 +396,12 @@ export function KanbanBoard({
       };
       if (etapa.is_compra_futura && mudaDeEtapa) {
         setCompraFuturaPendente({ args, lead, etapa });
+        return;
+      }
+      // ia.vek v1.9.59.2: sair do Perdido OU do Vendido para uma etapa ABERTA (nem perda, nem ganho, nem Compra
+      // futura) pede o motivo. Andar entre etapas de venda ou reordenar o Vendido não pede (o destino é is_won).
+      if (mudaDeEtapa && (lead.status === "lost" || lead.status === "won") && !etapa.is_lost && !etapa.is_won) {
+        setReaberturaPendente(args);
         return;
       }
       // ia.vek v1.9.12: entrar na venda, na loja de carros, pede valor e data.
@@ -687,6 +705,31 @@ export function KanbanBoard({
             const lead = data?.leads.find((l) => l.id === perdaPendente);
             const etapa = data?.stages.find((e) => e.is_lost);
             if (lead && etapa) avisarMovimento(lead, etapa);
+          }}
+        />
+      )}
+      {reaberturaPendente && (
+        <ReabrirLeadDialog
+          open
+          de={
+            data?.leads.find((l) => l.id === reaberturaPendente.leadId)?.status === "won" ? "won" : "lost"
+          }
+          pending={moveCard.isPending}
+          onOpenChange={(v: boolean) => !v && setReaberturaPendente(null)}
+          onConfirm={(motivo) => {
+            const args = reaberturaPendente;
+            // o lead de ANTES do movimento: o "Desfazer" do aviso volta para onde ele estava
+            const lead = leadsAtuais.current.find((l) => l.id === args.leadId);
+            moveCard.mutate(
+              { ...args, motivoReabertura: motivo },
+              {
+                onSuccess: () => {
+                  setReaberturaPendente(null);
+                  const etapa = data?.stages.find((e) => e.id === args.stageId);
+                  if (etapa && lead) avisarMovimento(lead, etapa);
+                },
+              },
+            );
           }}
         />
       )}

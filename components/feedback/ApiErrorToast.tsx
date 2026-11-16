@@ -118,6 +118,8 @@ const COPY: Record<string, { variant: Variant; msg?: string }> = {
   // qualquer genérico daqui alcança.
   lost_reason_required: { variant: "warning" },
   lost_reason_invalid: { variant: "warning" },
+  // ia.vek v1.9.59.2: tirar do Perdido pede o motivo (texto livre). Recusa rotineira, não quebra.
+  motivo_da_reabertura_obrigatorio: { variant: "warning" },
 
   // ---- Chaves de IA em uso ----
   //

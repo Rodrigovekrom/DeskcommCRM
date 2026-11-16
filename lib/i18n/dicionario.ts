@@ -10652,6 +10652,15 @@ export const DICIONARIO: Traducoes = {
   "Já existe um contato com este telefone.": { es: "Ya existe un contacto con este teléfono." },
   // ia.vek v1.9.59 (CRM-407): a resposta à SDR quando o cliente está com o SDR de Follow-up (sem nome nem id)
   "Este cliente está com o SDR de Follow-up; ele foi avisado.": { es: "Este cliente está con el SDR de Follow-up; ya fue avisado." },
+  // ia.vek v1.9.59.2: tirar o lead do Perdido pede o motivo (a rota de mover e a janela do quadro)
+  "Escreva o motivo para tirar o lead do Perdido.": { es: "Escribe el motivo para sacar el lead de Perdido." },
+  "Por que este lead sai do Perdido?": { es: "¿Por qué este lead sale de Perdido?" },
+  "Escreva o motivo. Ele fica registrado no histórico do lead.": { es: "Escribe el motivo. Queda registrado en el historial del lead." },
+  "Ex: O cliente voltou a falar e quer ver o carro": { es: "Ej.: El cliente volvió a escribir y quiere ver el auto" },
+  // ia.vek v1.9.59.2: desfazer depois de vendido (o mesmo motivo, para tirar o lead do Vendido)
+  "Escreva o motivo para tirar o lead do Vendido.": { es: "Escribe el motivo para sacar el lead de Vendido." },
+  "Por que este lead sai do Vendido?": { es: "¿Por qué este lead sale de Vendido?" },
+  "Ex: O financiamento foi negado e a venda não fechou": { es: "Ej.: El financiamiento fue rechazado y la venta no se cerró" },
   "Janela inválida.": { es: "Ventana inválida." },
   "Janela inválida: 'from' deve ser anterior a 'to'.": { es: "Ventana inválida: 'from' debe ser anterior a 'to'." },
   "Lead não encontrado.": { es: "Lead no encontrado." },

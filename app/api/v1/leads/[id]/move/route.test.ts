@@ -355,13 +355,26 @@ describe("POST /move num funil que retoma como novo negócio", () => {
     expect(corpo.error.code).toBe("reabertura_cria_novo");
   });
 
-  it("mesmo cenário num funil mesmo_registro reabre, como antes da issue", async () => {
+  it("mesmo cenário num funil mesmo_registro reabre, como antes da issue (ia.vek v1.9.59.2: com o motivo)", async () => {
     const falso = bancoFalso(null, {}, "lost");
     vi.mocked(createClient).mockResolvedValue(falso as never);
     const { POST } = await import("./route");
 
-    const response = await POST(
+    // ia.vek v1.9.59.2: tirar do Perdido pede o motivo; sem ele, 422 e a etapa não muda.
+    const semMotivo = await POST(
       request({ stage_id: STAGE_B, position_in_stage: 1500, expected_updated_at: CARREGADO }),
+      { params: Promise.resolve({ id: LEAD_ID }) },
+    );
+    expect(semMotivo.status).toBe(422);
+    expect(falso.banco.stageId).not.toBe(STAGE_B);
+
+    const response = await POST(
+      request({
+        stage_id: STAGE_B,
+        position_in_stage: 1500,
+        expected_updated_at: CARREGADO,
+        motivo_reabertura: "Cliente voltou a responder",
+      }),
       { params: Promise.resolve({ id: LEAD_ID }) },
     );
 

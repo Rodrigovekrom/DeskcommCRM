@@ -27,6 +27,8 @@ export interface MoveArgs {
   via?: "arrasto" | "botao" | "desfazer";
   /** ia.vek v1.9.45 (CRM-294): "AAAA-MM", quando o destino é a Compra futura. */
   compraFuturaMes?: string;
+  /** ia.vek v1.9.59.2: o motivo para tirar o lead do Perdido (texto livre, vai à linha do tempo). */
+  motivoReabertura?: string;
 }
 
 /**
@@ -72,6 +74,12 @@ interface OpcoesDeMove {
   onTravaDaLoja?: (trava: TravaDaLoja) => void;
   /** ia.vek v1.9.20 (0608): mover para Agendado sem horário abre a janela de agendar. */
   onAgendadoSemHorario?: (args: MoveArgs) => void;
+  /**
+   * ia.vek v1.9.59.2: tirar do Perdido sem o motivo (`motivo_da_reabertura_obrigatorio`) abre a janela do
+   * motivo com o MESMO movimento (rede de segurança: a tela já pergunta antes; o Desfazer de uma perda ou de uma
+   * venda cai aqui, e a tela decide pelo status do lead se a janela é a do Perdido ou a do Vendido).
+   */
+  onMotivoDaReabertura?: (args: MoveArgs) => void;
 }
 
 /** O que a recusa da trava da loja devolve: o lead e os rótulos do que falta. */
@@ -97,6 +105,7 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
         ...(args.venda ? { venda: args.venda } : {}),
         ...(args.via ? { via: args.via } : {}),
         ...(args.compraFuturaMes ? { compra_futura_mes: args.compraFuturaMes } : {}),
+        ...(args.motivoReabertura ? { motivo_reabertura: args.motivoReabertura } : {}),
       });
     },
     // ia.vek v1.7.7: por PREFIXO (`setQueriesData`) — o mesmo funil pode estar
@@ -157,6 +166,10 @@ export function useMoveCard(pipelineId: string, opcoes: OpcoesDeMove = {}) {
       // perguntar. O rollback acima já devolveu o card; o reenvio parte do
       // MESMO `expected_updated_at`, porque a recusa veio antes de qualquer
       // escrita — não há segundo carimbo para recolher.
+      if (err instanceof ApiError && err.code === "motivo_da_reabertura_obrigatorio" && opcoes.onMotivoDaReabertura) {
+        opcoes.onMotivoDaReabertura(args);
+        return;
+      }
       if (err instanceof ApiError && err.code === "iavek_agendado_sem_horario" && opcoes.onAgendadoSemHorario) {
         opcoes.onAgendadoSemHorario(args);
         return;

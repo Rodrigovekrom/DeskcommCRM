@@ -279,11 +279,8 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   if (p.tipo === "trocar_vendedor") {
     if (!pode.trocar_vendedor) {
-      return proibido(
-        c.dentroDas72h
-          ? "Só o guardião do lead (ou a gerência) troca o vendedor."
-          : "Depois das 72h, só o gerente ou o administrador troca o vendedor.",
-      );
+      // ia.vek v1.9.59.2 (CRM-438 e): o guardião troca também depois das 72h; a recusa é a mesma antes e depois.
+      return proibido("Só o guardião do lead (ou a gerência) troca o vendedor.");
     }
     if (p.vendedor_id === lead.owner_user_id) return fail("validation_failed", t("O lead já está com este vendedor."), 422, { requestId });
     if (!(await vendedoresDaLoja(admin, orgId)).some((v) => v.id === p.vendedor_id)) {

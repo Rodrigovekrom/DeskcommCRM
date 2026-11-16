@@ -56,9 +56,10 @@ describe("v1.9.4 — os campos da passagem (a trava)", () => {
 });
 
 describe("v1.9.4 — quem troca o vendedor", () => {
-  it("o guardião troca a qualquer momento DENTRO das 72h; depois, só o administrador", () => {
+  it("o guardião troca dentro e (v1.9.59.2, CRM-438 e) DEPOIS das 72h; o vendedor nunca", () => {
     expect(podeTrocarVendedor({ souGuardiao: true, souGestor: false, dentroDas72h: true })).toBe(true);
-    expect(podeTrocarVendedor({ souGuardiao: true, souGestor: false, dentroDas72h: false })).toBe(false);
+    expect(podeTrocarVendedor({ souGuardiao: true, souGestor: false, dentroDas72h: false })).toBe(true);
+    expect(podeTrocarVendedor({ souGuardiao: false, souGestor: false, dentroDas72h: false })).toBe(false);
     expect(podeTrocarVendedor({ souGuardiao: false, souGestor: true, dentroDas72h: false })).toBe(true);
     expect(podeTrocarVendedor({ souGuardiao: false, souGestor: false, dentroDas72h: true })).toBe(false);
     // 28/10: o gerente (gestor) fica livre, antes e depois das 72h.
@@ -75,7 +76,11 @@ describe("v1.9.4 — quem troca o vendedor", () => {
     const r = ler("app/api/v1/iavek/passagem/route.ts");
     expect(r).toContain('tipo: "lead_retirado",');
     expect(r).toContain("contato_nome: await nomeDoCliente(admin, orgId, lead.contact_id, t)");
-    expect(r).toContain('"Depois das 72h, só o gerente ou o administrador troca o vendedor."');
+    // v1.9.59.2 (CRM-438 e): a recusa é uma só, antes e depois das 72h; o motivo segue obrigatório no pedido.
+    expect(r).toContain('return proibido("Só o guardião do lead (ou a gerência) troca o vendedor.");');
+    expect(r).not.toContain("Depois das 72h, só o gerente ou o administrador troca o vendedor.");
+    expect(ler("lib/iavek/passagem.ts")).toMatch(/tipo: z\.literal\("trocar_vendedor"\),[\s\S]{0,120}motivo: texto\(3, 300\),/);
+    expect(ler("app/api/v1/iavek/space-do-guardiao/route.ts")).toContain('pode_trocar: estado !== "followup" && Boolean(vendedorId),');
   });
 });
 

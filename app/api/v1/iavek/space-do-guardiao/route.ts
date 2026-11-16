@@ -138,8 +138,9 @@ export async function GET(): Promise<Response> {
         etapa: l.stage_id ? nomeDaEtapa.get(l.stage_id) ?? null : null,
         estado,
         fim_das_horas: new Date(fim).toISOString(),
-        // As mesmas regras do CRM-209 para o guardião: dentro das horas e fora do Follow-up.
-        pode_trocar: estado !== "followup" && agora < fim && Boolean(vendedorId),
+        // As mesmas regras da passagem para o guardião: fora do Follow-up. ia.vek v1.9.59.2 (CRM-438 e): também
+        // depois das horas (o motivo é obrigatório no pedido).
+        pode_trocar: estado !== "followup" && Boolean(vendedorId),
       };
     });
 

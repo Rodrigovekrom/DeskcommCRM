@@ -66,6 +66,8 @@ function montar(o: {
   falhaNaPerda?: boolean;
   /** v1.9.41: quantos do lote antigo já passaram hoje. */
   loteHoje?: number;
+  /** v1.9.59.2: contato → id do lead que ele JÁ tem aberto no Follow-up. */
+  abertoNoFollowup?: Record<string, string>;
 }) {
   const log = {
     passados: [] as string[],
@@ -75,6 +77,8 @@ function montar(o: {
     cobrancas: [] as Array<[string, number, string]>,
     reengajos: [] as string[],
     perdidos: [] as Array<[string, string]>,
+    semClone: [] as Array<[string, string]>,
+    perguntasFollowup: [] as Array<[string, string]>,
   };
   const deps: DepsDaEsteira = {
     agora: () => AGORA,
@@ -85,6 +89,14 @@ function montar(o: {
       log.passados.push(l.id);
       if (lote) log.loteAntigo.push([l.id, lote.dono, lote.soL3]);
       return { ok: true, lead: { ...l, id: l.id + "-fu", stage_id: etapa, created_at: AGORA.toISOString(), inicio: l.created_at } };
+    },
+    leadAbertoNoFollowup: async (contato, pid) => {
+      log.perguntasFollowup.push([contato, pid]);
+      return o.abertoNoFollowup?.[contato] ?? null;
+    },
+    fecharApontandoParaFollowup: async (l, existente) => {
+      log.semClone.push([l.id, existente]);
+      return true;
     },
     mover: async (l, etapa) => {
       log.movidos.push([l.id, etapa]);
@@ -461,5 +473,51 @@ describe("v1.9.52.3 (Lupa 051624): a reconciliação conta as tarefas à parte",
     deps.reconciliarFollowup = async () => ({ guardioes: 1, originais: 2, tarefas: 4 });
     const r = await rodarEsteira(cfg, deps);
     expect(r.reconciliadosFollowup).toBe(7);
+  });
+});
+
+describe("v1.9.59.2: quem já tem lead aberto no Follow-up não ganha outro clone", () => {
+  it("contato COM lead aberto no Follow-up: não clona, fecha apontando para ele, sem L3", async () => {
+    const { deps, log } = montar({
+      entrada: [lead({ id: "reaberto", created_at: ha(100 * HORA) })],
+      abertoNoFollowup: { "c-reaberto": "fu-existente" },
+    });
+    const r = await rodarEsteira(cfg, deps);
+    expect(log.perguntasFollowup).toEqual([["c-reaberto", F]]);
+    expect(log.passados).toEqual([]);
+    expect(log.semClone).toEqual([["reaberto", "fu-existente"]]);
+    expect(log.criadas).toEqual([]);
+    expect(r.passados).toBe(0);
+    expect(r.passadosSemClone).toBe(1);
+    expect(r.falhasNaPassagem).toBe(0);
+  });
+
+  it("contato SEM lead aberto no Follow-up: a passagem de sempre (clone + L3)", async () => {
+    const { deps, log } = montar({ entrada: [lead({ id: "novo72", created_at: ha(100 * HORA) })] });
+    const r = await rodarEsteira(cfg, deps);
+    expect(log.passados).toEqual(["novo72"]);
+    expect(log.semClone).toEqual([]);
+    expect(log.criadas.map(([id, c]) => [id, c])).toEqual([["novo72-fu", "L3"]]);
+    expect(r.passados).toBe(1);
+    expect(r.passadosSemClone).toBe(0);
+  });
+
+  it("fechar sem clone falhou: conta como falha da passagem e não clona", async () => {
+    const { deps, log } = montar({
+      entrada: [lead({ id: "x", created_at: ha(100 * HORA) })],
+      abertoNoFollowup: { "c-x": "fu-x" },
+    });
+    deps.fecharApontandoParaFollowup = async () => false;
+    const r = await rodarEsteira(cfg, deps);
+    expect(log.passados).toEqual([]);
+    expect(r.falhasNaPassagem).toBe(1);
+    expect(r.passadosSemClone).toBe(0);
+  });
+
+  it("lead sem contato: não pergunta, passa como antes", async () => {
+    const { deps, log } = montar({ entrada: [lead({ id: "semcontato", contact_id: null, created_at: ha(100 * HORA) })] });
+    await rodarEsteira(cfg, deps);
+    expect(log.perguntasFollowup).toEqual([]);
+    expect(log.passados).toEqual(["semcontato"]);
   });
 });

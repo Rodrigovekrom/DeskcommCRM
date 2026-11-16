@@ -43,6 +43,14 @@ export const moveLeadSchema = z.object({
    */
   won_reason: z.string().max(500).optional(),
   /**
+   * ia.vek v1.9.59.2: o motivo para tirar o lead do Perdido (texto livre, vai à linha do tempo). Quem exige é a
+   * rota do board (`/move`): sem ele, a reabertura é 422 `motivo_da_reabertura_obrigatorio`. Em branco = ausente.
+   */
+  motivo_reabertura: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().trim().min(3).max(500).optional(),
+  ),
+  /**
    * ia.vek v1.9.45 (CRM-294): o mês e o ano previstos da Compra futura ("AAAA-MM"), quando a etapa de
    * destino é a Compra futura. Vai NA MESMA escrita que muda a etapa; o banco exige e recusa o passado.
    */

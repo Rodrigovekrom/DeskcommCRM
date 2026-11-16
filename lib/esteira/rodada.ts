@@ -173,6 +173,16 @@ export interface DepsDaEsteira {
   ): Promise<{ ok: true; lead: LeadDaEsteira } | { ok: false; erro: string }>;
   /** v1.9.41: quantos do lote antigo já passaram a partir de `desde` (a meia-noite local de hoje). */
   passadosDoLoteAntigoDesde?(desde: Date): Promise<number>;
+  /**
+   * ia.vek v1.9.59.2 (um lead com 4 clones no Follow-up, medido): o contato já tem um lead ABERTO no funil de
+   * Follow-up? Devolve o id dele (ou null). Perguntado ANTES de clonar: quem já está lá não ganha outro clone.
+   */
+  leadAbertoNoFollowup(contactId: string, followupPipelineId: string): Promise<string | null>;
+  /**
+   * ia.vek v1.9.59.2: fecha a origem como a passagem fecha (Perdido, `moved_to_another_pipeline`), sem clonar,
+   * e grava na linha do tempo a nota que aponta para o lead que já estava aberto no Follow-up.
+   */
+  fecharApontandoParaFollowup(lead: LeadDaEsteira, existenteId: string): Promise<boolean>;
   mover(lead: LeadDaEsteira, etapaId: string): Promise<boolean>;
   /** Negócios (entre os dados) que já tiveram handoff para humano. */
   comHandoff(leadIds: string[]): Promise<Set<string>>;
@@ -209,6 +219,8 @@ export interface ResumoDaRodada {
   falhasNaPassagem: number;
   /** v1.9.41: quantos dos `passados` vieram do lote antigo. */
   passadosLoteAntigo: number;
+  /** v1.9.59.2: venceram as 72h, mas o contato já tinha lead aberto no Follow-up: a origem fechou sem clone. */
+  passadosSemClone: number;
   /** v1.9.23: venceram as 72h mas ficaram, pelo "Manter em negociação" ou por resposta recente. */
   seguradosManter: number;
   seguradosResposta: number;
@@ -225,7 +237,7 @@ export interface ResumoDaRodada {
 
 export function rodadaTeveEfeito(r: ResumoDaRodada): boolean {
   return (
-    r.passados + r.falhasNaPassagem + r.fasesMovidas + r.reengajados + r.perdidosSemRetorno + r.falhasSemRetorno +
+    r.passados + r.passadosSemClone + r.falhasNaPassagem + r.fasesMovidas + r.reengajados + r.perdidosSemRetorno + r.falhasSemRetorno +
       r.ligacoesCriadas + r.cobrancas >
     0
   );
@@ -236,6 +248,7 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
     passados: 0,
     falhasNaPassagem: 0,
     passadosLoteAntigo: 0,
+    passadosSemClone: 0,
     seguradosManter: 0,
     seguradosResposta: 0,
     fasesMovidas: 0,
@@ -257,6 +270,24 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
       resumo.ligacoesCriadas += 1;
       jaTem?.add(sourceKindDaLigacao(codigo));
     }
+  };
+
+  // ia.vek v1.9.59.2: o contato que JÁ tem lead aberto no Follow-up não ganha outro clone (um lead reaberto do
+  // Perdido passava de novo e cada passagem fazia mais um). A origem fecha como na passagem, com a nota que aponta
+  // para o que já estava lá, e não nasce L3 (o lead de lá já tem as ligações dele).
+  // 'clonou' = passou com clone (segue para a L3); 'sem_clone' = fechou apontando; 'falhou' = nada mudou.
+  const passar = async (
+    lead: LeadDaEsteira,
+    loteAntigo?: PassagemDoLoteAntigo,
+  ): Promise<{ como: "clonou"; lead: LeadDaEsteira } | { como: "sem_clone" } | { como: "falhou" }> => {
+    const existente = lead.contact_id ? await deps.leadAbertoNoFollowup(lead.contact_id, followup.pipeline_id) : null;
+    if (existente) {
+      if (!(await deps.fecharApontandoParaFollowup(lead, existente))) return { como: "falhou" };
+      resumo.passadosSemClone += 1;
+      return { como: "sem_clone" };
+    }
+    const r = await deps.passarParaFollowup(lead, followup.fases[0]!.etapa_id, loteAntigo);
+    return r.ok ? { como: "clonou", lead: r.lead } : { como: "falhou" };
   };
 
   // ── 1 e 4 (L1, L2, L3): funil de entrada ────────────────────────────────────
@@ -282,11 +313,12 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
         resumo.seguradosResposta += 1;
         continue;
       }
-      const r = await deps.passarParaFollowup(lead, followup.fases[0]!.etapa_id);
-      if (!r.ok) {
+      const r = await passar(lead);
+      if (r.como === "falhou") {
         resumo.falhasNaPassagem += 1;
         continue;
       }
+      if (r.como === "sem_clone") continue;
       resumo.passados += 1;
       await criar(r.lead, "L3", new Set());
       continue;
@@ -326,11 +358,13 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
           continue;
         }
         const dono = lote.donos[(jaHoje + i) % lote.donos.length]!;
-        const r = await deps.passarParaFollowup(lead, followup.fases[0]!.etapa_id, { dono, soL3: lote.so_l3 });
-        if (!r.ok) {
+        const r = await passar(lead, { dono, soL3: lote.so_l3 });
+        if (r.como === "falhou") {
           resumo.falhasNaPassagem += 1;
           continue;
         }
+        // v1.9.59.2: fechou sem clone (já estava no Follow-up): não gasta a cota nem a vez do rodízio.
+        if (r.como === "sem_clone") continue;
         i += 1;
         cota -= 1;
         resumo.passados += 1;
