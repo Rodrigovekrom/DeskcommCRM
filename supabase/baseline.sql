@@ -30337,6 +30337,8 @@ alter table public.passagens_de_atendimento
   add constraint passagens_de_atendimento_motor_check
   check (motor in ('engine','crm'));
 
+-- ia.vek (migration 0645, v1.9.60, CRM-460/485): 'falha_da_ia' (o turno da IA morreu) e 'bloqueio_de_manipulacao' /
+-- 'manipulacao' (a manipulação forte segurou a resposta) entram AQUI, no bloco único destas constraints (regra #159).
 alter table public.passagens_de_atendimento
   drop constraint if exists passagens_de_atendimento_origem_check;
 alter table public.passagens_de_atendimento
