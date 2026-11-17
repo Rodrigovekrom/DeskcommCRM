@@ -52737,4 +52737,18 @@ revoke all on public.iavek_rotinas_rodadas from public, anon, authenticated;
 grant select, insert, update, delete on public.iavek_rotinas_rodadas to service_role;
 
 
+-- ---- ia.vek: sai a chave zero_data_retention do agente (migration 0644, v1.9.60, CRM-489) ----
+-- Ver o cabeçalho de supabase/migrations/20261117150000_0644_iavek_tira_zero_data_retention.sql.
+alter table public.ai_agents
+  alter column config set default jsonb_build_object(
+    'temperature', 0.3, 'max_tokens', 1024, 'rag_top_k', 5,
+    'rag_similarity_threshold', 0.40, 'context_message_window', 20,
+    'confidence_threshold', 0.55, 'sentiment_threshold', 0.3);
+
+update public.ai_agents
+   set config = config - 'zero_data_retention'
+ where config ? 'zero_data_retention'
+   and config->'zero_data_retention' = 'false'::jsonb;
+
+
 notify pgrst, 'reload schema';
