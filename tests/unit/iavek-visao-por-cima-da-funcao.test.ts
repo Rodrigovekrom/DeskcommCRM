@@ -153,6 +153,30 @@ describe("(Lupa 204427, 2) nenhum item do menu leva a uma página que desvia a p
   });
 });
 
+describe("(Lupa 214120) o menu de quem tem a lista não ganha NADA além do marcado (nem um item essencial)", () => {
+  it("o vendedor com uma lista SEM os essenciais: a barra = as 4 da função + só as marcadas a mais; os essenciais ficam no rodapé", () => {
+    const lista = ["/app/meu-dia", "/app/pipeline", "/app/tasks"];
+    const s = combinarInterfaces(EMPRESA_SEM_LISTA, vinculo("vendedor", lista));
+    const barra = sidebarGroups(false, "agent", s)
+      .filter((g) => g.group.id !== "organizacao")
+      .flatMap((g) => g.items.map((i) => i.href));
+    expect(barra).toEqual(["/app/meu-dia", "/app/pipeline", "/app/tasks"]);
+  });
+  it.each([
+    ["vendedor", "agent", "vendedor", VENDEDOR_6],
+    ["gerente", "manager", "gerente", GERENTE_4],
+    ["gerente que é SDR", "manager", "sdr", GERENTE_SDR_14],
+    ["SDR com uma lista curta", "agent", "sdr", ["/app/meu-dia", "/app/contacts"]],
+  ] as const)("%s: tudo o que entra a MAIS do que o desenho da função (fora do rodapé) está na lista marcada", (_n, role, funcao, lista) => {
+    const sem = combinarInterfaces(EMPRESA_SEM_LISTA, vinculo(funcao));
+    const com = combinarInterfaces(EMPRESA_SEM_LISTA, vinculo(funcao, [...lista]));
+    const fora = (st: typeof com) =>
+      sidebarGroups(false, role, st).filter((g) => g.group.id !== "organizacao").flatMap((g) => g.items.map((i) => i.href));
+    const amais = fora(com).filter((h) => !fora(sem).includes(h));
+    for (const h of amais) expect(lista as readonly string[]).toContain(h);
+  });
+});
+
 describe("(Lupa 211841) o combinado NUNCA é gravado de volta", () => {
   const raiz = process.cwd();
   const arquivos = (dir: string): string[] =>
