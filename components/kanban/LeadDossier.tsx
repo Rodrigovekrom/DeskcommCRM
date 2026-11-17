@@ -24,6 +24,7 @@ import { PassarFicha } from "@/components/iavek/PassarFicha";
 import { OwnerBadge } from "./OwnerBadge";
 import { resolveLeadOwner } from "@/lib/kanban/owner";
 import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
+import { BotaoLigar } from "@/components/ligar/BotaoLigar";
 import type { CustomFieldDef } from "@/components/contacts/CustomFieldsEditor";
 import { usePerfilDaEmpresa } from "@/hooks/iavek/usePerfilDaEmpresa";
 
@@ -131,6 +132,12 @@ export function LeadDossier({
       >
         <SheetHeader className="pb-3">
           <SheetTitle className="text-base leading-6">{lead.title}</SheetTitle>
+          {/* ia.vek CRM-532: o discador do celular, com o número do cadastro; o registro cai NESTE negócio */}
+          {lead.contact_id && (
+            <div>
+              <BotaoLigar contatoId={lead.contact_id} telefone={lead.contact_phone} leadId={lead.id} />
+            </div>
+          )}
         </SheetHeader>
 
         {/* ① cabeçalho vivo */}

@@ -45,6 +45,8 @@ export interface Tarefa {
   updated_at: string;
   /** Origem automática (ia.vek: `ligacao:<código>` = ligação da esteira, que se registra pelos 3 campos). */
   source_kind?: string | null;
+  /** ia.vek CRM-532: o telefone do contato, para o botão "Ligar" da tarefa de ligação (nulo se a RLS não mostra o contato). */
+  contato?: { phone_number: string | null } | null;
 }
 
 export interface NovaTarefa {

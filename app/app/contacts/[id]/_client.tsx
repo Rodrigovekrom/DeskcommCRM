@@ -43,6 +43,7 @@ import { ConversaNoDossie } from "@/components/kanban/ConversaNoDossie";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { origemDoContato } from "@/lib/leads/origem-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
+import { BotaoLigar } from "@/components/ligar/BotaoLigar";
 import { DialButton } from "@/components/voice/DialButton";
 
 interface Props {
@@ -276,6 +277,8 @@ export function ContactDetailClient({ contactId }: Props) {
               </Button>
             )}
             <DialButton contactId={contactId} hasPhone={!!contact.phone_number} />
+            {/* ia.vek CRM-532: o discador do celular, com o número do cadastro */}
+            <BotaoLigar contatoId={contactId} telefone={contact.phone_number} tamanho="default" />
             <Button variant="outline" onClick={() => setEditOpen(true)} className="shrink-0">
               <PencilSimple size={16} weight="bold" aria-hidden />
               <span>{t("Editar")}</span>

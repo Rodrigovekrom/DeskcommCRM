@@ -43,6 +43,7 @@ import { ReassignDialog } from "@/components/inbox/ReassignDialog";
 import { SnoozeButton } from "@/components/inbox/SnoozeButton";
 import { DialButton } from "@/components/voice/DialButton";
 import { VideoCallButton } from "@/components/inbox/VideoCallButton";
+import { BotaoLigar } from "@/components/ligar/BotaoLigar";
 import { motivoDoContato } from "@/lib/inbox/motivo-do-envio-bloqueado";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -295,6 +296,11 @@ export function ConversationHeader({
             outro canal. Grupos não representam uma pessoa para ligar. */}
         {!conversation.is_group && c?.id && (
           <DialButton contactId={c.id} hasPhone={!!c.phone_number} />
+        )}
+        {/* ia.vek CRM-532: "Ligar" abre o discador do CELULAR com o número do cadastro (no computador, o número +
+            Copiar + Registrar). Independe da chamada pelo WhatsApp acima, que só aparece com a voz ligada. */}
+        {!conversation.is_group && c?.id && (
+          <BotaoLigar contatoId={c.id} telefone={c.phone_number} ehGrupo={conversation.is_group ?? false} />
         )}
         {/* Videochamada (#2440): sem JITSI_SERVER_URL este botão não renderiza,
             então ele não ocupa lugar nem na instalação que não oferece a feature.

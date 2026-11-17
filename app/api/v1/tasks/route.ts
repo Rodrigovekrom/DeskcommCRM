@@ -40,7 +40,9 @@ export const dynamic = "force-dynamic";
 
 /** As colunas que a tela lê. Explícitas para o `select *` não vazar coluna nova. */
 const COLUNAS =
-  "id, organization_id, title, description, due_date, priority, status, lead_id, contact_id, assigned_to, created_by, created_at, updated_at, source_kind";
+  "id, organization_id, title, description, due_date, priority, status, lead_id, contact_id, assigned_to, created_by, created_at, updated_at, source_kind, " +
+  // ia.vek CRM-532: o telefone do contato para o "Ligar" da tarefa de ligação (a RLS de contacts decide; sem ver, nulo)
+  "contato:contacts(phone_number)";
 
 const criacaoSchema = z.object({
   title: z.string().trim().min(1).max(255),

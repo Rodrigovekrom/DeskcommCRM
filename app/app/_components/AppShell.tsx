@@ -10,6 +10,7 @@ import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessage
 import { useInboundCallAlerts } from "@/hooks/calls/useInboundCallAlerts";
 import { useCrmAlerts } from "@/hooks/notifications/useCrmAlerts";
 import { useNotifyOpenFromServiceWorker } from "@/lib/notifications/notify_open";
+import { ComoFoiALigacao } from "@/components/ligar/ComoFoiALigacao";
 import { ConviteDoCelular } from "@/components/notifications/ConviteDoCelular";
 import { estiloDaReserva, useOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
 
@@ -108,6 +109,8 @@ export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellPr
         >
           {/* ia.vek CRM-530: o convite para o aviso no celular, no 1º acesso de cada aparelho (só quem atende). */}
           <ConviteDoCelular podeAtender={podeAtender} />
+          {/* ia.vek CRM-532: o "Como foi a ligação?" na volta do discador (só quem atende) */}
+          {podeAtender && <ComoFoiALigacao />}
           {children}
         </main>
       </div>

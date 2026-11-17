@@ -15,6 +15,8 @@ import {
 } from "@/lib/tarefas/tipos";
 import { Check, PencilSimple, Trash } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
+import { BotaoLigar } from "@/components/ligar/BotaoLigar";
+import { ehLigacao } from "@/lib/esteira/rodada";
 
 interface Props {
   tarefas: Tarefa[];
@@ -104,6 +106,18 @@ function Linha({
         </p>
         {tarefa.description ? (
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{tarefa.description}</p>
+        ) : null}
+
+        {/* ia.vek CRM-532: na tarefa de ligação ABERTA, o discador do celular com o número do cadastro do contato */}
+        {!encerrada && ehLigacao(tarefa.source_kind) && tarefa.contact_id ? (
+          <div className="mt-1.5">
+            <BotaoLigar
+              contatoId={tarefa.contact_id}
+              telefone={tarefa.contato?.phone_number}
+              leadId={tarefa.lead_id}
+              tarefaId={tarefa.id}
+            />
+          </div>
         ) : null}
 
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">

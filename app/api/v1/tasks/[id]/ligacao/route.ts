@@ -6,25 +6,19 @@
  * fecha, a linha "Ligação registrada" entra na timeline com os 3 campos, e o
  * próximo passo mexe no negócio pelos MESMOS caminhos da tela (mover, perder,
  * criar tarefa). Agente ou acima, como concluir tarefa.
+ *
+ * (CRM-532) O registro em si mora em app/api/v1/_ligacao/registrar.ts, o MESMO do "Como foi a ligação?" do botão Ligar.
  */
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
-import { moveLeadHandler } from "@/app/api/v1/leads/_handler";
-import type { HandlerCtx } from "@/lib/api/handlers/types";
-import { ApiError } from "@/lib/api/types";
-import { ok, fail } from "@/lib/api/wrappers";
-import { audit } from "@/lib/audit";
+import { registrarLigacao, type NegocioDaLigacao } from "@/app/api/v1/_ligacao/registrar";
+import { fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
-import { configDaEsteira } from "@/lib/esteira/config";
-import { efeitosDoRegistro, registroDeLigacaoSchema } from "@/lib/esteira/registro-de-ligacao";
-import { PREFIXO_DE_LIGACAO, ehLigacao } from "@/lib/esteira/rodada";
-import { emitLeadActivity } from "@/lib/leads/activity-emitter";
-import { encerraDemanda } from "@/lib/leads/encerramento";
+import { registroDeLigacaoSchema } from "@/lib/esteira/registro-de-ligacao";
+import { ehLigacao } from "@/lib/esteira/rodada";
 import { createClient } from "@/lib/supabase/server";
-import { registraAtividadeDaTarefa } from "@/lib/tarefas/atividade";
-import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
 import type { Tarefa } from "@/lib/tarefas/tipos";
 
 export const dynamic = "force-dynamic";
@@ -76,117 +70,15 @@ export async function POST(req: NextRequest, ctx: Contexto): Promise<Response> {
         .eq("organization_id", orgId)
         .maybeSingle()
     : { data: null };
-  const negocio = negocioLido as { id: string; pipeline_id: string; status: string; contact_id: string | null } | null;
-  const { data: orgRow } = await supabase.from("organizations").select("settings").eq("id", orgId).maybeSingle();
-  const cfg = configDaEsteira((orgRow as { settings?: unknown } | null)?.settings);
-  const agora = new Date();
-  const efeitos = efeitosDoRegistro(
-    registro,
-    { source_kind: tarefa.source_kind! },
-    negocio ? { pipelineId: negocio.pipeline_id, status: negocio.status } : null,
-    cfg,
-    agora,
-  );
-
-  // 1. A tarefa fecha. Condicional ao status de antes: dois cliques não registram duas vezes.
-  const { data: fechada, error: errFechar } = await supabase
-    .from("crm_tasks")
-    .update({ status: "done" })
-    .eq("id", id)
-    .eq("organization_id", orgId)
-    .in("status", ["pending", "in_progress"])
-    .select("id");
-  if (errFechar) return fail("internal_error", "Não deu para fechar a tarefa.", 500, { requestId });
-  if (!fechada || fechada.length === 0) {
-    return fail("conflict", "Esta ligação já foi registrada.", 409, { requestId });
-  }
-
-  const actor = { type: "user", id: authz.user.id } as const;
-  await registraAtividadeDaTarefa(supabase, { organizationId: orgId, tarefa, tipo: "task_completed", actor });
-  if (negocio) {
-    await emitLeadActivity(supabase, {
-      organizationId: orgId,
-      leadId: negocio.id,
-      contactId: negocio.contact_id,
-      type: "call_logged",
-      sourceModule: "esteira",
-      sourceId: tarefa.id,
-      actor,
-      reason: `${registro.atendeu ? "Atendeu" : "Não atendeu"}: ${registro.resumo}`,
-      payload: {
-        task_id: tarefa.id,
-        codigo: tarefa.source_kind!.slice(PREFIXO_DE_LIGACAO.length),
-        atendeu: registro.atendeu,
-        resumo: registro.resumo,
-        proximo: registro.proximo ?? null,
-      },
-    });
-  }
-
-  // 2. Os efeitos do próximo passo.
-  const handlerCtx: HandlerCtx = { organization_id: orgId, actor, requestId, idioma: authz.user.idioma };
-  const aplicados: string[] = [];
-  try {
-    for (const e of efeitos) {
-      if (e.tipo === "nova_ligacao" && negocio) {
-        const r = await criarTarefaInterna(supabase, {
-          organizationId: orgId,
-          leadId: negocio.id,
-          contactId: negocio.contact_id,
-          titulo: e.titulo,
-          descricao: "Registre a ligação pelos 3 campos ao concluir.",
-          venceEmDias: 0,
-          venceEm: e.venceEm,
-          atribuirA: tarefa.assigned_to ? { usuario_id: tarefa.assigned_to } : "dono_do_lead",
-          prioridade: "high",
-          origem: "esteira",
-          sourceKind: e.sourceKind,
-          aceitaSemResponsavel: true,
-          agora,
-          requestId,
-        });
-        if (r.ok) aplicados.push(e.sourceKind);
-      } else if (e.tipo === "mover" && negocio) {
-        await moveLeadHandler(supabase, handlerCtx, negocio.id, {
-          to_stage_id: e.etapaId,
-          reason: `Ligação: ${registro.resumo}`,
-        });
-        aplicados.push("mover");
-      } else if (e.tipo === "cancelar_ligacoes_pendentes" && negocio) {
-        await supabase
-          .from("crm_tasks")
-          .update({ status: "cancelled" })
-          .eq("organization_id", orgId)
-          .eq("lead_id", negocio.id)
-          .like("source_kind", `${PREFIXO_DE_LIGACAO}%`)
-          .in("status", ["pending", "in_progress"]);
-        aplicados.push("cancelar_pendentes");
-      } else if (e.tipo === "perder" && negocio) {
-        await encerraDemanda(supabase, handlerCtx, {
-          leadId: negocio.id,
-          desfecho: "lost",
-          motivo: e.motivo,
-          razaoNaTimeline: e.detalhe ? `Ligação: ${e.detalhe}` : `Ligação: ${registro.resumo}`,
-        });
-        aplicados.push("perder");
-      }
-    }
-  } catch (err) {
-    // A ligação já está registrada; o efeito que falhou volta como recusa legível.
-    if (err instanceof ApiError) {
-      return fail(err.code, err.message, err.status, { requestId, details: { registrada: true, aplicados } });
-    }
-    throw err;
-  }
-
-  void audit({
-    action: "esteira.ligacao_registrada",
-    actorUserId: authz.user.id,
-    organizationId: orgId,
-    resourceType: "crm_tasks",
-    resourceId: tarefa.id,
+  const negocio = negocioLido as NegocioDaLigacao | null;
+  return registrarLigacao({
+    supabase,
+    orgId,
+    user: { id: authz.user.id, idioma: authz.user.idioma },
     requestId,
-    metadata: { atendeu: registro.atendeu, proximo: registro.proximo?.tipo ?? null, aplicados },
+    registro,
+    tarefa,
+    negocio,
+    origem: "esteira",
   });
-  return ok({ registrada: true, aplicados }, { requestId, status: 201 });
 }

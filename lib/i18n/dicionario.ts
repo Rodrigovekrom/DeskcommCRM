@@ -15512,6 +15512,13 @@ export const DICIONARIO: Traducoes = {
     es: "No pude enviar el enlace. Cópialo y pégalo en la conversación.",
   },
   "Enviar link na conversa": { es: "Enviar enlace a la conversación" },
+  // ─── ia.vek CRM-532: o botão "Ligar" e o "Como foi a ligação?" ───
+  // ("Ligar" sozinho já é a chave de LIGAR um recurso, em espanhol "Activar": o botão usa a frase inteira)
+  "Ligar para o cliente": { es: "Llamar al cliente" },
+  "Como foi a ligação?": { es: "¿Cómo fue la llamada?" },
+  "Ligue do seu celular para:": { es: "Llama desde tu celular al:" },
+  "Registrar a ligação": { es: "Registrar la llamada" },
+  "Registre o que foi falado com o cliente.": { es: "Registra lo que se habló con el cliente." },
   // ─── ia.vek CRM-530: o aviso no celular (o convite e o botão de teste) ───
   "Aviso no celular": { es: "Aviso en el celular" },
   "Para ser avisado no iPhone quando um cliente seu escrever: toque em Compartilhar e depois em Adicionar à Tela de Início. Depois, abra o CRM por lá.": { es: "Para recibir el aviso en el iPhone cuando un cliente tuyo escriba: toca Compartir y después Agregar a la pantalla de inicio. Después, abre el CRM desde allí." },

@@ -4,6 +4,9 @@
  * "Registrar ligação" (ia.vek D3): os 3 campos da tarefa de ligação da esteira.
  * Concluir uma ligação passa por aqui em vez do clique simples, porque o
  * próximo passo mexe no negócio (retentativa, agendamento, retorno, perda).
+ *
+ * (CRM-532) O MESMO formulário serve ao "Como foi a ligação?" depois do botão "Ligar": com `destino` (o contato e o
+ * negócio), envia para /api/v1/contacts/[id]/ligacao, que fecha a tarefa de ligação aberta se houver ou só registra.
  */
 import { useState } from "react";
 
@@ -20,15 +23,26 @@ import type { Tarefa } from "@/lib/tarefas/tipos";
 
 type Proximo = "agendou" | "retornar" | "sem_interesse";
 
+/** O destino do "Como foi a ligação?" (CRM-532): o contato e, se a tela souber, o negócio. */
+export interface DestinoDaLigacao {
+  contatoId: string;
+  leadId: string | null;
+  /** O que aparece sob o título (o nome do contato, ou o título da tarefa de ligação aberta). */
+  subtitulo: string;
+}
+
 export function RegistroDeLigacao({
   tarefa,
+  destino = null,
   aoFechar,
   aoRegistrar,
 }: {
   tarefa: Tarefa | null;
+  destino?: DestinoDaLigacao | null;
   aoFechar: () => void;
   aoRegistrar: () => void;
 }) {
+  const aberto = tarefa !== null || destino !== null;
   const t = useT();
   const [atendeu, setAtendeu] = useState<"sim" | "nao" | "">("");
   const [resumo, setResumo] = useState("");
@@ -44,7 +58,7 @@ export function RegistroDeLigacao({
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    if (!tarefa) return;
+    if (!aberto) return;
     setErro(null);
     if (atendeu === "") return setErro(t("Diga se o cliente atendeu."));
     if (resumo.trim().length < 3) return setErro(t("Escreva o resumo da ligação em uma frase."));
@@ -62,7 +76,11 @@ export function RegistroDeLigacao({
     }
     setEnviando(true);
     try {
-      const r = await fetch(`/api/v1/tasks/${tarefa.id}/ligacao`, {
+      const url = tarefa
+        ? `/api/v1/tasks/${tarefa.id}/ligacao`
+        : `/api/v1/contacts/${destino!.contatoId}/ligacao`;
+      if (!tarefa && destino?.leadId) corpo.lead_id = destino.leadId;
+      const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(corpo),
@@ -79,13 +97,13 @@ export function RegistroDeLigacao({
   }
 
   return (
-    <Dialog open={tarefa !== null} onOpenChange={(aberto) => (!aberto ? aoFechar() : undefined)}>
+    <Dialog open={aberto} onOpenChange={(abrir) => (!abrir ? aoFechar() : undefined)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t("Registrar ligação")}</DialogTitle>
+          <DialogTitle>{tarefa ? t("Registrar ligação") : t("Como foi a ligação?")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={enviar} className="space-y-4" data-testid="registro-de-ligacao">
-          <p className="text-sm text-muted-foreground">{tarefa?.title}</p>
+          <p className="text-sm text-muted-foreground">{tarefa?.title ?? destino?.subtitulo}</p>
 
           <div className="space-y-1.5">
             <Label>{t("O cliente atendeu?")}</Label>
