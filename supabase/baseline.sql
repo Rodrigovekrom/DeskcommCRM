@@ -13488,6 +13488,28 @@ grant  execute on function public.fn_gasto_de_ia_do_mes(uuid)
 
 notify pgrst, 'reload schema';
 
+-- ---- gasto de IA do mês em lote (migration 0642, ia.vek v1.9.60, CRM-484) ----
+create or replace function public.fn_gasto_de_ia_do_mes_em_lote(p_orgs uuid[])
+returns table (organization_id uuid, gasto numeric)
+  language sql
+  stable
+  security invoker
+  set search_path to 'public', 'pg_temp'
+as $$
+  select o, public.fn_gasto_de_ia_do_mes(o)
+    from unnest(coalesce(p_orgs, '{}'::uuid[])) as o;
+$$;
+
+comment on function public.fn_gasto_de_ia_do_mes_em_lote(uuid[]) is
+  'ia.vek 0642 (v1.9.60, CRM-484): o gasto de IA do MÊS de várias organizações de uma vez, chamando fn_gasto_de_ia_do_mes para cada uma (a régua única, em centavos de DÓLAR). Usada pelo painel de admin da plataforma no lugar de ai_budgets.current_month_consumed_cents, que não zera no mês. security invoker, só service_role.';
+
+revoke execute on function public.fn_gasto_de_ia_do_mes_em_lote(uuid[])
+  from public, anon, authenticated;
+grant  execute on function public.fn_gasto_de_ia_do_mes_em_lote(uuid[])
+  to service_role;
+
+notify pgrst, 'reload schema';
+
 
 -- ---- outbound zera unread na fila (migration 0161) ----
 create or replace function public.fn_mark_conversation_message(

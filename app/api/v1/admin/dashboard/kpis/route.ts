@@ -227,6 +227,9 @@ export async function GET(_req: NextRequest) {
   // número — chamar isso de alerta treina o operador a ignorar a cor exatamente
   // onde ela precisa ser crível.
   //
+  // ia.vek v1.9.60 (CRM-484): RESOLVIDO pela 0642 — o percentual abaixo vem de fn_gasto_de_ia_do_mes_em_lote, a régua
+  // do mês. O texto a seguir descreve o FALLBACK (sem a função), que continua marcado como "acumulado".
+  //
   // ⚠️ DIVERGÊNCIA DECLARADA — ESTE NÚMERO NÃO É O DO MÊS, E NÃO É O QUE DECIDE.
   //
   // Ele vem de `ai_budgets.current_month_consumed_cents`, o contador
@@ -252,6 +255,21 @@ export async function GET(_req: NextRequest) {
   // um alarme vermelho dizendo "a IA deste tenant parou" sobre um contador que
   // não zera é o alarme não-crível que o vizinho de `aiOverallStatus` diz querer
   // evitar.
+  // ia.vek v1.9.60 (CRM-484, migration 0642): o gasto DO MÊS pela régua única, em lote. Sem a função (imagem nova num
+  // banco sem a 0642) ou com erro, o painel cai no contador acumulado de antes, e o rótulo diz "acumulado".
+  const orgsDoTeto = (aiBudgetAlertsRes.data ?? []).map((row) => row.organization_id as string);
+  const gastoDoMes = new Map<string, number>();
+  let fonteDoGasto: "mes" | "acumulado" = "acumulado";
+  if (orgsDoTeto.length > 0) {
+    const { data: lote, error: eLote } = await admin.rpc("fn_gasto_de_ia_do_mes_em_lote", { p_orgs: orgsDoTeto });
+    if (!eLote && Array.isArray(lote)) {
+      for (const l of lote as Array<{ organization_id: string; gasto: number | string | null }>) {
+        gastoDoMes.set(l.organization_id, Number(l.gasto ?? 0));
+      }
+      fonteDoGasto = "mes";
+    }
+  }
+  const rotuloDoGasto = fonteDoGasto === "mes" ? "gasto do mês" : "gasto acumulado";
   const perto = (aiBudgetAlertsRes.data ?? [])
     .map((row) => {
       const org = (row as { organizations?: { display_name?: string } }).organizations;
@@ -262,7 +280,12 @@ export async function GET(_req: NextRequest) {
         modo: normalizarModoDeOrcamento(
           (row as { enforcement_mode?: string | null }).enforcement_mode ?? null,
         ),
-        pct: limit > 0 ? Number(row.current_month_consumed_cents ?? 0) / limit : 0,
+        pct:
+          limit > 0
+            ? (fonteDoGasto === "mes"
+                ? (gastoDoMes.get(row.organization_id as string) ?? 0)
+                : Number(row.current_month_consumed_cents ?? 0)) / limit
+            : 0,
       };
     })
     .filter((r) => r.pct >= 0.8);
@@ -285,8 +308,8 @@ export async function GET(_req: NextRequest) {
       tenant_name: row.nome,
       message:
         row.modo === "bloquear"
-          ? `Budget IA ${Math.round(row.pct * 100)}% do teto (gasto acumulado) — este tenant escolheu parar a IA no limite`
-          : `Budget IA ${Math.round(row.pct * 100)}% do teto (gasto acumulado)`,
+          ? `Budget IA ${Math.round(row.pct * 100)}% do teto (${rotuloDoGasto}) — este tenant escolheu parar a IA no limite`
+          : `Budget IA ${Math.round(row.pct * 100)}% do teto (${rotuloDoGasto})`,
       // Leva à saúde DO TENANT, e não a `/admin/usage`: é a única tela de admin
       // que lê a régua real (`fn_gasto_de_ia_do_mes`). Quem clicar por causa
       // deste alerta chega no número que decide, não em outro acumulado.
