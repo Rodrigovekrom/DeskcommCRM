@@ -76,6 +76,11 @@ interface Excecao {
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
   {
+    tabela: "iavek_turnos_da_ia",
+    razao:
+      "tests/invariants/iavek-turnos-da-ia-so-do-servidor.test.ts — um registro por turno respondido pela IA (0646, v1.9.60, CRM-491), exclusivo do servidor: SELECT/INSERT/UPDATE/DELETE com JWT authenticated recusados para o admin da organização e para o anon; o service_role grava e lê.",
+  },
+  {
     tabela: "iavek_rotinas_rodadas",
     razao:
       "tests/invariants/iavek-rotinas-rodadas-so-do-servidor.test.ts — a última rodada das rotinas automáticas (0643, v1.9.60, CRM-490), exclusiva do servidor: SELECT/INSERT/UPDATE/DELETE com JWT authenticated recusados para o admin da organização e para o anon; o service_role grava e lê.",

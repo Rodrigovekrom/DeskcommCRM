@@ -52751,4 +52751,31 @@ update public.ai_agents
    and config->'zero_data_retention' = 'false'::jsonb;
 
 
+-- ---- ia.vek: um registro por turno da IA (migration 0646, v1.9.60, CRM-491) ----
+-- Só tabela. Ver o cabeçalho de supabase/migrations/20261117170000_0646_iavek_turnos_da_ia.sql.
+create table if not exists public.iavek_turnos_da_ia (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  job_id uuid,
+  kind text check (kind is null or length(kind) <= 40),
+  conversation_id uuid,
+  contact_id uuid references public.contacts(id) on delete cascade,
+  inbound_message_id uuid,
+  mensagens_enviadas uuid[] not null default '{}',
+  agent_id uuid,
+  agent_version_id uuid,
+  modelo text check (modelo is null or length(modelo) <= 120),
+  nivel_manipulacao text check (nivel_manipulacao is null or nivel_manipulacao in ('none', 'low', 'high')),
+  criado_em timestamptz not null default now()
+);
+comment on table public.iavek_turnos_da_ia is
+  'ia.vek v1.9.60 (0646, CRM-491): uma linha por turno respondido pela IA (ligações e fatos, sem texto do cliente). Liga às llm_calls por job_id. Só do servidor.';
+create index if not exists iavek_turnos_da_ia_conversa on public.iavek_turnos_da_ia (organization_id, conversation_id, criado_em desc);
+create index if not exists iavek_turnos_da_ia_job on public.iavek_turnos_da_ia (job_id);
+
+alter table public.iavek_turnos_da_ia enable row level security;
+revoke all on public.iavek_turnos_da_ia from public, anon, authenticated;
+grant select, insert, update, delete on public.iavek_turnos_da_ia to service_role;
+
+
 notify pgrst, 'reload schema';

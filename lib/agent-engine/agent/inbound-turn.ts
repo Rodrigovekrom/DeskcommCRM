@@ -221,6 +221,7 @@ import {
   type JailbreakLevel,
 } from '../guardrails/jailbreak/classifier';
 import { bloqueioDeManipulacaoLigado } from '../guardrails/jailbreak/bloqueio';
+import { registrarTurnoDaIa } from './registro-do-turno';
 import { camadaLigada, lerCamadasDaOrg } from '../guardrails/camadas-da-org';
 import {
   nivelFinalDaManipulacao,
@@ -5102,6 +5103,26 @@ async function executarTurnoDoAgente(
       );
     }
 
+    // ia.vek v1.9.60 (CRM-491): um registro por turno respondido (sem texto do cliente). Nunca lança.
+    if (!preview) {
+      await registrarTurnoDaIa(
+        pool,
+        {
+          organizationId: tenantId,
+          jobId: liveJob().id,
+          kind: liveJob().kind,
+          conversationId: input.conversationId || null,
+          contactId: leadId || null,
+          inboundMessageId: input.inboundMessageId ?? null,
+          outcomes,
+          agentId: agentConfig?.agentId ?? null,
+          agentVersionId: agentConfig?.versionId ?? null,
+          modelo: turn.model ?? null,
+          nivelManipulacao: jailbreakLevel,
+        },
+        runLog,
+      );
+    }
     runLog.info('turno do agente concluído', {
       kind: liveJob().kind,
       messages_sent: outcomes.length,
