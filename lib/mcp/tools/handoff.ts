@@ -250,5 +250,6 @@ function proximoPasso(result: TriggerHandoffResult): string {
  */
 function motivoDoAgenteExterno(texto: string): HandoffReason {
   const codigo = motivoCodigoDoTexto(texto);
-  return codigo === "suspected_optout" || codigo === "caso_escalado" ? "requested_human" : codigo;
+  // ia.vek v1.9.60 (CRM-460): `falha_da_ia` também nasce de caminho interno (o worker, quando o turno morre).
+  return codigo === "suspected_optout" || codigo === "caso_escalado" || codigo === "falha_da_ia" ? "requested_human" : codigo;
 }

@@ -71,6 +71,8 @@ export const ORIGENS_DA_PASSAGEM = [
   "legado_teto",
   "mcp_externo",
   "runtime_nativo",
+  // ia.vek v1.9.60 (0645, CRM-460): o turno da IA morreu depois de esgotar as tentativas (erro do sistema).
+  "falha_da_ia",
 ] as const;
 export type OrigemDaPassagem = (typeof ORIGENS_DA_PASSAGEM)[number];
 
@@ -90,6 +92,8 @@ export const MOTIVOS_DA_PASSAGEM = [
   "legal_mention",
   "refund_mention",
   "caso_escalado",
+  // ia.vek v1.9.60 (0645, CRM-460): a IA falhou ao responder — o cliente não pediu uma pessoa.
+  "falha_da_ia",
 ] as const;
 export type MotivoDaPassagem = (typeof MOTIVOS_DA_PASSAGEM)[number];
 
@@ -134,6 +138,7 @@ export const FRASE_DO_MOTIVO = {
   legal_mention: "A conversa tocou em assunto jurídico",
   refund_mention: "A conversa tocou em reembolso",
   caso_escalado: "Uma pessoa da equipe escalou um atendimento",
+  falha_da_ia: "A IA falhou ao responder (erro do sistema) — o cliente não pediu uma pessoa",
 } satisfies Record<MotivoDaPassagem, string>;
 
 /**

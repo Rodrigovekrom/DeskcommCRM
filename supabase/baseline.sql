@@ -30345,7 +30345,7 @@ alter table public.passagens_de_atendimento
     'pedido_explicito','opt_out_provavel','ferramenta_do_modelo',
     'teto_de_gasto','caso_escalado','sentimento','legado_pedido',
     'legado_juridico','legado_etapa','legado_confianca','legado_teto',
-    'mcp_externo','runtime_nativo'));
+    'mcp_externo','runtime_nativo','falha_da_ia'));
 
 alter table public.passagens_de_atendimento
   drop constraint if exists passagens_de_atendimento_motivo_codigo_check;
@@ -30354,7 +30354,7 @@ alter table public.passagens_de_atendimento
   check (motivo_codigo in (
     'requested_human','suspected_optout','orcamento_de_ia','low_sentiment',
     'low_confidence','critical_stage','legal_mention','refund_mention',
-    'caso_escalado'));
+    'caso_escalado','falha_da_ia'));
 
 alter table public.passagens_de_atendimento
   drop constraint if exists passagens_de_atendimento_aviso_motivo_codigo_check;

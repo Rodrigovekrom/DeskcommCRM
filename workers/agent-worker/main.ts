@@ -75,6 +75,9 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type pg from "pg";
 
 import { createInboundTurnHandler } from "@/lib/agent-engine/agent/inbound-turn";
+import { avisarLeadLendoOContato } from "@/lib/agent-engine/agent/aviso-de-escalacao";
+import { passarAoHumanoSeOJobMorreu } from "@/lib/agent-engine/agent/passagem-por-falha";
+import { WahaChannelAdapter } from "@/lib/agent-engine/edge/channel/waha-adapter";
 import {
   createFollowupTurnHandler,
   type FollowupTurnDeps,
@@ -272,6 +275,11 @@ export async function startWorker(
     log.error("pool: conexão caiu — recria no próximo uso", { error: errMsg(err) }),
   );
   const workerId = `agent-engine-${hostname()}-${process.pid}`;
+  // ia.vek v1.9.60 (CRM-460): o canal para o aviso ao cliente quando o turno morre (o mesmo config do main).
+  const crmCfgDaPassagem = crmEdgeConfigFromEnv({
+    SUPABASE_URL: urlDoSupabaseNoServidor(env.SUPABASE_SERVER_URL, env.NEXT_PUBLIC_SUPABASE_URL),
+    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+  });
 
   await assertHarnessSchema(pool);
 
@@ -573,6 +581,20 @@ export async function startWorker(
           await cancelJob(pool, job.id, workerId, errMsg(err), claimOfJob(job)?.acquired_at);
         } else {
           await failJob(pool, job.id, workerId, err, claimOfJob(job)?.acquired_at);
+        }
+        // ia.vek v1.9.60 (CRM-460): o turno que MORREU (o failJob acima esgotou as tentativas) devolve a conversa a
+        // uma pessoa, em vez de deixar o cliente sem resposta. Lê o job de novo (só no caminho de falha) e nunca lança.
+        if (!terminal) {
+          await passarAoHumanoSeOJobMorreu(pool, job.id, {
+            log,
+            avisarCliente: (ids) =>
+              avisarLeadLendoOContato(pool, ids, {
+                motivo: "outro",
+                channel: new WahaChannelAdapter(pool, crmCfgDaPassagem),
+                now: new Date(),
+                log,
+              }),
+          });
         }
       } catch (failErr) {
         log.error("disposição do job indisponível — lease expira via reaper", {

@@ -13511,6 +13511,9 @@ export const DICIONARIO: Traducoes = {
     { es: "El cliente pidió hablar con una persona" },
   "O cliente parece ter pedido para não receber mais mensagens":
     { es: "El cliente parece haber pedido no recibir más mensajes" },
+  "A IA falhou ao responder (erro do sistema) — o cliente não pediu uma pessoa": {
+    es: "La IA falló al responder (error del sistema) — el cliente no pidió una persona",
+  },
   "O limite de gasto com IA foi atingido — o cliente não pediu uma pessoa":
     { es: "Se alcanzó el límite de gasto en IA — el cliente no pidió hablar con una persona" },
   "O cliente demonstrou irritação na conversa":
