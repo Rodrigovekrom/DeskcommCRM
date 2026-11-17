@@ -30,6 +30,7 @@ import {
 } from "@/lib/leads/motivo-da-perda";
 import { encerraDemanda } from "@/lib/leads/encerramento";
 import { mesclarSourceMetadata } from "@/lib/leads/mesclar-source-metadata";
+import { conversaSegueODono } from "@/lib/iavek/conversa-segue-o-dono";
 import { RECUSA_DE_TROCA_DE_FUNIL } from "@/lib/leads/clonar-para-funil";
 import { modoDeReabertura, recusaReabertura } from "@/lib/leads/reabertura";
 import {
@@ -901,6 +902,27 @@ async function fecharCloneDaPassagem(p: {
       });
     }
 
+    // 3. ia.vek v1.9.60 (CRM-436, Lupa 130153): a CONVERSA segue o dono do lead reaberto, pela MESMA regra da troca de
+    // responsável (`conversaSegueODono`, CRM-244): só a que está com uma PESSOA, e outra; a da IA ou sem dono fica.
+    // Sem isto o vendedor reabria o lead e a conversa seguia com a SDR de Follow-up, dona do clone.
+    let conversaPassou = false;
+    if (donoDoOriginal && clone.contact_id) {
+      try {
+        conversaPassou = await conversaSegueODono(admin, {
+          orgId: p.organizationId,
+          contactId: clone.contact_id,
+          novoDono: donoDoOriginal,
+          actor: ator,
+        });
+      } catch (erro) {
+        console.error("[lead.move] a conversa não seguiu o dono do lead reaberto", {
+          request_id: p.requestId,
+          lead_id: p.leadId,
+          error: erro instanceof Error ? erro.message : String(erro),
+        });
+      }
+    }
+
     const nota = await emitLeadActivity(admin, {
       organizationId: p.organizationId,
       leadId: clone.id,
@@ -915,6 +937,7 @@ async function fecharCloneDaPassagem(p: {
         motivo_reabertura: p.motivoReabertura,
         tarefas_movidas: tarefasDoClone,
         ligacoes_canceladas: ligacoesCanceladas,
+        conversa_passou: conversaPassou,
       },
     });
     if (!nota.ok) {

@@ -15,6 +15,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { conversaSegueODono } from "@/lib/iavek/conversa-segue-o-dono";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { audit } from "@/lib/audit";
 import type { AuthUser } from "@/lib/auth/types";
@@ -29,6 +30,8 @@ vi.mock("@/lib/leads/activity-emitter", () => ({
   stageChangeReason: vi.fn(() => "razão"),
 }));
 vi.mock("@/lib/leads/activity-write-failure", () => ({ registraFalhaDeAtividade: vi.fn(async () => undefined) }));
+// ia.vek v1.9.60 (Lupa 130153): a conversa segue o dono do lead reaberto, pela regra do CRM-244.
+vi.mock("@/lib/iavek/conversa-segue-o-dono", () => ({ conversaSegueODono: vi.fn(async () => true) }));
 
 import { POST } from "@/app/api/v1/leads/[id]/move/route";
 
@@ -367,6 +370,17 @@ describe("v1.9.59.2: reabrir do Perdido da passagem fecha o clone do Follow-up",
       .mock.calls.map((c) => c[1])
       .find((c) => c.type === "demand_closed" && c.leadId === CLONE_ID);
     expect(desfecho?.reason).toBe("Fechado: o lead original foi reaberto");
+  });
+
+  it("⭐ a CONVERSA segue o dono do lead reaberto (regra do CRM-244), e a nota do clone diz que passou", async () => {
+    vi.mocked(conversaSegueODono).mockClear();
+    await reabrir();
+    expect(conversaSegueODono).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(conversaSegueODono).mock.calls[0]![1]).toMatchObject({ contactId: CONTATO, novoDono: DONO_ORIGINAL });
+    const notaDoClone = vi.mocked(emitLeadActivity).mock.calls.find(
+      (c) => (c[1] as { leadId?: string }).leadId === CLONE_ID && (c[1] as { type?: string }).type === "note",
+    );
+    expect((notaDoClone?.[1] as { payload?: Record<string, unknown> }).payload?.conversa_passou).toBe(true);
   });
 
   it("clone já perdido: nada é feito, clone_fechado false", async () => {
