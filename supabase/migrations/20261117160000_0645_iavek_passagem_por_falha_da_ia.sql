@@ -5,8 +5,11 @@
 -- o cliente que escreveu fica sem resposta e ninguém assume. A v1.9.60 passa a conversa para a fila humana nesse caso
 -- (lib/agent-engine/agent/passagem-por-falha.ts), e a linha de passagens_de_atendimento precisa dizer POR ONDE e POR QUE.
 --
+-- E (CRM-485) o bloqueio da manipulação forte: origem 'bloqueio_de_manipulacao', motivo 'manipulacao'.
+--
 -- O QUE MUDA: só os dois CHECKs de vocabulário fechado, reconstruídos com a lista INTEIRA (a última definição é a que
--- vale; lista incompleta seria remoção silenciosa) + 'falha_da_ia' em origem e em motivo_codigo. Nenhuma linha muda.
+-- vale; lista incompleta seria remoção silenciosa) + 'falha_da_ia' e 'bloqueio_de_manipulacao' em origem, 'falha_da_ia'
+-- e 'manipulacao' em motivo_codigo. Nenhuma linha muda.
 -- Volta: voltar-0645.sql (os CHECKs de antes; falha se já houver linha com 'falha_da_ia', de propósito).
 
 alter table public.passagens_de_atendimento
@@ -17,7 +20,7 @@ alter table public.passagens_de_atendimento
     'pedido_explicito','opt_out_provavel','ferramenta_do_modelo',
     'teto_de_gasto','caso_escalado','sentimento','legado_pedido',
     'legado_juridico','legado_etapa','legado_confianca','legado_teto',
-    'mcp_externo','runtime_nativo','falha_da_ia'));
+    'mcp_externo','runtime_nativo','falha_da_ia','bloqueio_de_manipulacao'));
 
 alter table public.passagens_de_atendimento
   drop constraint if exists passagens_de_atendimento_motivo_codigo_check;
@@ -26,6 +29,6 @@ alter table public.passagens_de_atendimento
   check (motivo_codigo in (
     'requested_human','suspected_optout','orcamento_de_ia','low_sentiment',
     'low_confidence','critical_stage','legal_mention','refund_mention',
-    'caso_escalado','falha_da_ia'));
+    'caso_escalado','falha_da_ia','manipulacao'));
 
 notify pgrst, 'reload schema';

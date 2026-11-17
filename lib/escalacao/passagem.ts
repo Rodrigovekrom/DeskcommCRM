@@ -73,6 +73,8 @@ export const ORIGENS_DA_PASSAGEM = [
   "runtime_nativo",
   // ia.vek v1.9.60 (0645, CRM-460): o turno da IA morreu depois de esgotar as tentativas (erro do sistema).
   "falha_da_ia",
+  // ia.vek v1.9.60 (0645, CRM-485): o detector de manipulação deu nível ALTO e a organização liga o bloqueio.
+  "bloqueio_de_manipulacao",
 ] as const;
 export type OrigemDaPassagem = (typeof ORIGENS_DA_PASSAGEM)[number];
 
@@ -94,6 +96,8 @@ export const MOTIVOS_DA_PASSAGEM = [
   "caso_escalado",
   // ia.vek v1.9.60 (0645, CRM-460): a IA falhou ao responder — o cliente não pediu uma pessoa.
   "falha_da_ia",
+  // ia.vek v1.9.60 (0645, CRM-485): a mensagem tentou mudar as regras da IA (manipulação forte).
+  "manipulacao",
 ] as const;
 export type MotivoDaPassagem = (typeof MOTIVOS_DA_PASSAGEM)[number];
 
@@ -139,6 +143,7 @@ export const FRASE_DO_MOTIVO = {
   refund_mention: "A conversa tocou em reembolso",
   caso_escalado: "Uma pessoa da equipe escalou um atendimento",
   falha_da_ia: "A IA falhou ao responder (erro do sistema) — o cliente não pediu uma pessoa",
+  manipulacao: "A mensagem tentou mudar as regras da IA — a resposta foi segurada para uma pessoa ver",
 } satisfies Record<MotivoDaPassagem, string>;
 
 /**

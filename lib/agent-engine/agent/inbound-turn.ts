@@ -220,6 +220,7 @@ import {
   type JailbreakClassifierKnobs,
   type JailbreakLevel,
 } from '../guardrails/jailbreak/classifier';
+import { bloqueioDeManipulacaoLigado } from '../guardrails/jailbreak/bloqueio';
 import { camadaLigada, lerCamadasDaOrg } from '../guardrails/camadas-da-org';
 import {
   nivelFinalDaManipulacao,
@@ -4407,6 +4408,35 @@ async function executarTurnoDoAgente(
       jailbreakVerdict === null || jailbreakVerdict.falhou ? null : jailbreakVerdict.level,
       jailbreakLevel,
     );
+
+    // ia.vek v1.9.60 (CRM-485): MANIPULAÇÃO FORTE SEGURA A RESPOSTA — só com a organização ligando o bloqueio
+    // (settings.iavek.manipulacao.bloquear_no_alto; DESLIGADO por padrão, e aí tudo segue advisório como antes). Nível
+    // `high` + bloqueio ligado: nenhuma resposta sai neste turno, e a conversa vai para uma pessoa, com as palavras do
+    // cliente no resumo. Sem aviso automático ao cliente: quem assume decide o que dizer a quem tentou mudar as regras.
+    if (
+      !preview &&
+      jailbreakLevel === JAILBREAK_ESCALATION_LEVEL &&
+      (await bloqueioDeManipulacaoLigado(pool, tenantId))
+    ) {
+      const briefing = montarBriefingDaPassagem({
+        checkpoint: previous,
+        pendentesDoCliente: inboundsPendentes,
+        motivo: { codigo: 'manipulacao' },
+      });
+      await performHumanHandoff(
+        pool,
+        { tenantId, leadId, conversationId: input.conversationId },
+        {
+          reason: 'manipulacao',
+          conversationSummary: briefing.body,
+          inboxTitle: 'Mensagem de manipulação: a resposta da IA foi segurada',
+          passagem: { origem: 'bloqueio_de_manipulacao', motivoCodigo: 'manipulacao', briefing },
+          log: runLog,
+        },
+      );
+      runLog.warn('manipulação forte: resposta segurada e conversa passada a uma pessoa', { kind: liveJob().kind });
+      return;
+    }
 
     // Spec 16 §4: a projeção arma quando NENHUMA ferramenta de catálogo entrou —
     // é exatamente o turno em que os ids do contexto não têm uso, e portanto o
