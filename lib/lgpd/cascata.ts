@@ -103,6 +103,12 @@ export interface ClienteDaCascata {
     select(colunas: string): Filtravel<{ data: unknown; error: { message: string } | null }>;
     update(patch: Record<string, unknown>): Filtravel<{ error: { message: string } | null }>;
   };
+  /**
+   * ia.vek v1.9.60 (CRM-488): opcional para os dublês de teste que não precisam dele. O passo 10 só roda com ele.
+   * A função que ele chama (0564) só aceita o service_role: com o client do USUÁRIO (a rota do botão) ela recusa,
+   * a falha fica registrada, e a retomada diária (data-retention, service role) completa.
+   */
+  rpc?(nome: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>;
 }
 
 /** O texto-sentinela que marca uma nota de memória do agente JÁ redigida. */
@@ -169,6 +175,8 @@ export interface ResultadoDaRedacao {
   socialIdentidadeRedigida: boolean;
   /** Quantas mensagens já anonimizadas tiveram a transcrição da mídia apagada AGORA (0497). */
   transcricoesRedigidas: number;
+  /** ia.vek v1.9.60 (CRM-488): quantos trechos da base de conhecimento (ai_chunks) das conversas do contato saíram AGORA. */
+  trechosApagados: number;
   /**
    * As tabelas que esta execução REALMENTE tocou.
    *
@@ -193,7 +201,8 @@ export function houveRedacao(r: ResultadoDaRedacao): boolean {
     r.runsRedigidas > 0 ||
     r.estadosRedigidos > 0 ||
     r.socialIdentidadeRedigida ||
-    r.transcricoesRedigidas > 0
+    r.transcricoesRedigidas > 0 ||
+    r.trechosApagados > 0
   );
 }
 
@@ -491,6 +500,26 @@ export async function completarRedacaoDoContato(
     }
   }
 
+  // ── Passo 10 — A BASE DE CONHECIMENTO (`ai_chunks`) — ia.vek v1.9.60, CRM-488 ──
+  //
+  // A ingestão de conversas (lib/ai/rag/ingest/conversations.ts) grava trechos ANONIMIZADOS da conversa em `ai_chunks`,
+  // com `metadata.conversation_id`. O anonimizador é heurístico (nome, CPF, telefone…), e o embedding é um derivado da
+  // conversa: quem pediu anonimização espera que o trecho saia. Reusa a MESMA remoção do "marcar como pessoal"
+  // (fn_contato_pessoal_remove_trechos_do_rag, 0564): apaga só os trechos das conversas DESTE contato, nunca a fonte
+  // inteira (uma fonte de conversas tem trechos de vários contatos). Idempotente: na segunda passada apaga 0.
+  let trechosApagados = 0;
+  if (db.rpc) {
+    const { data: removidos, error } = await db.rpc("fn_contato_pessoal_remove_trechos_do_rag", {
+      p_org: contato.organizationId,
+      p_contact: contato.id,
+    });
+    if (error) falhas.push(`ai_chunks: ${error.message}`);
+    else {
+      trechosApagados = Number(removidos ?? 0) || 0;
+      if (trechosApagados > 0) tabelas.push("ai_chunks");
+    }
+  }
+
   return {
     leadsRedigidas,
     atividadesRedigidas,
@@ -499,6 +528,7 @@ export async function completarRedacaoDoContato(
     estadosRedigidos,
     socialIdentidadeRedigida,
     transcricoesRedigidas,
+    trechosApagados,
     tabelas,
     falhas,
   };
@@ -562,8 +592,11 @@ function idsComResiduo(argumentos: {
   sociais: { id: string; social_identity: unknown }[];
   /** Já filtradas no banco: mensagem anonimizada que ainda guarda transcrição. */
   transcricoes: { contact_id: string | null }[];
+  /** ia.vek v1.9.60 (CRM-488): trechos de RAG que ainda existem de conversas do contato (já casados com ele). */
+  trechos?: { contact_id: string | null }[];
 }): Set<string> {
   const { leads, atividades, notas, runs, estados, sociais, transcricoes } = argumentos;
+  const trechos = argumentos.trechos ?? [];
   const comResiduo = new Set<string>();
   for (const l of leads) {
     if (l.contact_id && !jaRedigida(l.title)) comResiduo.add(l.contact_id);
@@ -591,6 +624,9 @@ function idsComResiduo(argumentos: {
   }
   for (const m of transcricoes) {
     if (m.contact_id) comResiduo.add(m.contact_id);
+  }
+  for (const t of trechos) {
+    if (t.contact_id) comResiduo.add(t.contact_id);
   }
   return comResiduo;
 }
@@ -706,6 +742,30 @@ export async function varrerRedacoesIncompletas(
       .not("media_derived_text", "is", null);
     if (transcErr) falhas.push(`messages media_derived_text varredura: ${transcErr.message}`);
 
+    // ia.vek v1.9.60 (CRM-488): trechos de RAG que sobraram das conversas destes contatos. Duas leituras curtas:
+    // as conversas do bloco, e os trechos que apontam para elas (em regime, vazio).
+    const trechosDoBloco: { contact_id: string | null }[] = [];
+    const { data: convs, error: convErr } = await db
+      .from("conversations")
+      .select("id, contact_id")
+      .in("contact_id", bloco);
+    if (convErr) falhas.push(`conversations varredura: ${convErr.message}`);
+    const contatoDaConversa = new Map(
+      ((convs ?? []) as { id: string; contact_id: string | null }[]).map((c) => [c.id, c.contact_id]),
+    );
+    if (contatoDaConversa.size > 0) {
+      const { data: tr, error: trErr } = await db
+        .from("ai_chunks")
+        .select("metadata")
+        .in("metadata->>conversation_id", [...contatoDaConversa.keys()])
+        .limit(1000);
+      if (trErr) falhas.push(`ai_chunks varredura: ${trErr.message}`);
+      for (const t of (tr ?? []) as { metadata: { conversation_id?: unknown } | null }[]) {
+        const conv = typeof t.metadata?.conversation_id === "string" ? t.metadata.conversation_id : null;
+        trechosDoBloco.push({ contact_id: conv ? (contatoDaConversa.get(conv) ?? null) : null });
+      }
+    }
+
     const achados = idsComResiduo({
       leads: (leads ?? []) as { contact_id: string | null; title: string | null }[],
       atividades: (atvs ?? []) as { contact_id: string | null; payload: unknown }[],
@@ -718,6 +778,7 @@ export async function varrerRedacoesIncompletas(
       }[],
       sociais: (sociais ?? []) as { id: string; social_identity: unknown }[],
       transcricoes: (transcricoes ?? []) as { contact_id: string | null }[],
+      trechos: trechosDoBloco,
     });
     // A detecção não filtra org (ver o cabeçalho): um `contact_id` que não
     // saiu da lista de contatos anonimizados não vira visita.

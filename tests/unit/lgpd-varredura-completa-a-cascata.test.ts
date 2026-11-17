@@ -414,6 +414,7 @@ describe("a unidade que as duas bocas compartilham", () => {
       estadosRedigidos: 0,
       socialIdentidadeRedigida: false,
       transcricoesRedigidas: 0,
+      trechosApagados: 0,
       tabelas: [],
       falhas: [],
     };
@@ -425,6 +426,7 @@ describe("a unidade que as duas bocas compartilham", () => {
     expect(houveRedacao({ ...vazio, estadosRedigidos: 1 })).toBe(true);
     expect(houveRedacao({ ...vazio, socialIdentidadeRedigida: true })).toBe(true);
     expect(houveRedacao({ ...vazio, transcricoesRedigidas: 1 })).toBe(true);
+    expect(houveRedacao({ ...vazio, trechosApagados: 1 })).toBe(true);
   });
 
   it("⭐ `tabelas` lista só o que foi tocado — não o literal das três", async () => {
