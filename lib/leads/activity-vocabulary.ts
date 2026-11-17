@@ -151,6 +151,8 @@ export type ActivityType =
    */
   | "task_created"
   | "task_completed"
+  /** ia.vek 0640/CRM-532: a tarefa (a ligação) cancelada por regra, com o motivo; o banco já gravava este tipo. */
+  | "task_cancelled"
   /**
    * ia.vek D3 — esteira de vendas. A LIGAÇÃO registrada pelos 3 campos (atendeu?,
    * resumo, próximo passo); o lead em follow-up que VOLTOU a falar; e a cobrança
@@ -311,6 +313,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   voice_call_unanswered: "Chamada de voz sem resposta",
   task_created: "Tarefa combinada",
   task_completed: "Tarefa concluída",
+  task_cancelled: "Tarefa cancelada",
   call_logged: "Ligação registrada",
   esteira_reengajou: "Cliente voltou a falar",
   esteira_ligacao_cobrada: "Ligação atrasada cobrada",

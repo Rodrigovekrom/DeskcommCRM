@@ -36,6 +36,9 @@ import type { Tarefa } from "@/lib/tarefas/tipos";
 /** O `source_kind` de uma ligação SEM tarefa (só para decidir os efeitos; nunca gravado numa tarefa). */
 export const SOURCE_KIND_AVULSA = `${PREFIXO_DE_LIGACAO}avulsa`;
 
+/** O `cancelada_motivo` das ligações que o registro fecha (agendou / sem interesse), no molde da 0639/0640. */
+export const MOTIVO_LIGACAO_REGISTRADA = "ligacao_registrada";
+
 export interface NegocioDaLigacao {
   id: string;
   pipeline_id: string;
@@ -175,13 +178,28 @@ export async function registrarLigacao(args: {
         });
         aplicados.push("mover");
       } else if (e.tipo === "cancelar_ligacoes_pendentes" && negocio) {
-        await supabase
+        // (Lupa 205419) como a 0639/0640: o MOTIVO na tarefa e 1 linha task_cancelled por tarefa na linha do tempo
+        const { data: canceladas } = await supabase
           .from("crm_tasks")
-          .update({ status: "cancelled" })
+          .update({ status: "cancelled", cancelada_motivo: MOTIVO_LIGACAO_REGISTRADA })
           .eq("organization_id", orgId)
           .eq("lead_id", negocio.id)
           .like("source_kind", `${PREFIXO_DE_LIGACAO}%`)
-          .in("status", ["pending", "in_progress"]);
+          .in("status", ["pending", "in_progress"])
+          .select("id, contact_id, title, source_kind");
+        for (const c of (canceladas ?? []) as { id: string; contact_id: string | null; title: string; source_kind: string | null }[]) {
+          await emitLeadActivity(supabase, {
+            organizationId: orgId,
+            leadId: negocio.id,
+            contactId: c.contact_id ?? negocio.contact_id,
+            type: "task_cancelled",
+            sourceModule: "tarefas",
+            sourceId: c.id,
+            actor,
+            reason: `Ligação fechada: ${MOTIVO_LIGACAO_REGISTRADA}`,
+            payload: { motivo: MOTIVO_LIGACAO_REGISTRADA, ligacao: c.source_kind, titulo: (c.title ?? "").slice(0, 200), origem: "ligacao" },
+          });
+        }
         aplicados.push("cancelar_pendentes");
       } else if (e.tipo === "perder" && negocio) {
         await encerraDemanda(supabase, handlerCtx, {

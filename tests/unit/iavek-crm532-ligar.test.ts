@@ -24,6 +24,13 @@ describe("CRM-532: o href do botão Ligar", () => {
     expect(hrefDeLigar("+5532984793302")).toBe("tel:+5532984793302");
     expect(hrefDeLigar("+55 (32) 98479-3302")).toBe("tel:+5532984793302");
   });
+  it("(Lupa 205419) só com o código do país: o local sem o país não vira link (seria outro país)", () => {
+    expect(hrefDeLigar("5532984793302")).toBe("tel:+5532984793302");
+    expect(hrefDeLigar("+1 212 555 0100")).toBe("tel:+12125550100");
+    expect(hrefDeLigar("32984793302")).toBeNull();
+    expect(hrefDeLigar("(32) 98479-3302")).toBeNull();
+  });
+
   it("sem número utilizável, sem botão", () => {
     expect(hrefDeLigar(null)).toBeNull();
     expect(hrefDeLigar("")).toBeNull();
@@ -66,6 +73,8 @@ interface Banco {
   fecha: number;
   /** quantas linhas o DESFAZER do fechamento (update status de volta, filtrado por status='done') devolve */
   desfaz: number;
+  /** as ligações abertas que o 'cancelar_ligacoes_pendentes' (status cancelled) devolve */
+  cancela: Linhas[];
 }
 
 function clienteFalso(b: Banco) {
@@ -88,6 +97,9 @@ function clienteFalso(b: Banco) {
         updates.push({ tabela, valores, filtros: [...filtros] });
         if (tabela === "crm_tasks" && (valores as { status?: string }).status === "done") {
           return { data: Array.from({ length: b.fecha }, () => ({ id: "t" })), error: null };
+        }
+        if (tabela === "crm_tasks" && (valores as { status?: string }).status === "cancelled") {
+          return { data: b.cancela, error: null };
         }
         if (tabela === "crm_tasks" && filtros.some(([c, v]) => c === "status" && v === "done")) {
           return { data: Array.from({ length: b.desfaz }, () => ({ id: "t" })), error: null };
@@ -155,6 +167,7 @@ function banco(over: Partial<Banco> = {}): Banco {
     crm_tasks: [],
     fecha: 1,
     desfaz: 1,
+    cancela: [],
     ...over,
   };
 }
@@ -347,6 +360,24 @@ describe("CRM-532: a rota do CONTATO (o 'Como foi a ligação?')", () => {
     for (const f of [rota, reg]) {
       expect(f).not.toMatch(/createAdminClient|supabase\/admin|service_role/);
     }
+  });
+
+  it("(Lupa 205419) 'agendou' cancela as ligações abertas COM o motivo e 1 linha task_cancelled por tarefa", async () => {
+    const aberta = { id: "77777777-7777-4777-8777-777777777777", contact_id: CONTATO, title: "Ligar (L2) — Maria", source_kind: "ligacao:L2" };
+    const f = clienteFalso(banco({ cancela: [aberta] }));
+    espioes.cliente.atual = f.cliente;
+    const { POST } = await import("@/app/api/v1/contacts/[id]/ligacao/route");
+    const r = await POST(
+      pedido(`http://x/api/v1/contacts/${CONTATO}/ligacao`, { atendeu: true, resumo: "vem sábado ver o carro", proximo: { tipo: "agendou", data: "2026-11-21T13:00:00.000Z" } }),
+      ctx(CONTATO),
+    );
+    expect(r.status).toBe(201);
+    const cancelou = f.updates.find((u) => u.tabela === "crm_tasks" && (u.valores as { status: string }).status === "cancelled");
+    expect(cancelou?.valores).toEqual({ status: "cancelled", cancelada_motivo: "ligacao_registrada" });
+    expect(espioes.emitLeadActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "task_cancelled", sourceModule: "tarefas", sourceId: aberta.id, payload: expect.objectContaining({ motivo: "ligacao_registrada", origem: "ligacao" }) }),
+    );
   });
 
   it("POST sem negócio aberto: 422, nada gravado", async () => {

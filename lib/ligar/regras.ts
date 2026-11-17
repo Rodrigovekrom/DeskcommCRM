@@ -21,6 +21,9 @@ export const VALIDADE_DA_MARCA_MS = 2 * 60 * 60 * 1000;
 export function hrefDeLigar(telefone: string | null | undefined): string | null {
   if (!telefone) return null;
   const digitos = telefone.replace(/\D/g, "");
-  if (digitos.length < 8 || digitos.length > 15) return null;
+  // (Lupa 205419) só com o CÓDIGO DO PAÍS: o número guardado com '+' (o canônico do CRM), ou com 12 a 15 dígitos (o
+  // país + DDD + número). Um local de 10-11 dígitos sem o país viraria '+11…', outro país: aí NÃO há link.
+  const comPais = telefone.trim().startsWith("+") ? digitos.length >= 8 : digitos.length >= 12;
+  if (!comPais || digitos.length > 15) return null;
   return `tel:+${digitos}`;
 }
