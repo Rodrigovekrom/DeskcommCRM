@@ -320,6 +320,11 @@ const DECISOES: Record<string, Decisao> = {
     decidida: "manter",
     razao: "token/utm/query de aterrissagem da Meta, mesmo motivo do gclid: identificador de campanha que só serve enquanto existir — apagar desfaz a atribuição sem proteger texto de ninguém.",
   },
+  // ia.vek v1.9.60 (0646, CRM-491): tabela nova com FK para contacts.
+  iavek_turnos_da_ia: {
+    decidida: "manter",
+    razao: "ia.vek 0646: um registro por turno da IA só com LIGAÇÕES e FATOS (ids de job, conversa, mensagens, agente e versão; o modelo; o nível de manipulação em vocabulário fechado) — nenhum texto do cliente nem da IA. Liga as llm_calls à conversa para a auditoria; o texto pessoal está em messages, que a cascata redige. Sai junto com o contato (on delete cascade).",
+  },
   send_ledger: {
     decidida: "manter",
     razao: "body_hash é IRREVERSÍVEL (a própria doutrina do invariante irmão manda `_hash` ficar de fora) e last_error/status são código; é a prova de que a mensagem saiu, sem guardar o que ela dizia.",
