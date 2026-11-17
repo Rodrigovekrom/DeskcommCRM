@@ -391,7 +391,7 @@ export async function rescheduleJob(
 export async function reapExpiredJobs(
   db: Queryable,
   opts: { visibilityTimeoutMs: number },
-): Promise<{ revived: number; dead: number }> {
+): Promise<{ revived: number; dead: number; deadIds: string[] }> {
   const { rows } = await db.query<{ id: string; status: JobStatus }>(
     `with expired as (
        update job_queue
@@ -433,6 +433,8 @@ export async function reapExpiredJobs(
   return {
     revived: rows.filter((r) => r.status === 'pending').length,
     dead: rows.filter((r) => r.status === 'dead').length,
+    // ia.vek v1.9.60 (CRM-460): quem MORREU pelo reaper (lease expirado), para o worker passar a conversa a uma pessoa.
+    deadIds: rows.filter((r) => r.status === 'dead').map((r) => r.id),
   };
 }
 

@@ -280,6 +280,20 @@ export async function startWorker(
     SUPABASE_URL: urlDoSupabaseNoServidor(env.SUPABASE_SERVER_URL, env.NEXT_PUBLIC_SUPABASE_URL),
     SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
   });
+  const depsDaPassagem = {
+    log,
+    avisarCliente: (ids: Parameters<typeof avisarLeadLendoOContato>[1]) =>
+      avisarLeadLendoOContato(pool, ids, {
+        motivo: "outro",
+        channel: new WahaChannelAdapter(pool, crmCfgDaPassagem),
+        now: new Date(),
+        log,
+      }),
+  };
+  // O job que morre pelo REAPER (lease expirado: o worker caiu no meio do turno) é o "IA caiu" típico: mesma passagem.
+  const passarOsMortosDoReaper = async (ids: readonly string[]): Promise<void> => {
+    for (const id of ids) await passarAoHumanoSeOJobMorreu(pool, id, depsDaPassagem);
+  };
 
   await assertHarnessSchema(pool);
 
@@ -295,8 +309,9 @@ export async function startWorker(
     visibilityTimeoutMs: env.QUEUE_VISIBILITY_TIMEOUT_MS,
   });
   if (bootReap.revived + bootReap.dead > 0) {
-    log.warn("órfãos soltos no boot", bootReap);
+    log.warn("órfãos soltos no boot", { revived: bootReap.revived, dead: bootReap.dead });
   }
+  await passarOsMortosDoReaper(bootReap.deadIds);
 
   // O comportamento da INSTALAÇÃO entra no processo ANTES dos laços que
   // consomem turnos: a releitura abaixo só acontece no primeiro tique do reaper
@@ -326,8 +341,10 @@ export async function startWorker(
       log.error("comportamento da instalação: releitura falhou", { error: errMsg(err) }),
     );
     reapExpiredJobs(pool, { visibilityTimeoutMs: env.QUEUE_VISIBILITY_TIMEOUT_MS })
-      .then((reaped) => {
-        if (reaped.revived + reaped.dead > 0) log.warn("reaper devolveu jobs órfãos", reaped);
+      .then(async (reaped) => {
+        if (reaped.revived + reaped.dead > 0)
+          log.warn("reaper devolveu jobs órfãos", { revived: reaped.revived, dead: reaped.dead });
+        await passarOsMortosDoReaper(reaped.deadIds);
       })
       .catch((err: unknown) => log.error("reaper falhou", { error: errMsg(err) }));
   }, env.QUEUE_REAPER_INTERVAL_MS);
@@ -585,16 +602,7 @@ export async function startWorker(
         // ia.vek v1.9.60 (CRM-460): o turno que MORREU (o failJob acima esgotou as tentativas) devolve a conversa a
         // uma pessoa, em vez de deixar o cliente sem resposta. Lê o job de novo (só no caminho de falha) e nunca lança.
         if (!terminal) {
-          await passarAoHumanoSeOJobMorreu(pool, job.id, {
-            log,
-            avisarCliente: (ids) =>
-              avisarLeadLendoOContato(pool, ids, {
-                motivo: "outro",
-                channel: new WahaChannelAdapter(pool, crmCfgDaPassagem),
-                now: new Date(),
-                log,
-              }),
-          });
+          await passarAoHumanoSeOJobMorreu(pool, job.id, depsDaPassagem);
         }
       } catch (failErr) {
         log.error("disposição do job indisponível — lease expira via reaper", {

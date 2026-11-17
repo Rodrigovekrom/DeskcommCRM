@@ -134,7 +134,7 @@ describe("v1.9.60 (CRM-460): se a IA cair, a conversa vai para uma pessoa", () =
     expect(main).toContain(
       "else { await failJob(pool, job.id, workerId, err, claimOfJob(job)?.acquired_at); }",
     );
-    expect(main).toMatch(/if \(!terminal\) \{ await passarAoHumanoSeOJobMorreu\(pool, job\.id, \{/);
+    expect(main).toContain("if (!terminal) { await passarAoHumanoSeOJobMorreu(pool, job.id, depsDaPassagem); }");
   });
 
   it("passarAoHumanoSeOJobMorreu só age quando a releitura acha o job dead", async () => {
@@ -143,5 +143,32 @@ describe("v1.9.60 (CRM-460): se a IA cair, a conversa vai para uma pessoa", () =
     const x = deps();
     expect(await passarAoHumanoSeOJobMorreu(vivo, "job-1", x.d)).toBe("nao_morreu");
     expect(x.handoff).not.toHaveBeenCalled();
+  });
+});
+
+describe("v1.9.60 (CRM-460): o job que morre pelo REAPER (lease expirado) também vai para uma pessoa", () => {
+  it("reapExpiredJobs devolve os ids dos que MORRERAM (e só deles)", async () => {
+    const { reapExpiredJobs } = await import("@/lib/agent-engine/queue/queue");
+    const db = {
+      query: vi.fn(async () => ({
+        rows: [
+          { id: "j-vivo", status: "pending" },
+          { id: "j-morto-1", status: "dead" },
+          { id: "j-morto-2", status: "dead" },
+        ],
+      })),
+    };
+    expect(await reapExpiredJobs(db as never, { visibilityTimeoutMs: 1000 })).toEqual({
+      revived: 1,
+      dead: 2,
+      deadIds: ["j-morto-1", "j-morto-2"],
+    });
+  });
+
+  it("o worker passa os mortos do reaper no BOOT e no laço, pela mesma passagem", () => {
+    const main = readFileSync(join(process.cwd(), "workers/agent-worker/main.ts"), "utf8").replace(/\s+/gu, " ");
+    expect(main).toContain("await passarOsMortosDoReaper(bootReap.deadIds);");
+    expect(main).toContain("await passarOsMortosDoReaper(reaped.deadIds);");
+    expect(main).toContain("for (const id of ids) await passarAoHumanoSeOJobMorreu(pool, id, depsDaPassagem);");
   });
 });
