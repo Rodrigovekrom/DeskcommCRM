@@ -121,6 +121,10 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
       if (n.dados.evento === "aviso_de_ajuda_entregue") {
         return t("Pediram ajuda: {nome} é seu agora.").replace("{nome}", String(n.dados.nome ?? t("um cliente")));
       }
+      // v1.9.60 (CRM-422): pediram ajuda num lead que já tem dono; o lead segue com o dono.
+      if (n.dados.evento === "aviso_de_ajuda_lead_com_dono") {
+        return t("Pediram ajuda no seu lead {nome}: ele segue com o dono.").replace("{nome}", String(n.dados.nome ?? t("um cliente")));
+      }
       if (n.dados.evento === "aviso_de_ajuda_nao_reconhecido") {
         return t("Aviso do grupo sem lead reconhecido: {nome}. O lead segue em IA Atendendo.").replace(
           "{nome}",

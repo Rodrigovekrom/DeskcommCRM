@@ -12059,6 +12059,7 @@ export const DICIONARIO: Traducoes = {
   "Só o dono do lead, o guardião, o gerente ou o admin mantêm em negociação.": { es: "Solo el dueño del lead, el guardián, el gerente o el admin lo mantienen en negociación." },
   "Este lead não está nas 72h.": { es: "Este lead no está en las 72h." },
   "Pediram ajuda: {nome} é seu agora.": { es: "Pidieron ayuda: {nome} ahora es tuyo." },
+  "Pediram ajuda no seu lead {nome}: ele segue com o dono.": { es: "Pidieron ayuda en tu lead {nome}: sigue con su dueño." },
   "Aviso do grupo sem lead reconhecido: {nome}. O lead segue em IA Atendendo.": { es: "Aviso del grupo sin lead reconocido: {nome}. El lead sigue en IA Atendiendo." },
   "um cliente": { es: "un cliente" },
   "Pediram ajuda — sem dono": { es: "Pidieron ayuda — sin dueño" },
