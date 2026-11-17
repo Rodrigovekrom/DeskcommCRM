@@ -154,7 +154,7 @@ describe("(Lupa 204427, 2) nenhum item do menu leva a uma página que desvia a p
 });
 
 describe("(Lupa 214120) o menu de quem tem a lista não ganha NADA além do marcado (nem um item essencial)", () => {
-  it("o vendedor com uma lista SEM os essenciais: a barra = as 4 da função + só as marcadas a mais; os essenciais ficam no rodapé", () => {
+  it("o vendedor com uma lista SEM os essenciais: a barra = SÓ o que foi marcado (a lista também corta Agenda e Meus dados); os essenciais ficam no rodapé", () => {
     const lista = ["/app/meu-dia", "/app/pipeline", "/app/tasks"];
     const s = combinarInterfaces(EMPRESA_SEM_LISTA, vinculo("vendedor", lista));
     const barra = sidebarGroups(false, "agent", s)
