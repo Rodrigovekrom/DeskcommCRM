@@ -75,3 +75,14 @@ export function ComoFoiALigacao() {
     />
   );
 }
+
+/**
+ * Para quem NÃO liga pelo CRM (ex.: a função mudou de vendedor para SDR): uma marca antiga no aparelho é apagada sem
+ * perguntar nada.
+ */
+export function ApagaMarcaAntiga() {
+  useEffect(() => {
+    apagarMarca();
+  }, []);
+  return null;
+}

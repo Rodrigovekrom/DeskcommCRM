@@ -16,7 +16,7 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MINIMO_FORA_MS, VALIDADE_DA_MARCA_MS, hrefDeLigar } from "@/lib/ligar/regras";
+import { MINIMO_FORA_MS, VALIDADE_DA_MARCA_MS, funcoesQueLigam, hrefDeLigar, ligaNaTela, ligaPeloCrm } from "@/lib/ligar/regras";
 import { voltouDaLigacao } from "@/lib/ligar/marca";
 
 describe("CRM-532: o href do botão Ligar", () => {
@@ -36,6 +36,35 @@ describe("CRM-532: o href do botão Ligar", () => {
     expect(hrefDeLigar("")).toBeNull();
     expect(hrefDeLigar("123")).toBeNull();
     expect(hrefDeLigar("1".repeat(16))).toBeNull();
+  });
+});
+
+describe("CRM-532: quem liga pelo CRM (Rodrigo 17/11: 'todo mundo que quiser'; a loja pode restringir)", () => {
+  it("de fábrica, TODO MUNDO QUE ATENDE, com qualquer função ou sem função; o viewer (não atende) nunca; o analista de ficha nunca", () => {
+    for (const f of ["vendedor", "sdr", "sdr_followup", "gerente", "apoio", "suporte", undefined, null, ""]) {
+      expect(ligaPeloCrm(f, {}, true)).toBe(true);
+    }
+    expect(ligaPeloCrm("vendedor", {}, false)).toBe(false); // o viewer: não atende
+    expect(ligaPeloCrm(undefined, {}, false)).toBe(false);
+    expect(ligaPeloCrm("analista_ficha", {}, true)).toBe(false);
+  });
+  it("a loja que restringe a ['vendedor']: só o vendedor; quem não tem função fica fora", () => {
+    const loja = { iavek: { ligar: { funcoes: ["vendedor"] } } };
+    expect(ligaPeloCrm("vendedor", loja, true)).toBe(true);
+    for (const f of ["sdr", "sdr_followup", "gerente", "suporte", undefined]) expect(ligaPeloCrm(f, loja, true)).toBe(false);
+  });
+  it("(Lupa 213638) em prévia 'ver como', pela PRESENÇA da prévia: sem botão, mesmo com a função igual à real", () => {
+    expect(ligaNaTela(true, false)).toBe(true); // sem prévia: vale o do servidor
+    expect(ligaNaTela(true, true)).toBe(false); // em prévia (qualquer função, inclusive a igual à real)
+    expect(ligaNaTela(false, false)).toBe(false); // o servidor disse não (ex.: o viewer)
+  });
+
+  it("valor ruim na config volta ao padrão (todo mundo que atende), e o viewer continua fora", () => {
+    for (const ruim of ["vendedor", 3, null, [], ["nao_existe"], [1, 2]]) {
+      expect(funcoesQueLigam({ iavek: { ligar: { funcoes: ruim } } })).toBeNull();
+      expect(ligaPeloCrm("sdr", { iavek: { ligar: { funcoes: ruim } } }, true)).toBe(true);
+      expect(ligaPeloCrm("sdr", { iavek: { ligar: { funcoes: ruim } } }, false)).toBe(false);
+    }
   });
 });
 
@@ -66,6 +95,10 @@ describe("CRM-532: a decisão pendente do Rodrigo mora num ponto só", () => {
 
 type Linhas = Record<string, unknown>;
 interface Banco {
+  /** o vínculo de QUEM chama (a função decide se liga pelo CRM) */
+  user_organizations: Linhas[];
+  /** a org (a config da loja: settings.iavek.ligar.funcoes) */
+  organizations?: Linhas[];
   contacts: Linhas[];
   crm_leads: Linhas[];
   crm_tasks: Linhas[];
@@ -106,7 +139,7 @@ function clienteFalso(b: Banco) {
         }
         return { data: [], error: null };
       }
-      if (tabela === "organizations") return { data: [{ settings: {} }], error: null };
+      if (tabela === "organizations") return { data: b.organizations ?? [{ settings: {} }], error: null };
       if (tabela === "crm_pipelines") return { data: [], error: null };
       return { data: filtrar(), error: null };
     };
@@ -119,6 +152,7 @@ function clienteFalso(b: Banco) {
       eq: (c: string, v: unknown) => (filtros.push([c, v]), q),
       in: (c: string, v: unknown) => (filtros.push([`in:${c}`, v]), q),
       like: (c: string, v: unknown) => (filtros.push([`like:${c}`, v]), q),
+      is: (_c: string, _v: unknown) => q,
       order: () => q,
       limit: () => q,
       maybeSingle: async () => {
@@ -160,6 +194,7 @@ vi.mock("@/lib/leads/encerramento", () => ({ encerraDemanda: espioes.encerraDema
 
 function banco(over: Partial<Banco> = {}): Banco {
   return {
+    user_organizations: [{ organization_id: ORG, user_id: "u-quem-ligou", interface_settings: { preset: "completa", funcao: "vendedor" } }],
     contacts: [{ id: CONTATO, organization_id: ORG }],
     crm_leads: [
       { id: LEAD, organization_id: ORG, pipeline_id: "p1", status: "open", contact_id: CONTATO, last_activity_at: null, created_at: "2026-11-01T00:00:00Z" },
@@ -380,6 +415,39 @@ describe("CRM-532: a rota do CONTATO (o 'Como foi a ligação?')", () => {
     );
   });
 
+  it("a loja que RESTRINGE a ['vendedor']: a SDR não pergunta no GET e leva 403 no POST, sem gravar nada", async () => {
+    const f = clienteFalso(
+      banco({
+        user_organizations: [{ organization_id: ORG, user_id: "u-quem-ligou", interface_settings: { preset: "completa", funcao: "sdr" } }],
+        organizations: [{ id: ORG, settings: { iavek: { ligar: { funcoes: ["vendedor"] } } } }],
+        crm_tasks: [tarefaDeLigacao()],
+      }),
+    );
+    espioes.cliente.atual = f.cliente;
+    const { GET, POST } = await import("@/app/api/v1/contacts/[id]/ligacao/route");
+    const g = await GET({ nextUrl: new URL(`http://x/api/v1/contacts/${CONTATO}/ligacao`) } as never, ctx(CONTATO));
+    expect(((await g.json()) as { data: { pergunta: boolean } }).data.pergunta).toBe(false);
+    const p = await POST(pedido(`http://x/api/v1/contacts/${CONTATO}/ligacao`, { atendeu: false, resumo: "caixa postal" }), ctx(CONTATO));
+    expect(p.status).toBe(403);
+    expect(f.updates).toEqual([]);
+    expect(espioes.emitLeadActivity).not.toHaveBeenCalled();
+  });
+
+  it("(Lupa 212827) a SDR (de fábrica, liga) liga para o cliente do negócio do VENDEDOR: grava NAQUELE negócio, a próxima fica com ELA e o dono não muda", async () => {
+    const f = clienteFalso(
+      banco({
+        user_organizations: [{ organization_id: ORG, user_id: "u-quem-ligou", interface_settings: { preset: "completa", funcao: "sdr" } }],
+      }),
+    );
+    espioes.cliente.atual = f.cliente;
+    const { POST } = await import("@/app/api/v1/contacts/[id]/ligacao/route");
+    const r = await POST(pedido(`http://x/api/v1/contacts/${CONTATO}/ligacao`, { atendeu: false, resumo: "caixa postal" }), ctx(CONTATO));
+    expect(r.status).toBe(201);
+    expect(espioes.emitLeadActivity).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: "call_logged", leadId: LEAD }));
+    expect(espioes.criarTarefaInterna).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ atribuirA: { usuario_id: "u-quem-ligou" } }));
+    expect(f.updates.some((u) => u.tabela === "crm_leads")).toBe(false); // o dono do negócio não muda
+  });
+
   it("POST sem negócio aberto: 422, nada gravado", async () => {
     espioes.cliente.atual = clienteFalso(banco({ crm_leads: [] })).cliente;
     const { POST } = await import("@/app/api/v1/contacts/[id]/ligacao/route");
@@ -397,7 +465,9 @@ describe("CRM-532: o botão nas telas (a fiação)", () => {
     expect(ler("components/kanban/LeadDossier.tsx")).toContain("leadId={lead.id} />");
     expect(ler("app/app/tasks/_components/ListaDeTarefas.tsx")).toMatch(/!encerrada && ehLigacao\(tarefa\.source_kind\)/);
   });
-  it("o 'Como foi a ligação?' é montado uma vez, na casca, só para quem atende", () => {
-    expect(ler("app/app/_components/AppShell.tsx")).toContain("{podeAtender && <ComoFoiALigacao />}");
+  it("o 'Como foi a ligação?' é montado uma vez, na casca, só para quem liga pelo CRM (e a marca antiga dos outros some)", () => {
+    expect(ler("app/app/_components/AppShell.tsx")).toContain("{ligaAqui ? <ComoFoiALigacao /> : <ApagaMarcaAntiga />}");
+    expect(ler("app/app/_components/AppShell.tsx")).toContain("ligaNaTela(ligaPeloCrm, useEmPreviaOpcional())");
+    expect(ler("app/app/layout.tsx")).toContain("ligaPeloCrm={ligaPeloCrmAqui}");
   });
 });

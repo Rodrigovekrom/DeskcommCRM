@@ -198,6 +198,15 @@ export function RegistroDeLigacao({
           ) : null}
 
           <DialogFooter className="pt-2">
+            {/* (CRM-532, pedido do Rodrigo) só no "Como foi a ligação?" do botão Ligar (`destino`; a `tarefa` aqui é a da
+                TELA de Tarefas, nunca a que a rota do contato acha, que vira só o subtítulo): tocou mas não ligou. Fecha sem
+                NENHUMA chamada ao servidor (não grava ligação, nem "não atendeu", nem tarefa). A marca do toque já saiu
+                na volta, então a pergunta não volta para ele. */}
+            {destino && !tarefa ? (
+              <Button type="button" variant="outline" disabled={enviando} onClick={aoFechar} data-testid="nao-liguei">
+                {t("Não liguei")}
+              </Button>
+            ) : null}
             <Button type="button" variant="ghost" disabled={enviando} onClick={aoFechar}>
               {t("Cancelar")}
             </Button>

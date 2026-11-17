@@ -23,7 +23,7 @@ import { registroDeLigacaoSchema } from "@/lib/esteira/registro-de-ligacao";
 import { PREFIXO_DE_LIGACAO } from "@/lib/esteira/rodada";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { resolveActiveLeadForContact, type LeadCandidate } from "@/lib/leads/active-lead";
-import { LIGACAO_SEM_TAREFA_REGISTRA } from "@/lib/ligar/regras";
+import { LIGACAO_SEM_TAREFA_REGISTRA, ligaPeloCrm } from "@/lib/ligar/regras";
 import { createClient } from "@/lib/supabase/server";
 import type { Tarefa } from "@/lib/tarefas/tipos";
 
@@ -38,6 +38,26 @@ const corpoSchema = registroDeLigacaoSchema.and(z.object({ lead_id: uuid.nullish
 
 type Cliente = Awaited<ReturnType<typeof createClient>>;
 type TarefaDeLigacao = Tarefa & { source_kind: string | null };
+
+/**
+ * (decisão do Rodrigo 17/11, Lupa 212314) Esta pessoa liga pelo CRM? A função REAL do vínculo dela + a lista da loja
+ * (settings.iavek.ligar.funcoes; de fábrica, só o vendedor), lidas pelo cliente da sessão. Quem não liga: o GET não
+ * pergunta, e o POST recusa com 403, sem gravar nada.
+ */
+async function ligaAqui(supabase: Cliente, orgId: string, userId: string, atende: boolean): Promise<boolean> {
+  const [{ data: vinculo }, { data: org }] = await Promise.all([
+    supabase
+      .from("user_organizations")
+      .select("interface_settings")
+      .eq("organization_id", orgId)
+      .eq("user_id", userId)
+      .is("revoked_at", null)
+      .maybeSingle(),
+    supabase.from("organizations").select("settings").eq("id", orgId).maybeSingle(),
+  ]);
+  const funcao = (vinculo as { interface_settings?: { funcao?: string } } | null)?.interface_settings?.funcao;
+  return ligaPeloCrm(funcao, (org as { settings?: unknown } | null)?.settings, atende);
+}
 
 /** O negócio e a tarefa de ligação aberta, pelo cliente da sessão (RLS). */
 async function alvoDaLigacao(
@@ -110,6 +130,9 @@ export async function GET(req: NextRequest, ctx: Contexto): Promise<Response> {
 
   const leadPedido = req.nextUrl.searchParams.get("lead_id");
   const supabase = await createClient();
+  if (!(await ligaAqui(supabase, authz.org.orgId, authz.user.id, true))) {
+    return ok({ pergunta: false, lead_id: null, tarefa: null }, { requestId });
+  }
   const alvo = await alvoDaLigacao(
     supabase,
     authz.org.orgId,
@@ -149,6 +172,9 @@ export async function POST(req: NextRequest, ctx: Contexto): Promise<Response> {
   }
   const { lead_id: leadPedido, ...registro } = parsed.data;
   const supabase = await createClient();
+  if (!(await ligaAqui(supabase, orgId, authz.user.id, true))) {
+    return fail("forbidden", "Registrar a ligação por aqui é só para quem liga pelo CRM.", 403, { requestId });
+  }
   const alvo = await alvoDaLigacao(supabase, orgId, id, leadPedido ?? null);
   if (!alvo.contatoVisivel) return fail("not_found", "Contato não encontrado.", 404, { requestId });
   if (alvo.leadPedidoInvisivel) return fail("not_found", "Negócio não encontrado.", 404, { requestId });

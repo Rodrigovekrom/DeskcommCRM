@@ -10,7 +10,10 @@ import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessage
 import { useInboundCallAlerts } from "@/hooks/calls/useInboundCallAlerts";
 import { useCrmAlerts } from "@/hooks/notifications/useCrmAlerts";
 import { useNotifyOpenFromServiceWorker } from "@/lib/notifications/notify_open";
-import { ComoFoiALigacao } from "@/components/ligar/ComoFoiALigacao";
+import { ApagaMarcaAntiga, ComoFoiALigacao } from "@/components/ligar/ComoFoiALigacao";
+import { useEmPreviaOpcional } from "@/hooks/auth/AuthProvider";
+import { ligaNaTela } from "@/lib/ligar/regras";
+import { LigarProvider } from "@/components/ligar/LigarContext";
 import { ConviteDoCelular } from "@/components/notifications/ConviteDoCelular";
 import { estiloDaReserva, useOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
 
@@ -25,10 +28,16 @@ interface AppShellProps {
    * 403 a cada minuto em nome de ninguém.
    */
   podeAtender: boolean;
+  /** ia.vek CRM-532: a pessoa liga pelo CRM (decidido no layout do servidor). Sem isso, nem o botão nem a pergunta. */
+  ligaPeloCrm?: boolean;
+
   children: ReactNode;
 }
 
-export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellProps) {
+export function AppShell({ sidebarCollapsed, podeAtender, ligaPeloCrm = false, children }: AppShellProps) {
+  // ia.vek CRM-532: o admin em "ver como" (a função VISTA difere da REAL) não vê o botão nem a pergunta, para nunca gravar
+  // ligação enquanto vê como outra função. É trava SÓ DA TELA: o servidor aceita, porque quem grava é a pessoa real.
+  const ligaAqui = ligaNaTela(ligaPeloCrm, useEmPreviaOpcional());
   useInboundMessageAlerts();
   useInboundCallAlerts();
   useCrmAlerts();
@@ -54,6 +63,7 @@ export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellPr
       sumindo. Princípio 2 de `docs/design-system/screen-flow/07-responsive-strategy.md`,
       escrito em abril de 2026 e aplicado em 6 lugares de 33 até aqui.
     */
+    <LigarProvider value={ligaAqui}>
     <div className="relative isolate flex min-h-dvh w-full bg-background">
       {/* Rede neural da marca, variante sutil: atrás de tudo, só nas áreas livres. */}
       <FundoDaCasca />
@@ -109,8 +119,9 @@ export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellPr
         >
           {/* ia.vek CRM-530: o convite para o aviso no celular, no 1º acesso de cada aparelho (só quem atende). */}
           <ConviteDoCelular podeAtender={podeAtender} />
-          {/* ia.vek CRM-532: o "Como foi a ligação?" na volta do discador (só quem atende) */}
-          {podeAtender && <ComoFoiALigacao />}
+          {/* ia.vek CRM-532: o "Como foi a ligação?" na volta do discador, SÓ para quem liga pelo CRM (a função da lista
+              da loja; de fábrica, o vendedor). Para os outros, a marca antiga do aparelho é apagada sem perguntar. */}
+          {ligaAqui ? <ComoFoiALigacao /> : <ApagaMarcaAntiga />}
           {children}
         </main>
       </div>
@@ -129,5 +140,6 @@ export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellPr
       */}
       <BarraInferior />
     </div>
+    </LigarProvider>
   );
 }

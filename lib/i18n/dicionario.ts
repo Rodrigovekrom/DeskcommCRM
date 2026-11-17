@@ -15515,6 +15515,7 @@ export const DICIONARIO: Traducoes = {
   // ─── ia.vek CRM-532: o botão "Ligar" e o "Como foi a ligação?" ───
   // ("Ligar" sozinho já é a chave de LIGAR um recurso, em espanhol "Activar": o botão usa a frase inteira)
   "Ligar para o cliente": { es: "Llamar al cliente" },
+  "Não liguei": { es: "No llamé" },
   "Como foi a ligação?": { es: "¿Cómo fue la llamada?" },
   "Ligue do seu celular para:": { es: "Llama desde tu celular al:" },
   "Registrar a ligação": { es: "Registrar la llamada" },

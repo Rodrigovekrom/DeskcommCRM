@@ -9,12 +9,14 @@
  * No COMPUTADOR o `tel:` abre outro programa ou nada, e o CRM não tem como saber se a pessoa ligou. Então o botão
  * abre um quadro com o número grande, "Copiar" e "Registrar a ligação" (à mão), sem pergunta automática.
  *
- * Não aparece em grupo nem sem telefone utilizável (hrefDeLigar → null).
+ * Não aparece em grupo, sem telefone utilizável (hrefDeLigar → null), nem para quem não liga pelo CRM (a função fora da
+ * lista da loja; de fábrica, só o vendedor liga: useLigaPeloCrm).
  */
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useLigaPeloCrm } from "@/components/ligar/LigarContext";
 import { useT } from "@/hooks/i18n/useT";
 import { copyToClipboard } from "@/lib/clipboard";
 import { marcarLigacao } from "@/lib/ligar/marca";
@@ -54,7 +56,8 @@ export function BotaoLigar({
   const [copiado, setCopiado] = useState(false);
   useEffect(() => setToque(ehToque()), []);
 
-  const href = ehGrupo ? null : hrefDeLigar(telefone);
+  const ligaAqui = useLigaPeloCrm();
+  const href = ehGrupo || !ligaAqui ? null : hrefDeLigar(telefone);
   if (!href) return null;
   const numero = href.slice("tel:".length);
 

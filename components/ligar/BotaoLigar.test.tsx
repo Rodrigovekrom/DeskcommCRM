@@ -7,7 +7,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 
-import { BotaoLigar, EVENTO_PERGUNTAR } from "@/components/ligar/BotaoLigar";
+import { BotaoLigar as BotaoSemContexto, EVENTO_PERGUNTAR } from "@/components/ligar/BotaoLigar";
+import { LigarProvider } from "@/components/ligar/LigarContext";
+import type { ComponentProps } from "react";
+
+/** O vendedor (liga pelo CRM): o botão dentro do provedor com `true`. */
+const BotaoLigar = (p: ComponentProps<typeof BotaoSemContexto>) => (
+  <LigarProvider value={true}>
+    <BotaoSemContexto {...p} />
+  </LigarProvider>
+);
 import { lerMarca, apagarMarca } from "@/lib/ligar/marca";
 
 function toque(sim: boolean) {
@@ -29,6 +38,18 @@ describe("CRM-532: BotaoLigar", () => {
     expect(a.getAttribute("href")).toBe("tel:+5532984793302");
     fireEvent.click(a);
     expect(lerMarca()).toMatchObject({ contatoId: "c-1", leadId: "l-1", tarefaId: "t-1" });
+  });
+
+  it("(Rodrigo 17/11) quem NÃO liga pelo CRM (SDR, gerente, admin: o provedor com false, ou nenhum provedor) não vê o botão", () => {
+    toque(true);
+    const { container: semProvedor } = render(<BotaoSemContexto contatoId="c" telefone="+5532984793302" />);
+    expect(semProvedor.innerHTML).toBe("");
+    const { container: comFalse } = render(
+      <LigarProvider value={false}>
+        <BotaoSemContexto contatoId="c" telefone="+5532984793302" />
+      </LigarProvider>,
+    );
+    expect(comFalse.innerHTML).toBe("");
   });
 
   it("em grupo ou sem telefone, o botão não aparece", () => {

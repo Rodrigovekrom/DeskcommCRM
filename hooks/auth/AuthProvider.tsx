@@ -177,6 +177,15 @@ export function AuthProvider({
 }
 
 /** ia.vek v1.9.19: a função vista, sem exigir o provedor (componentes usados fora dele). */
+/**
+ * ia.vek CRM-532 (Lupa 213638): a tela está na prévia "ver como"? Pela PRESENÇA do alvo da prévia (o verComo preenchido),
+ * nunca pela diferença de função (a prévia de uma função igual à real passaria). Fora do provedor: false. Não lança.
+ */
+export function useEmPreviaOpcional(): boolean {
+  const ctx = useContext(Ctx);
+  return Boolean(ctx?.podeVerComo && ctx.verComo);
+}
+
 export function useFuncaoVistaOpcional(): unknown {
   return useContext(Ctx)?.activeOrg?.interface_settings?.funcao ?? null;
 }

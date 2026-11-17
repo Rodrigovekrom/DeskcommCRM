@@ -15,7 +15,7 @@ import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
  */
 
 let activeOrg: ActiveOrg | null = null;
-vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null,
+vi.mock("@/hooks/auth/AuthProvider", () => ({  useFuncaoVistaOpcional: () => null, useEmPreviaOpcional: () => false,
  useAuth: () => ({ user: null, activeOrg }) }));
 
 afterEach(() => {

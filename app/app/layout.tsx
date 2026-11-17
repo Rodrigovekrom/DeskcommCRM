@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { isMfaEnrolled, loadAuthUser, requiresMfa, resolveActiveOrg } from "@/lib/auth/server";
 import { DEFAULT_VISIBILITY_MODE, roleAtLeast, type VisibilityMode } from "@/lib/auth/types";
+import { ligaPeloCrm } from "@/lib/ligar/regras";
 import { clientePelaAgendaLigado } from "@/lib/schemas/settings";
 import { AuthProvider } from "@/hooks/auth/AuthProvider";
 import { ProvedorDeCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
@@ -77,6 +78,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   let conexoesCaidas: ConexaoCaida[] = [];
   let enrolled = false;
   let needsMfaGate = false;
+  // ia.vek CRM-532: esta pessoa liga pelo CRM (a função REAL do vínculo + a lista da loja)?
+  let ligaPeloCrmAqui = false;
 
   if (activeOrg) {
     const admin = createAdminClient();
@@ -129,6 +132,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       throw new Error(`organizacao_ilegivel: ${orgRes.error.message}`);
     }
     conexoesCaidas = conexoes;
+    ligaPeloCrmAqui = ligaPeloCrm(
+      (activeOrg.interface_settings as { funcao?: string } | undefined)?.funcao,
+      orgRow?.settings,
+      roleAtLeast(activeOrg.role, "agent"),
+    );
     enrolled = isEnrolled;
     needsMfaGate = mfaRequired;
 
@@ -262,6 +270,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <AppShell
           sidebarCollapsed={collapsed}
           podeAtender={Boolean(activeOrg && roleAtLeast(activeOrg.role, "agent"))}
+          ligaPeloCrm={ligaPeloCrmAqui}
         >
           {children}
         </AppShell>
