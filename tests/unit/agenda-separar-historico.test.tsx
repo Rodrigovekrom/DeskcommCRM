@@ -354,7 +354,7 @@ describe("histórico da agenda — a repartição nas quatro abas", () => {
    * No dia em que a fronteira passar a olhar `termina`, este caso REPROVA por
    * ter passado, e quem consertar é obrigado a vir tirar o `.fails`.
    */
-  it.fails("o compromisso EM ANDAMENTO ainda é Próximos — começou, mas não terminou", () => {
+  it("o compromisso EM ANDAMENTO ainda é Próximos — começou, mas não terminou (v1.9.60, CRM-409)", () => {
     montar([ag("em-andamento", -5, { duracao: 30 })]);
 
     expect(

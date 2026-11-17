@@ -77,7 +77,12 @@ function separar(agendamentos: Agendamento[], agora: Date): Record<AbaDoHistoric
       vazio.aguardando.push(a);
       continue;
     }
-    (isBefore(new Date(a.comeca), agora) ? vazio.passados : vazio.proximos).push(a);
+    // ia.vek v1.9.60 (CRM-409): "passado" é o que já TERMINOU. Olhar só o começo jogava a visita em andamento em
+    // "Passados", oferecendo "Faltou" para quem está na loja. O resto da casa já trata o compromisso como ocupado até
+    // `termina` (lib/agenda/consulta.ts). Sem `termina` válido, vale o começo, como antes.
+    const fim = new Date(a.termina);
+    const referencia = Number.isNaN(fim.getTime()) ? new Date(a.comeca) : fim;
+    (!isBefore(agora, referencia) ? vazio.passados : vazio.proximos).push(a);
   }
   return vazio;
 }
