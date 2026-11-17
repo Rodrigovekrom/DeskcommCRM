@@ -76,10 +76,10 @@ beforeAll(() => {
       ('${USER_REVOGADO}', 'crm530-revogado@invariant.test'),
       ('${USER_PENDENTE}', 'crm530-pendente@invariant.test')
       on conflict do nothing;
-    insert into public.user_organizations (user_id, organization_id, role, accepted_at, revoked_at)
-      values ('${USER_REVOGADO}', '${GOV_ORG}', 'admin', now(), now()) on conflict do nothing;
-    insert into public.user_organizations (user_id, organization_id, role, accepted_at)
-      values ('${USER_PENDENTE}', '${GOV_ORG}', 'admin', null) on conflict do nothing;
+    insert into public.user_organizations (user_id, organization_id, role, accepted_at, revoked_at, interface_settings)
+      values ('${USER_REVOGADO}', '${GOV_ORG}', 'admin', now(), now(), '{"preset":"completa"}'::jsonb) on conflict do nothing;
+    insert into public.user_organizations (user_id, organization_id, role, accepted_at, interface_settings)
+      values ('${USER_PENDENTE}', '${GOV_ORG}', 'admin', null, '{"preset":"completa"}'::jsonb) on conflict do nothing;
     ${subs}
   `);
 });
@@ -148,24 +148,31 @@ describe("CRM-530: o aviso vai só a quem a policy deixa ver, e só a membro ati
     sql(`
       insert into auth.users (id, email) values ('${USER_SDR}', 'crm530-sdr@invariant.test') on conflict do nothing;
       insert into public.user_organizations (user_id, organization_id, role, accepted_at, interface_settings)
-        values ('${USER_SDR}', '${GOV_ORG}', 'agent', now(), '{"funcao":"sdr"}'::jsonb) on conflict do nothing;
+        values ('${USER_SDR}', '${GOV_ORG}', 'agent', now(), '{"preset":"completa","funcao":"sdr"}'::jsonb) on conflict do nothing;
       insert into public.push_subscriptions (organization_id, user_id, endpoint, p256dh, auth)
         values ('${GOV_ORG}', '${USER_SDR}', 'https://push.invariant.test/${USER_SDR}', 'p', 'a') on conflict (endpoint) do nothing;
       insert into public.crm_pipelines (id, organization_id, name, slug)
         values ('${PIPE_FU}', '${GOV_ORG}', 'Follow-up CRM-530', 'fu-crm530') on conflict do nothing;
       insert into public.crm_stages (id, organization_id, pipeline_id, name, slug, position)
         values ('${STAGE_FU}', '${GOV_ORG}', '${PIPE_FU}', 'Fase 1', 'fase-1', 1000) on conflict do nothing;
-      update public.organizations
-         set settings = coalesce(settings, '{}'::jsonb)
-                        || jsonb_build_object('esteira', coalesce(settings->'esteira', '{}'::jsonb)
-                             || jsonb_build_object('followup', jsonb_build_object('pipeline_id', '${PIPE_FU}')))
-       where id = '${GOV_ORG}';
       insert into public.contacts (id, organization_id, display_name)
         values ('${CONTATO_FU}', '${GOV_ORG}', 'Contato no Follow-up CRM-530') on conflict do nothing;
       insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, contact_id)
         values ('${LEAD_FU}', '${GOV_ORG}', '${PIPE_FU}', '${STAGE_FU}', 'Lead no Follow-up', '${CONTATO_FU}') on conflict do nothing;
       insert into public.conversations (id, organization_id, contact_id, channel_session_id, status)
         values ('${CONV_FU}', '${GOV_ORG}', '${CONTATO_FU}', '${GOV_SESSION}', 'open') on conflict do nothing;
+    `);
+    // CONTROLE (a prova de que é a 0641 que a esconde): sem o Follow-up ligado na org, a SDR (own_and_unassigned) VÊ a
+    // conversa sem dono, e o módulo manda para ela
+    expect(countAs(USER_SDR, `select count(*) from public.conversations where id = '${CONV_FU}';`)).toBe(1);
+    expect(moduloVe(USER_SDR, CONV_FU)).toBe(true);
+    // liga o Follow-up: o lead do contato está SÓ no funil de Follow-up e não é dela -> a 0641 a esconde
+    sql(`
+      update public.organizations
+         set settings = coalesce(settings, '{}'::jsonb)
+                        || jsonb_build_object('esteira', coalesce(settings->'esteira', '{}'::jsonb)
+                             || jsonb_build_object('followup', jsonb_build_object('pipeline_id', '${PIPE_FU}')))
+       where id = '${GOV_ORG}';
     `);
     // ela está entre os candidatos (é membro ativa e inscrita): o que a tira é a policy, não o filtro de candidatos
     const cand = new Set(sql(`${comParametros(SQL_CANDIDATOS, [GOV_ORG])};`).split("\n").filter(Boolean));
