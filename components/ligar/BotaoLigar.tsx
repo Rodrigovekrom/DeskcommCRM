@@ -10,7 +10,7 @@
  * abre um quadro com o número grande, "Copiar" e "Registrar a ligação" (à mão), sem pergunta automática.
  *
  * Não aparece em grupo, sem telefone utilizável (hrefDeLigar → null), nem para quem não liga pelo CRM (a função fora da
- * lista da loja; de fábrica, só o vendedor liga: useLigaPeloCrm).
+ * lista da loja; de fábrica, todos que atendem: useLigaPeloCrm), nem na prévia "ver como" do admin.
  */
 import { useEffect, useState } from "react";
 

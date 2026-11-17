@@ -41,7 +41,7 @@ type TarefaDeLigacao = Tarefa & { source_kind: string | null };
 
 /**
  * (decisão do Rodrigo 17/11, Lupa 212314) Esta pessoa liga pelo CRM? A função REAL do vínculo dela + a lista da loja
- * (settings.iavek.ligar.funcoes; de fábrica, só o vendedor), lidas pelo cliente da sessão. Quem não liga: o GET não
+ * (settings.iavek.ligar.funcoes; de fábrica, TODOS que atendem), lidas pelo cliente da sessão. Quem não liga: o GET não
  * pergunta, e o POST recusa com 403, sem gravar nada.
  */
 async function ligaAqui(supabase: Cliente, orgId: string, userId: string, atende: boolean): Promise<boolean> {
