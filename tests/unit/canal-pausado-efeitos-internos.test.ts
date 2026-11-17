@@ -78,9 +78,14 @@ vi.mock("@/lib/supabase/admin", () => ({
 const enviarPushDaOrg = vi.fn(async (_org: string, _payload: unknown) => ({ sent: 1, gone: 0 }));
 vi.mock("@/lib/notifications/web_push", () => ({
   enviarPushDaOrg: (org: string, payload: unknown) => enviarPushDaOrg(org, payload),
+  // ia.vek CRM-530: a mensagem vai a quem vê a conversa (enviarPushAosUsuarios); para esta guarda, o que importa é se
+  // ALGUM push sai, então os dois caminhos contam no mesmo espião.
+  enviarPushAosUsuarios: (org: string, _ids: readonly string[], payload: unknown) => enviarPushDaOrg(org, payload),
   enviarPushAoUsuario: async () => ({ sent: 0, gone: 0 }),
 }));
 vi.mock("@/lib/notifications/vapid", () => ({ vapidPronto: () => true }));
+vi.mock("@/lib/notifications/quem-ve", () => ({ inscritosQueVeem: async () => ["u-ve"], gerenciaInscrita: async () => ["u-g"] }));
+vi.mock("@/lib/agent-engine/db/request-pool", () => ({ getRequestPool: () => ({}) }));
 vi.mock("@/lib/branding/saida", () => ({ marcaDaSaida: async () => ({ nome: "Marca" }) }));
 
 // ─── 2. reatividade do fluxo ────────────────────────────────────────────────

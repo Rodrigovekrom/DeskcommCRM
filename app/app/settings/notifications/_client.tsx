@@ -2,7 +2,7 @@
 
 import { useT } from "@/hooks/i18n/useT";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -90,6 +90,49 @@ export function NotificationPrefsClient() {
           ))}
         </tbody>
       </table>
+      {/* ia.vek CRM-530: o botão de teste, para ver e ouvir o aviso no celular na hora. */}
+      {permission === "granted" ? <EnviarTeste /> : null}
     </Card>
+  );
+}
+
+function EnviarTeste() {
+  const t = useT();
+  const [estado, setEstado] = useState<"" | "enviando" | "enviado" | "nenhum" | "espere" | "falhou">("");
+  async function enviar() {
+    setEstado("enviando");
+    try {
+      const r = await fetch("/api/v1/notifications/push/teste", { method: "POST" });
+      if (r.status === 429) return setEstado("espere");
+      const j = (await r.json()) as { data?: { enviados?: number } };
+      setEstado(r.ok ? ((j.data?.enviados ?? 0) > 0 ? "enviado" : "nenhum") : "falhou");
+    } catch {
+      setEstado("falhou");
+    }
+  }
+  const frase: Record<typeof estado, string> = {
+    "": t("Feche ou minimize o CRM em 5 segundos para ver o aviso chegar."),
+    enviando: t("Enviando…"),
+    enviado: t("Teste enviado. Se não chegou, confira o som das notificações do navegador no celular."),
+    nenhum: t("Nenhum aparelho seu está inscrito. Ative o aviso neste aparelho primeiro."),
+    espere: t("Espere um minuto para enviar outro teste."),
+    falhou: t("Não consegui enviar o teste agora."),
+  };
+  return (
+    <div className="flex flex-col gap-2 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-muted-foreground" data-testid="push-teste-frase">{frase[estado]}</p>
+      <button
+        type="button"
+        className="rounded-md border px-3 py-1.5"
+        disabled={estado === "enviando"}
+        onClick={() => {
+          setTimeout(() => void enviar(), 5000);
+          setEstado("enviando");
+        }}
+        data-testid="push-teste"
+      >
+        {t("Enviar um teste")}
+      </button>
+    </div>
   );
 }

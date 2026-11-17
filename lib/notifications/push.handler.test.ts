@@ -11,6 +11,15 @@ vi.mock("@/lib/notifications/vapid", () => ({
 }));
 
 const enviarPushDaOrgMock = vi.fn(async (_organizationId: string, _payload: PushPayload) => ({ sent: 1, gone: 0 }));
+const enviarPushAosUsuariosMock = vi.fn(
+  async (_organizationId: string, _userIds: readonly string[], _payload: PushPayload) => ({ sent: 1, gone: 0 }),
+);
+const inscritosQueVeemMock = vi.fn(async (_pool: unknown, _org: string, _tabela: string, _id: string) => ["u-ve"]);
+vi.mock("./quem-ve", () => ({
+  inscritosQueVeem: (pool: unknown, org: string, tabela: string, id: string) => inscritosQueVeemMock(pool, org, tabela, id),
+  gerenciaInscrita: async () => ["u-gerente"],
+}));
+vi.mock("@/lib/agent-engine/db/request-pool", () => ({ getRequestPool: () => ({}) }));
 const enviarPushAoUsuarioMock = vi.fn(
   async (_organizationId: string, _userId: string | null, _payload: PushPayload) => ({ sent: 0, gone: 0 }),
 );
@@ -24,6 +33,8 @@ vi.mock("./web_push", () => ({
   enviarPushDaOrg: (organizationId: string, payload: PushPayload) => enviarPushDaOrgMock(organizationId, payload),
   enviarPushAoUsuario: (organizationId: string, userId: string | null, payload: PushPayload) =>
     enviarPushAoUsuarioMock(organizationId, userId, payload),
+  enviarPushAosUsuarios: (organizationId: string, userIds: readonly string[], payload: PushPayload) =>
+    enviarPushAosUsuariosMock(organizationId, userIds, payload),
 }));
 
 // A rota 1:1 (`handleInbound`) usa o admin client para buscar nome/avatar em
@@ -58,6 +69,8 @@ describe("webPushInboundHandler", () => {
     state.vapidPronto = false;
     enviarPushDaOrgMock.mockClear();
     enviarPushAoUsuarioMock.mockClear();
+    enviarPushAosUsuariosMock.mockClear();
+    inscritosQueVeemMock.mockClear();
     createAdminClientMock.mockClear();
     fromMock.mockClear();
   });
@@ -83,22 +96,21 @@ describe("webPushInboundHandler", () => {
       state.vapidPronto = true;
     });
 
-    it("título é a cópia de grupo, href aponta pra conversa, envia pela ORG (não por usuário)", async () => {
+    it("título é a cópia de grupo, href aponta pra conversa, e vai SÓ a quem VÊ a conversa (CRM-530), nunca à org inteira", async () => {
       const result = await webPushInboundHandler.handle(grupoRow());
 
       expect(result.status).toBe("ok");
-      expect(enviarPushDaOrgMock).toHaveBeenCalledTimes(1);
-      const [orgId, payload] = enviarPushDaOrgMock.mock.calls[0]!;
+      expect(inscritosQueVeemMock).toHaveBeenCalledWith(expect.anything(), "org1", "conversations", "conv-1");
+      expect(enviarPushAosUsuariosMock).toHaveBeenCalledTimes(1);
+      const [orgId, destinos, payload] = enviarPushAosUsuariosMock.mock.calls[0]!;
       expect(orgId).toBe("org1");
-      expect(payload).toMatchObject({
-        title: "Nova mensagem no grupo",
-        href: "/app/inbox?id=conv-1",
-      });
-      // Nunca o desfecho do 1:1 ("Nova mensagem" quando não há nome de contato).
+      expect(destinos).toEqual(["u-ve"]);
+      expect(payload).toMatchObject({ title: "Nova mensagem no grupo", href: "/app/inbox?id=conv-1" });
+      // de fábrica ('so_nome'), o texto do grupo NÃO vai à tela de bloqueio
+      expect(payload.body).toBe("Toque para abrir a conversa");
       expect(payload.title).not.toBe("Nova mensagem");
-      // Recipiente é a ORG inteira — nunca `enviarPushAoUsuario` (que é o
-      // caminho de lead.assigned/user.mentioned, dirigido a UM usuário).
-      expect(enviarPushAoUsuarioMock).not.toHaveBeenCalled();
+      // CRM-530: nunca mais a org inteira
+      expect(enviarPushDaOrgMock).not.toHaveBeenCalled();
     });
 
     it("não busca nome/avatar do contato — `contacts` nunca é lido", async () => {
@@ -106,10 +118,11 @@ describe("webPushInboundHandler", () => {
       expect(fromMock).not.toHaveBeenCalledWith("contacts");
     });
 
-    it("sem conversation_id: href cai para /app/inbox (mesma forma do 1:1 sem conversa)", async () => {
-      await webPushInboundHandler.handle(grupoRow({ conversation_id: undefined }));
-      const [, payload] = enviarPushDaOrgMock.mock.calls[0]!;
-      expect(payload).toMatchObject({ title: "Nova mensagem no grupo", href: "/app/inbox" });
+    it("sem conversation_id: não manda nada (não há conversa para conferir quem vê)", async () => {
+      const r = await webPushInboundHandler.handle(grupoRow({ conversation_id: undefined }));
+      expect(r.status).toBe("skipped");
+      expect(r.detail).toBe("sem_conversa");
+      expect(enviarPushAosUsuariosMock).not.toHaveBeenCalled();
     });
   });
 });

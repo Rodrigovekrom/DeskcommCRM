@@ -79,6 +79,17 @@ export async function enviarPushAoUsuario(
 ): Promise<{ sent: number; gone: number }> {
   if (!vapidPronto()) return { sent: 0, gone: 0 };
   const admin = createAdminClient();
+  // ia.vek CRM-530: só membro ATIVO da org recebe (aceito e não revogado). Quem saiu da loja não recebe, mesmo com a
+  // inscrição antiga no aparelho.
+  const { data: membro, error: membroErr } = await admin
+    .from("user_organizations")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    .not("accepted_at", "is", null)
+    .maybeSingle();
+  if (membroErr || !membro) return { sent: 0, gone: 0 };
   const { data, error } = await admin
     .from("push_subscriptions")
     .select("id, endpoint, p256dh, auth")
@@ -101,4 +112,23 @@ export async function enviarPushAoUsuario(
       }),
     }),
   });
+}
+
+/**
+ * ia.vek CRM-530: manda a cada pessoa da lista (sem repetir), por `enviarPushAoUsuario`, que confere o membro ativo.
+ * É o caminho de toda mensagem e aviso da Central: nunca mais `enviarPushDaOrg` para eles (a cerca está nos testes).
+ */
+export async function enviarPushAosUsuarios(
+  organizationId: string,
+  userIds: readonly string[],
+  payload: PushPayload,
+): Promise<{ sent: number; gone: number }> {
+  let sent = 0;
+  let gone = 0;
+  for (const userId of [...new Set(userIds)]) {
+    const r = await enviarPushAoUsuario(organizationId, userId, payload);
+    sent += r.sent;
+    gone += r.gone;
+  }
+  return { sent, gone };
 }

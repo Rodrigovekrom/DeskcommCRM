@@ -10,6 +10,7 @@ import { useInboundMessageAlerts } from "@/hooks/notifications/useInboundMessage
 import { useInboundCallAlerts } from "@/hooks/calls/useInboundCallAlerts";
 import { useCrmAlerts } from "@/hooks/notifications/useCrmAlerts";
 import { useNotifyOpenFromServiceWorker } from "@/lib/notifications/notify_open";
+import { ConviteDoCelular } from "@/components/notifications/ConviteDoCelular";
 import { estiloDaReserva, useOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
 
 interface AppShellProps {
@@ -105,6 +106,8 @@ export function AppShell({ sidebarCollapsed, podeAtender, children }: AppShellPr
           style={estiloDaReserva(ocupacaoDoRodape)}
           data-rodape-ocupado={ocupacaoDoRodape}
         >
+          {/* ia.vek CRM-530: o convite para o aviso no celular, no 1º acesso de cada aparelho (só quem atende). */}
+          <ConviteDoCelular podeAtender={podeAtender} />
           {children}
         </main>
       </div>

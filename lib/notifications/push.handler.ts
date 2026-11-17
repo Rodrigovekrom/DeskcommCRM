@@ -2,14 +2,43 @@ import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/disp
 import { marcaDaSaida } from "@/lib/branding/saida";
 import { canalDoEventoDesativado } from "@/lib/channels/desativado";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { montarPayloadDeInbound, truncar } from "./push_payload";
-import { enviarPushAoUsuario, enviarPushDaOrg } from "./web_push";
+import { conteudoDoAviso, CORPO_NEUTRO, montarPayloadDeInbound, truncar } from "./push_payload";
+import { enviarPushAoUsuario, enviarPushAosUsuarios } from "./web_push";
+import { gerenciaInscrita, inscritosQueVeem } from "./quem-ve";
+import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
+import { REFERENCIAS_DE_AVISO } from "@/lib/ai/inbox-destino";
 import { vapidPronto } from "./vapid";
 import { pushDoAvisoDaCentral } from "./push-dos-avisos";
 import type { PushPayload } from "./push_payload";
 import { rotuloDoContato, SEM_NOME } from "@/lib/contacts/rotulo-do-contato";
 
 export const WEB_PUSH_INBOUND_KEY = "web-push-inbound.v1";
+
+/** ia.vek CRM-530: o que a tela de bloqueio mostra, pela config da org (`settings.iavek.push.conteudo`). */
+async function conteudoDaOrg(organizationId: string) {
+  try {
+    const { data } = await createAdminClient()
+      .from("organizations")
+      .select("settings")
+      .eq("id", organizationId)
+      .maybeSingle();
+    return conteudoDoAviso((data as { settings?: unknown } | null)?.settings);
+  } catch {
+    return conteudoDoAviso(null); // em erro, o padrão ('so_nome'): o lado que mostra menos
+  }
+}
+
+/**
+ * ia.vek CRM-530: quem recebe o aviso de uma linha (a conversa, ou o que o aviso da Central referencia): SÓ os inscritos
+ * ATIVOS que a RLS daquela tabela deixa VER aquela linha (`./quem-ve.ts`). Sem o pool, ninguém (o lado seguro).
+ */
+async function destinosQueVeem(organizationId: string, tabela: string, id: string): Promise<string[]> {
+  try {
+    return await inscritosQueVeem(getRequestPool(), organizationId, tabela, id);
+  } catch {
+    return [];
+  }
+}
 
 async function handleInbound(row: EventRow): Promise<HandlerResult> {
   // Canal DESATIVADO (#2329): a lei do #2318 vale nos dois sentidos — o canal
@@ -70,15 +99,21 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
       icon = signed?.signedUrl ?? null;
     }
   }
+  if (!conversationId) {
+    return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_conversa" };
+  }
   const payload = montarPayloadDeInbound({
     brand: marca.nome,
     conversationId,
     preview: body,
     contactName,
     icon,
+    conteudo: await conteudoDaOrg(row.organization_id),
   });
-  const { sent } = await enviarPushDaOrg(row.organization_id, payload);
-  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent}` };
+  // ia.vek CRM-530: SÓ a quem pode ver esta conversa (a policy conversations_select, perguntada por inscrito).
+  const destinos = await destinosQueVeem(row.organization_id, "conversations", conversationId);
+  const { sent } = await enviarPushAosUsuarios(row.organization_id, destinos, payload);
+  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent} destinos:${destinos.length}` };
 }
 
 /**
@@ -102,26 +137,54 @@ async function handleGroupInbound(row: EventRow): Promise<HandlerResult> {
   const type = typeof row.payload.type === "string" ? row.payload.type : "text";
   const body = type === "text" ? preview : "Mídia";
 
+  if (!conversationId) {
+    return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_conversa" };
+  }
+  // ia.vek CRM-530: o texto do grupo só aparece na tela de bloqueio com a config 'completo'.
+  const conteudo = await conteudoDaOrg(row.organization_id);
   const payload: PushPayload = {
     title: "Nova mensagem no grupo",
-    body: truncar(body),
-    tag: conversationId ? `msg:${conversationId}` : "msg",
-    href: conversationId ? `/app/inbox?id=${conversationId}` : "/app/inbox",
+    body: conteudo === "completo" ? truncar(body) : CORPO_NEUTRO,
+    tag: `msg:${conversationId}`,
+    href: `/app/inbox?id=${conversationId}`,
   };
-  const { sent } = await enviarPushDaOrg(row.organization_id, payload);
-  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent}` };
+  const destinos = await destinosQueVeem(row.organization_id, "conversations", conversationId);
+  const { sent } = await enviarPushAosUsuarios(row.organization_id, destinos, payload);
+  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent} destinos:${destinos.length}` };
 }
 
 /** Os avisos da Central que pedem gente — ver `./push-dos-avisos.ts`. */
 async function handleAvisoQuePedeGente(row: EventRow): Promise<HandlerResult> {
   const id = typeof row.payload.item_id === "string" ? row.payload.item_id : row.entity_id;
   if (!id) return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_alvo" };
-  const payload = await pushDoAvisoDaCentral(createAdminClient(), row.organization_id, id);
+  const admin = createAdminClient();
+  const payload = await pushDoAvisoDaCentral(admin, row.organization_id, id);
   if (payload === null) {
     return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "aviso_fora_do_celular" };
   }
-  const { sent } = await enviarPushDaOrg(row.organization_id, payload);
-  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent}` };
+  // ia.vek CRM-530: o aviso vai a quem VÊ o que ele referencia (a mesma tabela que a Central abre,
+  // REFERENCIAS_DE_AVISO); sem referência (ex.: a IA sem saldo, que é da loja inteira), à gerência ativa inscrita.
+  const { data: item } = await admin
+    .from("agent_inbox_items")
+    .select("ref_kind, ref_id")
+    .eq("id", id)
+    .eq("organization_id", row.organization_id)
+    .maybeSingle();
+  const ref = item as { ref_kind?: string | null; ref_id?: string | null } | null;
+  const alvo = ref?.ref_kind ? (REFERENCIAS_DE_AVISO as Record<string, { tabela: string }>)[ref.ref_kind] : undefined;
+  let destinos: string[];
+  if (alvo && ref?.ref_id) {
+    destinos = await destinosQueVeem(row.organization_id, alvo.tabela, ref.ref_id);
+  } else {
+    // sem referência, OU uma referência FORA da lista (Lupa 185335): FECHA na gerência ativa inscrita, nunca a org inteira
+    try {
+      destinos = await gerenciaInscrita(getRequestPool(), row.organization_id);
+    } catch {
+      destinos = [];
+    }
+  }
+  const { sent } = await enviarPushAosUsuarios(row.organization_id, destinos, payload);
+  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent} destinos:${destinos.length}` };
 }
 
 async function leadBits(organizationId: string, leadId: string): Promise<{

@@ -18,10 +18,17 @@ vi.mock("@/lib/notifications/vapid", () => ({ vapidPronto: () => true, vapidPubl
 vi.mock("@/lib/notifications/web_push", () => ({
   enviarPushDaOrg: vi.fn().mockResolvedValue({ sent: 1, gone: 0 }),
   enviarPushAoUsuario: vi.fn().mockResolvedValue({ sent: 1, gone: 0 }),
+  enviarPushAosUsuarios: vi.fn().mockResolvedValue({ sent: 1, gone: 0 }),
 }));
+// ia.vek CRM-530: o aviso vai a quem VÊ o que ele referencia (ou à gerência, sem referência), nunca à org inteira
+vi.mock("@/lib/notifications/quem-ve", () => ({
+  inscritosQueVeem: vi.fn().mockResolvedValue(["u-ve"]),
+  gerenciaInscrita: vi.fn().mockResolvedValue(["u-gerente"]),
+}));
+vi.mock("@/lib/agent-engine/db/request-pool", () => ({ getRequestPool: () => ({}) }));
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { enviarPushDaOrg } from "@/lib/notifications/web_push";
+import { enviarPushAosUsuarios, enviarPushDaOrg } from "@/lib/notifications/web_push";
 import { webPushInboundHandler } from "@/lib/notifications/push.handler";
 import type { EventRow } from "@/lib/event-log/dispatcher";
 import { corpoDoAvisoDeEtapa, tituloDoAvisoDeEtapa } from "@/lib/leads/aviso-de-etapa";
@@ -53,6 +60,7 @@ const evento = (event_type: string, payload: Record<string, unknown>): EventRow 
 
 beforeEach(() => {
   vi.mocked(enviarPushDaOrg).mockClear();
+  vi.mocked(enviarPushAosUsuarios).mockClear();
   filtros.length = 0;
 });
 
@@ -73,7 +81,7 @@ describe("aviso da Central → celular", () => {
     }) as never);
     const r = await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "i1" }));
     expect(r.status).toBe("ok");
-    const payload = vi.mocked(enviarPushDaOrg).mock.calls[0]![1];
+    const payload = vi.mocked(enviarPushAosUsuarios).mock.calls[0]![2];
     expect(payload).toEqual({
       title: "Negocio entró en «Pedido confirmado»",
       body: "Abre el negocio para dar el siguiente paso. Este aviso se pidió en la configuración de la etapa.",
@@ -92,7 +100,7 @@ describe("aviso da Central → celular", () => {
       organizations: { locale: "es" },
     }) as never);
     await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "i2" }));
-    expect(vi.mocked(enviarPushDaOrg).mock.calls[0]![1]).toEqual({
+    expect(vi.mocked(enviarPushAosUsuarios).mock.calls[0]![2]).toEqual({
       title: "La IA pasó una conversación al equipo",
       body: "Abre la conversación para responder al cliente.",
       tag: "aviso:i2",
@@ -106,7 +114,7 @@ describe("aviso da Central → celular", () => {
       organizations: { locale: "pt-BR" },
     }) as never);
     await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "i3" }));
-    expect(vi.mocked(enviarPushDaOrg).mock.calls[0]![1]).toMatchObject({
+    expect(vi.mocked(enviarPushAosUsuarios).mock.calls[0]![2]).toMatchObject({
       title: "A IA passou uma conversa para a equipe",
       href: "/app/contacts/k1",
     });
@@ -121,7 +129,7 @@ describe("aviso da Central → celular", () => {
       organizations: { locale: "es" },
     }) as never);
     await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "i4" }));
-    expect(vi.mocked(enviarPushDaOrg).mock.calls[0]![1]).toEqual({
+    expect(vi.mocked(enviarPushAosUsuarios).mock.calls[0]![2]).toEqual({
       title: "La IA se quedó sin saldo en el proveedor",
       body: "Recarga el saldo en la cuenta del proveedor: las respuestas salen solas cuando vuelva.",
       tag: "aviso:i4",
@@ -142,7 +150,7 @@ describe("aviso da Central → celular", () => {
     expect(r.status).toBe("ok");
     // O destino é o mesmo que a Central daria ao aviso (`proposal`): um push
     // que abre a Central obriga quem atende a procurar a proposta de novo.
-    expect(vi.mocked(enviarPushDaOrg).mock.calls[0]![1]).toEqual({
+    expect(vi.mocked(enviarPushAosUsuarios).mock.calls[0]![2]).toEqual({
       // O título é o `title` do aviso — o mesmo que o cartão da tela mostra
       // (`AvisoDePropostaEmDestaque`), que já diz de quem é o orçamento.
       title: "Proposta «Site» de Maria Souza está pronta para revisão",
@@ -166,7 +174,7 @@ describe("aviso da Central → celular", () => {
       organizations: { locale: "es" },
     }) as never);
     await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "i8" }));
-    const payload = vi.mocked(enviarPushDaOrg).mock.calls[0]![1];
+    const payload = vi.mocked(enviarPushAosUsuarios).mock.calls[0]![2];
     expect(payload.body).toBe("La IA preparó una propuesta. Revísala antes de enviar.");
     // A prova: nenhum resto do texto de passagem para pessoa.
     expect(JSON.stringify(payload)).not.toMatch(/conversación|equipo|responder al cliente/i);
@@ -179,6 +187,7 @@ describe("aviso da Central → celular", () => {
     }) as never);
     const r = await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "i5" }));
     expect(r.status).toBe("skipped");
+    expect(enviarPushAosUsuarios).not.toHaveBeenCalled();
     expect(enviarPushDaOrg).not.toHaveBeenCalled();
   });
 
@@ -192,6 +201,7 @@ describe("aviso da Central → celular", () => {
     }) as never);
     const r = await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "i6" }));
     expect(r.status).toBe("skipped");
+    expect(enviarPushAosUsuarios).not.toHaveBeenCalled();
     expect(enviarPushDaOrg).not.toHaveBeenCalled();
   });
 
@@ -199,6 +209,7 @@ describe("aviso da Central → celular", () => {
     vi.mocked(createAdminClient).mockReturnValue(banco({ agent_inbox_items: null }) as never);
     const r = await webPushInboundHandler.handle(evento("central.aviso_criado", { item_id: "ausente" }));
     expect(r.status).toBe("skipped");
+    expect(enviarPushAosUsuarios).not.toHaveBeenCalled();
     expect(enviarPushDaOrg).not.toHaveBeenCalled();
   });
 });

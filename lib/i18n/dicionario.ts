@@ -15512,6 +15512,18 @@ export const DICIONARIO: Traducoes = {
     es: "No pude enviar el enlace. Cópialo y pégalo en la conversación.",
   },
   "Enviar link na conversa": { es: "Enviar enlace a la conversación" },
+  // ─── ia.vek CRM-530: o aviso no celular (o convite e o botão de teste) ───
+  "Aviso no celular": { es: "Aviso en el celular" },
+  "Para ser avisado no iPhone quando um cliente seu escrever: toque em Compartilhar e depois em Adicionar à Tela de Início. Depois, abra o CRM por lá.": { es: "Para recibir el aviso en el iPhone cuando un cliente tuyo escriba: toca Compartir y después Agregar a la pantalla de inicio. Después, abre el CRM desde allí." },
+  "Quer ser avisado no celular quando um cliente seu escrever?": { es: "¿Quieres recibir un aviso en el celular cuando un cliente tuyo escriba?" },
+  "Teste do CRM": { es: "Prueba del CRM" },
+  "Se você ouviu, o aviso no celular está funcionando.": { es: "Si lo escuchaste, el aviso en el celular está funcionando." },
+  "Espere um minuto para enviar outro teste.": { es: "Espera un minuto para enviar otra prueba." },
+  "Feche ou minimize o CRM em 5 segundos para ver o aviso chegar.": { es: "Cierra o minimiza el CRM en 5 segundos para ver llegar el aviso." },
+  "Teste enviado. Se não chegou, confira o som das notificações do navegador no celular.": { es: "Prueba enviada. Si no llegó, revisa el sonido de las notificaciones del navegador en el celular." },
+  "Nenhum aparelho seu está inscrito. Ative o aviso neste aparelho primeiro.": { es: "Ningún dispositivo tuyo está suscrito. Activa el aviso en este dispositivo primero." },
+  "Não consegui enviar o teste agora.": { es: "No pude enviar la prueba ahora." },
+  "Enviar um teste": { es: "Enviar una prueba" },
 };
 
 /**
