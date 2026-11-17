@@ -56,6 +56,7 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
   const body = type === "text" ? preview : "Mídia";
 
   const marca = await marcaDaSaida(row.organization_id);
+  const conteudo = await conteudoDaOrg(row.organization_id);
   const contactId = typeof row.payload.contact_id === "string" ? row.payload.contact_id : null;
   let contactName: string | null = null;
   let icon: string | null = null;
@@ -92,7 +93,8 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
     // trocá-lo por "Sem nome" pioraria o título sem ninguém pedir.
     const rotulo = rotuloDoContato(c);
     contactName = rotulo === SEM_NOME ? null : rotulo;
-    if (c?.avatar_storage_path && !c.is_anonymized) {
+    // (Lupa 190537) a foto só vai à tela de bloqueio no 'completo': nos outros modos, nem se gera a URL assinada
+    if (conteudo === "completo" && c?.avatar_storage_path && !c.is_anonymized) {
       const { data: signed } = await admin.storage
         .from("whatsapp-media")
         .createSignedUrl(c.avatar_storage_path, 300);
@@ -108,7 +110,7 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
     preview: body,
     contactName,
     icon,
-    conteudo: await conteudoDaOrg(row.organization_id),
+    conteudo,
   });
   // ia.vek CRM-530: SÓ a quem pode ver esta conversa (a policy conversations_select, perguntada por inscrito).
   const destinos = await destinosQueVeem(row.organization_id, "conversations", conversationId);
@@ -158,10 +160,17 @@ async function handleAvisoQuePedeGente(row: EventRow): Promise<HandlerResult> {
   const id = typeof row.payload.item_id === "string" ? row.payload.item_id : row.entity_id;
   if (!id) return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_alvo" };
   const admin = createAdminClient();
-  const payload = await pushDoAvisoDaCentral(admin, row.organization_id, id);
-  if (payload === null) {
+  const doAviso = await pushDoAvisoDaCentral(admin, row.organization_id, id);
+  if (doAviso === null) {
     return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "aviso_fora_do_celular" };
   }
+  // (Lupa 190537) a mesma config da tela de bloqueio: o aviso da Central já sai sem dado de cliente, salvo o da proposta,
+  // que nomeia a contraparte (a exceção do push-dos-avisos). No 'so_nome' isso é de propósito: o nome é permitido, e o
+  // texto da mensagem nunca vai. No 'nada', o aviso também vira genérico.
+  const payload: PushPayload =
+    (await conteudoDaOrg(row.organization_id)) === "nada"
+      ? { title: "Novo aviso na Central", body: CORPO_NEUTRO, tag: doAviso.tag, href: doAviso.href }
+      : doAviso;
   // ia.vek CRM-530: o aviso vai a quem VÊ o que ele referencia (a mesma tabela que a Central abre,
   // REFERENCIAS_DE_AVISO); sem referência (ex.: a IA sem saldo, que é da loja inteira), à gerência ativa inscrita.
   const { data: item } = await admin

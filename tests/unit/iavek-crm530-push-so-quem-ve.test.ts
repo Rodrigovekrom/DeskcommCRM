@@ -10,13 +10,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TABELAS_QUE_DECIDEM, gerenciaInscrita, inscritosQueVeem } from "@/lib/notifications/quem-ve";
 
 /** Um pool falso: a 1ª consulta (os candidatos) devolve `candidatos`; cada "exists" devolve se aquele `sub` vê. */
-function poolFalso(candidatos: string[], veem: Set<string>, falhaEm?: string) {
+function poolFalso(candidatos: string[], veem: Set<string>, falhaEm?: string, rollbackFalha = false) {
   const sqls: string[] = [];
   let subAtual = "";
   const client = {
     query: vi.fn(async (sql: string, params?: unknown[]) => {
       sqls.push(sql);
       if (sql.includes("set_config('request.jwt.claims'")) subAtual = String(params?.[1] ?? "");
+      if (sql === "rollback" && rollbackFalha) throw new Error("conexão caiu no rollback");
       if (sql.includes("select exists")) {
         if (subAtual === falhaEm) throw new Error("falhou");
         return { rows: [{ ve: veem.has(subAtual) }] };
@@ -67,6 +68,31 @@ describe("CRM-530: quem VÊ decide quem recebe (a PRÓPRIA policy, por inscrito)
     await inscritosQueVeem(f.pool, "org", "conversations", "conv-1");
     expect(f.sqls[f.sqls.length - 1]).toBe("rollback");
     expect(f.client.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("o ROLLBACK que falha DESTRÓI a conexão (release com erro), em vez de devolvê-la ao pool como a última pessoa", async () => {
+    const f = poolFalso(["a"], new Set(["a"]), undefined, true);
+    const log = vi.fn();
+    expect(await inscritosQueVeem(f.pool, "org", "conversations", "conv-1", log)).toEqual([]);
+    expect(f.client.release).toHaveBeenCalledTimes(1);
+    expect((f.client.release.mock.calls[0] as unknown[])[0]).toBeInstanceOf(Error);
+    expect(log).toHaveBeenCalledWith("push_quem_ve_rollback_falhou", expect.anything());
+  });
+
+  it("o rollback que dá certo devolve a conexão ao pool normalmente (release sem erro)", async () => {
+    const f = poolFalso(["a"], new Set(["a"]));
+    await inscritosQueVeem(f.pool, "org", "conversations", "conv-1");
+    expect((f.client.release.mock.calls[0] as unknown[])[0]).toBeUndefined();
+  });
+
+  it("o PRAZO TOTAL da transação (3 s) estourado no meio: FECHA (ninguém) e vai ao log", async () => {
+    const f = poolFalso(["a", "b", "c"], new Set(["a", "b", "c"]));
+    let t = 0;
+    const agora = () => (t += 1200); // cada leitura do relógio avança 1,2 s: o 3º candidato passa do prazo
+    const log = vi.fn();
+    expect(await inscritosQueVeem(f.pool, "org", "conversations", "conv-1", log, agora)).toEqual([]);
+    expect(log).toHaveBeenCalledWith("push_quem_ve_falhou", expect.objectContaining({ erro: expect.stringContaining("prazo total") }));
+    expect(f.sqls[f.sqls.length - 1]).toBe("rollback");
   });
 
   it("sem conexão no pool: ninguém recebe, sem lançar", async () => {
@@ -133,7 +159,7 @@ describe("CRM-530: a CERCA, nenhuma mensagem nem aviso da Central volta a ir à 
 describe("CRM-530: o roteamento no handler", () => {
   beforeEach(() => vi.resetModules());
 
-  async function handlerCom(opts: { item?: Record<string, unknown> | null }) {
+  async function handlerCom(opts: { item?: Record<string, unknown> | null; settings?: unknown }) {
     const quemVe = { inscritosQueVeem: vi.fn(async () => ["u-ve"]), gerenciaInscrita: vi.fn(async () => ["u-gerente"]) };
     const envio = {
       enviarPushAosUsuarios: vi.fn(async () => ({ sent: 1, gone: 0 })),
@@ -149,9 +175,10 @@ describe("CRM-530: o roteamento no handler", () => {
     vi.doMock("@/lib/notifications/push-dos-avisos", () => ({
       pushDoAvisoDaCentral: async () => ({ title: "Aviso", body: "b", tag: "t", href: "/app/central" }),
     }));
+    const assinar = vi.fn(async () => ({ data: { signedUrl: "https://assinada/foto" } }));
     const linhas: Record<string, unknown> = {
-      contacts: { display_name: "Maria Souza", is_personal: false, is_anonymized: false },
-      organizations: { settings: {} },
+      contacts: { display_name: "Maria Souza", is_personal: false, is_anonymized: false, avatar_storage_path: "org/foto.jpg" },
+      organizations: { settings: opts.settings ?? {} },
       agent_inbox_items: opts.item ?? null,
     };
     vi.doMock("@/lib/supabase/admin", () => ({
@@ -163,11 +190,11 @@ describe("CRM-530: o roteamento no handler", () => {
           q.maybeSingle = async () => ({ data: linhas[t] ?? null, error: null });
           return q;
         },
-        storage: { from: () => ({ createSignedUrl: async () => ({ data: null }) }) },
+        storage: { from: () => ({ createSignedUrl: assinar }) },
       }),
     }));
     const { webPushInboundHandler } = await import("@/lib/notifications/push.handler");
-    return { webPushInboundHandler, quemVe, envio };
+    return { webPushInboundHandler, quemVe, envio, assinar };
   }
 
   const linha = (event_type: string, payload: Record<string, unknown>) => ({
@@ -186,6 +213,23 @@ describe("CRM-530: o roteamento no handler", () => {
     expect(destinos).toEqual(["u-ve"]);
     expect(payload.title).toBe("Nova mensagem de Maria Souza");
     expect(JSON.stringify(payload)).not.toContain("CPF");
+  });
+
+  it("'so_nome' (de fábrica): a URL assinada da foto NEM é gerada; 'completo': é gerada e vai no aviso", async () => {
+    const h = await handlerCom({});
+    await h.webPushInboundHandler.handle(linha("message.received", { conversation_id: "c", contact_id: "ct", body_preview: "oi", type: "text" }) as never);
+    expect(h.assinar).not.toHaveBeenCalled();
+    vi.resetModules();
+    const c = await handlerCom({ settings: { iavek: { push: { conteudo: "completo" } } } });
+    await c.webPushInboundHandler.handle(linha("message.received", { conversation_id: "c", contact_id: "ct", body_preview: "oi", type: "text" }) as never);
+    expect(c.assinar).toHaveBeenCalledTimes(1);
+    expect((c.envio.enviarPushAosUsuarios.mock.calls[0] as unknown as unknown[])[2]).toMatchObject({ icon: "https://assinada/foto", body: "oi" });
+  });
+
+  it("aviso da Central com a config 'nada': genérico, sem o título do aviso", async () => {
+    const h = await handlerCom({ item: { ref_kind: "conversation", ref_id: "conv-9" }, settings: { iavek: { push: { conteudo: "nada" } } } });
+    await h.webPushInboundHandler.handle(linha("central.aviso_criado", { item_id: "item-1" }) as never);
+    expect((h.envio.enviarPushAosUsuarios.mock.calls[0] as unknown as unknown[])[2]).toMatchObject({ title: "Novo aviso na Central" });
   });
 
   it("aviso da Central que referencia uma conversa: SÓ a quem vê aquela conversa", async () => {

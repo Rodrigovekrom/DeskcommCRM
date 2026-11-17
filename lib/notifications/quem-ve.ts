@@ -56,6 +56,11 @@ export async function inscritosAtivos(pool: pg.Pool, orgId: string): Promise<str
 
 /** O prazo de cada transação de visibilidade (Lupa 183222): curto, para nunca segurar conexão do pool. */
 export const SQL_PRAZO = "set local statement_timeout = '2s'";
+/**
+ * O prazo da transação INTEIRA (Lupa 190537): o statement_timeout vale por COMANDO, e com 15 inscritos são ~32 comandos.
+ * Estourou, FECHA (ninguém recebe) e vai ao log. Conferido antes de cada candidato.
+ */
+export const PRAZO_TOTAL_MS = 3000;
 
 /**
  * Quem, entre os inscritos ativos, VÊ a linha `id` da `tabela` pela RLS.
@@ -72,6 +77,7 @@ export async function inscritosQueVeem(
   tabela: string,
   id: string,
   log: (msg: string, meta: Record<string, unknown>) => void = () => undefined,
+  agora: () => number = Date.now,
 ): Promise<string[]> {
   if (!TABELAS_QUE_DECIDEM.has(tabela) || !/^[a-z_]+$/.test(tabela)) return [];
   let candidatos: string[];
@@ -90,11 +96,14 @@ export async function inscritosQueVeem(
     return [];
   }
   const veem: string[] = [];
+  const limite = agora() + PRAZO_TOTAL_MS;
+  let erroNoRollback: Error | undefined;
   try {
     await client.query('begin');
     await client.query(SQL_PRAZO);
     await client.query(SQL_ASSUMIR_PAPEL);
     for (const userId of candidatos) {
+      if (agora() > limite) throw new Error(`prazo total de ${PRAZO_TOTAL_MS} ms estourado`);
       await client.query(SQL_CLAIMS, [claimsDe(userId), userId]);
       // a RLS da tabela decide; a org já foi filtrada nos candidatos
       const { rows } = await client.query<{ ve: boolean }>(sqlVe(tabela), [id]);
@@ -105,8 +114,16 @@ export async function inscritosQueVeem(
     log('push_quem_ve_falhou', { tabela, candidatos: candidatos.length, erro: err instanceof Error ? err.message.slice(0, 200) : 'desconhecido' });
     veem.length = 0;
   } finally {
-    await client.query('rollback').catch(() => undefined);
-    client.release();
+    try {
+      await client.query('rollback');
+    } catch (err) {
+      // (Lupa 190537) o rollback falhou: a conexão pode ter ficado com a transação ABERTA, no papel authenticated e com as
+      // claims do último inscrito. Ela NÃO volta ao pool: release(err) faz o pg DESTRUIR a conexão.
+      erroNoRollback = err instanceof Error ? err : new Error('rollback falhou');
+      log('push_quem_ve_rollback_falhou', { erro: erroNoRollback.message.slice(0, 200) });
+      veem.length = 0;
+    }
+    client.release(erroNoRollback);
   }
   return veem;
 }
