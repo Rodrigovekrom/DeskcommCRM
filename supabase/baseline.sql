@@ -52721,4 +52721,20 @@ comment on column public.iavek_pedidos_de_agendamento.titulo is
   'ia.vek v1.9.38 (CRM-256): título próprio do compromisso que o pedido vira. Nulo = o nome do tipo.';
 
 
+-- ---- ia.vek: a última rodada das rotinas automáticas (migration 0643, v1.9.60, CRM-490) ----
+-- Só tabela (sem função). Ver o cabeçalho de supabase/migrations/20261117140000_0643_iavek_rotinas_rodadas.sql.
+create table if not exists public.iavek_rotinas_rodadas (
+  rotina text primary key check (length(rotina) between 1 and 60),
+  ultima_em timestamptz not null default now(),
+  ultimo_resultado jsonb not null default '{}'::jsonb,
+  request_id text check (request_id is null or length(request_id) <= 100)
+);
+comment on table public.iavek_rotinas_rodadas is
+  'ia.vek v1.9.60 (0643, CRM-490): a última rodada que TERMINOU de cada rotina automática (data-retention, media-retention), com as contagens. Só do servidor; sem dado de cliente.';
+
+alter table public.iavek_rotinas_rodadas enable row level security;
+revoke all on public.iavek_rotinas_rodadas from public, anon, authenticated;
+grant select, insert, update, delete on public.iavek_rotinas_rodadas to service_role;
+
+
 notify pgrst, 'reload schema';

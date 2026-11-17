@@ -87,6 +87,7 @@ import {
   type ResultadoDaVarredura,
 } from "@/lib/lgpd/cascata";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { registrarRodada } from "@/lib/retencao/registrar-rodada";
 
 export const dynamic = "force-dynamic";
 
@@ -812,6 +813,18 @@ async function handle(req: NextRequest): Promise<Response> {
     }
   }
 
+  // ia.vek v1.9.60 (CRM-490): a rodada que TERMINOU fica registrada, com ou sem efeito (não é auditoria).
+  await registrarRodada(
+    createAdminClient(),
+    "data-retention",
+    {
+      ...resultado,
+      anonimizacoes_examinadas: varredura.examinados,
+      anonimizacoes_completadas: varredura.completados.length,
+      anonimizacoes_tem_resto: varredura.temResto,
+    } as unknown as Record<string, unknown>,
+    requestId,
+  );
   return ok(
     {
       ...resultado,

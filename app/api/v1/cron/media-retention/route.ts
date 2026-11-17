@@ -32,6 +32,7 @@ import { audit } from "@/lib/audit";
 import { autorizaCron } from "@/lib/auth/cron-auth";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { registrarRodada } from "@/lib/retencao/registrar-rodada";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,8 @@ export async function GET(req: NextRequest): Promise<Response> {
       requestId,
     });
   }
+  // ia.vek v1.9.60 (CRM-490): a rodada que terminou fica registrada, com ou sem efeito.
+  await registrarRodada(admin, "media-retention", total, requestId);
   return ok(total, { requestId });
 }
 
