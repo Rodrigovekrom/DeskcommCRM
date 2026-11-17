@@ -257,10 +257,18 @@ export function podePedirODia(
 }
 
 /** ia.vek v1.9.17: a tela de Tarefas segue o menu da função, para quem atende. */
-export function abreATelaDeTarefas(funcao: unknown, role: string | null | undefined, administra: boolean): boolean {
+export function abreATelaDeTarefas(
+  funcao: unknown,
+  role: string | null | undefined,
+  administra: boolean,
+  /** ia.vek (decisão do Rodrigo 17/11): a lista PRÓPRIA da pessoa (só quando `personalizada`) também abre a tela. */
+  interfaceDaPessoa?: { personalizada?: boolean; destinos?: readonly string[] } | null,
+): boolean {
   if (administra || role !== "agent") return true;
   const f = funcaoDaTela(funcao);
-  return !f || DESTINOS_DA_FUNCAO[f].includes("/app/tasks");
+  if (!f || DESTINOS_DA_FUNCAO[f].includes("/app/tasks")) return true;
+  // a privacidade fica com a RLS de crm_tasks (o agent vê só as dele): abrir a tela não abre dados de ninguém
+  return interfaceDaPessoa?.personalizada === true && (interfaceDaPessoa.destinos ?? []).includes("/app/tasks");
 }
 
 /**

@@ -97,7 +97,11 @@ describe("portas por empresa (issue #1341)", () => {
     const doVinculo = { preset: "completa", destinos: ["/app/products"] } as const;
     const resultado = combinarInterfaces(daEmpresa, doVinculo);
     expect(resultado.destinos).not.toEqual([]);
-    expect(interfaceSettingsSchema.safeParse(resultado).success).toBe(true);
+    // ia.vek (visão por cima da função): o resultado traz a marca `personalizada` (a lista é da pessoa), que é só de
+    // apresentação e fica FORA do schema de gravação de propósito. O que se valida aqui é a parte GRAVÁVEL.
+    const { personalizada, ...gravavel } = resultado;
+    expect(personalizada).toBe(true);
+    expect(interfaceSettingsSchema.safeParse(gravavel).success).toBe(true);
     expect(lerInterface(resultado).settings.destinos).toEqual(resultado.destinos);
     expect(hrefs(resultado).sort()).toEqual(essenciais().sort());
   });

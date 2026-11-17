@@ -1,0 +1,5349 @@
+{
+ "viewer|-|completa": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/templates",
+      "Respostas rápidas"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "l": "Agente de IA",
+    "i": []
+   },
+   {
+    "g": "analise",
+    "l": "Análise",
+    "i": [
+     [
+      "/app/metrics",
+      "Desempenho"
+     ],
+     [
+      "/app/activities",
+      "Atividades"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda",
+       "/app/templates"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline",
+       "/app/space-do-guardiao",
+       "/app/kanban",
+       "/app/campaigns",
+       "/app/contacts",
+       "/app/companies",
+       "/app/people",
+       "/app/tasks",
+       "/app/comandas"
+      ]
+     ],
+     [
+      "Preparar a venda",
+      [
+       "/app/products"
+      ]
+     ],
+     [
+      "Fechar a venda",
+      [
+       "/app/proposals"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": [
+     [
+      "Acompanhar o agente",
+      [
+       "/app/ai/inbox",
+       "/app/ai/proposals"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Dinheiro",
+      [
+       "/app/faturamento",
+       "/app/honorarios"
+      ]
+     ],
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros",
+       "/app/metrics",
+       "/app/activities"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua empresa",
+      [
+       "/app/settings/tenant/agenda",
+       "/app/settings/tenant/financeiro",
+       "/app/team",
+       "/app/extensions"
+      ]
+     ],
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security",
+       "/app/settings/notifications"
+      ]
+     ],
+     [
+      "Dados e acesso",
+      [
+       "/app/integracao-dados"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|-|simplificada": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/kanban",
+       "/app/contacts",
+       "/app/tasks"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|sdr|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/space-do-guardiao",
+      "Space do guardião"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline",
+       "/app/space-do-guardiao"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|sdr|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|suporte|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|suporte|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|vendedor|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|vendedor|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|apoio|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|apoio|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|gerente|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|gerente|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|analista_ficha|completa": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|analista_ficha|simplificada": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|sdr_followup|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Leads do Follow-up"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "viewer|sdr_followup|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|-|completa": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/templates",
+      "Respostas rápidas"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "l": "Agente de IA",
+    "i": [
+     [
+      "/app/ai/cases",
+      "Casos"
+     ]
+    ]
+   },
+   {
+    "g": "analise",
+    "l": "Análise",
+    "i": [
+     [
+      "/app/metrics",
+      "Desempenho"
+     ],
+     [
+      "/app/activities",
+      "Atividades"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda",
+       "/app/templates"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline",
+       "/app/space-do-guardiao",
+       "/app/kanban",
+       "/app/campaigns",
+       "/app/contacts",
+       "/app/companies",
+       "/app/people",
+       "/app/tasks",
+       "/app/comandas"
+      ]
+     ],
+     [
+      "Preparar a venda",
+      [
+       "/app/products"
+      ]
+     ],
+     [
+      "Fechar a venda",
+      [
+       "/app/proposals"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": [
+     [
+      "Acompanhar o agente",
+      [
+       "/app/ai/cases",
+       "/app/ai/inbox",
+       "/app/ai/proposals"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Dinheiro",
+      [
+       "/app/faturamento",
+       "/app/honorarios"
+      ]
+     ],
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros",
+       "/app/metrics",
+       "/app/activities"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua empresa",
+      [
+       "/app/settings/tenant/agenda",
+       "/app/settings/tenant/financeiro",
+       "/app/team",
+       "/app/extensions"
+      ]
+     ],
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security",
+       "/app/settings/notifications"
+      ]
+     ],
+     [
+      "Dados e acesso",
+      [
+       "/app/integracao-dados"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|-|simplificada": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/kanban",
+       "/app/contacts",
+       "/app/tasks"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|sdr|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/space-do-guardiao",
+      "Space do guardião"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline",
+       "/app/space-do-guardiao"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|sdr|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|suporte|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|suporte|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|vendedor|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|vendedor|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|apoio|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|apoio|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|gerente|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|gerente|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|analista_ficha|completa": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|analista_ficha|simplificada": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|sdr_followup|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Leads do Follow-up"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "agent|sdr_followup|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|-|completa": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/templates",
+      "Respostas rápidas"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "l": "Agente de IA",
+    "i": [
+     [
+      "/app/ai/cases",
+      "Casos"
+     ]
+    ]
+   },
+   {
+    "g": "analise",
+    "l": "Análise",
+    "i": [
+     [
+      "/app/metrics",
+      "Desempenho"
+     ],
+     [
+      "/app/ads/meta",
+      "Meta Ads"
+     ],
+     [
+      "/app/activities",
+      "Atividades"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda",
+       "/app/templates"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline",
+       "/app/space-do-guardiao",
+       "/app/kanban",
+       "/app/campaigns",
+       "/app/contacts",
+       "/app/companies",
+       "/app/people",
+       "/app/tasks",
+       "/app/calls",
+       "/app/comandas"
+      ]
+     ],
+     [
+      "Preparar a venda",
+      [
+       "/app/products"
+      ]
+     ],
+     [
+      "Fechar a venda",
+      [
+       "/app/proposals"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": [
+     [
+      "Acompanhar o agente",
+      [
+       "/app/ai/cases",
+       "/app/ai/inbox",
+       "/app/ai/proposals",
+       "/app/ai/runs",
+       "/app/ai/usage"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Dinheiro",
+      [
+       "/app/faturamento",
+       "/app/honorarios"
+      ]
+     ],
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros",
+       "/app/metrics",
+       "/app/ads/meta",
+       "/app/activities"
+      ]
+     ],
+     [
+      "O histórico que se consulta",
+      [
+       "/app/ai/evolution",
+       "/app/audit"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua empresa",
+      [
+       "/app/settings/tenant/agenda",
+       "/app/settings/tenant/financeiro",
+       "/app/team",
+       "/app/extensions"
+      ]
+     ],
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security",
+       "/app/settings/notifications"
+      ]
+     ],
+     [
+      "Dados e acesso",
+      [
+       "/app/integracao-dados"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|-|simplificada": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/kanban",
+       "/app/contacts",
+       "/app/tasks"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|sdr|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/space-do-guardiao",
+      "Space do guardião"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline",
+       "/app/space-do-guardiao"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|sdr|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|suporte|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|suporte|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|vendedor|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|vendedor|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|apoio|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|apoio|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|gerente|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|gerente|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|analista_ficha|completa": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|analista_ficha|simplificada": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|sdr_followup|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Leads do Follow-up"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "manager|sdr_followup|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|-|completa": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/espaco-ia",
+      "Espaço da IA"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/templates",
+      "Respostas rápidas"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "l": "Agente de IA",
+    "i": [
+     [
+      "/app/ai/agents",
+      "Agentes"
+     ],
+     [
+      "/app/ai/followups",
+      "Follow-ups"
+     ],
+     [
+      "/app/ai/cases",
+      "Casos"
+     ]
+    ]
+   },
+   {
+    "g": "canais",
+    "l": "Canais",
+    "i": [
+     [
+      "/app/connections",
+      "Conexões"
+     ],
+     [
+      "/app/webhooks",
+      "Webhooks"
+     ]
+    ]
+   },
+   {
+    "g": "analise",
+    "l": "Análise",
+    "i": [
+     [
+      "/app/metrics",
+      "Desempenho"
+     ],
+     [
+      "/app/ads/meta",
+      "Meta Ads"
+     ],
+     [
+      "/app/activities",
+      "Atividades"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/espaco-ia",
+       "/app/radar",
+       "/app/agenda",
+       "/app/templates"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/prospecting",
+       "/app/pipeline",
+       "/app/space-do-guardiao",
+       "/app/kanban",
+       "/app/campaigns",
+       "/app/contacts",
+       "/app/companies",
+       "/app/people",
+       "/app/tasks",
+       "/app/calls",
+       "/app/comandas"
+      ]
+     ],
+     [
+      "Preparar a venda",
+      [
+       "/app/products",
+       "/app/imports",
+       "/app/settings/tenant/pipelines"
+      ]
+     ],
+     [
+      "Fechar a venda",
+      [
+       "/app/proposals"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": [
+     [
+      "Montar o agente",
+      [
+       "/app/ai/agents",
+       "/app/ai/followups",
+       "/app/ai/atendimento",
+       "/app/ai/routers",
+       "/app/ai/credentials",
+       "/app/ai/providers"
+      ]
+     ],
+     [
+      "Ensinar o agente",
+      [
+       "/app/ai/knowledge/sources",
+       "/app/ai/memory",
+       "/app/ai/skills"
+      ]
+     ],
+     [
+      "Acompanhar o agente",
+      [
+       "/app/ai/cases",
+       "/app/ai/inbox",
+       "/app/ai/cases/avisos",
+       "/app/ai/proposals",
+       "/app/ai/runs",
+       "/app/ai/usage"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "canais",
+    "s": [
+     [
+      "",
+      [
+       "/app/connections",
+       "/app/integrations/nuvemshop",
+       "/app/webhooks"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Dinheiro",
+      [
+       "/app/faturamento",
+       "/app/honorarios"
+      ]
+     ],
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros",
+       "/app/metrics",
+       "/app/ads/meta",
+       "/app/activities"
+      ]
+     ],
+     [
+      "O histórico que se consulta",
+      [
+       "/app/ai/evolution",
+       "/app/audit"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua empresa",
+      [
+       "/app/settings/tenant/agenda",
+       "/app/settings/tenant/proposals",
+       "/app/settings/tenant/proposals/modelos",
+       "/app/settings/tenant/financeiro",
+       "/app/team",
+       "/app/settings/atendimento",
+       "/app/settings/automacoes",
+       "/app/settings/tags",
+       "/app/settings/recursos",
+       "/app/settings/tenant",
+       "/app/settings/conversoes",
+       "/app/settings/meta-ads",
+       "/app/settings/marca",
+       "/app/settings/billing",
+       "/app/extensions"
+      ]
+     ],
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security",
+       "/app/settings/notifications"
+      ]
+     ],
+     [
+      "Dados e acesso",
+      [
+       "/app/lgpd/requests",
+       "/app/settings/api-tokens",
+       "/app/settings/voip-trunk",
+       "/app/integracao-dados"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|-|simplificada": {
+  "sidebar": [
+   {
+    "g": "atendimento",
+    "l": "Controle de atendimentos",
+    "i": [
+     [
+      "/app/inbox",
+      "Entrada de leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "l": "CRM",
+    "i": [
+     [
+      "/app/kanban",
+      "Funis"
+     ],
+     [
+      "/app/contacts",
+      "Contatos"
+     ],
+     [
+      "/app/tasks",
+      "Tarefas"
+     ]
+    ]
+   },
+   {
+    "g": "canais",
+    "l": "Canais",
+    "i": [
+     [
+      "/app/connections",
+      "Conexões"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/kanban",
+       "/app/contacts",
+       "/app/tasks"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": [
+     [
+      "",
+      [
+       "/app/connections"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|sdr|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/space-do-guardiao",
+      "Space do guardião"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline",
+       "/app/space-do-guardiao"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|sdr|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-guardiao",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|suporte|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|suporte|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-suporte-ia",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento da IA"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|vendedor|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Meus leads"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|vendedor|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-vendedor",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|apoio|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|apoio|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|gerente|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ],
+     [
+      "/app/radar",
+      "Radar"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/pipeline",
+      "Kanban por vendedor"
+     ],
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/meu-dia",
+       "/app/radar",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|gerente|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-controle",
+    "l": "Controle e análise",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda da loja"
+     ]
+    ]
+   },
+   {
+    "g": "iavek-acompanhamento",
+    "l": "Acompanhamento",
+    "i": [
+     [
+      "/app/inbox",
+      "Atendimento do lead"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/inbox",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|analista_ficha|completa": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|analista_ficha|simplificada": {
+  "sidebar": [
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": []
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|sdr_followup|completa": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/meu-dia",
+      "Meu dia"
+     ],
+     [
+      "/app/pipeline",
+      "Leads do Follow-up"
+     ],
+     [
+      "/app/agenda",
+      "Agenda"
+     ],
+     [
+      "/app/meus-numeros",
+      "Meus dados"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/meu-dia",
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": [
+     [
+      "O dia a dia da venda",
+      [
+       "/app/pipeline"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": [
+     [
+      "Os números do período",
+      [
+       "/app/meus-numeros"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ },
+ "admin|sdr_followup|simplificada": {
+  "sidebar": [
+   {
+    "g": "iavek-sdr-followup",
+    "l": "Meu trabalho",
+    "i": [
+     [
+      "/app/agenda",
+      "Agenda"
+     ]
+    ]
+   },
+   {
+    "g": "organizacao",
+    "l": "Organização",
+    "i": []
+   }
+  ],
+  "hubs": [
+   {
+    "g": "atendimento",
+    "s": [
+     [
+      "",
+      [
+       "/app/agenda"
+      ]
+     ]
+    ]
+   },
+   {
+    "g": "crm",
+    "s": []
+   },
+   {
+    "g": "ia",
+    "s": []
+   },
+   {
+    "g": "canais",
+    "s": []
+   },
+   {
+    "g": "analise",
+    "s": []
+   },
+   {
+    "g": "organizacao",
+    "s": [
+     [
+      "Sua conta",
+      [
+       "/app/settings/profile",
+       "/app/settings/security"
+      ]
+     ],
+     [
+      "Sua empresa",
+      [
+       "/app/team",
+       "/app/settings/tenant"
+      ]
+     ]
+    ]
+   }
+  ]
+ }
+}

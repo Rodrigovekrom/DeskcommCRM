@@ -160,6 +160,22 @@ export function sidebarGroups(
       return d && visible.has(i.href) ? [{ ...d, label: i.label }] : [];
     }),
   })).filter((g) => g.items.length > 0);
+  // ia.vek (decisão do Rodrigo 17/11, opção a): com a lista PRÓPRIA da pessoa, as telas que ela tem a mais do que o
+  // desenho da função entram DEPOIS, no último grupo da função, com o rótulo do catálogo. Quem decidiu que elas aparecem
+  // foi `destinosDaInterface` (personalizadaMostra); aqui é só onde ficam. Sem a lista própria, nada muda.
+  if (settings?.personalizada === true && daFuncao.length > 0) {
+    const doDesenho = new Set(desenho.flatMap((g) => g.itens.map((i) => i.href)));
+    // (Lupa 205856) do conjunto VISÍVEL (que já passou pelo papel, módulo, capacidade e a trava de página da função),
+    // e não só dos itens de barra: as telas "só de hub" marcadas (ex.: Campanhas) também entram, porque o menu da função
+    // não tem hub. As do rodapé (Configurações) continuam no rodapé.
+    const amais = NAV_DESTINATIONS.filter(
+      (d) => d.group !== GRUPO_NO_RODAPE && visible.has(d.href) && !doDesenho.has(d.href),
+    );
+    if (amais.length > 0) {
+      const ultimo = daFuncao[daFuncao.length - 1]!;
+      daFuncao[daFuncao.length - 1] = { ...ultimo, items: [...ultimo.items, ...amais] };
+    }
+  }
   return [...daFuncao, ...grupos.filter((g) => g.group.id === GRUPO_NO_RODAPE)];
 }
 

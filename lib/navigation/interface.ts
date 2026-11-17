@@ -4,7 +4,7 @@ import { ROLE_RANK, type Role } from "@/lib/auth/types";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
 import { NAV_CATALOG, type NavMetadata, type NavDestinationId } from "./catalogo";
-import { ESPACO_DA_IA, FUNCOES, funcaoMostra, veEspacoDaIa } from "@/lib/iavek/funcoes";
+import { ESPACO_DA_IA, FUNCOES, abreFunisEEntrada, funcaoMostra, veEspacoDaIa } from "@/lib/iavek/funcoes";
 
 const ids = NAV_CATALOG.map((d) => d.href);
 export const interfaceSettingsSchema = z
@@ -20,7 +20,14 @@ export const interfaceSettingsSchema = z
     funcao: z.enum(FUNCOES).optional(),
   })
   .strict();
-export type InterfaceSettings = z.infer<typeof interfaceSettingsSchema>;
+export type InterfaceSettings = z.infer<typeof interfaceSettingsSchema> & {
+  /**
+   * ia.vek (decisão do Rodrigo 17/11, Lupa 204427): a lista de telas é da PRÓPRIA pessoa (e não só da empresa). Só então
+   * ela vale por cima do desenho da função, e só na APRESENTAÇÃO. Marcado por `combinarInterfaces` no login; FORA do
+   * schema de propósito: nenhuma rota de salvar aceita gravá-lo (o .strict() recusa).
+   */
+  personalizada?: boolean;
+};
 export const INTERFACE_COMPLETA: InterfaceSettings = { preset: "completa" };
 const SIMPLIFICADA: readonly NavDestinationId[] = [
   "/app/inbox",
@@ -106,10 +113,32 @@ export function lerInterface(raw: unknown): {
   });
   if (!parsed.success) return { settings: INTERFACE_COMPLETA, needsAdjustment: true };
   return {
-    settings: parsed.data,
+    // a marca de combinarInterfaces atravessa a releitura (sem ela, a lista própria nunca passaria por cima da função)
+    settings: value.personalizada === true ? { ...parsed.data, personalizada: true } : parsed.data,
     needsAdjustment: !!destinos && destinos.length !== (value.destinos as unknown[]).length,
   };
 }
+/**
+ * ia.vek (decisão do Rodrigo 17/11, opção a; Lupa 204427): a lista que o gerente marcou À MÃO para a pessoa vale por
+ * cima do desenho da função — SÓ na apresentação (o menu e as travas de página que são só de apresentação). O que a
+ * pessoa vê de DADOS não muda: a RLS, o modo 'own' e os contatos do vendedor seguem a função.
+ *
+ * Só quando a lista é da PRÓPRIA pessoa (`personalizada`, marcado por `combinarInterfaces`); a lista da empresa sozinha
+ * nunca passa por cima da função. E nunca uma tela cuja PÁGINA a função recusa (Lupa 204427, 2): Entrada de leads e
+ * Funis desviam o vendedor (`abreFunisEEntrada`), então não entram no menu dele, nem marcadas.
+ */
+export function personalizadaMostra(settings: InterfaceSettings, href: string): boolean {
+  if (settings.personalizada !== true || !settings.destinos) return false;
+  if (!settings.destinos.includes(href as NavDestinationId)) return false;
+  return paginaDaFuncaoAbre(settings.funcao, href);
+}
+
+/** As páginas que DESVIAM por função (o resto das travas é por papel, já em `canSee`). */
+export function paginaDaFuncaoAbre(funcao: InterfaceSettings["funcao"], href: string): boolean {
+  if (href === "/app/inbox" || href === "/app/kanban") return abreFunisEEntrada(funcao);
+  return true;
+}
+
 export function destinosDaInterface(
   raw: unknown,
   platform: boolean,
@@ -125,7 +154,7 @@ export function destinosDaInterface(
     (d) =>
       essencial(d, role, platform) ||
       ((!chosen || chosen.includes(d.href as NavDestinationId)) &&
-        funcaoMostra(settings.funcao, d.href) &&
+        (funcaoMostra(settings.funcao, d.href) || personalizadaMostra(settings, d.href)) &&
         // ia.vek v1.7.5: o Espaço da IA é só do admin e da função suporte.
         (d.href !== ESPACO_DA_IA || veEspacoDaIa(settings.funcao, role, platform))),
   );
@@ -196,12 +225,16 @@ export function combinarInterfaces(daEmpresa: unknown, doVinculo: unknown): Inte
   const funcao = doVinculoLido.funcao ? { funcao: doVinculoLido.funcao } : {};
   if (!empresa && !vinculo) return { ...INTERFACE_COMPLETA, ...funcao };
   const soUm = empresa ?? vinculo;
+  // a lista é da PRÓPRIA pessoa? Só então ela passa por cima da função (personalizadaMostra)
+  // (só os `destinos` gravados para ela; o preset "simplificada" não é escolha de telas e não passa por cima)
+  const personalizada = doVinculoLido.destinos ? { personalizada: true } : {};
   if (!empresa || !vinculo)
-    return { preset: "completa", destinos: [...(soUm as readonly NavDestinationId[])], ...funcao };
+    return { preset: "completa", destinos: [...(soUm as readonly NavDestinationId[])], ...funcao, ...personalizada };
   const comuns = empresa.filter((id) => vinculo.includes(id));
   return {
     preset: "completa",
     destinos: [...(comuns.length > 0 ? comuns : SO_O_ESSENCIAL)],
     ...funcao,
+    ...personalizada,
   };
 }
