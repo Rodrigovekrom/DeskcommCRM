@@ -33,7 +33,15 @@ export default async function TarefasPage() {
   if (!activeOrg) redirect("/app");
 
   const administra = (user.is_platform_admin && !user.support) || activeOrg.role === "admin";
-  if (!abreATelaDeTarefas(activeOrg.interface_settings?.funcao, activeOrg.role, administra)) redirect("/app/meu-dia");
+  if (
+    !abreATelaDeTarefas(
+      activeOrg.interface_settings?.funcao,
+      activeOrg.role,
+      administra,
+      activeOrg.interface_settings as { personalizada?: boolean; destinos?: readonly string[] } | null | undefined,
+    )
+  )
+    redirect("/app/meu-dia");
 
   const podeEditar = (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent;
 
