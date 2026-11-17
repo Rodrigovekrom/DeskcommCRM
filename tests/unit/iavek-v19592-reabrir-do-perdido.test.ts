@@ -219,8 +219,8 @@ describe("v1.9.59.2: tirar o lead do Perdido pede o motivo", () => {
         ["eq", "lead_id", LEAD_ID],
         ["eq", "type", "task_cancelled"],
         ["eq", "source_module", "tarefas"],
-        // o corpo em vigor do gatilho (0639) grava 'gatilho_0639'; o da 0625, 'gatilho_0625': as duas voltam
-        ["in", "metadata->>origem", ["gatilho_0625", "gatilho_0639"]],
+        // o corpo em vigor do gatilho (0639) grava 'gatilho_0639'; o da 0625, 'gatilho_0625'; o primeiro (0621), 'gatilho_0621': as três voltam
+        ["in", "metadata->>origem", ["gatilho_0621", "gatilho_0625", "gatilho_0639"]],
         ["gte", "performed_at", FECHADO_EM],
       ]),
     );

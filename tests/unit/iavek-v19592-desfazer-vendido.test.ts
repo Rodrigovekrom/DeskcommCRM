@@ -230,7 +230,7 @@ describe("v1.9.59.2: desfazer depois de vendido", () => {
     const atividades = estado.chamadas.find((c) => c.tabela === "crm_lead_activities");
     expect(atividades?.filtros).toEqual(
       expect.arrayContaining([
-        ["in", "metadata->>origem", ["gatilho_0625", "gatilho_0639"]],
+        ["in", "metadata->>origem", ["gatilho_0621", "gatilho_0625", "gatilho_0639"]],
         ["gte", "performed_at", VENDIDO_EM],
       ]),
     );

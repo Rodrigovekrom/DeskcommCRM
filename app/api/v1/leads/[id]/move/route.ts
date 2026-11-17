@@ -24,9 +24,12 @@ import { createClient } from "@/lib/supabase/server";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
 import { registraFalhaDeAtividade } from "@/lib/leads/activity-write-failure";
 import {
+  MOTIVO_DA_TRANSFERENCIA,
   decideMotivoDaPerda,
   recusaDeMotivoDaPerdaPeloBanco,
 } from "@/lib/leads/motivo-da-perda";
+import { encerraDemanda } from "@/lib/leads/encerramento";
+import { mesclarSourceMetadata } from "@/lib/leads/mesclar-source-metadata";
 import { RECUSA_DE_TROCA_DE_FUNIL } from "@/lib/leads/clonar-para-funil";
 import { modoDeReabertura, recusaReabertura } from "@/lib/leads/reabertura";
 import {
@@ -36,6 +39,7 @@ import {
   validaCamposExigidos,
 } from "@/lib/leads/campos-exigidos";
 import { traduzir } from "@/lib/i18n/dicionario";
+import type { Idioma } from "@/lib/i18n/idiomas";
 
 export const dynamic = "force-dynamic";
 
@@ -242,6 +246,7 @@ export async function POST(
   // Andar entre etapas de venda ou reordenar a coluna Vendido não é reabrir (o destino é is_won).
   const leadAtual = lead as {
     status?: string;
+    lost_reason?: string | null;
     closed_at?: string | null;
     source_metadata?: Record<string, unknown> | null;
     custom_fields?: Record<string, unknown> | null;
@@ -398,6 +403,9 @@ export async function POST(
   // Do Vendido, também devolve o carro ao estoque (antes da nota, para ela dizer se voltou).
   let tarefasDevolvidas = 0;
   let carroVoltou = false;
+  let cloneFechado: string | null = null;
+  let tarefasDoClone = 0;
+  let ligacoesCanceladas = 0;
   if (reabrindo) {
     tarefasDevolvidas = await devolverTarefasDaPerda({
       organizationId: lead.organization_id,
@@ -405,6 +413,22 @@ export async function POST(
       fechadoEm: fechadoEmAntes,
       requestId,
     });
+    // Do Perdido da PASSAGEM das 72h: o clone do Follow-up que segue aberto fecha (ver `fecharCloneDaPassagem`).
+    if (deStatus === "lost") {
+      const r = await fecharCloneDaPassagem({
+        organizationId: lead.organization_id,
+        leadId,
+        lostReason: leadAtual.lost_reason ?? null,
+        movidoPara: leadAtual.source_metadata?.movido_para,
+        motivoReabertura,
+        userId: user.id,
+        idioma: user.idioma,
+        requestId,
+      });
+      cloneFechado = r.cloneFechado;
+      tarefasDoClone = r.tarefasDoClone;
+      ligacoesCanceladas = r.ligacoesCanceladas;
+    }
     if (deStatus === "won") {
       carroVoltou = await devolverCarroAoEstoque({
         organizationId: lead.organization_id,
@@ -429,6 +453,9 @@ export async function POST(
         to_stage_id: input.stage_id,
         tarefas_devolvidas: tarefasDevolvidas,
         ...(deStatus === "won" ? { carro_voltou: carroVoltou } : {}),
+        ...(cloneFechado
+          ? { clone_fechado: cloneFechado, tarefas_do_clone: tarefasDoClone, ligacoes_canceladas: ligacoesCanceladas }
+          : {}),
       },
     });
     if (!nota.ok) {
@@ -487,7 +514,16 @@ export async function POST(
       to_stage_id: input.stage_id,
       position_in_stage: input.position_in_stage,
       ...(input.via ? { via: input.via } : {}),
-      ...(reabrindo && deStatus === "lost" ? { reabriu_do_perdido: true, tarefas_devolvidas: tarefasDevolvidas } : {}),
+      ...(reabrindo && deStatus === "lost"
+        ? {
+            reabriu_do_perdido: true,
+            tarefas_devolvidas: tarefasDevolvidas,
+            clone_fechado: cloneFechado !== null,
+            tarefas_do_clone: tarefasDoClone,
+            ligacoes_canceladas: ligacoesCanceladas,
+            ...(cloneFechado ? { clone_id: cloneFechado } : {}),
+          }
+        : {}),
       ...(reabrindo && deStatus === "won"
         ? { reabriu_do_vendido: true, tarefas_devolvidas: tarefasDevolvidas, carro_voltou: carroVoltou }
         : {}),
@@ -512,6 +548,13 @@ export async function POST(
           ...finalLead,
           tarefas_devolvidas: tarefasDevolvidas,
           ...(deStatus === "won" ? { carro_voltou: carroVoltou } : {}),
+          ...(deStatus === "lost"
+            ? {
+                clone_fechado: cloneFechado !== null,
+                tarefas_do_clone: tarefasDoClone,
+                ligacoes_canceladas: ligacoesCanceladas,
+              }
+            : {}),
         }
       : finalLead,
     { requestId },
@@ -521,7 +564,8 @@ export async function POST(
 /**
  * ia.vek v1.9.59.2: devolve a 'pending' as tarefas que o FECHAMENTO (perda ou venda) cancelou. Quem cancelou foi o
  * gatilho `fn_iavek_cancela_tarefas_do_lead_fechado`, que deixa uma linha `task_cancelled` (source_module
- * 'tarefas', source_id = a tarefa) no instante do fechamento, com metadata.origem 'gatilho_0625' (corpo da 0625) ou
+ * 'tarefas', source_id = a tarefa) no instante do fechamento, com metadata.origem
+ * 'gatilho_0621' (o primeiro corpo, da 0621: "Tarefa cancelada: lead fechado"), 'gatilho_0625' (corpo da 0625) ou
  * 'gatilho_0639' (o corpo em vigor desde a 0639, que também grava `crm_tasks.cancelada_motivo = 'lead_fechou'`). Na
  * venda o gatilho só cancela a pré-venda; na perda, todas — devolve-se o que ELE cancelou, nos dois casos. Só as
  * canceladas desse fechamento em diante (`closed_at` lido ANTES da reabertura) voltam; sem `closed_at`, nenhuma.
@@ -532,7 +576,7 @@ export async function POST(
  * passou pela RLS de `crm_leads` acima). Com o client do usuário, quem reabre o lead de outro devolveria 0 tarefas
  * em silêncio. Falha aqui não desfaz a reabertura: fica no log e a conta é 0.
  */
-const ORIGENS_DO_GATILHO_DE_FECHAMENTO = ["gatilho_0625", "gatilho_0639"] as const;
+const ORIGENS_DO_GATILHO_DE_FECHAMENTO = ["gatilho_0621", "gatilho_0625", "gatilho_0639"] as const;
 
 async function devolverTarefasDaPerda(p: {
   organizationId: string;
@@ -639,5 +683,260 @@ async function devolverCarroAoEstoque(p: {
       error: err instanceof Error ? err.message.slice(0, 200) : String(err),
     });
     return false;
+  }
+}
+
+/** `crm_tasks.cancelada_motivo` (coluna da 0639; códigos como 'lead_fechou', 'proxima_ligacao' da 0640). */
+const MOTIVO_DA_LIGACAO_CANCELADA = "lead_voltou_ao_vendedor";
+/** `metadata.origem` da linha `task_cancelled`: fora de ORIGENS_DO_GATILHO_DE_FECHAMENTO, nunca é devolvida. */
+const ORIGEM_DO_CANCELAMENTO_NA_REABERTURA = "reabertura_fecha_clone";
+
+/**
+ * A ligação que a RODADA da esteira agenda sozinha: `source_kind` `ligacao:L1`…`ligacao:L7` ou `ligacao:quente`
+ * (`sourceKindDaLigacao` em lib/esteira/rodada.ts, gravada por `criarLigacao` em lib/esteira/deps-reais.ts, por
+ * `criarTarefaInterna`, que grava `created_by: null`). A tela não cria `ligacao:*` (só o próximo passo,
+ * app/api/v1/tasks/route.ts). O retorno combinado e a retentativa (`ligacao:retorno`/`ligacao:retentativa`) nascem
+ * do registro que uma PESSOA fez da ligação (lib/esteira/registro-de-ligacao.ts): são combinados com o cliente e
+ * seguem com o lead, como as tarefas manuais.
+ */
+const LIGACAO_AUTOMATICA = /^ligacao:(L[1-7]|quente)$/;
+function ehLigacaoAutomaticaDaEsteira(t: { source_kind: string | null; created_by: string | null }): boolean {
+  return t.created_by === null && typeof t.source_kind === "string" && LIGACAO_AUTOMATICA.test(t.source_kind);
+}
+
+/**
+ * ia.vek v1.9.59.2 (decisão do Rodrigo): reabrir do Perdido um lead que a PASSAGEM das 72h fechou
+ * (`lost_reason = 'moved_to_another_pipeline'` e `source_metadata.movido_para.lead_id`, gravados por
+ * `clonarLeadParaFunil`) FECHA o clone do Follow-up que ainda está aberto — senão o mesmo cliente fica com
+ * dois leads vivos, um em cada funil, e dois donos ligando para ele.
+ *
+ * Na ordem:
+ *  0. as ligações AUTOMÁTICAS do Follow-up no clone (ver `ehLigacaoAutomaticaDaEsteira`) são CANCELADAS, com
+ *     `cancelada_motivo = 'lead_voltou_ao_vendedor'` e a linha `task_cancelled` (metadata.origem
+ *     'reabertura_fecha_clone'): o original volta ao funil de entrada, e a esteira agenda as ligações dele.
+ *  1. as demais tarefas ABERTAS do clone (pending/in_progress, as de gente) passam para o original; a do dono do clone passa a ser do
+ *     dono do original (quem fica com o lead reaberto), as dos outros seguem com quem estavam. ANTES de fechar o
+ *     clone: o gatilho do lead fechado (0625/0639) cancelaria todas. Se a mudança falhar, o clone NÃO fecha (as
+ *     tarefas dele seriam canceladas junto).
+ *  2. o clone fecha pelo MESMO `encerraDemanda` da passagem (etapa de perda do funil de Follow-up, motivo
+ *     `moved_to_another_pipeline`, que não avisa a perda ao guardião — 0638), ganha `source_metadata.voltou_para`
+ *     e uma nota na linha do tempo dele.
+ *
+ * Só quando o clone existe, está no funil de Follow-up da organização (`settings.esteira.followup.pipeline_id`)
+ * e segue 'open'. Client de SERVIÇO, filtrado por organização: o clone é de outra pessoa (a RLS esconderia).
+ * Falha aqui não desfaz a reabertura: fica no log, e a conta diz o que aconteceu.
+ */
+async function fecharCloneDaPassagem(p: {
+  organizationId: string;
+  leadId: string;
+  lostReason: string | null;
+  movidoPara: unknown;
+  motivoReabertura: string;
+  userId: string;
+  idioma: Idioma | undefined;
+  requestId: string;
+}): Promise<{ cloneFechado: string | null; tarefasDoClone: number; ligacoesCanceladas: number }> {
+  const nada = { cloneFechado: null, tarefasDoClone: 0, ligacoesCanceladas: 0 };
+  if (p.lostReason !== MOTIVO_DA_TRANSFERENCIA) return nada;
+  const cloneId =
+    p.movidoPara && typeof p.movidoPara === "object" ? (p.movidoPara as { lead_id?: unknown }).lead_id : null;
+  if (typeof cloneId !== "string" || !UUID.test(cloneId) || cloneId === p.leadId) return nada;
+
+  let tarefasDoClone = 0;
+  let ligacoesCanceladas = 0;
+  try {
+    const admin = createAdminClient();
+
+    const { data: org, error: e0 } = await admin
+      .from("organizations")
+      .select("settings")
+      .eq("id", p.organizationId)
+      .maybeSingle();
+    if (e0) throw new Error(e0.message);
+    const esteira = ((org as { settings?: Record<string, unknown> | null } | null)?.settings ?? {}).esteira as
+      | { followup?: { pipeline_id?: unknown } }
+      | undefined;
+    const funilDoFollowup = esteira?.followup?.pipeline_id;
+    if (typeof funilDoFollowup !== "string" || !UUID.test(funilDoFollowup)) return nada;
+
+    const { data: cloneRow, error: e1 } = await admin
+      .from("crm_leads")
+      .select("id, pipeline_id, status, owner_user_id, contact_id")
+      .eq("organization_id", p.organizationId)
+      .eq("id", cloneId)
+      .maybeSingle();
+    if (e1) throw new Error(e1.message);
+    const clone = cloneRow as {
+      id: string;
+      pipeline_id: string;
+      status: string;
+      owner_user_id: string | null;
+      contact_id: string | null;
+    } | null;
+    if (!clone || clone.pipeline_id !== funilDoFollowup || clone.status !== "open") return nada;
+
+    // 1. As tarefas abertas do clone vão para o original (antes de fechá-lo).
+    const { data: original, error: e2 } = await admin
+      .from("crm_leads")
+      .select("owner_user_id")
+      .eq("organization_id", p.organizationId)
+      .eq("id", p.leadId)
+      .maybeSingle();
+    if (e2) throw new Error(e2.message);
+    const donoDoOriginal = (original as { owner_user_id?: string | null } | null)?.owner_user_id ?? null;
+
+    const { data: abertas, error: e3 } = await admin
+      .from("crm_tasks")
+      .select("id, assigned_to, source_kind, created_by, title, contact_id")
+      .eq("organization_id", p.organizationId)
+      .eq("lead_id", clone.id)
+      .in("status", ["pending", "in_progress"]);
+    if (e3) throw new Error(e3.message);
+    const todas = (abertas ?? []) as Array<{
+      id: string;
+      assigned_to: string | null;
+      source_kind: string | null;
+      created_by: string | null;
+      title: string | null;
+      contact_id: string | null;
+    }>;
+
+    // 1a. As ligações AUTOMÁTICAS do Follow-up (as que a rodada da esteira agenda) NÃO vão para o original: são
+    // canceladas com o motivo e a linha `task_cancelled` (o mesmo formato dos gatilhos 0639/0640, com origem
+    // própria — `devolverTarefasDaPerda` só devolve as dos gatilhos de fechamento, nunca estas).
+    const automaticas = todas.filter(ehLigacaoAutomaticaDaEsteira);
+    if (automaticas.length > 0) {
+      const { data: canceladas, error: e5 } = await admin
+        .from("crm_tasks")
+        .update({ status: "cancelled", cancelada_motivo: MOTIVO_DA_LIGACAO_CANCELADA })
+        .eq("organization_id", p.organizationId)
+        .eq("lead_id", clone.id)
+        .in("status", ["pending", "in_progress"])
+        .in("id", automaticas.map((t) => t.id))
+        .select("id");
+      if (e5) throw new Error(e5.message);
+      const ids = new Set(((canceladas ?? []) as Array<{ id: string }>).map((t) => t.id));
+      ligacoesCanceladas = ids.size;
+      const linhas = automaticas
+        .filter((t) => ids.has(t.id))
+        .map((t) => ({
+          organization_id: p.organizationId,
+          lead_id: clone.id,
+          contact_id: t.contact_id ?? clone.contact_id,
+          source_module: "tarefas",
+          source_id: t.id,
+          type: "task_cancelled",
+          actor_kind: "rule",
+          reason: "Ligação cancelada: o lead voltou ao vendedor",
+          payload: {
+            motivo: MOTIVO_DA_LIGACAO_CANCELADA,
+            ligacao: t.source_kind,
+            titulo: (t.title ?? "").slice(0, 200),
+            lead_original: p.leadId,
+          },
+          metadata: { origem: ORIGEM_DO_CANCELAMENTO_NA_REABERTURA },
+          // performed_at: NÃO, o relógio é o do banco (a cerca performed-at-um-relogio-so)
+        }));
+      if (linhas.length > 0) {
+        const { error: e6 } = await admin.from("crm_lead_activities").insert(linhas);
+        if (e6) {
+          // As ligações já foram canceladas: a linha do tempo perdida não desfaz nada, fica no log.
+          console.error("[lead.move] linha task_cancelled das ligações do clone não gravada", {
+            request_id: p.requestId,
+            lead_id: p.leadId,
+            clone_id: clone.id,
+            error: e6.message.slice(0, 200),
+          });
+        }
+      }
+    }
+
+    // 1b. As tarefas MANUAIS (de gente) vão para o original.
+    const tarefas = todas.filter((t) => !ehLigacaoAutomaticaDaEsteira(t));
+    const trocaDeDono = clone.owner_user_id !== null && donoDoOriginal !== null;
+    const doDono = trocaDeDono ? tarefas.filter((t) => t.assigned_to === clone.owner_user_id).map((t) => t.id) : [];
+    const dosOutros = tarefas.filter((t) => !doDono.includes(t.id)).map((t) => t.id);
+    const grupos: Array<{ ids: string[]; patch: Record<string, unknown> }> = [
+      { ids: doDono, patch: { lead_id: p.leadId, assigned_to: donoDoOriginal } },
+      { ids: dosOutros, patch: { lead_id: p.leadId } },
+    ];
+    for (const g of grupos) {
+      if (g.ids.length === 0) continue;
+      const { data: movidas, error: e4 } = await admin
+        .from("crm_tasks")
+        .update(g.patch)
+        .eq("organization_id", p.organizationId)
+        .eq("lead_id", clone.id)
+        .in("status", ["pending", "in_progress"])
+        .in("id", g.ids)
+        .select("id");
+      if (e4) throw new Error(e4.message);
+      tarefasDoClone += (movidas ?? []).length;
+    }
+
+    // 2. O clone fecha como a passagem fecha (Perdido do Follow-up, motivo da transferência).
+    const ator = { type: "user" as const, id: p.userId };
+    const encerrado = await encerraDemanda(
+      admin,
+      { organization_id: p.organizationId, actor: ator, requestId: p.requestId, idioma: p.idioma },
+      {
+        leadId: clone.id,
+        desfecho: "lost",
+        motivo: MOTIVO_DA_TRANSFERENCIA,
+        razaoNaTimeline: "Fechado: o lead original foi reaberto",
+        payloadNaTimeline: { to_lead_id: p.leadId, motivo_reabertura: p.motivoReabertura },
+      },
+    );
+    if (encerrado.jaEstava) return { cloneFechado: null, tarefasDoClone, ligacoesCanceladas };
+
+    const mescla = await mesclarSourceMetadata(admin, p.organizationId, clone.id, {
+      voltou_para: { lead_id: p.leadId, em: new Date().toISOString(), por: "reabertura" },
+    });
+    if (!mescla.ok) {
+      console.error("[lead.move] voltou_para do clone não gravado", {
+        request_id: p.requestId,
+        lead_id: p.leadId,
+        clone_id: clone.id,
+        error: mescla.erro,
+      });
+    }
+
+    const nota = await emitLeadActivity(admin, {
+      organizationId: p.organizationId,
+      leadId: clone.id,
+      contactId: clone.contact_id,
+      type: "note",
+      sourceModule: "crm",
+      sourceId: p.leadId,
+      actor: ator,
+      reason: `Fechado: o lead original foi reaberto (motivo: ${p.motivoReabertura})`.slice(0, 500),
+      payload: {
+        lead_original: p.leadId,
+        motivo_reabertura: p.motivoReabertura,
+        tarefas_movidas: tarefasDoClone,
+        ligacoes_canceladas: ligacoesCanceladas,
+      },
+    });
+    if (!nota.ok) {
+      await registraFalhaDeAtividade(admin, {
+        organizationId: p.organizationId,
+        leadId: clone.id,
+        tipo: "note",
+        origem: "leads/[id]/move",
+        erro: nota.error,
+        requestId: p.requestId,
+      });
+    }
+    return { cloneFechado: clone.id, tarefasDoClone, ligacoesCanceladas };
+  } catch (err) {
+    console.error("[lead.move] fechar o clone da passagem falhou", {
+      request_id: p.requestId,
+      lead_id: p.leadId,
+      clone_id: cloneId,
+      tarefas_movidas: tarefasDoClone,
+      ligacoes_canceladas: ligacoesCanceladas,
+      error: err instanceof Error ? err.message.slice(0, 200) : String(err),
+    });
+    return { cloneFechado: null, tarefasDoClone, ligacoesCanceladas };
   }
 }
