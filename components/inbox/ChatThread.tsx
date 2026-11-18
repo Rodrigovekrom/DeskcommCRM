@@ -132,7 +132,7 @@ export function ChatThread({
   const termo = searchTerm.trim().toLocaleLowerCase();
   // CRM-539: enquanto a pessoa estiver no fim, o que cresce DEPOIS (foto, áudio, prévia, cartão) não a tira de lá;
   // com a busca ativa, nada reancora.
-  const ancora = useAncoraNoFim(scrollerRef, conteudoRef, conversationId, termo !== "");
+  const ancora = useAncoraNoFim(scrollerRef, conteudoRef, conversationId ?? "", termo !== "");
   const resultados = useMemo(
     () =>
       new Set(
