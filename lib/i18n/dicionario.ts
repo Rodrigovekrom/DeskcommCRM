@@ -10801,6 +10801,9 @@ export const DICIONARIO: Traducoes = {
   "Você não está atribuído a essa conversa.": { es: "No estás asignado a esta conversación." },
   "Web Push ainda não está no banco desta instalação.": { es: "Web Push aún no está en la base de datos de esta instalación." },
   "Web Push não configurado nesta instalação.": { es: "Web Push no configurado en esta instalación." },
+  "Web Push mal configurado nesta instalação (o e-mail de suporte ou o endereço do app).": {
+    es: "Web Push mal configurado en esta instalación (el correo de soporte o la dirección de la app).",
+  },
 
   // ─── Merge da main 1.8.0 — textos que a reescrita trouxe ───
   //

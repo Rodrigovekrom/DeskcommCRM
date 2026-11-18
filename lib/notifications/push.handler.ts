@@ -3,7 +3,7 @@ import { marcaDaSaida } from "@/lib/branding/saida";
 import { canalDoEventoDesativado } from "@/lib/channels/desativado";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { conteudoDoAviso, CORPO_NEUTRO, montarPayloadDeInbound, truncar } from "./push_payload";
-import { enviarPushAoUsuario, enviarPushAosUsuarios } from "./web_push";
+import { enviarPushAoUsuario, enviarPushAosUsuarios, type ResultadoPush } from "./web_push";
 import { gerenciaInscrita, inscritosQueVeem } from "./quem-ve";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { REFERENCIAS_DE_AVISO } from "@/lib/ai/inbox-destino";
@@ -13,6 +13,12 @@ import type { PushPayload } from "./push_payload";
 import { rotuloDoContato, SEM_NOME } from "@/lib/contacts/rotulo-do-contato";
 
 export const WEB_PUSH_INBOUND_KEY = "web-push-inbound.v1";
+
+/** ia.vek v1.9.64: o VAPID mal configurado é 'skipped' limpo ('vapid_invalido'), nunca erro (o drain não re-tenta). */
+function resultadoDoEnvio(r: ResultadoPush, sufixo = ""): HandlerResult {
+  if (r.falha) return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: r.falha };
+  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${r.sent}${sufixo}` };
+}
 
 /** ia.vek CRM-530: o que a tela de bloqueio mostra, pela config da org (`settings.iavek.push.conteudo`). */
 async function conteudoDaOrg(organizationId: string) {
@@ -114,8 +120,10 @@ async function handleInbound(row: EventRow): Promise<HandlerResult> {
   });
   // ia.vek CRM-530: SÓ a quem pode ver esta conversa (a policy conversations_select, perguntada por inscrito).
   const destinos = await destinosQueVeem(row.organization_id, "conversations", conversationId);
-  const { sent } = await enviarPushAosUsuarios(row.organization_id, destinos, payload);
-  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent} destinos:${destinos.length}` };
+  return resultadoDoEnvio(
+    await enviarPushAosUsuarios(row.organization_id, destinos, payload),
+    ` destinos:${destinos.length}`,
+  );
 }
 
 /**
@@ -151,8 +159,10 @@ async function handleGroupInbound(row: EventRow): Promise<HandlerResult> {
     href: `/app/inbox?id=${conversationId}`,
   };
   const destinos = await destinosQueVeem(row.organization_id, "conversations", conversationId);
-  const { sent } = await enviarPushAosUsuarios(row.organization_id, destinos, payload);
-  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent} destinos:${destinos.length}` };
+  return resultadoDoEnvio(
+    await enviarPushAosUsuarios(row.organization_id, destinos, payload),
+    ` destinos:${destinos.length}`,
+  );
 }
 
 /** Os avisos da Central que pedem gente — ver `./push-dos-avisos.ts`. */
@@ -192,8 +202,10 @@ async function handleAvisoQuePedeGente(row: EventRow): Promise<HandlerResult> {
       destinos = [];
     }
   }
-  const { sent } = await enviarPushAosUsuarios(row.organization_id, destinos, payload);
-  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent} destinos:${destinos.length}` };
+  return resultadoDoEnvio(
+    await enviarPushAosUsuarios(row.organization_id, destinos, payload),
+    ` destinos:${destinos.length}`,
+  );
 }
 
 async function leadBits(organizationId: string, leadId: string): Promise<{
@@ -232,8 +244,7 @@ async function enviarParaUsuario(
   if (!userId) {
     return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "skipped", detail: "sem_destinatario" };
   }
-  const { sent } = await enviarPushAoUsuario(organizationId, userId, payload);
-  return { consumer_key: WEB_PUSH_INBOUND_KEY, status: "ok", detail: `sent:${sent}` };
+  return resultadoDoEnvio(await enviarPushAoUsuario(organizationId, userId, payload));
 }
 
 export const webPushInboundHandler: EventHandler = {

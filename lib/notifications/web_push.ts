@@ -24,6 +24,13 @@ type AdminLike = {
   };
 };
 
+/**
+ * ia.vek v1.9.64 (achado da Lupa 1232): o resultado de um envio. `falha` só quando a instalação está MAL configurada
+ * (o `setVapidDetails` recusou o subject ou as chaves, ex.: o SUPPORT_EMAIL com '@' mas inválido, ou o
+ * NEXT_PUBLIC_APP_URL em http:). Antes, o throw saía FORA do try e virava 500 na rota e erro no drain.
+ */
+export type ResultadoPush = { sent: number; gone: number; falha?: "vapid_invalido" };
+
 function store(admin: AdminLike) {
   return admin.from("push_subscriptions");
 }
@@ -32,7 +39,7 @@ export async function enviarPushDaOrg(
   organizationId: string,
   payload: PushPayload,
   admin: AdminLike = createAdminClient() as unknown as AdminLike,
-): Promise<{ sent: number; gone: number }> {
+): Promise<ResultadoPush> {
   if (!vapidPronto()) return { sent: 0, gone: 0 };
 
   const { data, error } = await store(admin).select("id, endpoint, p256dh, auth").eq("organization_id", organizationId);
@@ -43,7 +50,13 @@ export async function enviarPushDaOrg(
   const rows = data ?? [];
   if (rows.length === 0) return { sent: 0, gone: 0 };
 
-  webpush.setVapidDetails(await vapidSubject(), vapidPublica()!, env.VAPID_PRIVATE_KEY.trim());
+  try {
+    webpush.setVapidDetails(await vapidSubject(), vapidPublica()!, env.VAPID_PRIVATE_KEY.trim());
+  } catch {
+    // a mensagem do web-push repete o subject (o e-mail de suporte): não vai ao log; só o motivo fixo
+    logger.warn("web_push_vapid_invalido", { motivo: "set_vapid_details_recusou" });
+    return { sent: 0, gone: 0, falha: "vapid_invalido" };
+  }
 
   let sent = 0;
   let gone = 0;
@@ -76,7 +89,7 @@ export async function enviarPushAoUsuario(
   organizationId: string,
   userId: string,
   payload: PushPayload,
-): Promise<{ sent: number; gone: number }> {
+): Promise<ResultadoPush> {
   if (!vapidPronto()) return { sent: 0, gone: 0 };
   const admin = createAdminClient();
   // ia.vek CRM-530: só membro ATIVO da org recebe (aceito e não revogado). Quem saiu da loja não recebe, mesmo com a
@@ -122,11 +135,13 @@ export async function enviarPushAosUsuarios(
   organizationId: string,
   userIds: readonly string[],
   payload: PushPayload,
-): Promise<{ sent: number; gone: number }> {
+): Promise<ResultadoPush> {
   let sent = 0;
   let gone = 0;
   for (const userId of [...new Set(userIds)]) {
     const r = await enviarPushAoUsuario(organizationId, userId, payload);
+    // a configuração é da instalação: se recusou para um, recusa para todos; para aqui, sem repetir o aviso no log
+    if (r.falha) return { sent, gone, falha: r.falha };
     sent += r.sent;
     gone += r.gone;
   }

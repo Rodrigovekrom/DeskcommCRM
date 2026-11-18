@@ -4,6 +4,7 @@
  * Manda UM aviso SÓ ao próprio usuário (todas as inscrições dele nesta org), para ele ver e ouvir na hora, com o CRM
  * fechado ou minimizado. Nunca a outra pessoa: o destino é o `user.id` da sessão, não algo que venha no corpo.
  * Limite: 1 teste por minuto por pessoa (por processo; o objetivo é não virar campainha, não auditoria).
+ * Com o VAPID mal configurado (o subject ou as chaves recusados pelo web-push): 503 'unavailable', nunca 500 (v1.9.64).
  * Responde quantos aparelhos receberam (`enviados`), para a tela dizer "nenhum aparelho inscrito" quando for 0.
  */
 import { randomUUID } from "node:crypto";
@@ -40,11 +41,17 @@ export async function POST(): Promise<Response> {
   }
   ultimoTeste.set(chave, agora);
 
-  const { sent } = await enviarPushAoUsuario(authz.org.orgId, authz.user.id, {
+  const { sent, falha } = await enviarPushAoUsuario(authz.org.orgId, authz.user.id, {
     title: t("Teste do CRM"),
     body: t("Se você ouviu, o aviso no celular está funcionando."),
     tag: "teste",
     href: "/app/settings/notifications",
   });
+  // ia.vek v1.9.64: o VAPID mal configurado (o subject ou as chaves) responde 503 limpo, não 500
+  if (falha) {
+    return fail("unavailable", t("Web Push mal configurado nesta instalação (o e-mail de suporte ou o endereço do app)."), 503, {
+      requestId,
+    });
+  }
   return ok({ enviados: sent }, { requestId });
 }
