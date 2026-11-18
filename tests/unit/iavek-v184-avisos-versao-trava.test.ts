@@ -36,8 +36,8 @@ describe("v1.8.4 — avisos do lead só quando algo mudou", () => {
 });
 
 describe("v1.8.4 — rodapé com o número certo", () => {
-  it("a versão em vigor (v1.9.2)", () => {
-    expect(ROTULO_DA_VERSAO).toBe("ia.vek CRM v1.9.61");
+  it("a versão em vigor", () => {
+    expect(ROTULO_DA_VERSAO).toBe("ia.vek CRM v1.9.63");
   });
 });
 
