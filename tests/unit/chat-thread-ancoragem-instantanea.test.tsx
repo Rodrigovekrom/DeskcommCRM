@@ -18,12 +18,12 @@ import type { Message } from "@/lib/types/messaging";
  * impediria a linha de voltar a `smooth` fixo.
  */
 
-const estado = vi.hoisted(() => ({ mensagens: [] as unknown[] }));
+const estado = vi.hoisted(() => ({ mensagens: [] as unknown[], carregando: false }));
 
 vi.mock("@/hooks/inbox/useMessagesRealtime", () => ({
   useMessagesRealtime: () => ({
-    data: { pages: [{ data: estado.mensagens }] },
-    isLoading: false,
+    data: estado.carregando ? undefined : { pages: [{ data: estado.mensagens }] },
+    isLoading: estado.carregando,
     isError: false,
     hasNextPage: false,
     isFetchingNextPage: false,
@@ -79,6 +79,7 @@ describe("ChatThread: ancoragem ao fim", () => {
     qc = new QueryClient();
     rolar.mockClear();
     estado.mensagens = [];
+    estado.carregando = false;
     Element.prototype.scrollIntoView = rolar;
   });
   afterEach(() => {
@@ -149,6 +150,93 @@ describe("ChatThread: ancoragem ao fim", () => {
       });
       cbs.forEach((cb) => cb());
       expect(topo).toBe(1800);
+    } finally {
+      (globalThis as { ResizeObserver: unknown }).ResizeObserver = antes;
+    }
+  });
+
+  /** O ResizeObserver de mentira: quem foi observado, quantos foram desligados, e os callbacks para "crescer". */
+  function observadorFalso() {
+    const r = { observados: [] as Element[], desligados: 0, cbs: [] as Array<() => void> };
+    (globalThis as { ResizeObserver: unknown }).ResizeObserver = class {
+      constructor(cb: () => void) {
+        r.cbs.push(cb);
+      }
+      observe(el: Element) {
+        r.observados.push(el);
+      }
+      disconnect() {
+        r.desligados += 1;
+      }
+    };
+    return r;
+  }
+  function crescer(sc: HTMLElement, altura: number, cbs: Array<() => void>) {
+    let topo = 0;
+    Object.defineProperty(sc, "clientHeight", { configurable: true, get: () => 500 });
+    Object.defineProperty(sc, "scrollHeight", { configurable: true, get: () => altura });
+    Object.defineProperty(sc, "scrollTop", {
+      configurable: true,
+      get: () => topo,
+      set: (v: number) => (topo = v),
+    });
+    cbs.forEach((cb) => cb());
+    return topo;
+  }
+
+  it("(Lupa 120412) a 1ª abertura FORA do cache: carregando (o Skeleton) → as mensagens chegam → o observador liga e o crescimento desce ao fim", () => {
+    const antes = globalThis.ResizeObserver;
+    const ro = observadorFalso();
+    try {
+      estado.carregando = true;
+      const { rerender } = render(<ChatThread conversationId="c-1" />, { wrapper });
+      expect(ro.observados).toHaveLength(0);
+      estado.carregando = false;
+      estado.mensagens = [mensagem(1), mensagem(2)];
+      rerender(<ChatThread conversationId="c-1" />);
+      expect(ro.observados).toHaveLength(2);
+      const sc = ro.observados[1] as HTMLElement;
+      expect(sc.className).toContain("overflow-y-auto");
+      expect(crescer(sc, 1800, ro.cbs)).toBe(1800);
+    } finally {
+      (globalThis as { ResizeObserver: unknown }).ResizeObserver = antes;
+    }
+  });
+
+  it("(Lupa 120412) trocar de conversa passando pelo Skeleton: o observador da velha desliga e o da nova liga", () => {
+    const antes = globalThis.ResizeObserver;
+    const ro = observadorFalso();
+    try {
+      estado.mensagens = [mensagem(1)];
+      const { rerender } = render(<ChatThread conversationId="c-1" />, { wrapper });
+      expect(ro.cbs).toHaveLength(1);
+      estado.carregando = true;
+      rerender(<ChatThread conversationId="c-2" />);
+      expect(ro.desligados).toBeGreaterThanOrEqual(1);
+      estado.carregando = false;
+      estado.mensagens = [mensagem(3)];
+      rerender(<ChatThread conversationId="c-2" />);
+      const ultimo = ro.cbs.length;
+      expect(ultimo).toBeGreaterThanOrEqual(2);
+      const sc = ro.observados[ro.observados.length - 1] as HTMLElement;
+      expect(crescer(sc, 1500, [ro.cbs[ultimo - 1]!])).toBe(1500);
+    } finally {
+      (globalThis as { ResizeObserver: unknown }).ResizeObserver = antes;
+    }
+  });
+
+  it("(Lupa 120412) a conversa VAZIA ('Nenhuma mensagem') recebe a 1ª mensagem: o observador liga", () => {
+    const antes = globalThis.ResizeObserver;
+    const ro = observadorFalso();
+    try {
+      const { rerender } = render(<ChatThread conversationId="c-1" />, { wrapper });
+      const antesDaPrimeira = ro.observados.length;
+      estado.mensagens = [mensagem(1)];
+      rerender(<ChatThread conversationId="c-1" />);
+      expect(ro.observados.length).toBeGreaterThan(antesDaPrimeira);
+      const sc = ro.observados[ro.observados.length - 1] as HTMLElement;
+      expect(sc.className).toContain("overflow-y-auto");
+      expect(crescer(sc, 1200, ro.cbs.slice(-1))).toBe(1200);
     } finally {
       (globalThis as { ResizeObserver: unknown }).ResizeObserver = antes;
     }

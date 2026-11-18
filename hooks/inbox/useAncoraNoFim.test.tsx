@@ -79,12 +79,16 @@ afterEach(() => {
 });
 
 function montar(s: ReturnType<typeof scroller>, chave = "conv-1") {
-  // as refs ESTÁVEIS, como as do useRef no ChatThread
-  const refScroller = { current: s.sc };
-  const refConteudo = { current: document.createElement("div") };
-  return renderHook(({ k, busca }) => useAncoraNoFim(refScroller, refConteudo, k, busca), {
+  // os refs de CALLBACK: o ChatThread os entrega quando o fio nasce (depois do Skeleton)
+  const conteudo = document.createElement("div");
+  const r = renderHook(({ k, busca }) => useAncoraNoFim(k, busca), {
     initialProps: { k: chave, busca: false },
   });
+  act(() => {
+    r.result.current.aoMontarScroller(s.sc);
+    r.result.current.aoMontarConteudo(conteudo);
+  });
+  return r;
 }
 
 describe("CRM-539: estaNoFim (a folga é a constante)", () => {
@@ -187,5 +191,37 @@ describe("CRM-539: useAncoraNoFim", () => {
     s.rolarPara(0);
     s.crescer(1800);
     expect(s.topo).toBe(0);
+  });
+  it("(Lupa 120412) o fio nasce DEPOIS (o Skeleton): sem os elementos nada liga; quando eles chegam, liga", () => {
+    const s = scroller(1000, 500);
+    const conteudo = document.createElement("div");
+    const r = renderHook(() => useAncoraNoFim("conv-1"));
+    expect(callbacks).toHaveLength(0); // carregando: nada a observar
+    act(() => {
+      r.result.current.aoMontarScroller(s.sc);
+      r.result.current.aoMontarConteudo(conteudo);
+    });
+    expect(callbacks).toHaveLength(1);
+    s.crescer(1700);
+    expect(s.topo).toBe(1200);
+  });
+
+  it("(Lupa 120412) o fio desmonta (a troca passando pelo Skeleton) e remonta: o observador velho desliga e um novo liga", () => {
+    const s = scroller(1000, 500);
+    const r = montar(s);
+    expect(callbacks).toHaveLength(1);
+    act(() => {
+      r.result.current.aoMontarScroller(null);
+      r.result.current.aoMontarConteudo(null);
+    });
+    expect(desligados).toBe(1);
+    const novo = scroller(800, 300);
+    act(() => {
+      r.result.current.aoMontarScroller(novo.sc);
+      r.result.current.aoMontarConteudo(document.createElement("div"));
+    });
+    expect(callbacks).toHaveLength(2);
+    novo.crescer(1400);
+    expect(novo.topo).toBe(900);
   });
 });

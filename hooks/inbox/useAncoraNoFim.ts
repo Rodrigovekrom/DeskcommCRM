@@ -19,7 +19,7 @@
  * crescimento deixaria a tela "pulando" e, no meio dela, a medida da distância daria a falsa leitura de que a pessoa
  * saiu do fim.
  */
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * A folga para considerar que a pessoa está "no fim", em px. O celular arredonda o scrollTop (frações de pixel, a
@@ -37,6 +37,14 @@ export function estaNoFim(
 }
 
 export interface AncoraNoFim {
+  /**
+   * Os callbacks de ref (o `ref={...}`) do scroller e do conteúdo (Lupa 120412). O ChatThread só monta o fio DEPOIS de carregar (antes,
+   * o Skeleton, o erro ou o "Nenhuma mensagem"). Um ref de objeto não avisa quando o elemento nasce, e o efeito ficava
+   * sem nada para observar na 1ª abertura de uma conversa fora do cache. Com o elemento em ESTADO, o efeito liga quando
+   * ele nasce, e desliga e religa quando ele desmonta e remonta (a troca de conversa passando pelo Skeleton).
+   */
+  aoMontarScroller: (el: HTMLElement | null) => void;
+  aoMontarConteudo: (el: HTMLElement | null) => void;
   /** A pessoa está no fim agora? (a mesma leitura do `colado`, em estado, para o botão "Ir para a mais recente") */
   noFim: boolean;
   /** Leva ao fim na hora e volta a colar (o botão). */
@@ -44,17 +52,19 @@ export interface AncoraNoFim {
 }
 
 /**
- * @param scrollerRef o elemento que rola (o fio)
- * @param conteudoRef o conteúdo dentro dele, que cresce
  * @param chave a conversa: outra chave começa colada no fim
  * @param pausado com a BUSCA ativa, nada reancora (quem procura não é arrancado da ocorrência)
  */
-export function useAncoraNoFim(
-  scrollerRef: RefObject<HTMLElement | null>,
-  conteudoRef: RefObject<HTMLElement | null>,
-  chave: string,
-  pausado = false,
-): AncoraNoFim {
+export function useAncoraNoFim(chave: string, pausado = false): AncoraNoFim {
+  const [sc, setSc] = useState<HTMLElement | null>(null);
+  const [ct, setCt] = useState<HTMLElement | null>(null);
+  // o elemento também num ref, só para o botão (um handler) mexer na rolagem sem mudar o valor do estado
+  const scAtual = useRef<HTMLElement | null>(null);
+  const aoMontarScroller = useCallback((el: HTMLElement | null) => {
+    scAtual.current = el;
+    setSc(el);
+  }, []);
+  const aoMontarConteudo = useCallback((el: HTMLElement | null) => setCt(el), []);
   const colado = useRef(true);
   const pausa = useRef(pausado);
   useEffect(() => {
@@ -66,8 +76,6 @@ export function useAncoraNoFim(
 
   useEffect(() => {
     colado.current = true;
-    const sc = scrollerRef.current;
-    const ct = conteudoRef.current;
     if (!sc || !ct) return;
 
     const aoRolar = () => {
@@ -93,14 +101,14 @@ export function useAncoraNoFim(
       ro.disconnect();
       sc.removeEventListener("scroll", aoRolar);
     };
-  }, [scrollerRef, conteudoRef, chave]);
+  }, [sc, ct, chave]);
 
   const irAoFim = useCallback(() => {
-    const sc = scrollerRef.current;
     colado.current = true;
     setLido({ chave, noFim: true });
-    if (sc) sc.scrollTop = sc.scrollHeight;
-  }, [scrollerRef, chave]);
+    const el = scAtual.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chave]);
 
-  return { noFim, irAoFim };
+  return { aoMontarScroller, aoMontarConteudo, noFim, irAoFim };
 }

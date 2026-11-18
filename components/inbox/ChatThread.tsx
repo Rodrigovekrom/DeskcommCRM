@@ -3,7 +3,7 @@
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 
 import type { Locale } from "date-fns";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { format, isToday, isYesterday } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -98,8 +98,6 @@ export function ChatThread({
   const claim = useClaimConversation();
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  /** O conteúdo do fio, que o useAncoraNoFim observa crescer (CRM-539). */
-  const conteudoRef = useRef<HTMLDivElement | null>(null);
   const paginasVistas = useRef(0);
   /**
    * Esta conversa já ancorou no fim ALGUMA vez, com conteúdo na tela?
@@ -132,7 +130,16 @@ export function ChatThread({
   const termo = searchTerm.trim().toLocaleLowerCase();
   // CRM-539: enquanto a pessoa estiver no fim, o que cresce DEPOIS (foto, áudio, prévia, cartão) não a tira de lá;
   // com a busca ativa, nada reancora.
-  const ancora = useAncoraNoFim(scrollerRef, conteudoRef, conversationId ?? "", termo !== "");
+  const { aoMontarScroller, aoMontarConteudo, noFim, irAoFim } = useAncoraNoFim(conversationId ?? "", termo !== "");
+  // o scroller serve aos dois: ao scrollerRef de sempre (a busca, a guarda de distância) e ao useAncoraNoFim, que precisa
+  // saber quando o elemento NASCE (depois do Skeleton). Um callback estável, para o React não o chamar a cada render.
+  const montarScroller = useCallback(
+    (el: HTMLDivElement | null) => {
+      scrollerRef.current = el;
+      aoMontarScroller(el);
+    },
+    [aoMontarScroller],
+  );
   const resultados = useMemo(
     () =>
       new Set(
@@ -336,8 +343,8 @@ export function ChatThread({
           {t("Resultados nas mensagens carregadas")}: {resultados.size}
         </div>
       )}
-      <div ref={scrollerRef} className="min-w-0 flex-1 overflow-y-auto py-2">
-        <div ref={conteudoRef}>
+      <div ref={montarScroller} className="min-w-0 flex-1 overflow-y-auto py-2">
+        <div ref={aoMontarConteudo}>
         {q.hasNextPage && (
           <div className="flex justify-center py-2">
             <Button
@@ -424,13 +431,13 @@ export function ChatThread({
 
         <div ref={bottomRef} />
         </div>
-        {!ancora.noFim && !termo && (
+        {!noFim && !termo && (
           <div className="pointer-events-none sticky bottom-2 flex justify-center">
             <Button
               size="sm"
               variant="secondary"
               className="pointer-events-auto shadow-md"
-              onClick={ancora.irAoFim}
+              onClick={irAoFim}
               data-testid="ir-para-a-mais-recente"
             >
               {t("Ir para a mais recente")}
