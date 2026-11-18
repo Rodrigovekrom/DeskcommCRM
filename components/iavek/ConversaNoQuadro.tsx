@@ -13,7 +13,6 @@ import { esperandoDesde, tempoDeEspera } from "@/lib/iavek/ordem-do-quadro";
 import { ChatThread } from "@/components/inbox/ChatThread";
 import { CRMSidePanel } from "@/components/inbox/CRMSidePanel";
 import { Composer, type ComposerHandle } from "@/components/inbox/Composer";
-import { BotaoManterEmNegociacao } from "@/components/inbox/BotaoManterEmNegociacao";
 import { ConversationHeader } from "@/components/inbox/ConversationHeader";
 import { SeloCronometro72h } from "@/components/inbox/SeloCronometro72h";
 import { JanelaFechadaAviso } from "@/components/inbox/JanelaFechadaAviso";
@@ -31,6 +30,7 @@ import { marcarAbertura, useAberturaDaConversa } from "@/hooks/iavek/useAbertura
 import { NomesDaEquipeProvider } from "@/components/iavek/NomesDaEquipe";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 import { apiClient } from "@/lib/api/client";
+import { roleAtLeast } from "@/lib/auth/types";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { estadoDaJanela } from "@/lib/channels/janela";
 import { motivoDaJanelaFechada, motivoDoContato } from "@/lib/inbox/motivo-do-envio-bloqueado";
@@ -180,9 +180,9 @@ function PainelDaConversa({
   const { garantir, dialogo } = useProximoPassoObrigatorio();
   // ia.vek v1.9.18: abre só com o chat; ações e painel abrem por botão, a cada abertura.
   const [painelAberto, setPainelAberto] = useState(false);
-  const [acoesAbertas, setAcoesAbertas] = useState(false);
   const { activeOrg } = useAuth();
   const ehVendedor = funcaoDaTela(activeOrg?.interface_settings?.funcao) === "vendedor";
+  const podeAtender = roleAtLeast(activeOrg?.role, "agent") && !supportReadonly;
   const assumir = useClaimConversation();
   const faltam = useContext(IncompletosNoCardContext)?.[lead.id] ?? [];
 
@@ -248,9 +248,6 @@ function PainelDaConversa({
         </button>
       )}
       <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5">
-        <Button variant="outline" size="sm" className="h-11 md:h-8" onClick={() => setAcoesAbertas((v) => !v)} aria-expanded={acoesAbertas} data-testid="alternar-acoes">
-          {t("Ações")}
-        </Button>
         <Button variant="outline" size="sm" className="h-11 md:h-8" onClick={() => setPainelAberto((v) => !v)} aria-expanded={painelAberto} data-testid="alternar-ficha-celular">
           {painelAberto ? t("Voltar à conversa") : t("Dados do lead")}
         </Button>
@@ -265,26 +262,25 @@ function PainelDaConversa({
             {t("Assumir")}
           </Button>
         )}
-        {/* v1.9.23: o relógio das 72h e o "Manter em negociação" à vista, sem abrir "Ações". */}
+        {/* CRM-536 (decisão 3A): o relógio das 72h É o "Manter por mais 72h" (clicável para quem pode manter). */}
         {!conversa.is_group && conversa.contacts?.id && (
-          <>
-            <SeloCronometro72h contactId={conversa.contacts.id} />
-            <BotaoManterEmNegociacao contactId={conversa.contacts.id} />
-          </>
+          <SeloCronometro72h contactId={conversa.contacts.id} clicavel />
         )}
-        {ehVendedor && conversa.contacts?.id && (
+        {/* CRM-536: "Agendar horário" para TODOS que atendem (antes, só a função vendedor). Quem marca direto e quem
+            pede é a rota que decide; quem só visualiza e o suporte em leitura não veem o botão. */}
+        {podeAtender && conversa.contacts?.id && (
           <PedirAgendamento rotulo={t("Agendar horário")} contactId={conversa.contacts.id} conversationId={conversa.id} leadId={lead.id} />
         )}
       </div>
       <div className="flex min-h-0 flex-1">
       <div className={painelAberto ? "hidden min-h-0 flex-1 flex-col lg:flex" : "flex min-h-0 flex-1 flex-col"}>
-        {acoesAbertas && (
-          <ConversationHeader
-            conversation={conversa}
-            onAbrirConversa={onAbrirConversa}
-            antesDeEncerrar={(acao) => garantir(conversa, acao)}
-          />
-        )}
+        {/* CRM-536: sem "Ações": as ações do cabeçalho ficam à vista, sem os 5 que a barra de cima já mostra. */}
+        <ConversationHeader
+          conversation={conversa}
+          onAbrirConversa={onAbrirConversa}
+          antesDeEncerrar={(acao) => garantir(conversa, acao)}
+          modo="no-quadro"
+        />
         <div className="min-h-0 flex-1 overflow-hidden">
           <ChatThread
             conversationId={conversa.id}
@@ -331,7 +327,7 @@ function PainelDaConversa({
             <DadosDaCompraNoCard lead={lead} pipelineId={pipelineId} />
           </div>
         </DadosDaCompraNoCardContext.Provider>
-        <CRMSidePanel conversation={conversa} />
+        <CRMSidePanel conversation={conversa} noQuadro />
       </div>
       </div>
       {dialogo}

@@ -55,6 +55,11 @@ interface Props {
    * medem as seções de dentro abrem já aberto, para seguir medindo o mesmo.
    */
   verMaisInicial?: boolean;
+  /**
+   * ia.vek CRM-536: dentro do painel das 72h (ConversaNoQuadro), que já tem "Agendar horário" na própria barra. Nesse
+   * modo, o "Pedir agendamento" daqui não se repete. Na Entrada (o padrão), nada muda.
+   */
+  noQuadro?: boolean;
 }
 
 interface LeadRow {
@@ -546,7 +551,7 @@ function CamposDoFunil({
   );
 }
 
-export function CRMSidePanel({ conversation, verMaisInicial = false }: Props) {
+export function CRMSidePanel({ conversation, verMaisInicial = false, noQuadro = false }: Props) {
   const { user, activeOrg } = useAuth();
   const ehAdminDaLoja = (user.is_platform_admin && !user.support) || activeOrg?.role === "admin";
   // ia.vek v1.9.1: no modo agendamento (clínica) a recepção (gerente) marca direto.
@@ -722,7 +727,7 @@ export function CRMSidePanel({ conversation, verMaisInicial = false }: Props) {
       <div className="flex flex-wrap gap-2 text-xs" data-testid="acoes-na-barra">
         {/* ia.vek v1.7.6: só o admin marca; os demais PEDEM o agendamento. */}
         {contactId&&conversation&&marcaDireto?<Link className="underline" href={`/app/agenda?contato=${contactId}&conversa=${conversation.id}`}>{t("Marcar compromisso")}</Link>:null}
-        {contactId&&conversation&&!marcaDireto?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
+        {contactId&&conversation&&!marcaDireto&&!noQuadro?<PedirAgendamento contactId={contactId} conversationId={conversation.id} leadId={leadAtivoId ?? leads?.[0]?.id ?? null} />:null}
         {/* ia.vek v1.7.8: Passar Ficha do lead deste atendimento. */}
         {(() => { const l = (leads ?? []).find((x) => x.id === leadAtivoId) ?? leads?.[0] ?? null; return l && funcaoDaTela(activeOrg?.interface_settings?.funcao) !== "vendedor" ? <PassarFicha leadId={l.id} donoDoLead={(l as { owner_user_id?: string | null }).owner_user_id ?? null} /> : null; })()}
       </div>

@@ -15534,6 +15534,9 @@ export const DICIONARIO: Traducoes = {
   "Enviar um teste": { es: "Enviar una prueba" },
   // ─── ia.vek CRM-539: a conversa segue na última mensagem ───
   "Ir para a mais recente": { es: "Ir al más reciente" },
+  // ─── ia.vek CRM-536: o relógio das 72h é o "Manter" ───
+  "Toque para manter por mais {horas}h.": { es: "Toca para mantener {horas}h más." },
+  "Manter por mais {horas}h?": { es: "¿Mantener {horas}h más?" },
 };
 
 /**

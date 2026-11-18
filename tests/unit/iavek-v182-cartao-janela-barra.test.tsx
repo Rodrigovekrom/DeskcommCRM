@@ -38,7 +38,8 @@ describe("v1.8.2 — janela central", () => {
     expect(f).not.toContain('from "@/components/ui/sheet"');
     expect(f).toMatch(/md:w-\[80vw\]/);
     expect(f).toMatch(/md:h-\[80dvh\]/);
-    expect(f).toContain("<CRMSidePanel conversation={conversa} />");
+    // CRM-536: a MESMA barra da Entrada; o noQuadro só tira o "Pedir agendamento" repetido (a barra do painel já tem).
+    expect(f).toContain("<CRMSidePanel conversation={conversa} noQuadro />");
   });
 });
 

@@ -20,8 +20,13 @@ const startCall = vi.hoisted(() => vi.fn());
 // ia.vek v1.5: o selo das 72h lê a rota do painel (react-query); aqui não interessa.
 // ia.vek v1.8.4: o selo da nota lê por react-query; aqui ele não é o assunto.
 vi.mock("@/components/iavek/NotaDoAtendimento", () => ({ SeloDaNota: () => null }));
-vi.mock("@/components/inbox/SeloCronometro72h", () => ({ SeloCronometro72h: () => null }));
-vi.mock("@/components/inbox/BotaoManterEmNegociacao", () => ({ BotaoManterEmNegociacao: () => null }));
+// CRM-536: os dois viram marcas na tela, para o teste do modo "no-quadro" saber se aparecem (sem ler a rota).
+vi.mock("@/components/inbox/SeloCronometro72h", () => ({
+  SeloCronometro72h: () => <span data-testid="marca-selo-72h" />,
+}));
+vi.mock("@/components/inbox/BotaoManterEmNegociacao", () => ({
+  BotaoManterEmNegociacao: () => <span data-testid="marca-manter" />,
+}));
 // ia.vek v1.7.6: arquivar é de gerente e admin; o papel é trocável por caso.
 const papel = vi.hoisted(() => ({ role: "manager" as string }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
@@ -233,4 +238,57 @@ describe("ConversationHeader — busca dentro da conversa (#1793)", () => {
       papel.role = "manager";
     }
   });
+});
+
+/**
+ * ia.vek CRM-536: no painel das 72h (`modo="no-quadro"`), o cabeçalho não repete o que a barra do painel já mostra:
+ * o relógio (que lá é clicável: o "Manter"), o "Manter em negociação", o "Assumir", o telefone e o "Ver contato".
+ * A Entrada (o padrão) é a REFERÊNCIA FIXA: os 5 continuam lá, como antes.
+ */
+describe("CRM-536: o cabeçalho no painel das 72h × na Entrada", () => {
+  function comContato() {
+    const atual = conversa("open");
+    atual.contacts = {
+      id: "contato-1",
+      display_name: "Raphael",
+      name: "Raphael",
+      phone_number: "+5511999999999",
+      tags: [],
+      is_blocked: false,
+      is_personal: false,
+      is_anonymized: false,
+    };
+    return atual;
+  }
+  /** A linha do telefone sob o título (o número vem formatado; basta achar os dígitos). */
+  const temTelefone = () => Array.from(document.querySelectorAll("p")).some((p) => /9999/.test(p.textContent ?? ""));
+  const nomes = () =>
+    screen
+      .queryAllByRole("button")
+      .map((b) => b.textContent?.trim() ?? "")
+      .filter(Boolean)
+      .sort();
+
+  for (const role of ["agent", "manager", "admin"]) {
+    it(`(${role}) a Entrada continua com os 5; o painel tira SÓ os 5 e mantém todas as outras ações`, () => {
+      papel.role = role;
+      const { unmount } = render(<ConversationHeader conversation={comContato()} />);
+      expect(screen.getByTestId("marca-selo-72h")).toBeTruthy();
+      expect(screen.getByTestId("marca-manter")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Assumir" })).toBeTruthy();
+      expect(temTelefone()).toBe(true);
+      expect(screen.getByRole("link", { name: /Ver contato/ })).toBeTruthy();
+      const naEntrada = nomes();
+      unmount();
+
+      render(<ConversationHeader conversation={comContato()} modo="no-quadro" />);
+      expect(screen.queryByTestId("marca-selo-72h")).toBeNull();
+      expect(screen.queryByTestId("marca-manter")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Assumir" })).toBeNull();
+      expect(temTelefone()).toBe(false);
+      expect(screen.queryByRole("link", { name: /Ver contato/ })).toBeNull();
+      // o resto das ações é o MESMO da Entrada (nenhuma outra sumiu)
+      expect(nomes()).toEqual(naEntrada.filter((n) => n !== "Assumir"));
+    });
+  }
 });

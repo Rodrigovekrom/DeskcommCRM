@@ -66,6 +66,12 @@ interface Props {
    * `false` quando o humano dono cancelou o pedido de próximo passo.
    */
   antesDeEncerrar?: (acao: "fechar" | "arquivar") => Promise<boolean>;
+  /**
+   * ia.vek CRM-536: `"no-quadro"` é o painel das 72h (ConversaNoQuadro), que já mostra na PRÓPRIA barra o relógio
+   * (clicável: é o "Manter"), o "Assumir", o telefone sob o título e o "Dados do lead" (no lugar do "Ver contato").
+   * Nesse modo, o cabeçalho não repete esses 5. A Entrada (`"entrada"`, o padrão) fica exatamente como era.
+   */
+  modo?: "entrada" | "no-quadro";
 }
 
 /**
@@ -101,8 +107,10 @@ export function ConversationHeader({
   buscaAberta,
   botaoBuscaRef,
   antesDeEncerrar,
+  modo = "entrada",
 }: Props) {
   const t = useT();
+  const noQuadro = modo === "no-quadro";
   const { user, activeOrg } = useAuth();
   // v1.9.18: o vendedor fica com Lembrar; Assumir, Transferir, Arquivar e Pessoal saem da tela dele.
   const ehVendedor = funcaoDaTela(activeOrg?.interface_settings?.funcao) === "vendedor";
@@ -237,9 +245,9 @@ export function ConversationHeader({
             lastInboundAt={conversation.last_inbound_at}
           />
           {/* ia.vek v1.5: as 72h do lead novo para agendar. */}
-          {!conversation.is_group && <SeloCronometro72h contactId={conversation.contact_id} />}
+          {!conversation.is_group && !noQuadro && <SeloCronometro72h contactId={conversation.contact_id} />}
           {/* ia.vek v1.9.23: segura o lead nas 72h por mais 72h. */}
-          {!conversation.is_group && <BotaoManterEmNegociacao contactId={conversation.contact_id} />}
+          {!conversation.is_group && !noQuadro && <BotaoManterEmNegociacao contactId={conversation.contact_id} />}
         </div>
 
         {/* QUEM ESTÁ NO COMANDO, com nome e por GEOMETRIA — disco cheio para
@@ -258,7 +266,7 @@ export function ConversationHeader({
             <OwnerBadge ownerKind={null} ownerName={null} />
           )}
         </div>
-        {phone && (
+        {phone && !noQuadro && (
           <p className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
             <Phone size={11} weight="regular" aria-hidden /> {phone}
           </p>
@@ -321,7 +329,7 @@ export function ConversationHeader({
           bloqueio={motivoDoContato(c, t)}
           encerrada={status === "closed"}
         />
-        {isOpen && !ehVendedor && (
+        {isOpen && !ehVendedor && !noQuadro && (
           <Button
             size="sm"
             variant="default"
@@ -489,7 +497,7 @@ export function ConversationHeader({
             Abaixo de 1280 o painel não existe, e aí esta é a única porta para o
             contato — por isso a condição é a mesma do painel, e não um valor
             escolhido à parte. Não é esconder ação; é não repeti-la. */}
-        {c?.id && (
+        {c?.id && !noQuadro && (
           <Button asChild size="sm" variant="ghost" className="xl:hidden">
             <Link href={`/app/contacts/${c.id}`} className="flex items-center gap-1">
               {t("Ver contato")}
