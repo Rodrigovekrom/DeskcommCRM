@@ -15532,6 +15532,8 @@ export const DICIONARIO: Traducoes = {
   "Nenhum aparelho seu está inscrito. Ative o aviso neste aparelho primeiro.": { es: "Ningún dispositivo tuyo está suscrito. Activa el aviso en este dispositivo primero." },
   "Não consegui enviar o teste agora.": { es: "No pude enviar la prueba ahora." },
   "Enviar um teste": { es: "Enviar una prueba" },
+  // ─── ia.vek CRM-539: a conversa segue na última mensagem ───
+  "Ir para a mais recente": { es: "Ir al más reciente" },
 };
 
 /**

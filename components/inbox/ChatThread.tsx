@@ -23,6 +23,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { capabilitiesOf, transportaMensagem, type ChannelProvider } from "@/lib/channels/capabilities";
 import { montarCartoesDaPassagem, type CartaoDaPassagem } from "@/lib/escalacao/cartao-da-passagem";
 import type { Message, Note } from "@/lib/types/messaging";
+import { estaNoFim, useAncoraNoFim } from "@/hooks/inbox/useAncoraNoFim";
 
 interface Props {
   conversationId: string | null;
@@ -97,6 +98,8 @@ export function ChatThread({
   const claim = useClaimConversation();
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  /** O conteúdo do fio, que o useAncoraNoFim observa crescer (CRM-539). */
+  const conteudoRef = useRef<HTMLDivElement | null>(null);
   const paginasVistas = useRef(0);
   /**
    * Esta conversa já ancorou no fim ALGUMA vez, com conteúdo na tela?
@@ -127,6 +130,9 @@ export function ChatThread({
    * aparece na bolha, e marcar uma bolha sem o termo visível seria mentir.
    */
   const termo = searchTerm.trim().toLocaleLowerCase();
+  // CRM-539: enquanto a pessoa estiver no fim, o que cresce DEPOIS (foto, áudio, prévia, cartão) não a tira de lá;
+  // com a busca ativa, nada reancora.
+  const ancora = useAncoraNoFim(scrollerRef, conteudoRef, conversationId, termo !== "");
   const resultados = useMemo(
     () =>
       new Set(
@@ -229,7 +235,7 @@ export function ChatThread({
     const primeiraAncoragem = !jaAncorou.current;
     if (jaAncorou.current) {
       const sc = scrollerRef.current;
-      if (sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight > 120) return;
+      if (sc && !estaNoFim(sc)) return;
     }
     // Fio ainda vazio não ancora nada: marcar aqui faria a guarda valer a partir
     // da pintura em branco, que é exatamente o defeito acima.
@@ -331,6 +337,7 @@ export function ChatThread({
         </div>
       )}
       <div ref={scrollerRef} className="min-w-0 flex-1 overflow-y-auto py-2">
+        <div ref={conteudoRef}>
         {q.hasNextPage && (
           <div className="flex justify-center py-2">
             <Button
@@ -416,6 +423,20 @@ export function ChatThread({
         ))}
 
         <div ref={bottomRef} />
+        </div>
+        {!ancora.noFim && !termo && (
+          <div className="pointer-events-none sticky bottom-2 flex justify-center">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="pointer-events-auto shadow-md"
+              onClick={ancora.irAoFim}
+              data-testid="ir-para-a-mais-recente"
+            >
+              {t("Ir para a mais recente")}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

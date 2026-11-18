@@ -115,4 +115,42 @@ describe("ChatThread: ancoragem ao fim", () => {
     rerender(<ChatThread conversationId="c-2" />);
     expect(comportamentos()).toEqual(["auto"]);
   });
+
+  it("(CRM-539) o fio observa o CONTEÚDO dentro do scroller, e o que cresce depois reancora no fim", () => {
+    const observados: Element[] = [];
+    const cbs: Array<() => void> = [];
+    const antes = globalThis.ResizeObserver;
+    (globalThis as { ResizeObserver: unknown }).ResizeObserver = class {
+      constructor(cb: () => void) {
+        cbs.push(cb);
+      }
+      observe(el: Element) {
+        observados.push(el);
+      }
+      disconnect() {}
+    };
+    try {
+      estado.mensagens = [mensagem(1)];
+      const { container } = render(<ChatThread conversationId="c-1" />, { wrapper });
+      // o conteúdo do fio E o próprio scroller (que volta do display:none no celular)
+      expect(observados).toHaveLength(2);
+      const conteudo = observados[0] as HTMLElement;
+      const sc = conteudo.parentElement as HTMLElement;
+      expect(observados[1]).toBe(sc);
+      expect(sc.className).toContain("overflow-y-auto");
+      expect(container.contains(conteudo)).toBe(true);
+      let topo = 0;
+      Object.defineProperty(sc, "clientHeight", { configurable: true, get: () => 500 });
+      Object.defineProperty(sc, "scrollHeight", { configurable: true, get: () => 1800 });
+      Object.defineProperty(sc, "scrollTop", {
+        configurable: true,
+        get: () => topo,
+        set: (v: number) => (topo = v),
+      });
+      cbs.forEach((cb) => cb());
+      expect(topo).toBe(1800);
+    } finally {
+      (globalThis as { ResizeObserver: unknown }).ResizeObserver = antes;
+    }
+  });
 });
