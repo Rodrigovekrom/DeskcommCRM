@@ -104,7 +104,7 @@ export function SeloCronometro72h({
         title={`${prazo}. ${t("Toque para manter por mais {horas}h.").replace("{horas}", String(cronometro.horas))}`}
         className={cn(
           classes,
-          "cursor-pointer hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          "cursor-pointer hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden",
         )}
         disabled={manter.isPending}
         onClick={() => setPerguntando(true)}
