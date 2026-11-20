@@ -25,6 +25,7 @@ import { logger } from "@/lib/logger";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { lerTudo, todasAsPaginas } from "@/lib/supabase/paginas";
 import { manterAteDoLead, nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
+import { SQL_RECONCILIAR_FOLLOWUP } from "@/lib/esteira/reconciliar-followup-sql";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
 import { lerLeadDaPassagem, reativarLead } from "@/lib/iavek/passagem-servidor";
@@ -512,43 +513,9 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
     async reconciliarFollowup(followupPipelineId) {
       // v1.9.52.3: idempotente; só com SDR de Follow-up ATIVO na org (sem ele, os conjuntos são vazios e nada muda).
       // Janela de 30 dias de clones, para a consulta ficar barata.
+      // v1.9.60.1: o SQL mora em reconciliar-followup-sql.ts (a parte das tarefas sem subconsulta correlacionada).
       const { rows } = await getRequestPool().query(
-        `with sdrs as (
-           select user_id from public.user_organizations
-            where organization_id = $1 and revoked_at is null and role = 'agent' and interface_settings->>'funcao' = 'sdr_followup'),
-         clones as (
-           select c.id, c.owner_user_id, c.created_at from public.crm_leads c
-            where c.organization_id = $1 and c.pipeline_id = $2 and c.owner_user_id in (select user_id from sdrs)
-              and c.created_at > now() - interval '30 days'),
-         g as (
-           update public.crm_leads c set sdr_user_id = c.owner_user_id
-             from clones k where c.id = k.id and c.sdr_user_id is distinct from c.owner_user_id returning c.id),
-         o as (
-           update public.crm_leads x set owner_user_id = k.owner_user_id, owner_kind = 'user', owner_agent_id = null, sdr_user_id = k.owner_user_id
-             from clones k
-            where x.organization_id = $1 and x.status = 'lost' and x.lost_reason = 'moved_to_another_pipeline'
-              and x.source_metadata->'movido_para'->>'lead_id' = k.id::text
-              and (x.owner_user_id is distinct from k.owner_user_id or x.sdr_user_id is distinct from k.owner_user_id)
-           returning x.id),
-         -- (Lupa 050818, Maestro 050832) as TAREFAS dos 2 leads (o clone e o original) com outra pessoa, menos as 'done':
-         -- é a tarefa que abre o contato a quem a tem (fn_iavek_contatos_do_vendedor), então uma falha no passo (d) da
-         -- passagem não pode ficar calada.
-         t as (
-           update public.crm_tasks tk set assigned_to = k.owner_user_id
-             from clones k
-            where tk.organization_id = $1 and tk.status <> 'done'
-              and tk.assigned_to is not null and tk.assigned_to is distinct from k.owner_user_id
-              -- (Lupa 051624, Maestro 051636) SÓ as tarefas que JÁ EXISTIAM na passagem (o clone nasce nela). A tarefa
-              -- criada DEPOIS é de quem a pessoa quis (o SDR de Follow-up ou o gerente pode DELEGAR a um vendedor).
-              and tk.created_at <= k.created_at
-              and (tk.lead_id = k.id
-                   or tk.lead_id in (select x2.id from public.crm_leads x2
-                                      where x2.organization_id = $1 and x2.status = 'lost'
-                                        and x2.lost_reason = 'moved_to_another_pipeline'
-                                        and x2.source_metadata->'movido_para'->>'lead_id' = k.id::text))
-           returning tk.id)
-         select (select count(*) from g)::int as guardioes, (select count(*) from o)::int as originais,
-                (select count(*) from t)::int as tarefas`,
+        SQL_RECONCILIAR_FOLLOWUP,
         [orgId, followupPipelineId],
       );
       const r = (rows[0] ?? { guardioes: 0, originais: 0, tarefas: 0 }) as { guardioes: number; originais: number; tarefas: number };
