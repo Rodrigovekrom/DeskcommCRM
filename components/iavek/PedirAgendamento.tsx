@@ -31,6 +31,8 @@ import { Label } from "@/components/ui/label";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { type CamposDaPassagem } from "@/lib/iavek/passagem";
+import { TarefasAntesDePassar } from "@/components/iavek/TarefasAntesDePassar";
+import { ApiError } from "@/lib/api/types";
 import { CamposDaPassagemForm, camposIniciais, camposParaEnviar } from "@/components/iavek/CamposDaPassagemForm";
 
 interface Vendedor {
@@ -86,6 +88,10 @@ export function PedirAgendamento({
   // v1.9.4 (CRM-209): a passagem por agendamento leva os 7 campos e o contexto.
   const [campos, setCampos] = useState<CamposDaPassagem>({});
   const [contexto, setContexto] = useState("");
+  // v1.9.62 (CRM-497, D4 1A): o servidor recusou com tarefas abertas (o agendamento passaria o lead): o passo das
+  // tarefas aparece aqui mesmo, e o envio espera zero abertas.
+  const [comTarefas, setComTarefas] = useState(false);
+  const [tarefasProntas, setTarefasProntas] = useState(true);
 
   // v1.9.3: quem marca direto (SDR da loja) já sabe ao montar, para o botão
   // dizer "Marcar agendamento". Falhou a leitura: segue o pedido de sempre.
@@ -123,6 +129,8 @@ export function PedirAgendamento({
     // v1.9.48: o vendedor que marca o próprio cliente já vem escolhido; os demais escolhem.
     setVendedorId(vendedores.some((v) => v.id === user.id) ? user.id : "");
     setContexto("");
+    setComTarefas(false);
+    setTarefasProntas(true);
     setAberto(true);
     if (marcaDireto && leadId) {
       apiClient
@@ -169,6 +177,10 @@ export function PedirAgendamento({
       setAberto(false);
       aoEnviar?.();
     } catch (e) {
+      if (e instanceof ApiError && e.code === "tarefas_abertas" && leadId) {
+        setComTarefas(true);
+        setTarefasProntas(false);
+      }
       showApiError(e);
     } finally {
       setEnviando(false);
@@ -271,6 +283,7 @@ export function PedirAgendamento({
                 placeholder={t("Em branco, vale o nome do tipo")}
               />
             </div>
+            {comTarefas && leadId && <TarefasAntesDePassar leadId={leadId} aoMudarPronto={setTarefasProntas} />}
             {marcaDireto && (
               <div className="space-y-1 rounded-md border border-border p-2">
                 <p className="text-xs font-medium">{t("Para o vendedor (obrigatório)")}</p>
@@ -295,7 +308,7 @@ export function PedirAgendamento({
             </Button>
             <Button
               onClick={() => void enviar()}
-              disabled={!valido || enviando}
+              disabled={!valido || enviando || !tarefasProntas}
               data-testid="enviar-pedido"
             >
               {marcaDireto ? t("Marcar") : t("Enviar pedido")}

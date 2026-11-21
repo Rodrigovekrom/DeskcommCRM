@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { CamposDaPassagemForm, camposIniciais, camposParaEnviar } from "@/components/iavek/CamposDaPassagemForm";
+import { TarefasAntesDePassar } from "@/components/iavek/TarefasAntesDePassar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -93,6 +94,8 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
   const [motivo, setMotivo] = useState("");
   const [feito, setFeito] = useState("");
   const [sugerido, setSugerido] = useState("");
+  // v1.9.62 (CRM-497, D4 1A): o passo das tarefas diz se o lead já pode passar (zero de pessoa abertas)
+  const [tarefasProntas, setTarefasProntas] = useState(false);
 
   const enviar = useMutation({
     mutationFn: (corpo: Record<string, unknown>) => apiClient.post("/api/v1/iavek/passagem", { lead_id: leadId, ...corpo }),
@@ -102,7 +105,11 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
       void qc.invalidateQueries({ queryKey: chave });
       void qc.invalidateQueries({ queryKey: ["iavek"] });
     },
-    onError: showApiError,
+    onError: (erro) => {
+      // v1.9.62: o servidor conferiu de novo e achou tarefa aberta (outra pessoa criou no meio): a lista se atualiza.
+      void qc.invalidateQueries({ queryKey: ["iavek", "passagem", "tarefas", leadId] });
+      showApiError(erro);
+    },
   });
 
   if (!data || !data.loja) return null;
@@ -119,9 +126,10 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
     setMotivo("");
     setFeito("");
     setSugerido("");
+    setTarefasProntas(false);
   }
 
-  const pronto =
+  const camposProntos =
     acao === "negociar"
       ? Boolean(vendedorId) && contexto.trim().length >= CONTEXTO_MINIMO && objecao.trim().length >= 3 && passo.trim().length >= 3 && Boolean(quando)
       : acao === "devolver"
@@ -129,6 +137,7 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
         : acao === "trocar_vendedor"
           ? Boolean(vendedorId) && motivo.trim().length >= 3
           : acao === "reativar";
+  const pronto = camposProntos && tarefasProntas;
 
   function confirmar() {
     if (acao === "negociar") {
@@ -248,6 +257,7 @@ function PassagemDaLoja({ leadId }: { leadId: string }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {acao && <TarefasAntesDePassar leadId={leadId} aoMudarPronto={setTarefasProntas} />}
             {(acao === "negociar" || acao === "trocar_vendedor") && (
               <div className="space-y-1">
                 <Label htmlFor="passagem-vendedor">{t("Vendedor")}</Label>
