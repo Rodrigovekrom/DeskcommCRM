@@ -243,18 +243,26 @@ describe("CRM-532: a rota da TAREFA segue igual (agora pelo registrar compartilh
     expect(espioes.emitLeadActivity).not.toHaveBeenCalled();
   });
 
-  it("(Lupa 200426) a tarefa ABERTA cujo fechamento volta com 0 linhas (a RLS barrando): 403, e NADA mais gravado", async () => {
+  // v1.9.62 (0649, Lupa 202249): a ORDEM mudou. A linha do tempo vem PRIMEIRO, a próxima ligação nasce com a atual
+  // ainda aberta, e só então a atual fecha. Sem reabrir nada: a falha no meio deixa a atual aberta.
+  it("(v1.9.62) a tarefa ABERTA cujo fechamento volta com 0 linhas (a RLS barrando, ou outro clique): 403, e a próxima que nasceu é CANCELADA", async () => {
+    espioes.criarTarefaInterna.mockImplementationOnce(async () => ({ ok: true, tarefa_id: "nova-1", assigned_to: "u-dona" }) as never);
+    const { logger } = await import("@/lib/logger");
+    const erro = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const f = clienteFalso(banco({ crm_tasks: [tarefaDeLigacao()], fecha: 0 }));
     espioes.cliente.atual = f.cliente;
     const { POST } = await import("@/app/api/v1/tasks/[id]/ligacao/route");
     const r = await POST(pedido(`http://x/api/v1/tasks/${TAREFA}/ligacao`, { atendeu: false, resumo: "caixa postal" }), ctx(TAREFA));
     expect(r.status).toBe(403);
-    expect(espioes.emitLeadActivity).not.toHaveBeenCalled();
+    const cancelou = f.updates.find((u) => u.tabela === "crm_tasks" && (u.valores as { status: string }).status === "cancelled");
+    expect(cancelou?.valores).toMatchObject({ cancelada_motivo: "registro_sem_fechamento" });
+    expect(cancelou?.filtros).toContainEqual(["id", "nova-1"]);
     expect(espioes.registraAtividadeDaTarefa).not.toHaveBeenCalled();
-    expect(espioes.criarTarefaInterna).not.toHaveBeenCalled();
+    expect(erro).toHaveBeenCalledWith("[ligacao] a tarefa não fechou; a próxima foi cancelada", expect.objectContaining({ task_id: TAREFA }));
+    erro.mockRestore();
   });
 
-  it("(Lupa 200426) a linha do tempo que FALHA: desfaz o fechamento da tarefa, erro 500, sem o próximo passo", async () => {
+  it("(v1.9.62) a linha do tempo que FALHA: erro 500 e NADA mais (a tarefa nem fecha, nada a desfazer, sem o próximo passo)", async () => {
     espioes.emitLeadActivity.mockImplementation(async () => ({ ok: false, error: "permission denied" }));
     const { logger } = await import("@/lib/logger");
     const erro = vi.spyOn(logger, "error").mockImplementation(() => undefined);
@@ -263,27 +271,30 @@ describe("CRM-532: a rota da TAREFA segue igual (agora pelo registrar compartilh
     const { POST } = await import("@/app/api/v1/tasks/[id]/ligacao/route");
     const r = await POST(pedido(`http://x/api/v1/tasks/${TAREFA}/ligacao`, { atendeu: false, resumo: "caixa postal" }), ctx(TAREFA));
     expect(r.status).toBe(500);
-    expect(erro).toHaveBeenCalledWith("[ligacao] call_logged não gravou; tarefa desfeita", expect.anything());
-    expect(erro).not.toHaveBeenCalledWith("[ligacao] desfazer falhou", expect.anything());
-    const desfez = f.updates.find((u) => u.tabela === "crm_tasks" && (u.valores as { status: string }).status === "in_progress");
-    expect(desfez?.filtros).toContainEqual(["id", TAREFA]);
-    expect(desfez?.filtros).toContainEqual(["status", "done"]);
+    expect(erro).toHaveBeenCalledWith("[ligacao] call_logged não gravou; nada mudou", expect.anything());
+    expect(f.updates.filter((u) => u.tabela === "crm_tasks")).toEqual([]);
     expect(espioes.registraAtividadeDaTarefa).not.toHaveBeenCalled();
     expect(espioes.criarTarefaInterna).not.toHaveBeenCalled();
     erro.mockRestore();
   });
 
-  it("(Lupa 200617) o DESFAZER que também falha (0 linhas): vai ao log '[ligacao] desfazer falhou' com o id da tarefa, e 500", async () => {
-    espioes.emitLeadActivity.mockImplementation(async () => ({ ok: false, error: "permission denied" }));
-    const { logger } = await import("@/lib/logger");
-    const erro = vi.spyOn(logger, "error").mockImplementation(() => undefined);
-    const f = clienteFalso(banco({ crm_tasks: [tarefaDeLigacao("pending")], desfaz: 0 }));
+  it("(v1.9.62) a próxima ligação nasce ANTES de a atual fechar (a 0649 deixa: o vendedor ainda tem a atual aberta)", async () => {
+    const ordem: string[] = [];
+    espioes.criarTarefaInterna.mockImplementationOnce(async () => {
+      ordem.push("criou");
+      return { ok: true, tarefa_id: "nova-2", assigned_to: "u-dona" } as never;
+    });
+    const f = clienteFalso(banco({ crm_tasks: [tarefaDeLigacao()] }));
     espioes.cliente.atual = f.cliente;
     const { POST } = await import("@/app/api/v1/tasks/[id]/ligacao/route");
+    const fechouAntes = () => f.updates.some((u) => u.tabela === "crm_tasks" && (u.valores as { status: string }).status === "done");
+    espioes.registraAtividadeDaTarefa.mockImplementationOnce(async () => {
+      ordem.push(fechouAntes() ? "fechou" : "nao-fechou");
+      return undefined;
+    });
     const r = await POST(pedido(`http://x/api/v1/tasks/${TAREFA}/ligacao`, { atendeu: false, resumo: "caixa postal" }), ctx(TAREFA));
-    expect(r.status).toBe(500);
-    expect(erro).toHaveBeenCalledWith("[ligacao] desfazer falhou", expect.objectContaining({ task_id: TAREFA }));
-    erro.mockRestore();
+    expect(r.status).toBe(201);
+    expect(ordem).toEqual(["criou", "fechou"]);
   });
 
   it("(Lupa 200426) sem tarefa, a linha do tempo que FALHA: erro 500, nunca 'registrei'", async () => {

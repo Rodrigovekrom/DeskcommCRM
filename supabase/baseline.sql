@@ -50615,7 +50615,11 @@ create or replace function public.fn_iavek_tarefas_da_passagem(
   p_org uuid,
   p_lead uuid,
   p_motivo_automaticas text,
-  p_motivo_de_pessoa text default null
+  p_motivo_de_pessoa text default null,
+  -- (P3 do Rodrigo, ponto único em lib/iavek/regras-da-passagem.ts) os source_kind de pessoa que NÃO são cancelados e
+  -- seguem com o novo dono (ex.: as promessas da IA ao cliente). Vazio (hoje) = todas as de pessoa são canceladas.
+  p_preservar text[] default '{}'::text[],
+  p_novo_dono uuid default null
 )
 returns jsonb
 language plpgsql
@@ -50641,6 +50645,7 @@ begin
          and t.lead_id = p_lead
          and t.status in ('pending', 'in_progress')
          and not coalesce(t.source_kind = any(v_auto), false)  -- source_kind nulo: null = any() é NULL
+         and not coalesce(t.source_kind = any(p_preservar), false)
       returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind
     ), log as (
       insert into public.crm_lead_activities
@@ -50654,12 +50659,18 @@ begin
     )
     -- (o insert do 'log' roda uma vez de qualquer jeito: CTE que escreve sempre executa; a conta sai das canceladas)
     select count(*) into v_p from canceladas;
+    -- as preservadas (P3) seguem com o novo dono
+    if p_novo_dono is not null and coalesce(array_length(p_preservar, 1), 0) > 0 then
+      update public.crm_tasks t set assigned_to = p_novo_dono
+       where t.organization_id = p_org and t.lead_id = p_lead and t.status in ('pending', 'in_progress')
+         and t.source_kind = any(p_preservar);
+    end if;
   end if;
   return jsonb_build_object('automaticas', coalesce(v_a, 0), 'de_pessoa', v_p);
 end;
 $$;
-revoke execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text) from public, anon, authenticated;
-grant execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text) to service_role;
+revoke execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text, text[], uuid) from public, anon, authenticated;
+grant execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text, text[], uuid) to service_role;
 
 
 -- ---- ia.vek: o lead do vendedor vai para a coluna de entrada dele (migration 0648, v1.9.62, CRM-535) ----
@@ -50785,6 +50796,8 @@ set search_path = public, pg_temp
 as $$
 declare
   v_uid uuid := auth.uid();
+  v_alvo uuid;
+  v_alvo_restrito boolean;
 begin
   if v_uid is null or new.contact_id is null or new.status not in ('pending', 'in_progress') then
     return new;
@@ -50796,32 +50809,31 @@ begin
     return new;  -- a tarefa já aberta, editada sem mudar o contato nem o responsável
   end if;
   if new.organization_id not in (select public.fn_iavek_orgs_onde_sou_vendedor()) then
-    return new;  -- quem escreve não está restrito nesta org (gerência, SDR, admin)
+    return new;  -- quem escreve não está restrito nesta org (gerência, SDR, admin): delegar é dela
   end if;
-  if public.fn_iavek_alcanca_contato_sem_tarefa(v_uid, new.organization_id, new.contact_id)
-     or new.contact_id in (select f.contato_id from public.fn_iavek_contatos_do_followup() f)
-     -- já tem OUTRA tarefa ABERTA dele do mesmo contato (a delegada pela gerência): o acesso já existe, e a 2ª não abre nada
+  -- (Lupa 202249, ponto 2) quem GANHA o acesso é o assigned_to, não quem escreve: o alcance conferido é o DELE
+  v_alvo := new.assigned_to;
+  if v_alvo is null then
+    return new;  -- tarefa sem responsável não abre contato a ninguém (fn_iavek_contatos_do_vendedor olha o assigned_to)
+  end if;
+  select exists (select 1 from public.user_organizations uo
+                  where uo.user_id = v_alvo and uo.organization_id = new.organization_id and uo.revoked_at is null
+                    and uo.role = 'agent' and uo.interface_settings->>'funcao' in ('vendedor', 'sdr_followup'))
+    into v_alvo_restrito;
+  if not v_alvo_restrito then
+    return new;  -- quem recebe vê os contatos da org de qualquer jeito
+  end if;
+  if public.fn_iavek_alcanca_contato_sem_tarefa(v_alvo, new.organization_id, new.contact_id)
+     -- o Follow-up da SDR de Follow-up: a função é do auth.uid, então só vale quando o alvo é quem escreve
+     or (v_alvo = v_uid and new.contact_id in (select f.contato_id from public.fn_iavek_contatos_do_followup() f))
+     -- o alvo já tem OUTRA tarefa ABERTA do mesmo contato (a delegada): o acesso já existe, e a 2ª não abre nada
      or exists (select 1 from public.crm_tasks t2
-                 where t2.organization_id = new.organization_id and t2.assigned_to = v_uid
+                 where t2.organization_id = new.organization_id and t2.assigned_to = v_alvo
                    and t2.contact_id = new.contact_id and t2.id <> new.id
                    and t2.status in ('pending', 'in_progress')) then
     return new;
   end if;
-  -- O REGISTRO DA LIGAÇÃO (app/api/v1/_ligacao/registrar.ts, pela SESSÃO de propósito: Lupa) fecha a tarefa e, logo
-  -- depois, cria a próxima ligação ou desfaz o fechamento se a linha do tempo falhar. Para o vendedor que só alcançava o
-  -- contato por aquela tarefa, isso vale numa JANELA CURTA (5 min) depois de ela ser fechada como 'done': reabrir a
-  -- própria tarefa recém-fechada, ou nascer outra dele do mesmo contato. A cancelada (a passagem) nunca entra aqui.
-  if tg_op = 'UPDATE' and old.status = 'done' and old.updated_at > now() - interval '5 minutes' then
-    return new;
-  end if;
-  if tg_op = 'INSERT' and exists (
-       select 1 from public.crm_tasks t3
-        where t3.organization_id = new.organization_id and t3.assigned_to = v_uid
-          and t3.contact_id = new.contact_id and t3.status = 'done'
-          and t3.updated_at > now() - interval '5 minutes') then
-    return new;
-  end if;
-  raise exception 'tarefa_fora_do_alcance: a tarefa aberta é de um contato que você não atende'
+  raise exception 'tarefa_fora_do_alcance: a tarefa aberta é de um contato que quem a recebe não atende'
     using errcode = 'PT403';
 end;
 $$;

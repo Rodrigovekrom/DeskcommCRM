@@ -186,7 +186,7 @@ describe("v1.9.62 (D4 3A do Rodrigo): as tarefas na passagem SEM pessoa", () => 
     await passar();
     expect(rpcs).toContainEqual({
       nome: "fn_iavek_tarefas_da_passagem",
-      args: { p_org: ORG, p_lead: LEAD, p_motivo_automaticas: "passou_ao_followup", p_motivo_de_pessoa: "passagem_sem_revisao" },
+      args: { p_org: ORG, p_lead: LEAD, p_motivo_automaticas: "passou_ao_followup", p_motivo_de_pessoa: "passagem_sem_revisao", p_preservar: [], p_novo_dono: SDR_FU },
     });
     expect(tarefas).toEqual([]);
   });

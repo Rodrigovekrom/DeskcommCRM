@@ -25,6 +25,7 @@ import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { lerTudo, todasAsPaginas } from "@/lib/supabase/paginas";
 import { manterAteDoLead, nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
 import { SQL_RECONCILIAR_FOLLOWUP } from "@/lib/esteira/reconciliar-followup-sql";
+import { preservadasNaPassagem } from "@/lib/iavek/regras-da-passagem";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
 import { lerLeadDaPassagem, reativarLead } from "@/lib/iavek/passagem-servidor";
@@ -216,6 +217,8 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
           p_lead: lead.id,
           p_motivo_automaticas: MOTIVO_DA_PASSAGEM_72H,
           p_motivo_de_pessoa: MOTIVO_SEM_REVISAO,
+          p_preservar: preservadasNaPassagem(),
+          p_novo_dono: dono,
         } as never);
         if (erroDasTarefas) throw new Error(erroDasTarefas.message);
         logger.info("esteira_passagem_tarefas", { organization_id: orgId, lead_id: lead.id, ...(canceladas as object) });

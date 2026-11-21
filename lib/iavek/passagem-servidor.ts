@@ -7,6 +7,7 @@ import { ETAPA_DA_PASSAGEM, type CamposDaPassagem, type TipoDePassagem } from "@
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { logger } from "@/lib/logger";
+import { preservadasNaPassagem } from "@/lib/iavek/regras-da-passagem";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -468,6 +469,8 @@ export async function reativarLead(
       p_lead: lead.id,
       p_motivo_automaticas: MOTIVO_DA_PASSAGEM,
       p_motivo_de_pessoa: args.atorId ? null : MOTIVO_SEM_REVISAO,
+      p_preservar: args.atorId ? [] : preservadasNaPassagem(),
+      p_novo_dono: guardiao ?? null,
     } as never);
     if (error) throw new Error(error.message);
   } catch (e) {

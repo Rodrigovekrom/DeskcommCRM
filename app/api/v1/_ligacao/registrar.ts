@@ -38,6 +38,8 @@ export const SOURCE_KIND_AVULSA = `${PREFIXO_DE_LIGACAO}avulsa`;
 
 /** O `cancelada_motivo` das ligações que o registro fecha (agendou / sem interesse), no molde da 0639/0640. */
 export const MOTIVO_LIGACAO_REGISTRADA = "ligacao_registrada";
+/** v1.9.62: a próxima ligação cancelada porque a atual não fechou (a RLS ou outro clique). */
+export const MOTIVO_SEM_FECHAMENTO = "registro_sem_fechamento";
 
 export interface NegocioDaLigacao {
   id: string;
@@ -74,22 +76,15 @@ export async function registrarLigacao(args: {
 
   const actor = { type: "user", id: user.id } as const;
 
-  // 1. A tarefa fecha (se houver). Condicional ao status de antes: dois cliques não registram duas vezes.
-  if (tarefa) {
-    const { data: fechada, error: errFechar } = await supabase
-      .from("crm_tasks")
-      .update({ status: "done" })
-      .eq("id", tarefa.id)
-      .eq("organization_id", orgId)
-      .in("status", ["pending", "in_progress"])
-      .select("id");
-    if (errFechar) return fail("internal_error", "Não deu para fechar a tarefa.", 500, { requestId });
-    if (!fechada || fechada.length === 0) {
-      // quem chamou já viu a tarefa ABERTA pela sessão: 0 linhas aqui é a RLS barrando o fechamento (não "já registrada")
-      return fail("forbidden", "Você não pode fechar esta tarefa de ligação.", 403, { requestId });
-    }
-  }
+  // v1.9.62 (0649, Lupa 202249): a ORDEM mudou. Antes: fechar a tarefa, gravar a linha do tempo (e REABRIR a tarefa se
+  // ela falhasse) e criar a próxima ligação. Com a 0649, o vendedor que só alcança o contato por esta tarefa não pode
+  // reabri-la nem criar outra depois de fechada. Agora: (1) a linha do tempo; (2) a próxima ligação, com a atual AINDA
+  // aberta; (3) só então fechar a atual (condicional ao status: dois cliques não fecham duas vezes); (4) o resto dos
+  // efeitos. Sem reabrir nada: uma falha no meio deixa a atual ABERTA, que é o estado seguro.
+  const handlerCtx: HandlerCtx = { organization_id: orgId, actor, requestId, idioma: user.idioma };
+  const aplicados: string[] = [];
 
+  // 1. A linha do tempo. Falhou: NADA foi gravado ainda (a tarefa segue aberta), erro.
   if (negocio) {
     const linha = await emitLeadActivity(supabase, {
       organizationId: orgId,
@@ -109,27 +104,7 @@ export async function registrarLigacao(args: {
       },
     });
     if (!linha.ok) {
-      // a ligação NÃO ficou registrada: desfaz o fechamento da tarefa e responde erro (nunca sucesso sem registro)
-      if (tarefa) {
-        const { data: desfeita, error: errDesfazer } = await supabase
-          .from("crm_tasks")
-          .update({ status: tarefa.status })
-          .eq("id", tarefa.id)
-          .eq("organization_id", orgId)
-          .eq("status", "done")
-          .select("id");
-        if (errDesfazer || !desfeita || desfeita.length !== 1) {
-          // (Lupa 200617) a tarefa ficou 'done' SEM o call_logged: outro nome no log, para alguém achar e corrigir
-          logger.error("[ligacao] desfazer falhou", {
-            request_id: requestId,
-            org_id: orgId,
-            task_id: tarefa.id,
-            status_de_antes: tarefa.status,
-            erro: (errDesfazer?.message ?? `linhas desfeitas: ${desfeita?.length ?? 0}`).slice(0, 200),
-          });
-        }
-      }
-      logger.error("[ligacao] call_logged não gravou; tarefa desfeita", {
+      logger.error("[ligacao] call_logged não gravou; nada mudou", {
         request_id: requestId,
         org_id: orgId,
         lead_id: negocio.id,
@@ -139,39 +114,75 @@ export async function registrarLigacao(args: {
       return fail("internal_error", "Não consegui registrar a ligação. Nada foi salvo; tente de novo.", 500, { requestId });
     }
   }
+
+  // 2. A próxima ligação, com a atual ainda aberta.
+  const criadas: string[] = [];
+  for (const e of efeitos) {
+    if (e.tipo !== "nova_ligacao" || !negocio) continue;
+    const r = await criarTarefaInterna(supabase, {
+      organizationId: orgId,
+      leadId: negocio.id,
+      contactId: negocio.contact_id,
+      titulo: e.titulo,
+      descricao: "Registre a ligação pelos 3 campos ao concluir.",
+      venceEmDias: 0,
+      venceEm: e.venceEm,
+      // sem tarefa, quem ligou é quem fica com a próxima (ele é quem combinou com o cliente)
+      atribuirA: tarefa
+        ? tarefa.assigned_to
+          ? { usuario_id: tarefa.assigned_to }
+          : "dono_do_lead"
+        : { usuario_id: user.id },
+      prioridade: "high",
+      origem: "esteira",
+      sourceKind: e.sourceKind,
+      aceitaSemResponsavel: true,
+      agora,
+      requestId,
+    });
+    if (r.ok) {
+      aplicados.push(e.sourceKind);
+      criadas.push(r.tarefa_id);
+    }
+  }
+
+  // 3. A atual fecha (se houver). Condicional ao status de antes: dois cliques não registram duas vezes.
   if (tarefa) {
+    const { data: fechada, error: errFechar } = await supabase
+      .from("crm_tasks")
+      .update({ status: "done" })
+      .eq("id", tarefa.id)
+      .eq("organization_id", orgId)
+      .in("status", ["pending", "in_progress"])
+      .select("id");
+    if (errFechar || !fechada || fechada.length === 0) {
+      // quem chamou já viu a tarefa ABERTA pela sessão: 0 linhas aqui é a RLS barrando o fechamento (ou outro clique
+      // fechou no meio). A ligação ficou na linha do tempo (ela aconteceu); a próxima que nasceu aqui é cancelada, para
+      // não ficar uma ligação a mais.
+      for (const id of criadas) {
+        await supabase
+          .from("crm_tasks")
+          .update({ status: "cancelled", cancelada_motivo: MOTIVO_SEM_FECHAMENTO })
+          .eq("id", id)
+          .eq("organization_id", orgId);
+      }
+      logger.error("[ligacao] a tarefa não fechou; a próxima foi cancelada", {
+        request_id: requestId,
+        org_id: orgId,
+        task_id: tarefa.id,
+        canceladas: criadas.length,
+        erro: (errFechar?.message ?? "0 linhas").slice(0, 200),
+      });
+      if (errFechar) return fail("internal_error", "Não deu para fechar a tarefa.", 500, { requestId });
+      return fail("forbidden", "Você não pode fechar esta tarefa de ligação.", 403, { requestId });
+    }
     await registraAtividadeDaTarefa(supabase, { organizationId: orgId, tarefa, tipo: "task_completed", actor });
   }
 
-  // 2. Os efeitos do próximo passo.
-  const handlerCtx: HandlerCtx = { organization_id: orgId, actor, requestId, idioma: user.idioma };
-  const aplicados: string[] = [];
+  // 4. Os outros efeitos do próximo passo.
   try {
     for (const e of efeitos) {
-      if (e.tipo === "nova_ligacao" && negocio) {
-        const r = await criarTarefaInterna(supabase, {
-          organizationId: orgId,
-          leadId: negocio.id,
-          contactId: negocio.contact_id,
-          titulo: e.titulo,
-          descricao: "Registre a ligação pelos 3 campos ao concluir.",
-          venceEmDias: 0,
-          venceEm: e.venceEm,
-          // sem tarefa, quem ligou é quem fica com a próxima (ele é quem combinou com o cliente)
-          atribuirA: tarefa
-            ? tarefa.assigned_to
-              ? { usuario_id: tarefa.assigned_to }
-              : "dono_do_lead"
-            : { usuario_id: user.id },
-          prioridade: "high",
-          origem: "esteira",
-          sourceKind: e.sourceKind,
-          aceitaSemResponsavel: true,
-          agora,
-          requestId,
-        });
-        if (r.ok) aplicados.push(e.sourceKind);
-      } else if (e.tipo === "mover" && negocio) {
+      if (e.tipo === "mover" && negocio) {
         await moveLeadHandler(supabase, handlerCtx, negocio.id, {
           to_stage_id: e.etapaId,
           reason: `Ligação: ${registro.resumo}`,

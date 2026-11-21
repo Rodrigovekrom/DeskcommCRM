@@ -2,8 +2,9 @@
  * ia.vek v1.9.62 (0649, CRM-497 4A; Lupa 1718, Maestro 193121): o vendedor não ganha acesso a contato pela tarefa.
  * RECUSADOS (PT403 tarefa_fora_do_alcance), na sessão do VENDEDOR: criar tarefa aberta de um contato que ele não
  * atende; reabrir a tarefa cancelada (a passagem); trocar o contato de uma tarefa dele para outro; reabrir a 'done'
- * antiga. PASSAM: o contato do lead dele; a gerência delegando; a 2ª tarefa do contato já delegado; a SDR; o servidor;
- * a janela curta do registro de ligação (reabrir a 'done' recém-fechada, nascer outra logo depois).
+ * antiga, mesmo depois de TOCAR o título (Lupa 202249: sem janela); dar a OUTRO vendedor o contato do lead dele.
+ * PASSAM: o contato do lead dele; a gerência delegando; a 2ª tarefa do contato já delegado (é o que o registro de
+ * ligação faz: cria a próxima com a atual aberta); a SDR; o servidor.
  */
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -76,8 +77,20 @@ describe("0649: RECUSADO na sessão do vendedor", () => {
     expect(lastLine(sql(`select contact_id from public.crm_tasks where id='${T_DO_LEAD}';`))).toBe(C_DO_LEAD);
   });
 
-  it("reabrir a 'done' ANTIGA (fora da janela do registro de ligação)", () => {
+  it("reabrir a 'done' antiga, mesmo TOCANDO o título antes (o updated_at recente não abre nada)", () => {
+    expect(como(GOV_AGENT_A, `update public.crm_tasks set title='Tocada' where id='${T_DONE_VELHA}';`)).toMatch(/UPDATE 1/);
     expect(como(GOV_AGENT_A, `update public.crm_tasks set status='pending' where id='${T_DONE_VELHA}';`)).toMatch(/tarefa_fora_do_alcance/);
+    expect(como(GOV_AGENT_A, `update public.crm_tasks set status='pending' where id='${T_DONE_NOVA}';`)).toMatch(/tarefa_fora_do_alcance/);
+  });
+
+  it("quem GANHA o acesso é o assigned_to: o vendedor A não dá a outro vendedor (B) o contato do lead dele", () => {
+    funcao(GOV_AGENT_B, "vendedor");
+    try {
+      expect(criar(GOV_AGENT_A, C_DO_LEAD, GOV_AGENT_B)).toMatch(/tarefa_fora_do_alcance/);
+      expect(como(GOV_AGENT_A, `update public.crm_tasks set assigned_to='${GOV_AGENT_B}' where id='${T_DO_LEAD}';`)).toMatch(/tarefa_fora_do_alcance/);
+    } finally {
+      funcao(GOV_AGENT_B, "sdr");
+    }
   });
 });
 
@@ -108,8 +121,9 @@ describe("0649: PASSA", () => {
     ).toBe("CRIOU");
   });
 
-  it("a janela do registro de ligação: nascer a próxima dele do mesmo contato logo depois da 'done', e reabrir a recém-fechada", () => {
+  it("o registro de ligação: a próxima nasce com a atual AINDA aberta (outra tarefa aberta dele), e então a atual fecha", () => {
+    // a atual: delegada pela gerência (o vendedor só alcança o contato por ela)
+    expect(criar(GOV_MANAGER, C_JANELA, GOV_AGENT_A)).toMatch(/CRIOU|INSERT 0 1/);
     expect(criar(GOV_AGENT_A, C_JANELA)).toMatch(/CRIOU|INSERT 0 1/);
-    expect(como(GOV_AGENT_A, `update public.crm_tasks set status='pending' where id='${T_DONE_NOVA}';`)).toMatch(/UPDATE 1/);
   });
 });

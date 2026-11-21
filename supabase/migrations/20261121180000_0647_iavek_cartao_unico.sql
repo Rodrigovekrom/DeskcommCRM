@@ -161,7 +161,11 @@ create or replace function public.fn_iavek_tarefas_da_passagem(
   p_org uuid,
   p_lead uuid,
   p_motivo_automaticas text,
-  p_motivo_de_pessoa text default null
+  p_motivo_de_pessoa text default null,
+  -- (P3 do Rodrigo, ponto único em lib/iavek/regras-da-passagem.ts) os source_kind de pessoa que NÃO são cancelados e
+  -- seguem com o novo dono (ex.: as promessas da IA ao cliente). Vazio (hoje) = todas as de pessoa são canceladas.
+  p_preservar text[] default '{}'::text[],
+  p_novo_dono uuid default null
 )
 returns jsonb
 language plpgsql
@@ -187,6 +191,7 @@ begin
          and t.lead_id = p_lead
          and t.status in ('pending', 'in_progress')
          and not coalesce(t.source_kind = any(v_auto), false)  -- source_kind nulo: null = any() é NULL
+         and not coalesce(t.source_kind = any(p_preservar), false)
       returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind
     ), log as (
       insert into public.crm_lead_activities
@@ -200,9 +205,15 @@ begin
     )
     -- (o insert do 'log' roda uma vez de qualquer jeito: CTE que escreve sempre executa; a conta sai das canceladas)
     select count(*) into v_p from canceladas;
+    -- as preservadas (P3) seguem com o novo dono
+    if p_novo_dono is not null and coalesce(array_length(p_preservar, 1), 0) > 0 then
+      update public.crm_tasks t set assigned_to = p_novo_dono
+       where t.organization_id = p_org and t.lead_id = p_lead and t.status in ('pending', 'in_progress')
+         and t.source_kind = any(p_preservar);
+    end if;
   end if;
   return jsonb_build_object('automaticas', coalesce(v_a, 0), 'de_pessoa', v_p);
 end;
 $$;
-revoke execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text) from public, anon, authenticated;
-grant execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text) to service_role;
+revoke execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text, text[], uuid) from public, anon, authenticated;
+grant execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text, text[], uuid) to service_role;

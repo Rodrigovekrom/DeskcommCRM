@@ -237,7 +237,7 @@ describe("v1.9.62: a volta (reativarLead) move o MESMO lead para a entrada", () 
     await voltar(null);
     expect(rpcs).toContainEqual({
       nome: "fn_iavek_tarefas_da_passagem",
-      args: { p_org: ORG, p_lead: LEAD, p_motivo_automaticas: "passou_o_lead", p_motivo_de_pessoa: "passagem_sem_revisao" },
+      args: { p_org: ORG, p_lead: LEAD, p_motivo_automaticas: "passou_o_lead", p_motivo_de_pessoa: "passagem_sem_revisao", p_preservar: [], p_novo_dono: SDR },
     });
   });
 
@@ -245,7 +245,7 @@ describe("v1.9.62: a volta (reativarLead) move o MESMO lead para a entrada", () 
     await voltar(SDR);
     expect(rpcs).toContainEqual({
       nome: "fn_iavek_tarefas_da_passagem",
-      args: { p_org: ORG, p_lead: LEAD, p_motivo_automaticas: "passou_o_lead", p_motivo_de_pessoa: null },
+      args: { p_org: ORG, p_lead: LEAD, p_motivo_automaticas: "passou_o_lead", p_motivo_de_pessoa: null, p_preservar: [], p_novo_dono: SDR },
     });
   });
 

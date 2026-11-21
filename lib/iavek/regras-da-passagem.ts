@@ -7,4 +7,17 @@ export const REGRAS_DA_PASSAGEM = {
   trocaPeloQuadroExigeTarefasResolvidas: true,
   /** P2: "Resolver todas" marca todas como FEITAS ('feita') ou as CANCELA ('excluir', com o motivo). */
   resolverTodasComo: "feita" as "feita" | "excluir",
+  /**
+   * P3: na passagem SEM pessoa (72h, reengajo), as promessas da IA ao cliente seguem com o novo dono (true) ou são
+   * canceladas como as outras de pessoa (false, hoje). Os source_kind em SOURCE_KINDS_DAS_PROMESSAS.
+   */
+  promessasDaIaSeguemComONovoDono: false as boolean,
 } as const;
+
+/** As promessas da IA ao cliente (lib/tarefas/vocabulario-de-origem.ts). */
+export const SOURCE_KINDS_DAS_PROMESSAS: readonly string[] = ["promised_proposal", "promised_followup"];
+
+/** O que a passagem sem pessoa preserva (P3): a lista vai ao banco (fn_iavek_tarefas_da_passagem, p_preservar). */
+export function preservadasNaPassagem(): string[] {
+  return REGRAS_DA_PASSAGEM.promessasDaIaSeguemComONovoDono ? [...SOURCE_KINDS_DAS_PROMESSAS] : [];
+}
