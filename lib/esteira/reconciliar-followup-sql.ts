@@ -14,6 +14,8 @@
  * 'o') e o retorno (guardioes, originais, tarefas) não mudam. O teste
  * tests/invariants/iavek-v19601-reconciliar-followup-igual.test.ts roda o SQL ANTIGO e este no mesmo banco e compara.
  *
+ * v1.9.62 (CRM-497): só para os clones de antes do cartão único (`esteira_passou_em is null`).
+ *
  * $1 = organization_id, $2 = pipeline_id do Follow-up.
  */
 export const SQL_RECONCILIAR_FOLLOWUP = `with sdrs as (
@@ -22,7 +24,10 @@ export const SQL_RECONCILIAR_FOLLOWUP = `with sdrs as (
          clones as (
            select c.id, c.owner_user_id, c.created_at from public.crm_leads c
             where c.organization_id = $1 and c.pipeline_id = $2 and c.owner_user_id in (select user_id from sdrs)
-              and c.created_at > now() - interval '30 days'),
+              and c.created_at > now() - interval '30 days'
+              -- (v1.9.62, CRM-497) SÓ os CLONES de antes da 62: o lead que passou pelo move (esteira_passou_em) já
+              -- levou o dono e o guardião na mesma escrita, e as tarefas dele NÃO são reatribuídas (D4 do Rodrigo)
+              and c.esteira_passou_em is null),
          g as (
            update public.crm_leads c set sdr_user_id = c.owner_user_id
              from clones k where c.id = k.id and c.sdr_user_id is distinct from c.owner_user_id returning c.id),
