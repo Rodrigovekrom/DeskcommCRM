@@ -71,12 +71,20 @@ export const SQL_RECONCILIAR_FOLLOWUP = `with sdrs as (
  * que passaram pelo move (esteira_passou_em, nos últimos 30 dias) e ainda têm tarefa aberta CRIADA ANTES da passagem: as
  * automáticas fecham com 'passou_ao_followup' e as de pessoa com 'passagem_sem_revisao' (as preservadas, $3, ficam: P3),
  * cada uma com a linha task_cancelled. A tarefa criada DEPOIS da passagem nunca é tocada. Devolve quantas fechou.
+ * ⚠️ (Lupa 203526) TRAVA: a varredura só pega lead cuja data de passagem foi escrita PELO MOVE da esteira, ou seja, com
+ * source_metadata.passagem.em = esteira_passou_em e venceu_72h = true. Um roteiro de dado (a junção dos cartões, CRM-524,
+ * ou outro) que preencha esteira_passou_em de leads antigos com data recente NÃO os põe na varredura (senão a rodada
+ * seguinte cancelaria em massa as tarefas de pessoa vigentes deles). Quem mexer em esteira_passou_em fora do move passa
+ * pela Lupa dizendo isso.
  * $1 = organization_id, $2 = pipeline_id do Follow-up, $3 = text[] dos source_kind preservados.
  */
 export const SQL_VARRER_TAREFAS_DA_PASSAGEM = `with alvo as (
            select l.id, l.esteira_passou_em from public.crm_leads l
             where l.organization_id = $1 and l.pipeline_id = $2 and l.status = 'open'
-              and l.esteira_passou_em is not null and l.esteira_passou_em > now() - interval '30 days'),
+              and l.esteira_passou_em is not null and l.esteira_passou_em > now() - interval '30 days'
+              -- (Lupa 203526) só a passagem PELO MOVE: a marca do próprio move, com a mesma data
+              and l.source_metadata->'passagem'->>'venceu_72h' = 'true'
+              and (l.source_metadata->'passagem'->>'em')::timestamptz = l.esteira_passou_em),
          canceladas as (
            update public.crm_tasks t
               set status = 'cancelled',

@@ -195,17 +195,23 @@ describe("v1.9.62 (Lupa 202834): a varredura idempotente das tarefas de ANTES da
   const T_ANTES = `${N}042`;
   const T_DEPOIS = `${N}043`;
   const T_PROMESSA = `${N}044`;
+  const LJ = `${N}045`;
+  const T_JUNTADO = `${N}046`;
   const varrer = (preservar: string) =>
     valor(
       SQL_VARRER_TAREFAS_DA_PASSAGEM.replaceAll("$1", `'${GOV_ORG}'`).replaceAll("$2", `'${FUNIL_2}'`).replaceAll("$3::text[]", preservar) + ";",
     );
   beforeAll(() => {
-    sql(`insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, esteira_passou_em)
-           values ('${LP}', '${GOV_ORG}', '${FUNIL_2}', '${ETAPA_2}', 'Passou 0647', now() - interval '1 hour') on conflict (id) do nothing;
+    sql(`insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, esteira_passou_em, source_metadata)
+           values ('${LP}', '${GOV_ORG}', '${FUNIL_2}', '${ETAPA_2}', 'Passou 0647', '2026-11-21T12:00:00Z',
+                   '{"passagem":{"em":"2026-11-21T12:00:00.000Z","venceu_72h":true}}'::jsonb),
+                  ('${LJ}', '${GOV_ORG}', '${FUNIL_2}', '${ETAPA_2}', 'Juntado 0647', '2026-11-21T12:00:00Z', '{}'::jsonb)
+           on conflict (id) do nothing;
          insert into public.crm_tasks (id, organization_id, title, lead_id, assigned_to, due_date, status, source_kind, created_at) values
-           ('${T_ANTES}', '${GOV_ORG}', 'De antes', '${LP}', '${GOV_AGENT_B}', now(), 'pending', null, now() - interval '2 hours'),
+           ('${T_ANTES}', '${GOV_ORG}', 'De antes', '${LP}', '${GOV_AGENT_B}', now(), 'pending', null, '2026-11-21T10:00:00Z'),
            ('${T_DEPOIS}', '${GOV_ORG}', 'De depois', '${LP}', '${GOV_AGENT_B}', now(), 'pending', null, now()),
-           ('${T_PROMESSA}', '${GOV_ORG}', 'Promessa', '${LP}', '${GOV_AGENT_B}', now(), 'pending', 'promised_followup', now() - interval '2 hours')
+           ('${T_PROMESSA}', '${GOV_ORG}', 'Promessa', '${LP}', '${GOV_AGENT_B}', now(), 'pending', 'promised_followup', '2026-11-21T10:00:00Z'),
+           ('${T_JUNTADO}', '${GOV_ORG}', 'Do juntado', '${LJ}', '${GOV_AGENT_B}', now(), 'pending', null, '2026-11-21T10:00:00Z')
            on conflict (id) do nothing;`);
   });
 
@@ -221,5 +227,9 @@ describe("v1.9.62 (Lupa 202834): a varredura idempotente das tarefas de ANTES da
     expect(varrer(`'{}'::text[]`)).toBe("0");
     expect(valor(`select status from public.crm_tasks where id='${T_PROMESSA}';`)).toBe("cancelled");
     expect(valor(`select status from public.crm_tasks where id='${T_DEPOIS}';`)).toBe("pending");
+  });
+
+  it("(Lupa 203526) o lead com esteira_passou_em SEM a marca do move (um roteiro de dado) NUNCA é varrido", () => {
+    expect(valor(`select status from public.crm_tasks where id='${T_JUNTADO}';`)).toBe("pending");
   });
 });
