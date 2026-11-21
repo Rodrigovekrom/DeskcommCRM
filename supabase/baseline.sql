@@ -50614,6 +50614,9 @@ $$;
 --    (a régua da esteira: ligacao:L1..L7 e ligacao:quente) com p_motivo_automaticas e, se p_motivo_de_pessoa vier, TODAS
 --    as outras abertas (as de pessoa) com ele. Cada uma ganha a linha 'task_cancelled' (o mesmo formato da 0640).
 --    Nenhuma tarefa é reatribuída: o novo dono recebe o lead limpo. Devolve {automaticas, de_pessoa}.
+-- (Lupa 203241) a assinatura de 4 argumentos de um ensaio anterior sai antes: sem ela, a nova seria uma 2ª versão ao lado
+-- e a chamada de 4 argumentos (a 0650) ficaria ambígua.
+drop function if exists public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text);
 create or replace function public.fn_iavek_tarefas_da_passagem(
   p_org uuid,
   p_lead uuid,

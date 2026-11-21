@@ -159,18 +159,22 @@ export async function registrarLigacao(args: {
       // quem chamou já viu a tarefa ABERTA pela sessão: 0 linhas aqui é a RLS barrando o fechamento (ou outro clique
       // fechou no meio). A ligação ficou na linha do tempo (ela aconteceu); a próxima que nasceu aqui é cancelada, para
       // não ficar uma ligação a mais.
+      const naoCanceladas: Array<{ id: string; erro: string }> = [];
       for (const id of criadas) {
-        await supabase
+        const { error: errCancelar } = await supabase
           .from("crm_tasks")
           .update({ status: "cancelled", cancelada_motivo: MOTIVO_SEM_FECHAMENTO })
           .eq("id", id)
           .eq("organization_id", orgId);
+        // (Lupa 203241) o erro do cancelamento vai ao log com o id, para alguém achar a ligação a mais
+        if (errCancelar) naoCanceladas.push({ id, erro: (errCancelar.code ?? errCancelar.message).slice(0, 80) });
       }
       logger.error("[ligacao] a tarefa não fechou; a próxima foi cancelada", {
         request_id: requestId,
         org_id: orgId,
         task_id: tarefa.id,
-        canceladas: criadas.length,
+        canceladas: criadas.length - naoCanceladas.length,
+        ...(naoCanceladas.length ? { nao_canceladas: naoCanceladas } : {}),
         erro: (errFechar?.message ?? "0 linhas").slice(0, 200),
       });
       if (errFechar) return fail("internal_error", "Não deu para fechar a tarefa.", 500, { requestId });

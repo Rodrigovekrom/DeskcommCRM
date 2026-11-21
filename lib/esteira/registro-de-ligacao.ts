@@ -64,6 +64,12 @@ export interface SituacaoDoNegocio {
   status: string;
 }
 
+/**
+ * ⚠️ v1.9.62 (0649, Lupa 203241): este registro SÓ cria 'ligacao:retentativa' e 'ligacao:retorno'. O registrar
+ * (_ligacao/registrar.ts) cria a próxima com a atual AINDA aberta e só depois a fecha; o gatilho da 0640
+ * (trg_iavek_ligacao_nasceu) cancela as anteriores quando nasce uma L2–L7 ou 'quente', e mataria a atual no meio. Criar
+ * L* ou 'quente' aqui quebra a ordem nova (o teste tests/unit/iavek-v1962-registro-so-cria-retorno.test.ts trava isso).
+ */
 export function efeitosDoRegistro(
   r: RegistroDeLigacao,
   tarefa: { source_kind: string },
