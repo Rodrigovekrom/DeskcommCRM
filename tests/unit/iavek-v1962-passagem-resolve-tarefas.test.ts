@@ -23,6 +23,7 @@ let funcao: string;
 let papel: string;
 let lead: Record<string, unknown>;
 let tarefaVolta: boolean;
+let passagemResponde: Record<string, unknown>;
 
 function banco() {
   return {
@@ -88,9 +89,10 @@ function mocks() {
       automaticasFechadas.push(id);
     },
     anotarCampos: async () => ({ ...CAMPOS }),
-    mudarDono: async () => {
+    passarLeadNumaTransacao: async (_a: unknown, args: { leadId: string }) => {
       donosMudados += 1;
-      return true;
+      automaticasFechadas.push(args.leadId);
+      return passagemResponde;
     },
     moverParaAEtapaDaPassagem: async () => true,
     passarAConversa: async () => undefined,
@@ -121,6 +123,7 @@ beforeEach(() => {
   funcao = "sdr";
   papel = "agent";
   tarefaVolta = true;
+  passagemResponde = { ok: true };
   lead = {
     id: LEAD,
     organization_id: ORG,
@@ -154,6 +157,22 @@ describe("v1.9.62 (D4 1A): a passagem por pessoa exige as tarefas resolvidas", (
     expect(corpo.error.details.tarefas.map((x) => x.id)).toEqual([TAREFA]);
     expect(donosMudados).toBe(0);
     expect(automaticasFechadas).toEqual([]);
+  });
+
+  it("a transação acha tarefa que nasceu no meio: 409 tarefas_abertas (a recusa vem do banco)", async () => {
+    lead = { ...lead, owner_user_id: "outro-vendedor" };
+    passagemResponde = { ok: false, motivo: "tarefas_abertas", tarefas: [{ id: TAREFA }] };
+    const res = await passar(TROCA);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("tarefas_abertas");
+  });
+
+  it("outra pessoa mudou o dono no meio: 409 state_conflict", async () => {
+    lead = { ...lead, owner_user_id: "outro-vendedor" };
+    passagemResponde = { ok: false, motivo: "dono_mudou" };
+    const res = await passar(TROCA);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("state_conflict");
   });
 
   it("sem tarefa de pessoa aberta: passa, e as automáticas fecham depois da troca de dono", async () => {

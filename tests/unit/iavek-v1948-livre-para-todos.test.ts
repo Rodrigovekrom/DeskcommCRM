@@ -120,6 +120,12 @@ function montarMocks() {
     fecharAutomaticasDaPassagem: async (_a: unknown, _o: string, lead: string) => {
       automaticasFechadas.push(lead);
     },
+    // v1.9.62 (0650): a passagem numa transação (o dono, o guardião e o fecho das automáticas)
+    passarLeadNumaTransacao: async (_a: unknown, args: { leadId: string; dono: string; guardiao: string | null }) => {
+      gravados.push({ tabela: "crm_leads", op: "update", valores: { owner_user_id: args.dono, sdr_user_id: args.guardiao } });
+      automaticasFechadas.push(args.leadId);
+      return { ok: true };
+    },
   }));
   vi.doMock("@/lib/iavek/avisos-da-proposta", async (orig) => ({
     ...(await orig<Record<string, unknown>>()),

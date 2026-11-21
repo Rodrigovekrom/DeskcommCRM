@@ -49,7 +49,7 @@ import {
   passarAConversa,
   registrarPassagem,
   tarefasDePessoaAbertas,
-  fecharAutomaticasDaPassagem,
+  passarLeadNumaTransacao,
 } from "@/lib/iavek/passagem-servidor";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -314,9 +314,9 @@ async function sdrMarca(
     guardiaoNovo: ehSdr ? authz.user.id : null,
     vendedorId,
     lead: negocio,
+    atorId: authz.user.id,
   });
-  // v1.9.62 (D4): passou de mãos, as automáticas abertas fecham ('passou_o_lead'); o vendedor recebe o lead limpo.
-  if (leadPassado && mudouDeMaos) await fecharAutomaticasDaPassagem(admin, orgId, leadPassado);
+  // v1.9.62 (D4): passou de mãos, as automáticas abertas já fecharam na transação da passagem (0650).
   // v1.9.48 (0628, Maestro 113810): o lead SEM DONO e SEM GUARDIÃO que alguém de fora do SDR agenda ganha guardião
   // da LISTA do rodízio (a mesma do aviso do grupo, 0623). Quem agendou fica dono; lead que já tinha guardião não muda.
   if (leadPassado && negocio && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {
@@ -445,37 +445,27 @@ async function leadDoCliente(
  */
 async function passarOLeadAoVendedor(
   admin: ReturnType<typeof createAdminClient>,
-  args: { orgId: string; guardiaoNovo: string | null; vendedorId: string; lead: NegocioDoCliente },
+  args: { orgId: string; guardiaoNovo: string | null; vendedorId: string; lead: NegocioDoCliente; atorId: string },
 ): Promise<string | null> {
   const { lead } = args;
   if (lead.owner_user_id === args.vendedorId) return lead.id;
   const guardiao = lead.sdr_user_id ?? args.guardiaoNovo;
-  const mudanca = {
-    owner_user_id: args.vendedorId,
-    owner_kind: "user",
-    owner_agent_id: null,
-    sdr_user_id: guardiao,
-    assigned_at: new Date().toISOString(),
-  };
-  const sessao = await createClient();
-  const { data: peloSdr } = await sessao
-    .from("crm_leads")
-    .update(mudanca)
-    .eq("organization_id", args.orgId)
-    .eq("id", lead.id)
-    .select("id")
-    .maybeSingle();
-  if (peloSdr) return lead.id;
-  // Pelo servidor só com o dono que a SESSÃO viu (e conferiu acima): se outra
-  // pessoa assumiu o lead no meio do caminho, não passa por cima dela.
-  let peloServidor = admin
-    .from("crm_leads")
-    .update(mudanca)
-    .eq("organization_id", args.orgId)
-    .eq("id", lead.id);
-  peloServidor = lead.owner_user_id ? peloServidor.eq("owner_user_id", lead.owner_user_id) : peloServidor.is("owner_user_id", null);
-  const { data } = await peloServidor.select("id").maybeSingle();
-  return data ? lead.id : null;
+  // v1.9.62 (0650, CRM-497 D4): numa transação só, pelo servidor, e só com o dono que a SESSÃO viu (e conferiu acima):
+  // se outra pessoa assumiu o lead no meio do caminho, não passa por cima dela; com tarefa de pessoa aberta (nasceu no
+  // meio), não passa. Fecha as automáticas junto. Era: a sessão primeiro, depois o servidor, sem as tarefas.
+  const r = await passarLeadNumaTransacao(admin, {
+    orgId: args.orgId,
+    leadId: lead.id,
+    donoAnterior: lead.owner_user_id,
+    dono: args.vendedorId,
+    guardiao,
+    atorId: args.atorId,
+  });
+  if (!r.ok) {
+    logger.warn("[iavek-agenda] o lead não passou ao vendedor", { lead_id: lead.id, motivo: r.motivo });
+    return null;
+  }
+  return lead.id;
 }
 
 /** Sem tipo escolhido: o único tipo ativo da empresa, se houver um só. */

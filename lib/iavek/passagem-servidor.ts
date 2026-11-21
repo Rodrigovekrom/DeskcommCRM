@@ -102,6 +102,49 @@ export async function tarefasDePessoaAbertas(admin: SupabaseClient, orgId: strin
 }
 
 /**
+ * v1.9.62 (0650, CRM-497 D4; Lupa 1718): a passagem por PESSOA numa transação só (fn_iavek_passar_lead): trava o lead,
+ * confere o dono que a rota leu, recusa com tarefa de pessoa aberta, troca o dono e o guardião e fecha as automáticas.
+ * O aviso 'lead_passado' do gatilho nasce sem autor (é o servidor que escreve): o autor certo é gravado aqui, como o
+ * caminho do servidor de `mudarDono` já fazia.
+ */
+export type ResultadoDaPassagem =
+  | { ok: true }
+  | { ok: false; motivo: "tarefas_abertas"; tarefas: TarefaAbertaDaPassagem[] }
+  | { ok: false; motivo: "dono_mudou" | "lead_fechado" | "erro" };
+
+export async function passarLeadNumaTransacao(
+  admin: SupabaseClient,
+  args: { orgId: string; leadId: string; donoAnterior: string | null; dono: string; guardiao: string | null; atorId: string },
+): Promise<ResultadoDaPassagem> {
+  const { data, error } = await admin.rpc("fn_iavek_passar_lead" as never, {
+    p_org: args.orgId,
+    p_lead: args.leadId,
+    p_dono_anterior: args.donoAnterior,
+    p_dono: args.dono,
+    p_guardiao: args.guardiao,
+  } as never);
+  if (error) {
+    logger.error("[iavek-passagem] a passagem não rodou", { lead_id: args.leadId, erro: error.message });
+    return { ok: false, motivo: "erro" };
+  }
+  const r = (data ?? {}) as { ok?: boolean; motivo?: string; tarefas?: TarefaAbertaDaPassagem[] };
+  if (!r.ok) {
+    if (r.motivo === "tarefas_abertas") return { ok: false, motivo: "tarefas_abertas", tarefas: r.tarefas ?? [] };
+    return { ok: false, motivo: r.motivo === "dono_mudou" || r.motivo === "lead_fechado" ? r.motivo : "erro" };
+  }
+  await admin
+    .from("notificacoes")
+    .update({ ator_user_id: args.atorId })
+    .eq("organization_id", args.orgId)
+    .eq("lead_id", args.leadId)
+    .eq("user_id", args.dono)
+    .eq("tipo", "lead_passado")
+    .is("ator_user_id", null)
+    .gte("created_at", new Date(Date.now() - 120_000).toISOString());
+  return { ok: true };
+}
+
+/**
  * v1.9.62 (D4): depois de uma passagem POR PESSOA (que já exigiu zero de pessoa abertas), as AUTOMÁTICAS abertas fecham
  * com o motivo 'passou_o_lead': o novo dono recebe o lead limpo, e a régua do funil cria as dela. Nunca derruba a
  * passagem (o lead já passou): erro vai ao log.

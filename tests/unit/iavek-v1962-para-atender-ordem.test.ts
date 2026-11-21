@@ -10,11 +10,11 @@ import { describe, expect, it } from "vitest";
 const ler = (p: string) => readFileSync(p, "utf8");
 
 describe("a etapa antes do dono, nas passagens que escolhem a etapa", () => {
-  it("negociar: moverParaAEtapaDaPassagem(..., 'negociar') vem antes do mudarDono", () => {
+  it("negociar: moverParaAEtapaDaPassagem(..., 'negociar') vem antes da troca de dono", () => {
     const r = ler("app/api/v1/iavek/passagem/route.ts");
     const ramo = r.slice(r.indexOf('if (p.tipo === "negociar")'), r.indexOf('if (p.tipo === "devolver")'));
     expect(ramo.indexOf('moverParaAEtapaDaPassagem(admin, ctx, lead, "negociar")')).toBeGreaterThan(0);
-    expect(ramo.indexOf('moverParaAEtapaDaPassagem(admin, ctx, lead, "negociar")')).toBeLessThan(ramo.indexOf("mudarDono("));
+    expect(ramo.indexOf('moverParaAEtapaDaPassagem(admin, ctx, lead, "negociar")')).toBeLessThan(ramo.indexOf("passarLeadNumaTransacao("));
   });
 
   it("agendamento que muda o dono: a etapa antes do passarOLeadAoVendedor, e não move duas vezes", () => {

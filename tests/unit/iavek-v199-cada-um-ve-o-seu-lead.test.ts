@@ -96,7 +96,8 @@ describe("v1.9.9-seg (parte 2) — as rotas que usam a chave de serviço", () =>
     // e escondia do SDR o lead sem dono de antes de 02/11); nada do lead volta na resposta. A escrita pelo servidor
     // segue só com o dono conferido.
     expect(rota).toMatch(/async function leadDoCliente\(\s*admin: ReturnType<typeof createAdminClient>,[\s\S]{0,200}let consulta = admin/);
-    expect(rota).toMatch(/peloServidor\.eq\("owner_user_id", lead\.owner_user_id\) : peloServidor\.is\("owner_user_id", null\)/);
+    // v1.9.62 (0650): a escrita é a transação da passagem, com o dono que a rota leu (o banco recusa 'dono_mudou')
+    expect(rota).toMatch(/passarLeadNumaTransacao\(admin, \{[\s\S]{0,120}donoAnterior: lead\.owner_user_id,/);
   });
 
   it("B3: a passagem (GET e POST) responde 404 a quem não enxerga o lead", () => {
