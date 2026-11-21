@@ -172,4 +172,8 @@ anterior ao mês atual) e uma seção no painel do gerente. Entra junto.
 - `fn_iavek_notifica_tarefa_vencida`: só avisa tarefa de lead `open`. O **`future`** não avisa, decidido de propósito,
   igual a perdido e ganho. Entrou na lista da trava do status, que agora também pega `is distinct from 'open'`.
 
+- `fn_iavek_passar_lead` (0650, v1.9.62, CRM-497): a passagem por pessoa numa transação só passa lead `open`. O **`future`**
+  (Compra futura) volta `lead_fechado` e nada muda, decidido de propósito: nenhuma rota de passagem passa lead futuro (a
+  rota da passagem exige `open` nas permissões e o agendamento lê o lead `open`).
+
 - `fn_iavek_contatos_do_followup` (0635, v1.9.52): o SDR de Follow-up vê o contato e a conversa dos leads do funil Follow-up com status `open` OU `future` (o lead em Compra futura segue sendo trabalhado no Follow-up); o fechado (ganho/perdido) não.

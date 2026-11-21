@@ -29,6 +29,7 @@ const DECIDIDAS = [
   "fn_iavek_lead_segue_a_conversa",
   "fn_iavek_notifica_mudanca_do_lead",
   "fn_iavek_notifica_tarefa_vencida", // 0621: só avisa tarefa de lead 'open' (future, perdido e ganho não avisam)
+  "fn_iavek_passar_lead", // 0650 (v1.9.62): só passa lead 'open'; o 'future' (Compra futura) volta 'lead_fechado' (nenhuma rota de passagem o passa: Lupa 202834)
   "fn_iavek_preco_do_carro_mudou",
   "fn_iavek_rodizio_distribuir",
   "fn_iavek_trava_guardiao_do_lead",

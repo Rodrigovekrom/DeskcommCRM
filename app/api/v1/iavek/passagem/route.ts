@@ -219,7 +219,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   };
   // v1.9.62 (0650): a recusa da transação da passagem. 'tarefas_abertas' (nasceu uma no meio): o mesmo 409 com a lista;
-  // 'dono_mudou' (outra pessoa assumiu no meio): 409, sem passar por cima; o resto: 500 com a mensagem do caminho.
+  // 'dono_mudou' (outra pessoa assumiu no meio): 409, sem passar por cima; o resto: 500 com a mensagem (já traduzida) do caminho.
   const falhaDaPassagem = (r: Exclude<ResultadoDaPassagem, { ok: true }>, msg: string): Response => {
     if (r.motivo === "tarefas_abertas") {
       return fail("tarefas_abertas", t("Antes de passar o lead, resolva as tarefas abertas dele."), 409, {
@@ -230,7 +230,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (r.motivo === "dono_mudou") {
       return fail("state_conflict", t("Outra pessoa mudou o dono deste lead agora. Atualize e confira."), 409, { requestId });
     }
-    return fail("internal_error", t(msg), 500, { requestId });
+    return fail("internal_error", msg, 500, { requestId });
   };
 
   if (p.tipo === "negociar") {
@@ -254,7 +254,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     await moverParaAEtapaDaPassagem(admin, ctx, lead, "negociar");
     // v1.9.62 (0650): o dono, o guardião e o fecho das automáticas numa transação, com as tarefas conferidas de novo
     const passou = await passarLeadNumaTransacao(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao, atorId: eu, donoAnterior: lead.owner_user_id });
-    if (!passou.ok) return falhaDaPassagem(passou, "Não consegui passar o lead.");
+    if (!passou.ok) return falhaDaPassagem(passou, t("Não consegui passar o lead."));
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead para negociar" });
     await criarTarefaInterna(admin, {
       organizationId: orgId,
@@ -286,7 +286,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     const guardiao = lead.sdr_user_id as string;
     // v1.9.62 (0650): o dono, o guardião e o fecho das automáticas numa transação, com as tarefas conferidas de novo
     const passou = await passarLeadNumaTransacao(admin, { orgId, leadId: lead.id, dono: guardiao, guardiao, atorId: eu, donoAnterior: lead.owner_user_id });
-    if (!passou.ok) return falhaDaPassagem(passou, "Não consegui devolver o lead.");
+    if (!passou.ok) return falhaDaPassagem(passou, t("Não consegui devolver o lead."));
     await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: guardiao }, "devolver");
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: guardiao, actor: ctx.actor, motivo: "Devolveu o lead ao guardião" });
     await avisoDaPassagem(admin, {
@@ -323,7 +323,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     const anterior = lead.owner_user_id as string;
     // v1.9.62 (0650): o dono, o guardião e o fecho das automáticas numa transação, com as tarefas conferidas de novo
     const passou = await passarLeadNumaTransacao(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao: lead.sdr_user_id, atorId: eu, donoAnterior: lead.owner_user_id });
-    if (!passou.ok) return falhaDaPassagem(passou, "Não consegui trocar o vendedor.");
+    if (!passou.ok) return falhaDaPassagem(passou, t("Não consegui trocar o vendedor."));
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead a outro vendedor" });
     // Quem perdeu o lead fica sabendo, com o motivo.
     await avisoDaPassagem(admin, {
