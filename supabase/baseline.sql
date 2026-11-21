@@ -50639,7 +50639,7 @@ begin
        and t.status in ('pending', 'in_progress')
        and (t.source_kind = any(v_auto) or p_motivo_de_pessoa is not null)
     returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind, t.cancelada_motivo,
-              (t.source_kind = any(v_auto)) as automatica
+              coalesce(t.source_kind = any(v_auto), false) as automatica  -- source_kind nulo: null = any() é NULL
   ), log as (
     insert into public.crm_lead_activities
       (organization_id, lead_id, contact_id, source_module, source_id, type, actor_kind, reason, payload, metadata, performed_at)
