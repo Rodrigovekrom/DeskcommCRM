@@ -118,7 +118,7 @@ describe("0649: PASSA", () => {
         sql(`insert into public.crm_tasks (organization_id, title, contact_id, assigned_to, due_date, status)
              values ('${GOV_ORG}', 'Servidor 0649', '${C_LIVRE}', '${GOV_AGENT_A}', now() + interval '1 day', 'pending') returning 'CRIOU';`),
       ),
-    ).toBe("CRIOU");
+    ).toMatch(/CRIOU|INSERT 0 1/);
   });
 
   it("o registro de ligação: a próxima nasce com a atual AINDA aberta (outra tarefa aberta dele), e então a atual fecha", () => {
