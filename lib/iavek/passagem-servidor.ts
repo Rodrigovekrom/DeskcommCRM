@@ -59,6 +59,67 @@ export function horasDoCiclo(settingsDaOrg: unknown): number {
 export const MOTIVO_DA_PASSAGEM = "passou_o_lead";
 export const MOTIVO_SEM_REVISAO = "passagem_sem_revisao";
 
+/**
+ * v1.9.62 (CRM-497, D4 1A do Rodrigo): as tarefas AUTOMÁTICAS são a régua da esteira (`ligacao:L1..L7` e
+ * `ligacao:quente`); toda outra tarefa aberta é DE PESSOA (inclusive `ligacao:retorno`/`retentativa` e o próximo passo).
+ */
+export const SOURCE_KINDS_AUTOMATICOS: readonly string[] = [
+  "ligacao:L1",
+  "ligacao:L2",
+  "ligacao:L3",
+  "ligacao:L4",
+  "ligacao:L5",
+  "ligacao:L6",
+  "ligacao:L7",
+  "ligacao:quente",
+];
+
+export interface TarefaAbertaDaPassagem {
+  id: string;
+  title: string;
+  assigned_to: string | null;
+  due_date: string | null;
+  status: string;
+}
+
+/**
+ * v1.9.62 (D4 1A): as tarefas DE PESSOA abertas do lead (de quem for). Quem passa o lead resolve cada uma antes; com
+ * alguma aberta, a passagem por pessoa é recusada (409 `tarefas_abertas`) e NADA muda. Erro de leitura LANÇA: uma
+ * leitura que não aconteceu não vira "nenhuma aberta".
+ */
+export async function tarefasDePessoaAbertas(admin: SupabaseClient, orgId: string, leadId: string): Promise<TarefaAbertaDaPassagem[]> {
+  const { data, error } = await admin
+    .from("crm_tasks")
+    .select("id, title, assigned_to, due_date, status, source_kind")
+    .eq("organization_id", orgId)
+    .eq("lead_id", leadId)
+    .in("status", ["pending", "in_progress"])
+    .order("due_date", { ascending: true, nullsFirst: false });
+  if (error) throw new Error(`tarefas_da_passagem: ${error.message}`);
+  return ((data ?? []) as Array<TarefaAbertaDaPassagem & { source_kind: string | null }>)
+    .filter((t) => !SOURCE_KINDS_AUTOMATICOS.includes(t.source_kind ?? ""))
+    .map(({ source_kind: _s, ...t }) => t);
+}
+
+/**
+ * v1.9.62 (D4): depois de uma passagem POR PESSOA (que já exigiu zero de pessoa abertas), as AUTOMÁTICAS abertas fecham
+ * com o motivo 'passou_o_lead': o novo dono recebe o lead limpo, e a régua do funil cria as dela. Nunca derruba a
+ * passagem (o lead já passou): erro vai ao log.
+ */
+export async function fecharAutomaticasDaPassagem(admin: SupabaseClient, orgId: string, leadId: string): Promise<void> {
+  try {
+    const { error } = await admin.rpc("fn_iavek_tarefas_da_passagem" as never, {
+      p_org: orgId,
+      p_lead: leadId,
+      p_motivo_automaticas: MOTIVO_DA_PASSAGEM,
+      p_motivo_de_pessoa: null,
+    } as never);
+    if (error) throw new Error(error.message);
+  } catch (e) {
+    logger.error("[iavek-passagem] as automáticas não fecharam", { lead_id: leadId, erro: e instanceof Error ? e.message : String(e) });
+  }
+}
+
 /** v1.9.62: a 1ª etapa ABERTA do funil (nem ganho, nem perda, nem arquivada), pela posição. */
 async function primeiraEtapaAberta(admin: SupabaseClient, orgId: string, pipelineId: string): Promise<string | null> {
   const { data } = await admin

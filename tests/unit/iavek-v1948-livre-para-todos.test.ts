@@ -34,6 +34,8 @@ let avisosAoDono: unknown[];
 let avisosAoVendedor: unknown[];
 let compromissos: Array<Record<string, unknown>>;
 let pedidosGravados: number;
+let tarefasAbertas: Array<Record<string, unknown>>;
+let automaticasFechadas: string[];
 
 /** Um banco de mentira: toda cadeia aceita qualquer filtro e GRAVA updates/inserts. */
 function banco(dados: (tabela: string) => unknown) {
@@ -113,6 +115,11 @@ function montarMocks() {
     registrarPassagem: async () => {
       gravados.push({ tabela: "passagem", op: "insert", valores: {} });
     },
+    // v1.9.62 (CRM-497, D4 1A): as tarefas de pessoa abertas do lead e o fecho das automáticas na passagem
+    tarefasDePessoaAbertas: async () => tarefasAbertas,
+    fecharAutomaticasDaPassagem: async (_a: unknown, _o: string, lead: string) => {
+      automaticasFechadas.push(lead);
+    },
   }));
   vi.doMock("@/lib/iavek/avisos-da-proposta", async (orig) => ({
     ...(await orig<Record<string, unknown>>()),
@@ -149,6 +156,8 @@ beforeEach(() => {
   marcaDireto = true;
   ehSdr = false;
   etapaMovida = 0;
+  tarefasAbertas = [];
+  automaticasFechadas = [];
   montarMocks();
 });
 
@@ -189,6 +198,35 @@ describe("(2) o lead SEM dono: quem agenda fica dono, e o guardião vem do rodí
     expect(donoMexido().map((g) => g.valores.owner_user_id)).toContain(EU);
     expect(rpcs).toEqual([{ nome: "fn_iavek_guardiao_do_agendamento", args: { p_org: ORG, p_lead: LEAD, p_ator: EU } }]);
     expect(avisosAoDono).toEqual([]); // não havia dono para avisar
+  });
+});
+
+describe("v1.9.62 (CRM-497, D4 1A): o agendamento que PASSA o lead exige as tarefas resolvidas", () => {
+  it("com tarefa de pessoa aberta: 409 tarefas_abertas com a lista, e NADA é gravado (nem pedido, nem dono)", async () => {
+    leadDaSessao = { id: LEAD, custom_fields: {}, owner_user_id: null, sdr_user_id: null };
+    tarefasAbertas = [{ id: "t1", title: "Retornar", assigned_to: DONO, due_date: null, status: "pending" }];
+    const res = await agendar({ vendedor_id: EU });
+    expect(res.status).toBe(409);
+    const corpo = (await res.json()) as { error: { code: string; details: { tarefas: unknown[] } } };
+    expect(corpo.error.code).toBe("tarefas_abertas");
+    expect(corpo.error.details.tarefas).toHaveLength(1);
+    expect(gravados).toEqual([]);
+    expect(compromissos).toEqual([]);
+  });
+
+  it("sem tarefa de pessoa aberta: passa, e as automáticas fecham depois da passagem", async () => {
+    leadDaSessao = { id: LEAD, custom_fields: {}, owner_user_id: null, sdr_user_id: null };
+    const res = await agendar({ vendedor_id: EU });
+    expect(res.status).toBe(201);
+    expect(automaticasFechadas).toEqual([LEAD]);
+  });
+
+  it("no lead de OUTRA pessoa (não passa o lead), as tarefas não travam nem fecham", async () => {
+    leadDaSessao = { id: LEAD, custom_fields: {}, owner_user_id: DONO, sdr_user_id: null };
+    tarefasAbertas = [{ id: "t1", title: "Retornar", assigned_to: DONO, due_date: null, status: "pending" }];
+    const res = await agendar({ vendedor_id: EU });
+    expect(res.status).toBe(201);
+    expect(automaticasFechadas).toEqual([]);
   });
 });
 

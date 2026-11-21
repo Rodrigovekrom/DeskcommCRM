@@ -42,6 +42,8 @@ import {
   reativarLead,
   registrarPassagem,
   leadVisivelPelaSessao,
+  tarefasDePessoaAbertas,
+  fecharAutomaticasDaPassagem,
   type LeadDaPassagem,
 } from "@/lib/iavek/passagem-servidor";
 import { ehLojaDeCarros, lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
@@ -206,12 +208,24 @@ export async function POST(req: NextRequest): Promise<Response> {
   const ctx = { organization_id: authz.org.orgId, actor: { type: "user" as const, id: eu, role: authz.org.role }, requestId };
   const orgId = authz.org.orgId;
   const lead = c.lead;
+  // v1.9.62 (CRM-497, D4 1A do Rodrigo): quem PASSA o lead resolve antes TODAS as tarefas de pessoa abertas dele (de
+  // quem for). Com alguma aberta: 409 com a lista, e NADA muda. Perguntado depois da permissão, antes da 1ª escrita.
+  const recusaPorTarefasAbertas = async (): Promise<Response | null> => {
+    const abertas = await tarefasDePessoaAbertas(admin, orgId, lead.id);
+    if (abertas.length === 0) return null;
+    return fail("tarefas_abertas", t("Antes de passar o lead, resolva as tarefas abertas dele."), 409, {
+      requestId,
+      details: { tarefas: abertas },
+    });
+  };
 
   if (p.tipo === "negociar") {
     if (!pode.negociar) return proibido("Só o guardião do lead (ou a gerência) passa o lead para negociar.");
     if (!(await vendedoresDaLoja(admin, orgId)).some((v) => v.id === p.vendedor_id)) {
       return fail("validation_failed", t("Escolha um vendedor da loja."), 422, { requestId });
     }
+    const comTarefas = await recusaPorTarefasAbertas();
+    if (comTarefas) return comTarefas;
     const campos = (await anotarCampos(admin, orgId, lead.id, p.campos)) ?? lead.custom_fields;
     const faltam = camposQueFaltam(campos);
     if (faltam.length > 0) {
@@ -224,6 +238,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao, atorId: eu, donoAnterior: lead.owner_user_id }))) {
       return fail("internal_error", t("Não consegui passar o lead."), 500, { requestId });
     }
+    await fecharAutomaticasDaPassagem(admin, orgId, lead.id);
     await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: p.vendedor_id, sdr_user_id: guardiao }, "negociar");
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead para negociar" });
     await criarTarefaInterna(admin, {
@@ -251,10 +266,13 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   if (p.tipo === "devolver") {
     if (!pode.devolver) return proibido("Só o vendedor dono do lead devolve ao guardião.");
+    const comTarefas = await recusaPorTarefasAbertas();
+    if (comTarefas) return comTarefas;
     const guardiao = lead.sdr_user_id as string;
     if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: guardiao, guardiao, atorId: eu, donoAnterior: lead.owner_user_id }))) {
       return fail("internal_error", t("Não consegui devolver o lead."), 500, { requestId });
     }
+    await fecharAutomaticasDaPassagem(admin, orgId, lead.id);
     await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: guardiao }, "devolver");
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: guardiao, actor: ctx.actor, motivo: "Devolveu o lead ao guardião" });
     await avisoDaPassagem(admin, {
@@ -286,10 +304,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     if (!(await vendedoresDaLoja(admin, orgId)).some((v) => v.id === p.vendedor_id)) {
       return fail("validation_failed", t("Escolha um vendedor da loja."), 422, { requestId });
     }
+    const comTarefas = await recusaPorTarefasAbertas();
+    if (comTarefas) return comTarefas;
     const anterior = lead.owner_user_id as string;
     if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao: lead.sdr_user_id, atorId: eu, donoAnterior: lead.owner_user_id }))) {
       return fail("internal_error", t("Não consegui trocar o vendedor."), 500, { requestId });
     }
+    await fecharAutomaticasDaPassagem(admin, orgId, lead.id);
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead a outro vendedor" });
     // Quem perdeu o lead fica sabendo, com o motivo.
     await avisoDaPassagem(admin, {
@@ -314,6 +335,8 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   // reativar
   if (!pode.reativar) return proibido("Só o guardião, o dono ou a gestão reativam um lead do follow-up.");
+  const comTarefas = await recusaPorTarefasAbertas();
+  if (comTarefas) return comTarefas;
   const r = await reativarLead(admin, ctx, lead, { atorId: eu, motivo: p.motivo ?? "Reativado na tela" });
   if (!r.ok) return fail("state_conflict", t("Não consegui reativar o lead."), 409, { requestId, details: { causa: r.erro } });
   return feito(authz, requestId, lead.id, "reativar", { novo_lead_id: r.novoLeadId, para: r.para });

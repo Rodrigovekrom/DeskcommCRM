@@ -48,6 +48,8 @@ import {
   moverParaAEtapaDaPassagem,
   passarAConversa,
   registrarPassagem,
+  tarefasDePessoaAbertas,
+  fecharAutomaticasDaPassagem,
 } from "@/lib/iavek/passagem-servidor";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -219,6 +221,17 @@ async function sdrMarca(
   // de OUTRA pessoa passa, e NÃO tira o lead do dono (antes: 403, "peça à gerência"). O lead SEM dono (ou o da própria
   // pessoa) segue a passagem de sempre. Sem lead aberto do contato, o compromisso nasce só no contato.
   const deOutraPessoa = negocio !== null && negocio.owner_user_id !== null && negocio.owner_user_id !== authz.user.id;
+  // v1.9.62 (CRM-497, D4 1A do Rodrigo): quando o agendamento PASSA o lead (ele muda de mãos), quem passa resolve antes
+  // as tarefas de pessoa abertas dele. Com alguma aberta: 409 com a lista, ANTES da 1ª escrita (nem os campos, nem o pedido).
+  if (negocio !== null && !deOutraPessoa && negocio.owner_user_id !== vendedorId) {
+    const abertas = await tarefasDePessoaAbertas(admin, orgId, negocio.id);
+    if (abertas.length > 0) {
+      return fail("tarefas_abertas", t("Antes de passar o lead, resolva as tarefas abertas dele."), 409, {
+        requestId,
+        details: { tarefas: abertas },
+      });
+    }
+  }
   // ia.vek 0613 (CRM-255/257): marcar pede só o lead, o dia e a hora. Os campos que vierem seguem
   // gravados no negócio; o que faltar NÃO trava mais o agendamento.
   const campos = negocio ? ((await anotarCampos(admin, orgId, negocio.id, passagem.campos)) ?? negocio.custom_fields) : null;
@@ -291,6 +304,8 @@ async function sdrMarca(
     vendedorId,
     lead: negocio,
   });
+  // v1.9.62 (D4): passou de mãos, as automáticas abertas fecham ('passou_o_lead'); o vendedor recebe o lead limpo.
+  if (leadPassado && mudouDeMaos) await fecharAutomaticasDaPassagem(admin, orgId, leadPassado);
   // v1.9.48 (0628, Maestro 113810): o lead SEM DONO e SEM GUARDIÃO que alguém de fora do SDR agenda ganha guardião
   // da LISTA do rodízio (a mesma do aviso do grupo, 0623). Quem agendou fica dono; lead que já tinha guardião não muda.
   if (leadPassado && negocio && !ehSdr && negocio.owner_user_id === null && negocio.sdr_user_id === null) {
