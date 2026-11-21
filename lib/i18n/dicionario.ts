@@ -1633,6 +1633,7 @@ export const DICIONARIO: Traducoes = {
   "Nenhuma tarefa aberta. O lead vai limpo para quem recebe.": { es: "Ninguna tarea abierta. El lead va limpio para quien lo recibe." },
   "Resolva cada tarefa antes de passar: depois da passagem, nenhuma tarefa vai para quem recebe.": { es: "Resuelva cada tarea antes de pasar: después del pase, ninguna tarea va para quien lo recibe." },
   "Já fiz": { es: "Ya lo hice" },
+  "Cancelar TODAS as tarefas abertas deste lead (dá para voltar)?": { es: "¿Cancelar TODAS las tareas abiertas de este lead (se pueden recuperar)?" },
   "Resolver todas": { es: "Resolver todas" },
   "Excluídas ao passar (dá para voltar)": { es: "Eliminadas al pasar (se pueden recuperar)" },
   "Não consegui mudar a tarefa.": { es: "No pude cambiar la tarea." },

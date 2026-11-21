@@ -21,6 +21,11 @@ import { updateLeadSchema, validateRequest } from "@/lib/schemas";
 import { updateLeadHandler } from "../_handler";
 import { trocaResponsavel } from "@/lib/iavek/funcoes";
 import { funcaoNaOrganizacao } from "@/lib/iavek/contato-no-alcance";
+import { ehLojaDeCarros, lerPerfilDaEmpresa } from "@/lib/iavek/perfil-da-empresa";
+import { fecharAutomaticasDaPassagem, tarefasDePessoaAbertas } from "@/lib/iavek/passagem-servidor";
+import { REGRAS_DA_PASSAGEM } from "@/lib/iavek/regras-da-passagem";
+import { traduzir } from "@/lib/i18n/dicionario";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +86,36 @@ export async function PATCH(
       ? trocaResponsavel(await funcaoNaOrganizacao(supabase, organizationId, actor.id))
       : undefined;
 
+  // ia.vek v1.9.62 (CRM-497, D4 1A + P1 do Rodrigo): na LOJA, a PESSOA que troca o dono pelo quadro também resolve
+  // antes as tarefas de pessoa abertas do lead (o mesmo 409 da passagem). Só quando o dono MUDA de verdade; o token de
+  // integração e a clínica ficam como antes. O ponto único da regra: lib/iavek/regras-da-passagem.ts.
+  let passouPeloQuadro = false;
+  if (
+    REGRAS_DA_PASSAGEM.trocaPeloQuadroExigeTarefasResolvidas &&
+    authz.via === "session" &&
+    actor.type === "user" &&
+    "owner_user_id" in input
+  ) {
+    const admin = createAdminClient();
+    const [{ data: atual }, { data: org }] = await Promise.all([
+      admin.from("crm_leads").select("owner_user_id, status").eq("organization_id", organizationId).eq("id", leadId).maybeSingle(),
+      admin.from("organizations").select("settings").eq("id", organizationId).maybeSingle(),
+    ]);
+    const perfil = lerPerfilDaEmpresa((org as { settings?: unknown } | null)?.settings);
+    const loja = ehLojaDeCarros(perfil) && !perfil.modo_agendamento;
+    const donoAtual = (atual as { owner_user_id: string | null } | null)?.owner_user_id ?? null;
+    if (loja && atual && (input as { owner_user_id?: string | null }).owner_user_id !== donoAtual) {
+      const abertas = await tarefasDePessoaAbertas(admin, organizationId, leadId);
+      if (abertas.length > 0) {
+        return fail("tarefas_abertas", traduzir("Antes de passar o lead, resolva as tarefas abertas dele.", idioma ?? "pt-BR"), 409, {
+          requestId,
+          details: { tarefas: abertas },
+        });
+      }
+      passouPeloQuadro = true;
+    }
+  }
+
   try {
     const updated = await updateLeadHandler(
       supabase,
@@ -94,6 +129,8 @@ export async function PATCH(
       leadId,
       input,
     );
+    // v1.9.62 (D4): passou de mãos, as automáticas abertas fecham ('passou_o_lead')
+    if (passouPeloQuadro) await fecharAutomaticasDaPassagem(createAdminClient(), organizationId, leadId);
     return ok(updated, { requestId });
   } catch (err) {
     if (err instanceof ApiError) {

@@ -3,8 +3,8 @@
  * ia.vek v1.9.62 (CRM-497, D4 1A/2A do Rodrigo) — o passo "Antes de passar: as tarefas deste lead".
  *
  * Quem PASSA o lead resolve antes cada tarefa aberta dele (de quem for): "Já fiz" (marca feita) ou "Excluir" (CANCELA
- * com o motivo 'excluida_ao_passar': fica na linha do tempo e volta se foi engano, em "Voltar"). "Resolver todas" marca
- * todas como feitas, depois de perguntar. As ligações automáticas da régua não aparecem: fecham sozinhas na passagem.
+ * com o motivo 'excluida_ao_passar': fica na linha do tempo e volta se foi engano, em "Voltar"). "Resolver todas" faz o
+ * que REGRAS_DA_PASSAGEM.resolverTodasComo diz (P2; hoje: feitas), depois de perguntar. As ligações automáticas da régua não aparecem: fecham sozinhas na passagem.
  * O botão de passar fica desligado até ZERO abertas (`aoMudarPronto`); o servidor confere de novo (409 tarefas_abertas).
  */
 import { useEffect } from "react";
@@ -14,6 +14,7 @@ import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
+import { REGRAS_DA_PASSAGEM } from "@/lib/iavek/regras-da-passagem";
 
 interface TarefaDoPasso {
   id: string;
@@ -58,10 +59,16 @@ export function TarefasAntesDePassar({ leadId, aoMudarPronto }: { leadId: string
   });
 
   async function resolverTodas() {
-    if (!window.confirm(t("Marcar TODAS as tarefas abertas deste lead como feitas?"))) return;
+    // P2 do Rodrigo (o ponto único em lib/iavek/regras-da-passagem.ts): feitas ou canceladas
+    const acao = REGRAS_DA_PASSAGEM.resolverTodasComo;
+    const pergunta =
+      acao === "feita"
+        ? t("Marcar TODAS as tarefas abertas deste lead como feitas?")
+        : t("Cancelar TODAS as tarefas abertas deste lead (dá para voltar)?");
+    if (!window.confirm(pergunta)) return;
     for (const tarefa of abertas) {
       // uma por vez: cada uma é uma escrita conferida no servidor (a tarefa tem de ser deste lead e estar aberta)
-      await mudar.mutateAsync({ taskId: tarefa.id, acao: "feita" }).catch(() => undefined);
+      await mudar.mutateAsync({ taskId: tarefa.id, acao }).catch(() => undefined);
     }
   }
 

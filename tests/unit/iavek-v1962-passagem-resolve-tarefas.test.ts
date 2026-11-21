@@ -80,7 +80,7 @@ function mocks() {
   }));
   vi.doMock("@/lib/iavek/sdr-marca-direto", () => ({ vendedoresDaLoja: async () => [{ id: VENDEDOR, nome: "V" }] }));
   vi.doMock("@/lib/iavek/passagem-servidor", async (orig) => ({
-    ...(await orig<typeof import("@/lib/iavek/passagem-servidor")>()),
+    ...(await orig<Record<string, unknown>>()),
     leadVisivelPelaSessao: async () => true,
     lerLeadDaPassagem: async () => lead,
     tarefasDePessoaAbertas: async () => abertas,
