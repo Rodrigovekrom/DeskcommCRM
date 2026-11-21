@@ -235,11 +235,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       });
     }
     const guardiao = lead.sdr_user_id ?? (c.funcao === "sdr" || c.funcao === "suporte" ? eu : null);
+    // v1.9.62 (CRM-535): a ETAPA antes do DONO. Com o dono primeiro, o gatilho da 0648 levaria o lead à coluna de
+    // entrada do vendedor e a passagem o moveria de novo para 'qualificado' (2 movimentos, 2 avisos ao guardião).
+    await moverParaAEtapaDaPassagem(admin, ctx, lead, "negociar");
     if (!(await mudarDono(admin, { orgId, leadId: lead.id, dono: p.vendedor_id, guardiao, atorId: eu, donoAnterior: lead.owner_user_id }))) {
       return fail("internal_error", t("Não consegui passar o lead."), 500, { requestId });
     }
     await fecharAutomaticasDaPassagem(admin, orgId, lead.id);
-    await moverParaAEtapaDaPassagem(admin, ctx, { ...lead, owner_user_id: p.vendedor_id, sdr_user_id: guardiao }, "negociar");
     await passarAConversa(admin, { orgId, contactId: lead.contact_id, para: p.vendedor_id, actor: ctx.actor, motivo: "Passou o lead para negociar" });
     await criarTarefaInterna(admin, {
       organizationId: orgId,

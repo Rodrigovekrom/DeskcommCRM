@@ -297,6 +297,17 @@ async function sdrMarca(
   // fica de GUARDIÃO — o cliente aparece no Pipeline do vendedor.
   // O lead só muda de mãos quando é da própria pessoa ou não tem dono; o de outra pessoa fica com o dono (v1.9.48).
   const mudouDeMaos = negocio !== null && !deOutraPessoa && negocio.owner_user_id !== vendedorId;
+  const ctxDoSdr = { organization_id: orgId, actor: { type: "user" as const, id: authz.user.id, role: authz.org.role }, requestId };
+  // v1.9.62 (CRM-535): quando o lead MUDA DE MÃOS, a etapa 'Agendado' vem ANTES do dono. Com o dono primeiro, o gatilho
+  // da 0648 levaria o lead à coluna de entrada do vendedor e daqui ele seria movido de novo (2 movimentos, 2 avisos).
+  let jaMovido = false;
+  if (mudouDeMaos && negocio) {
+    const antes = await lerLeadDaPassagem(admin, orgId, negocio.id);
+    if (antes) {
+      await moverParaAEtapaDaPassagem(admin, ctxDoSdr, antes, "agendamento");
+      jaMovido = true;
+    }
+  }
   const leadPassado = negocio === null ? null : deOutraPessoa ? negocio.id : await passarOLeadAoVendedor(admin, {
     orgId,
     // v1.9.48: o guardião é sempre um SDR. Quem marca sem ser SDR não vira guardião (fica o que já havia).
@@ -319,8 +330,7 @@ async function sdrMarca(
   // v1.9.4: o lead vai para "Agendado" e o RESUMO fica para o vendedor ler.
   const lido = leadPassado ? await lerLeadDaPassagem(admin, orgId, leadPassado) : null;
   if (lido) {
-    const ctxDoSdr = { organization_id: orgId, actor: { type: "user" as const, id: authz.user.id, role: authz.org.role }, requestId };
-    await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");
+    if (!jaMovido) await moverParaAEtapaDaPassagem(admin, ctxDoSdr, lido, "agendamento");
     // o lead de outra pessoa fica com o dono: a conversa também (v1.9.48)
     if (!deOutraPessoa) await passarAConversa(admin, { orgId, contactId: lido.contact_id, para: vendedorId, actor: ctxDoSdr.actor, motivo: "Agendou e passou o lead ao vendedor" });
     // v1.9.48: só é PASSAGEM quando o lead muda de mãos; o vendedor que marca o próprio cliente não passa nada.
