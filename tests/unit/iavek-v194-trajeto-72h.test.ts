@@ -126,12 +126,12 @@ describe("v1.9.4 — a trava ao mover olha o funil novo (0596)", () => {
 describe("v1.9.4 — a esteira: 72h acabou, follow-up e reativação", () => {
   it("só leads nascidos depois de `desde` (não varre os antigos de uma vez)", () => {
     expect(ler("lib/esteira/config.ts")).toContain("desde: z.string().datetime({ offset: true }).optional(),");
-    expect(ler("lib/esteira/rodada.ts")).toContain("(desde === null || Date.parse(l.created_at) >= desde)");
+    expect(ler("lib/esteira/rodada.ts")).toContain("desde === null || Date.parse(l.created_at) >= desde || Boolean(l.passou_em)");
   });
 
   it("no follow-up o dono é o guardião; quem reativa volta ao SDR com um novo ciclo", () => {
     const d = ler("lib/esteira/deps-reais.ts");
-    expect(d).toContain("...(guardiao ? { owner_user_id: guardiao, owner_kind: \"user\", owner_agent_id: null } : {}),");
+    expect(d).toContain("...(dono ? { owner_user_id: dono, owner_kind: \"user\", owner_agent_id: null } : {}),");
     expect(d).toContain("async reativar(lead) {");
     const rd = ler("lib/esteira/rodada.ts");
     expect(rd).toContain("const novo = deps.reativar ? await deps.reativar(lead) : null;");

@@ -5,7 +5,6 @@ import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
 import { entradaDaEsteira } from "@/lib/iavek/cronometro-72h";
 import { ETAPA_DA_PASSAGEM, type CamposDaPassagem, type TipoDePassagem } from "@/lib/iavek/passagem";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
-import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
@@ -54,6 +53,26 @@ export { nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
 /** As horas do ciclo (a esteira da empresa; sem esteira, 72). */
 export function horasDoCiclo(settingsDaOrg: unknown): number {
   return entradaDaEsteira(settingsDaOrg)?.horas ?? 72;
+}
+
+/** v1.9.62 (CRM-497): os motivos das tarefas fechadas na passagem (crm_tasks.cancelada_motivo). */
+export const MOTIVO_DA_PASSAGEM = "passou_o_lead";
+export const MOTIVO_SEM_REVISAO = "passagem_sem_revisao";
+
+/** v1.9.62: a 1ª etapa ABERTA do funil (nem ganho, nem perda, nem arquivada), pela posição. */
+async function primeiraEtapaAberta(admin: SupabaseClient, orgId: string, pipelineId: string): Promise<string | null> {
+  const { data } = await admin
+    .from("crm_stages")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("pipeline_id", pipelineId)
+    .eq("is_archived", false)
+    .eq("is_won", false)
+    .eq("is_lost", false)
+    .order("position", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
 }
 
 export async function etapaPorSlug(
@@ -260,10 +279,10 @@ export async function registrarPassagem(
 /**
  * REATIVAR (decisão do Rodrigo, 27/10): o lead do follow-up que voltou —
  * respondeu no WhatsApp (a esteira detecta) ou o SDR marcou na tela — VOLTA
- * PARA O SDR e o processo recomeça: um clone no funil de ENTRADA, na etapa de
- * entrada, com um NOVO ciclo de 72h, dono = o guardião (o SDR que já cuidava;
- * sem guardião, fica sem dono e aparece em "Chegaram agora — sem dono"). O
- * negócio do follow-up fecha, ligado ao novo (o clone da tela).
+ * PARA O SDR e o processo recomeça: o MESMO lead volta ao funil de ENTRADA (v1.9.62,
+ * CRM-497: era um clone), na etapa de entrada, com um NOVO ciclo de 72h, dono = o
+ * guardião (o SDR que já cuidava; sem guardião, fica sem dono e aparece em
+ * "Chegaram agora — sem dono"). Devolve o id do próprio lead em `novoLeadId`.
  */
 /** v1.9.52: o dono do lead do Follow-up, SE ele é um SDR de Follow-up ativo (role agent, sem revogação) na org. */
 export async function sdrDeFollowupQueCuidava(
@@ -301,32 +320,74 @@ export async function reativarLead(
   const slugDaEntrada = (funil as { settings?: { etapa_de_entrada?: unknown } } | null)?.settings?.etapa_de_entrada;
   const etapa =
     typeof slugDaEntrada === "string" ? await etapaPorSlug(admin, lead.organization_id, entrada.pipeline_id, slugDaEntrada) : null;
-  const r = await clonarLeadParaFunil(admin, ctx, lead.id, { pipeline_id: entrada.pipeline_id, stage_id: etapa });
-  if (!r.ok) return { ok: false, erro: r.code };
-  const novo = r.clone as { id: string };
+  // ia.vek v1.9.62 (CRM-497, "sempre um cartão só"): a volta MOVE o mesmo lead para a entrada (era o clone da tela).
+  // A etapa é a de entrada do funil (o slug); sem ela, a 1ª etapa aberta do funil. Ela TEM de ser do funil de entrada.
+  const etapaDaVolta = etapa ?? (await primeiraEtapaAberta(admin, lead.organization_id, entrada.pipeline_id));
+  if (!etapaDaVolta) return { ok: false, erro: "entrada_sem_etapa" };
+  if (lead.status !== "open") return { ok: false, erro: "lead_nao_esta_aberto" };
+  if (lead.pipeline_id === entrada.pipeline_id) return { ok: false, erro: "ja_esta_na_entrada" };
   // ia.vek v1.9.52 (CRM-254, resposta 1 do Rodrigo): se quem cuidava do lead no Follow-up é um SDR DE FOLLOW-UP ativo
   // (o dono do lead do Follow-up), ELE fica com o reativado, como dono E guardião, para passar ao vendedor como o
   // guardião faz (muda a regra de 27/10, que devolvia ao guardião de antes). Sem SDR de Follow-up, a regra de antes.
   const guardiao = (await sdrDeFollowupQueCuidava(admin, lead)) ?? lead.sdr_user_id;
   const agora = new Date().toISOString();
-  // Ciclo novo: o nascimento das 72h é AGORA (o clone pode herdar a marca do ciclo antigo).
-  const { error: erroDoClone } = await admin
+  // Ciclo novo: o nascimento das 72h é AGORA. O rastro da volta fica no source_metadata.
+  const { data: movido, error: erroDoMove } = await admin
     .from("crm_leads")
     .update({
-      source_metadata: { ...((r.clone as { source_metadata?: Record<string, unknown> }).source_metadata ?? {}), esteira_inicio: agora },
+      pipeline_id: entrada.pipeline_id,
+      stage_id: etapaDaVolta,
+      source_metadata: {
+        ...(lead.source_metadata ?? {}),
+        esteira_inicio: agora,
+        volta: { em: agora, de_pipeline: lead.pipeline_id, de_etapa: lead.stage_id, de_dono: lead.owner_user_id, motivo: args.motivo },
+      },
       ...(guardiao
         ? { owner_user_id: guardiao, owner_kind: "user", owner_agent_id: null, sdr_user_id: guardiao, assigned_at: agora }
         : { owner_user_id: null, owner_kind: null, owner_agent_id: null }),
     })
     .eq("organization_id", lead.organization_id)
-    .eq("id", novo.id);
-  // Pacote de segurança e defeitos (31/10): o erro era ignorado. Não interrompe
-  // (o clone já existe; parar aqui deixaria o trabalho pela metade e um novo
-  // clique criaria OUTRO clone), mas fica no log: o clone ficou sem o dono e sem
-  // o ciclo novo, e alguém precisa olhar.
-  if (erroDoClone) {
-    logger.error("[iavek-reativar] clone sem dono/ciclo novo", { leadId: lead.id, clone: novo.id, erro: erroDoClone.message });
+    .eq("id", lead.id)
+    .eq("status", "open")
+    .eq("pipeline_id", lead.pipeline_id)
+    .select("id")
+    .maybeSingle();
+  if (erroDoMove || !movido) {
+    logger.warn("[iavek-reativar] a volta não moveu o lead", { leadId: lead.id, erro: erroDoMove?.message ?? "lead_mudou" });
+    return { ok: false, erro: erroDoMove?.code ?? "lead_mudou" };
   }
+  // D4 (Rodrigo, 21/11): as automáticas abertas fecham com o motivo da passagem; SEM pessoa (a esteira, atorId nulo) as
+  // de pessoa também, com 'passagem_sem_revisao'. Com pessoa, a rota já exigiu zero de pessoa abertas (1A).
+  try {
+    const { error } = await admin.rpc("fn_iavek_tarefas_da_passagem" as never, {
+      p_org: lead.organization_id,
+      p_lead: lead.id,
+      p_motivo_automaticas: MOTIVO_DA_PASSAGEM,
+      p_motivo_de_pessoa: args.atorId ? null : MOTIVO_SEM_REVISAO,
+    } as never);
+    if (error) throw new Error(error.message);
+  } catch (e) {
+    logger.error("[iavek-reativar] as tarefas da volta não fecharam", { leadId: lead.id, erro: e instanceof Error ? e.message : String(e) });
+  }
+  const r = await emitLeadActivity(admin, {
+    organizationId: lead.organization_id,
+    leadId: lead.id,
+    contactId: lead.contact_id,
+    type: "stage_changed",
+    sourceModule: "iavek_passagem",
+    sourceId: lead.id,
+    actor: ctx.actor,
+    reason: "Voltou para a entrada: o lead reativou e começa um ciclo novo de 72h",
+    payload: {
+      from_stage_id: lead.stage_id,
+      to_stage_id: etapaDaVolta,
+      from_pipeline_id: lead.pipeline_id,
+      pipeline_id: entrada.pipeline_id,
+      volta_da_esteira: true,
+    },
+  });
+  if (!r.ok) logger.warn("[iavek-reativar] a volta não foi para a linha do tempo", { leadId: lead.id, erro: r.error });
+  const novo = { id: lead.id };
   const novoLead = await lerLeadDaPassagem(admin, lead.organization_id, novo.id);
   if (novoLead) {
     await registrarPassagem(admin, {

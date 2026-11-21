@@ -138,6 +138,11 @@ export interface LeadDaEsteira {
   stage_id: string;
   created_at: string;
   owner_user_id: string | null;
+  /**
+   * v1.9.62 (0647, CRM-497): quando o lead passou ao Follow-up (o MESMO lead, sem clone). null = nunca passou
+   * (ou é um clone de antes da 62). Marca o começo do trecho no Follow-up: a régua e o "voltou a falar" contam dali.
+   */
+  passou_em?: string | null;
   /** Nascimento no funil de entrada (no clone, vem do `source_metadata.esteira_inicio`). */
   inicio: string;
   /** v1.9.23: "Manter em negociação" segura a passagem até aqui. */
@@ -184,8 +189,11 @@ export interface DepsDaEsteira {
    */
   fecharApontandoParaFollowup(lead: LeadDaEsteira, existenteId: string): Promise<boolean>;
   mover(lead: LeadDaEsteira, etapaId: string): Promise<boolean>;
-  /** Negócios (entre os dados) que já tiveram handoff para humano. */
-  comHandoff(leadIds: string[]): Promise<Set<string>>;
+  /**
+   * Negócios (entre os dados) que já tiveram handoff para humano. v1.9.62: com `desdePorLead`, só conta o handoff
+   * DEPOIS daquele instante (o começo do ciclo do mesmo lead que voltou à entrada).
+   */
+  comHandoff(leadIds: string[], desdePorLead?: ReadonlyMap<string, string>): Promise<Set<string>>;
   /** O cliente mandou mensagem depois de `desde`? */
   clienteFalouDesde(lead: LeadDaEsteira, desde: Date): Promise<boolean>;
   /** Quando foi a última marca de reengajamento deste negócio (null = nunca). */
@@ -197,8 +205,11 @@ export interface DepsDaEsteira {
    * (no funil de entrada), ou null se não deu (fica em "Reengajou", como antes).
    */
   reativar?(lead: LeadDaEsteira): Promise<LeadDaEsteira | null>;
-  /** `source_kind` das ligações que cada negócio já teve (qualquer status). */
-  ligacoesJaCriadas(leadIds: string[]): Promise<Map<string, Set<string>>>;
+  /**
+   * `source_kind` das ligações que cada negócio já teve (qualquer status). v1.9.62 (CRM-497): com `desdePorLead`, só as
+   * criadas DEPOIS daquele instante: o mesmo lead faz um 2º ciclo (volta à entrada, passa de novo) e a régua recomeça.
+   */
+  ligacoesJaCriadas(leadIds: string[], desdePorLead?: ReadonlyMap<string, string>): Promise<Map<string, Set<string>>>;
   /** CRM-141: leva o lead para a etapa de perda do funil dele, com o motivo. */
   perderSemRetorno(lead: LeadDaEsteira, motivo: string): Promise<boolean>;
   criarLigacao(lead: LeadDaEsteira, codigo: CodigoDeLigacao, venceEm: Date): Promise<boolean>;
@@ -294,11 +305,14 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   // v1.9.4: lead nascido antes de `desde` (o dia em que a esteira foi ligada) não é tocado.
   const desde = entrada.desde ? Date.parse(entrada.desde) : null;
   const todosNaEntrada = await deps.leadsAbertos(entrada.pipeline_id);
-  const naEntrada = todosNaEntrada.filter(
-    (l) => !compromisso.has(l.stage_id) && (desde === null || Date.parse(l.created_at) >= desde),
-  );
-  const criadasEntrada = await deps.ligacoesJaCriadas(naEntrada.map((l) => l.id));
-  const handoffs = await deps.comHandoff(naEntrada.map((l) => l.id));
+  // v1.9.62 (CRM-497): o lead que já passou pela esteira e VOLTOU à entrada (o mesmo lead, pelo reengajo) é da esteira,
+  // mesmo nascido antes de `desde`.
+  const daEsteira = (l: LeadDaEsteira) => desde === null || Date.parse(l.created_at) >= desde || Boolean(l.passou_em);
+  const naEntrada = todosNaEntrada.filter((l) => !compromisso.has(l.stage_id) && daEsteira(l));
+  // v1.9.62: na entrada, a régua (L1, L2) e o handoff contam do começo do CICLO (`inicio`): o lead que voltou faz L1/L2 de novo.
+  const cicloDaEntrada = new Map(naEntrada.map((l) => [l.id, l.inicio] as const));
+  const criadasEntrada = await deps.ligacoesJaCriadas(naEntrada.map((l) => l.id), cicloDaEntrada);
+  const handoffs = await deps.comHandoff(naEntrada.map((l) => l.id), cicloDaEntrada);
   for (const lead of naEntrada) {
     // D6: a idade conta do NASCIMENTO no ciclo (o mesmo relógio da tela), não da criação da linha.
     const idade = agora.getTime() - new Date(lead.inicio).getTime();
@@ -339,7 +353,7 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
         .filter(
           (l) =>
             !compromisso.has(l.stage_id) &&
-            Date.parse(l.created_at) < desde &&
+            !daEsteira(l) &&
             (aPartirDe === null || Date.parse(l.created_at) >= aPartirDe),
         )
         // Do mais antigo para o mais novo; o id desempata (a ordem não muda entre rodadas).
@@ -379,12 +393,20 @@ export async function rodarEsteira(cfg: ConfigDaEsteira, deps: DepsDaEsteira): P
   const indiceDaFase = new Map(followup.fases.map((f, i) => [f.etapa_id, i]));
   const semRetornoDesde = cfg.semRetorno ? new Date(cfg.semRetorno.desde) : null;
   const noFollowup = await deps.leadsAbertos(followup.pipeline_id);
-  const criadasFollowup = await deps.ligacoesJaCriadas(noFollowup.map((l) => l.id));
+  // v1.9.62 (CRM-497): no Follow-up, a régua conta da PASSAGEM do mesmo lead (o 2º ciclo ganha L3-L7 de novo). O clone
+  // de antes da 62 não tem a data: conta tudo, como antes.
+  const trechoDoFollowup = new Map(
+    noFollowup.filter((l) => l.passou_em).map((l) => [l.id, l.passou_em as string] as const),
+  );
+  const criadasFollowup = await deps.ligacoesJaCriadas(noFollowup.map((l) => l.id), trechoDoFollowup);
   for (const lead of noFollowup) {
     const jaTem = criadasFollowup.get(lead.id) ?? new Set<string>();
     if (fases.has(lead.stage_id)) {
       const ultimo = await deps.ultimoReengajo(lead.id);
-      const desde = new Date(Math.max(new Date(lead.created_at).getTime(), ultimo?.getTime() ?? 0));
+      // v1.9.62 (CRM-497): o trecho no Follow-up começa na PASSAGEM (o created_at do mesmo lead é o da entrada; com ele,
+      // qualquer mensagem das 72h viraria "Reengajou" na hora). O clone de antes da 62 segue pelo created_at dele.
+      const comecoDoTrecho = lead.passou_em ? Date.parse(lead.passou_em) : new Date(lead.created_at).getTime();
+      const desde = new Date(Math.max(comecoDoTrecho, ultimo?.getTime() ?? 0));
       if (await deps.clienteFalouDesde(lead, desde)) {
         if (await deps.mover(lead, followup.etapa_reengajou)) {
           await deps.marcarReengajou(lead);

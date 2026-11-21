@@ -1,6 +1,6 @@
 /**
  * Os fios da esteira (ia.vek D3): cada operação de `DepsDaEsteira` pelo MESMO
- * caminho que a tela usa — clone pela função da rota de clone, mover pelo
+ * caminho que a tela usa — a passagem das 72h MOVE o mesmo lead (v1.9.62, CRM-497), mover pelo
  * `moveLeadHandler`, tarefa pelo `criarTarefaInterna`, handoff pelo
  * `performHumanHandoff` da IA. O ator é de sistema (`webhook_source: esteira`):
  * quem agiu foi a regra, não uma pessoa.
@@ -18,7 +18,6 @@ import { performHumanHandoff } from "@/lib/agent-engine/agent/human-handoff";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { createLogger } from "@/lib/agent-engine/obs/logger";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
-import { clonarLeadParaFunil } from "@/lib/leads/clonar-lead-para-funil";
 import { encerraDemanda } from "@/lib/leads/encerramento";
 import { MOTIVO_DA_TRANSFERENCIA } from "@/lib/leads/motivo-da-perda";
 import { logger } from "@/lib/logger";
@@ -44,6 +43,11 @@ import {
 
 export const ATOR_DA_ESTEIRA = { type: "webhook_source", id: "esteira" } as const;
 
+/** v1.9.62 (CRM-497, D4): os motivos das tarefas canceladas na passagem das 72h (crm_tasks.cancelada_motivo). */
+export const MOTIVO_DA_PASSAGEM_72H = "passou_ao_followup";
+export const MOTIVO_SEM_REVISAO = "passagem_sem_revisao";
+const NOTA_DA_PASSAGEM = "Passou para o Follow-up: venceram as 72h na entrada, sem perda marcada";
+
 type LinhaDeLead = {
   id: string;
   contact_id: string | null;
@@ -51,6 +55,8 @@ type LinhaDeLead = {
   created_at: string;
   owner_user_id: string | null;
   source_metadata: Record<string, unknown> | null;
+  /** v1.9.62 (0647, CRM-497): quando passou ao Follow-up (o mesmo lead, sem clone). */
+  esteira_passou_em?: string | null;
 };
 
 function paraLeadDaEsteira(r: LinhaDeLead): LeadDaEsteira {
@@ -60,6 +66,7 @@ function paraLeadDaEsteira(r: LinhaDeLead): LeadDaEsteira {
     stage_id: r.stage_id,
     created_at: r.created_at,
     owner_user_id: r.owner_user_id,
+    passou_em: r.esteira_passou_em ?? null,
     // D6: o mesmo relógio do cronômetro, da passagem e do Space.
     inicio: nascimentoDoLead(r),
     manter_ate: manterAteDoLead(r),
@@ -74,6 +81,11 @@ function loteAntigoDoLead(r: Pick<LinhaDeLead, "source_metadata">): { em?: unkno
 }
 
 const URGENTES: ReadonlySet<CodigoDeLigacao> = new Set(["L1", "quente"]);
+
+/** v1.9.62: `quando` é depois de `desde`? Sem `desde`, sempre (conta tudo, como antes). */
+function depoisDe(quando: string, desde: string | undefined): boolean {
+  return desde === undefined || Date.parse(quando) > Date.parse(desde);
+}
 
 export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: () => Date): DepsDaEsteira {
   const ctx: HandlerCtx = {
@@ -94,7 +106,7 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       const linhas = await todasAsPaginas<LinhaDeLead>((de, ate) =>
         admin
           .from("crm_leads")
-          .select("id, contact_id, stage_id, created_at, owner_user_id, source_metadata")
+          .select("id, contact_id, stage_id, created_at, owner_user_id, source_metadata, esteira_passou_em")
           .eq("organization_id", orgId)
           .eq("pipeline_id", pipelineId)
           .eq("status", "open")
@@ -116,6 +128,10 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
     },
 
     async passarParaFollowup(lead, etapaId, loteAntigo) {
+      // ia.vek v1.9.62 (CRM-497, "sempre um cartão só"; desenho v5 7fe7db2f + v6 8201d8ce, Lupa): a passagem MOVE o
+      // MESMO lead para o Follow-up, numa escrita só (funil, etapa, dono, guardião, a data da passagem e o rastro).
+      // Era o clone da tela (clonarLeadParaFunil). A P-01 (a API recusa trocar pipeline_id) FICA para a pessoa;
+      // só a esteira, no servidor, move.
       const { data: etapa } = await admin
         .from("crm_stages")
         .select("pipeline_id")
@@ -123,69 +139,120 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
         .eq("id", etapaId)
         .maybeSingle();
       if (!etapa) return { ok: false, erro: "etapa_do_followup_nao_existe" };
-      const r = await clonarLeadParaFunil(admin, ctx, lead.id, {
-        pipeline_id: (etapa as { pipeline_id: string }).pipeline_id,
-        stage_id: etapaId,
-      });
-      if (!r.ok) {
-        logger.warn("esteira_passagem_recusada", { organization_id: orgId, lead_id: lead.id, code: r.code });
-        return { ok: false, erro: r.code };
-      }
-      const clone = r.clone as LinhaDeLead & { sdr_user_id?: string | null };
-      const metadata = {
-        ...(clone.source_metadata ?? {}),
-        esteira_inicio: lead.inicio,
-        // v1.9.41: a marca do lote antigo (a cota do dia conta por ela; o "só L3" mora aqui).
-        ...(loteAntigo ? { esteira_lote_antigo: { em: agora().toISOString(), so_l3: loteAntigo.soL3 } } : {}),
-      };
-      // v1.9.4 (Rodrigo, 27/10): no follow-up o dono é o GUARDIÃO (o SDR), não o
-      // vendedor que estava com o lead. O clone herda o guardião (gatilho 0579).
-      const { data: comGuardiao, error: erroDoGuardiao } = await admin
+      const destino = (etapa as { pipeline_id: string }).pipeline_id;
+      const { data: atual, error: erroDaLeitura } = await admin
         .from("crm_leads")
-        .select("sdr_user_id")
+        .select("id, contact_id, pipeline_id, stage_id, status, created_at, owner_user_id, sdr_user_id, source_metadata, esteira_passou_em")
         .eq("organization_id", orgId)
-        .eq("id", clone.id)
+        .eq("id", lead.id)
         .maybeSingle();
+      if (erroDaLeitura) return { ok: false, erro: "leitura_do_lead" };
+      const linha = atual as
+        | (LinhaDeLead & { pipeline_id: string; status: string; sdr_user_id: string | null })
+        | null;
+      if (!linha || linha.status !== "open") return { ok: false, erro: "lead_nao_esta_aberto" };
+      if (linha.pipeline_id === destino) return { ok: false, erro: "ja_esta_no_followup" };
       // v1.9.52 (0634, CRM-254 a/b): o dono no Follow-up é o SDR DE FOLLOW-UP da vez (rodízio entre os ativos), e as
       // ligações L3-L7 vêm junto (vão para o dono). Sem nenhum SDR de Follow-up ativo, a regra de antes: o guardião;
-      // no lote antigo sem guardião, o dono do rodízio. O guardião (sdr_user_id) do clone NÃO é mexido aqui.
+      // no lote antigo sem guardião, o dono do rodízio; senão fica o dono de agora.
       const { data: daVez, error: erroDaVez } = await admin.rpc("fn_iavek_sdr_followup_da_vez" as never, {
         p_org: orgId,
-        p_lead: clone.id,
+        p_lead: lead.id,
       } as never);
-      if (erroDaVez) logger.warn("esteira_sdr_followup_da_vez_falhou", { organization_id: orgId, lead_id: clone.id, codigo: erroDaVez.code ?? null });
+      if (erroDaVez) logger.warn("esteira_sdr_followup_da_vez_falhou", { organization_id: orgId, lead_id: lead.id, codigo: erroDaVez.code ?? null });
       const sdrDeFollowup = typeof daVez === "string" ? daVez : null;
-      // v1.9.41: no lote antigo, sem guardião, o dono é o do rodízio (nunca fica sem dono).
-      const guardiao =
-        sdrDeFollowup ?? (comGuardiao as { sdr_user_id: string | null } | null)?.sdr_user_id ?? loteAntigo?.dono ?? null;
-      const { error: erroDoClone } = await admin
+      const dono = sdrDeFollowup ?? linha.sdr_user_id ?? loteAntigo?.dono ?? linha.owner_user_id ?? null;
+      const em = agora().toISOString();
+      const anterior = linha.source_metadata ?? {};
+      const metadata: Record<string, unknown> = {
+        ...anterior,
+        // Relógio B (decisão do Rodrigo, 17/11): segue contando do nascimento na entrada.
+        esteira_inicio: lead.inicio,
+        passagem: {
+          em,
+          de_pipeline: linha.pipeline_id,
+          de_etapa: linha.stage_id,
+          de_dono: linha.owner_user_id,
+          venceu_72h: true,
+        },
+        // Uma 2ª passagem guarda a 1ª (a coluna regrava).
+        ...(linha.esteira_passou_em ? { passagem_anterior: { em: linha.esteira_passou_em, ...(anterior.passagem as object | undefined) } } : {}),
+        // v1.9.41: a marca do lote antigo (a cota do dia conta por ela; o "só L3" mora aqui).
+        ...(loteAntigo ? { esteira_lote_antigo: { em, so_l3: loteAntigo.soL3 } } : {}),
+      };
+      // Uma escrita só, e SÓ se o lead ainda está onde a rodada o leu (aberto, no mesmo funil): outra escrita no
+      // meio do caminho (a tela, outra rodada) não é atropelada.
+      const escrita = admin
         .from("crm_leads")
         .update({
+          pipeline_id: destino,
+          stage_id: etapaId,
+          esteira_passou_em: em,
           source_metadata: metadata,
-          ...(guardiao ? { owner_user_id: guardiao, owner_kind: "user", owner_agent_id: null } : {}),
+          ...(dono ? { owner_user_id: dono, owner_kind: "user", owner_agent_id: null } : {}),
+          // v1.9.52.3 (entregarAoSdrDeFollowup a.): com SDR de Follow-up, ele vira também o guardião.
+          ...(sdrDeFollowup ? { sdr_user_id: sdrDeFollowup } : {}),
+          ...(dono && dono !== linha.owner_user_id ? { assigned_at: em } : {}),
         })
         .eq("organization_id", orgId)
-        .eq("id", clone.id);
-      // ia.vek v1.9.14: o lead já passou; sem isto ficava sem dono e sem relógio em silêncio.
-      if (erroDoGuardiao || erroDoClone) {
-        logger.error("esteira_followup_incompleto", {
+        .eq("id", lead.id)
+        .eq("status", "open")
+        .eq("pipeline_id", linha.pipeline_id);
+      const { data: movido, error: erroDoMove } = await escrita.select("id").maybeSingle();
+      if (erroDoMove || !movido) {
+        logger.warn("esteira_passagem_recusada", {
           organization_id: orgId,
-          lead_id: clone.id,
-          erro: (erroDoGuardiao ?? erroDoClone)?.message,
-          // (Lupa 153805) a vez do SDR de Follow-up já foi registrada pela 0630: com o update falhando, ela fica gasta
-          // sem lead. Inofensivo (uma vez fora da ordem), mas o log diz qual, para a contagem do rodízio não confundir.
+          lead_id: lead.id,
+          code: erroDoMove?.code ?? "lead_mudou",
           ...(sdrDeFollowup ? { vez_gasta_sem_lead: sdrDeFollowup } : {}),
         });
+        return { ok: false, erro: erroDoMove?.code ?? "lead_mudou" };
       }
-      if (guardiao) clone.owner_user_id = guardiao;
-      // ia.vek v1.9.52.3 (regra do Rodrigo 13/11 ~22:55Z; Maestro 225419/232223/232320; Lupa 225428/232234): com um SDR
-      // DE FOLLOW-UP ativo, o lead que passa a ele SOME para o vendedor e o SDR de antes. Sem SDR de Follow-up, nada muda.
-      if (sdrDeFollowup) await entregarAoSdrDeFollowup(admin, ctx, orgId, { originalId: lead.id, cloneId: clone.id, contactId: lead.contact_id ?? null }, sdrDeFollowup);
+      // D4 3A (Rodrigo, 21/11): a passagem SEM pessoa. As automáticas abertas (a régua) fecham com o motivo da
+      // passagem e as de PESSOA com 'passagem_sem_revisao'; nenhuma é reatribuída (o novo dono recebe o lead limpo).
+      try {
+        const { data: canceladas, error: erroDasTarefas } = await admin.rpc("fn_iavek_tarefas_da_passagem" as never, {
+          p_org: orgId,
+          p_lead: lead.id,
+          p_motivo_automaticas: MOTIVO_DA_PASSAGEM_72H,
+          p_motivo_de_pessoa: MOTIVO_SEM_REVISAO,
+        } as never);
+        if (erroDasTarefas) throw new Error(erroDasTarefas.message);
+        logger.info("esteira_passagem_tarefas", { organization_id: orgId, lead_id: lead.id, ...(canceladas as object) });
+      } catch (err) {
+        // O lead já passou: falhar aqui não desfaz; a saúde lê esta linha.
+        logger.error("esteira_passagem_tarefas_falhou", {
+          organization_id: orgId,
+          lead_id: lead.id,
+          erro: err instanceof Error ? err.message.slice(0, 200) : String(err),
+        });
+      }
+      // A linha do tempo: a troca de etapa entre funis e a nota (o mesmo formato do move da tela).
+      const linhaDoTempo = await emitLeadActivity(admin, {
+        organizationId: orgId,
+        leadId: lead.id,
+        contactId: lead.contact_id,
+        type: "stage_changed",
+        sourceModule: "esteira",
+        sourceId: lead.id,
+        actor: ATOR_DA_ESTEIRA,
+        reason: NOTA_DA_PASSAGEM,
+        payload: {
+          from_stage_id: linha.stage_id,
+          to_stage_id: etapaId,
+          from_pipeline_id: linha.pipeline_id,
+          pipeline_id: destino,
+          passagem_72h: true,
+        },
+      });
+      if (!linhaDoTempo.ok) logger.warn("esteira_passagem_sem_linha_do_tempo", { organization_id: orgId, lead_id: lead.id, erro: linhaDoTempo.error });
+      // ia.vek v1.9.52.3: com um SDR DE FOLLOW-UP ativo, a CONVERSA segue o novo dono (o dono e o guardião já
+      // mudaram na escrita acima). Sem SDR de Follow-up, nada muda.
+      if (sdrDeFollowup) await entregarAConversaAoSdrDeFollowup(admin, ctx, orgId, { leadId: lead.id, contactId: lead.contact_id ?? null }, sdrDeFollowup);
+      const depois = { ...linha, pipeline_id: destino, stage_id: etapaId, owner_user_id: dono, esteira_passou_em: em };
 
-      // ia.vek v1.9.37 (CRM-229): o clone também procura o CARRO DO ANÚNCIO. Ele copia os campos do
-      // original, e o original que nasceu antes da v1.9.32 não tinha carro: 29 dos 40 leads de anúncio
-      // sem carro eram clones assim (medido em 07/11). Nunca pisa num carro já gravado e nunca
-      // derruba a passagem: o lead já está no Follow-up e é o que importa.
+      // ia.vek v1.9.37 (CRM-229): o lead que passa também procura o CARRO DO ANÚNCIO (o que nasceu antes da v1.9.32
+      // não tinha carro). Nunca pisa num carro já gravado e nunca derruba a passagem: o lead já está no Follow-up.
       if (lead.contact_id) {
         try {
           const { data: contato } = await admin
@@ -197,12 +264,12 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
           const desfecho = await gravarCarroDoAnuncio(
             admin,
             orgId,
-            clone.id,
+            lead.id,
             (contato as { source_metadata?: unknown } | null)?.source_metadata,
           );
-          registrarDesfechoDoCarro("clone_da_esteira", orgId, clone.id, desfecho);
+          registrarDesfechoDoCarro("clone_da_esteira", orgId, lead.id, desfecho);
         } catch (err) {
-          registrarDesfechoDoCarro("clone_da_esteira", orgId, clone.id, "erro", err);
+          registrarDesfechoDoCarro("clone_da_esteira", orgId, lead.id, "erro", err);
         }
       }
 
@@ -240,7 +307,7 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
             );
           }
         } catch (err) {
-          // O clone já existe: falhar aqui não desfaz a passagem; o aviso fica no log.
+          // O lead já passou: falhar aqui não desfaz a passagem; o aviso fica no log.
           logger.warn("esteira_handoff_falhou", {
             organization_id: orgId,
             lead_id: lead.id,
@@ -248,7 +315,7 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
           });
         }
       }
-      return { ok: true, lead: paraLeadDaEsteira({ ...clone, source_metadata: metadata }) };
+      return { ok: true, lead: paraLeadDaEsteira({ ...depois, source_metadata: metadata }) };
     },
 
     async leadAbertoNoFollowup(contactId, followupPipelineId) {
@@ -360,19 +427,24 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       }
     },
 
-    async comHandoff(leadIds) {
+    async comHandoff(leadIds, desdePorLead) {
       if (leadIds.length === 0) return new Set();
       // v1.9.19.2: em lotes e conferindo o erro. Um erro aqui virava "ninguém tem" em silêncio.
       const { data, error } = await buscaEmLotes(leadIds, (lote) =>
         admin
           .from("crm_lead_activities")
-          .select("lead_id")
+          .select("lead_id, created_at")
           .eq("organization_id", orgId)
           .eq("type", "handoff_triggered")
           .in("lead_id", lote),
       );
       if (error) throw new Error(error.message);
-      return new Set((data as Array<{ lead_id: string }>).map((r) => r.lead_id));
+      // v1.9.62: só o handoff do ciclo de agora (o mesmo lead que voltou à entrada não herda o do ciclo anterior).
+      return new Set(
+        (data as Array<{ lead_id: string; created_at: string }>)
+          .filter((r) => depoisDe(r.created_at, desdePorLead?.get(r.lead_id)))
+          .map((r) => r.lead_id),
+      );
     },
 
     async clienteFalouDesde(lead, desde) {
@@ -428,20 +500,22 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       });
     },
 
-    async ligacoesJaCriadas(leadIds) {
+    async ligacoesJaCriadas(leadIds, desdePorLead) {
       const mapa = new Map<string, Set<string>>();
       if (leadIds.length === 0) return mapa;
       // v1.9.19.2: um erro aqui viraria "nenhuma ligação criada", e a rodada repetiria ligações.
       const { data, error } = await buscaEmLotes(leadIds, (lote) =>
         admin
           .from("crm_tasks")
-          .select("lead_id, source_kind")
+          .select("lead_id, source_kind, created_at")
           .eq("organization_id", orgId)
           .like("source_kind", `${PREFIXO_DE_LIGACAO}%`)
           .in("lead_id", lote),
       );
       if (error) throw new Error(error.message);
-      for (const r of data as Array<{ lead_id: string; source_kind: string }>) {
+      for (const r of data as Array<{ lead_id: string; source_kind: string; created_at: string }>) {
+        // v1.9.62 (CRM-497): só as do trecho de agora (o 2º ciclo do mesmo lead recomeça a régua).
+        if (!depoisDe(r.created_at, desdePorLead?.get(r.lead_id))) continue;
         if (!mapa.has(r.lead_id)) mapa.set(r.lead_id, new Set());
         mapa.get(r.lead_id)!.add(r.source_kind);
       }
@@ -534,15 +608,12 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
 }
 
 /**
- * ia.vek v1.9.52.3: entrega o lead passado das 72h ao SDR DE FOLLOW-UP por inteiro, para o vendedor (A) e o SDR (B) de
- * antes deixarem de vê-lo:
- *  a. o CLONE (Follow-up): o guardião (sdr_user_id) também vira o SDR de Follow-up (o dono já virou acima);
- *  b. o ORIGINAL fechado (72h, 'moved_to_another_pipeline', que o Meus números não conta como perda): dono E guardião
- *     viram o SDR de Follow-up (decidido: o simples; Maestro 232320);
- *  c. a CONVERSA do contato segue o novo dono pela regra de sempre (`conversaSegueODono`: só a que está com uma
- *     PESSOA; a que a IA atende fica como está, para não calar a IA);
- *  d. as TAREFAS dos 2 leads que estão com outra pessoa (menos as 'done') passam ao SDR de Follow-up.
- * Nunca derruba a passagem (o lead já está no Follow-up): erro vai ao log, com o passo.
+ * ia.vek v1.9.52.3, v1.9.62 (CRM-497): a CONVERSA do lead passado das 72h segue o SDR DE FOLLOW-UP. Desde a 62 o lead é
+ * UM só (o dono e o guardião já mudaram na escrita da passagem), e as TAREFAS não são mais reatribuídas (D4 do Rodrigo:
+ * as automáticas e as de pessoa abertas fecharam com motivo; o novo dono recebe o lead limpo). Fica só a conversa:
+ * ela segue o novo dono pela regra de sempre (`conversaSegueODono`: só a que está com uma PESSOA; a que a IA atende
+ * fica como está, para não calar a IA), e a conversa SEM dono vai ao SDR só se a org NÃO tem atendimento automático.
+ * Nunca derruba a passagem (o lead já está no Follow-up): erro vai ao log.
  */
 const MOTIVO_DA_CONVERSA_SEM_IA = "Conversa sem atendente passada ao SDR de Follow-up (a loja não tem atendimento automático no ar)";
 const MOTIVO_DA_REABERTA = "Conversa reaberta sem dono devolvida ao SDR de Follow-up do lead (a loja não tem atendimento automático no ar)";
@@ -591,44 +662,13 @@ async function reconciliarConversasDoFollowup(
   return passadas;
 }
 
-async function entregarAoSdrDeFollowup(
+async function entregarAConversaAoSdrDeFollowup(
   admin: SupabaseClient,
   ctx: HandlerCtx,
   orgId: string,
-  ids: { originalId: string; cloneId: string; contactId: string | null },
+  ids: { leadId: string; contactId: string | null },
   sdr: string,
 ): Promise<void> {
-  const passo = async (nome: string, f: () => PromiseLike<{ error: { message: string } | null }>) => {
-    try {
-      const { error } = await f();
-      if (error) logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.cloneId, passo: nome, erro: error.message });
-    } catch (e) {
-      logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.cloneId, passo: nome, erro: e instanceof Error ? e.message : String(e) });
-    }
-  };
-  await passo("guardiao_do_clone", () =>
-    admin.from("crm_leads").update({ sdr_user_id: sdr }).eq("organization_id", orgId).eq("id", ids.cloneId),
-  );
-  await passo("original", () =>
-    admin
-      .from("crm_leads")
-      .update({ owner_user_id: sdr, owner_kind: "user", owner_agent_id: null, sdr_user_id: sdr })
-      .eq("organization_id", orgId)
-      .eq("id", ids.originalId),
-  );
-  await passo("tarefas", () =>
-    admin
-      .from("crm_tasks")
-      .update({ assigned_to: sdr })
-      .eq("organization_id", orgId)
-      .in("lead_id", [ids.originalId, ids.cloneId])
-      // (Maestro 050721, prova 05:05Z) também as CANCELADAS: o gatilho do lead fechado cancela as do original ANTES
-      // deste passo, e a cancelada com A/B dava a eles a tarefa E o contato (fn_iavek_contatos_do_vendedor olha a
-      // tarefa de qualquer status). Só as 'done' ficam com quem fez. Só o assigned_to muda.
-      .neq("status", "done")
-      .not("assigned_to", "is", null)
-      .neq("assigned_to", sdr),
-  );
   try {
     const seguiu = await conversaSegueODono(admin, { orgId, contactId: ids.contactId, novoDono: sdr, actor: ctx.actor });
     // (Maestro 002322, Lupa 002339) a conversa SEM dono: vai ao SDR de Follow-up SÓ se a org NÃO tem atendimento
@@ -651,12 +691,12 @@ async function entregarAoSdrDeFollowup(
           await passarAConversa(admin, { orgId, contactId: ids.contactId, para: sdr, actor: ctx.actor, motivo: MOTIVO_DA_CONVERSA_SEM_IA });
         } else if (temIa === undefined) {
           // (Lupa 003315) para saber se o caminho "não deu para saber" aparece na produção
-          logger.warn("conversa_sem_dono_ficou", { organization_id: orgId, lead_id: ids.cloneId, motivo: "org_sem_resposta_de_ia_definida" });
+          logger.warn("conversa_sem_dono_ficou", { organization_id: orgId, lead_id: ids.leadId, motivo: "org_sem_resposta_de_ia_definida" });
         }
       }
     }
   } catch (e) {
-    logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.cloneId, passo: "conversa", erro: e instanceof Error ? e.message : String(e) });
+    logger.error("esteira_followup_entrega_falhou", { organization_id: orgId, lead_id: ids.leadId, passo: "conversa", erro: e instanceof Error ? e.message : String(e) });
   }
 }
 

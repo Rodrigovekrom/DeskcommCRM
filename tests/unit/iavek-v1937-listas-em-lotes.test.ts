@@ -203,11 +203,11 @@ describe("cercas do texto", () => {
 });
 
 describe("CRM-229: o clone da esteira procura o carro do anúncio, e o desfecho fica no log", () => {
-  it("passarParaFollowup chama o casador para o CLONE (nunca para o original), dentro de try", () => {
+  it("passarParaFollowup chama o casador para o lead que passa (v1.9.62: o mesmo lead, sem clone), dentro de try", () => {
     const deps = readFileSync("lib/esteira/deps-reais.ts", "utf8");
     const passar = deps.slice(deps.indexOf("async passarParaFollowup("));
     const trecho = passar.slice(0, passar.indexOf("performHumanHandoff") > 0 ? passar.indexOf("performHumanHandoff") : 4000);
-    expect(trecho).toMatch(/gravarCarroDoAnuncio\(\s*admin,\s*orgId,\s*clone\.id,/);
+    expect(trecho).toMatch(/gravarCarroDoAnuncio\(\s*admin,\s*orgId,\s*lead\.id,/);
     expect(trecho).toMatch(/registrarDesfechoDoCarro\("clone_da_esteira"/);
     expect(trecho.indexOf("try {")).toBeLessThan(trecho.indexOf("gravarCarroDoAnuncio("));
   });
