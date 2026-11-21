@@ -104,9 +104,13 @@ describe("0647: fn_iavek_tarefas_da_passagem", () => {
       `cancelled/passagem_sem_revisao/${GOV_AGENT_B}`,
     );
     expect(valor(`select status from public.crm_tasks where id='${T_FEITA}';`)).toBe("done");
+    // (Lupa 201732) a automática pela fn_iavek_cancela_ligacoes (0640, a linha dela); a de pessoa pela 0647
+    expect(
+      valor(`select count(*) from public.crm_lead_activities where lead_id='${LEAD}' and type='task_cancelled' and metadata->>'origem'='gatilho_0640';`),
+    ).toBe("1");
     expect(
       valor(`select count(*) from public.crm_lead_activities where lead_id='${LEAD}' and type='task_cancelled' and metadata->>'origem'='passagem_0647';`),
-    ).toBe("2");
+    ).toBe("1");
   });
 
   it("sem o motivo das automáticas, recusa", () => {

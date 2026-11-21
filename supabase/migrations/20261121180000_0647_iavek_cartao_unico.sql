@@ -171,34 +171,37 @@ as $$
 declare
   v_auto constant text[] := array['ligacao:L1','ligacao:L2','ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7','ligacao:quente'];
   v_a integer;
-  v_p integer;
+  v_p integer := 0;
 begin
   if p_motivo_automaticas is null or btrim(p_motivo_automaticas) = '' then
     raise exception 'tarefas_da_passagem: o motivo das automáticas é obrigatório' using errcode = '22023';
   end if;
-  with canceladas as (
-    update public.crm_tasks t
-       set status = 'cancelled',
-           cancelada_motivo = case when t.source_kind = any(v_auto) then p_motivo_automaticas else p_motivo_de_pessoa end
-     where t.organization_id = p_org
-       and t.lead_id = p_lead
-       and t.status in ('pending', 'in_progress')
-       and (t.source_kind = any(v_auto) or p_motivo_de_pessoa is not null)
-    returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind, t.cancelada_motivo,
-              coalesce(t.source_kind = any(v_auto), false) as automatica  -- source_kind nulo: null = any() é NULL
-  ), log as (
-    insert into public.crm_lead_activities
-      (organization_id, lead_id, contact_id, source_module, source_id, type, actor_kind, reason, payload, metadata, performed_at)
-    select c.organization_id, c.lead_id, c.contact_id, 'tarefas', c.id, 'task_cancelled', 'rule',
-           'Tarefa cancelada na passagem: ' || c.cancelada_motivo,
-           jsonb_build_object('motivo', c.cancelada_motivo, 'ligacao', c.source_kind, 'titulo', left(c.title, 200),
-                              'automatica', c.automatica),
-           jsonb_build_object('origem', 'passagem_0647'), now()
-      from canceladas c
-  )
-  -- (o insert do 'log' roda uma vez de qualquer jeito: CTE que escreve sempre executa; a conta sai das canceladas)
-  select count(*) filter (where c.automatica), count(*) filter (where not c.automatica) into v_a, v_p from canceladas c;
-  return jsonb_build_object('automaticas', v_a, 'de_pessoa', v_p);
+  -- (Lupa 201732, OBRIGATÓRIO 3) as AUTOMÁTICAS pelo caminho que já existe: fn_iavek_cancela_ligacoes (0640), com o
+  -- motivo em crm_tasks.cancelada_motivo (0639) e a linha task_cancelled dela.
+  v_a := public.fn_iavek_cancela_ligacoes(p_org, array[p_lead], v_auto, p_motivo_automaticas, null, null);
+  if p_motivo_de_pessoa is not null then
+    with canceladas as (
+      update public.crm_tasks t
+         set status = 'cancelled', cancelada_motivo = p_motivo_de_pessoa
+       where t.organization_id = p_org
+         and t.lead_id = p_lead
+         and t.status in ('pending', 'in_progress')
+         and not coalesce(t.source_kind = any(v_auto), false)  -- source_kind nulo: null = any() é NULL
+      returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind
+    ), log as (
+      insert into public.crm_lead_activities
+        (organization_id, lead_id, contact_id, source_module, source_id, type, actor_kind, reason, payload, metadata, performed_at)
+      select c.organization_id, c.lead_id, c.contact_id, 'tarefas', c.id, 'task_cancelled', 'rule',
+             'Tarefa cancelada na passagem: ' || p_motivo_de_pessoa,
+             jsonb_build_object('motivo', p_motivo_de_pessoa, 'ligacao', c.source_kind, 'titulo', left(c.title, 200),
+                                'automatica', false),
+             jsonb_build_object('origem', 'passagem_0647'), now()
+        from canceladas c
+    )
+    -- (o insert do 'log' roda uma vez de qualquer jeito: CTE que escreve sempre executa; a conta sai das canceladas)
+    select count(*) into v_p from canceladas;
+  end if;
+  return jsonb_build_object('automaticas', coalesce(v_a, 0), 'de_pessoa', v_p);
 end;
 $$;
 revoke execute on function public.fn_iavek_tarefas_da_passagem(uuid, uuid, text, text) from public, anon, authenticated;
