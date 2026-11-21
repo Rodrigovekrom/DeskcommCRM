@@ -50649,9 +50649,9 @@ begin
                               'automatica', c.automatica),
            jsonb_build_object('origem', 'passagem_0647'), now()
       from canceladas c
-    returning c.automatica
   )
-  select count(*) filter (where automatica), count(*) filter (where not automatica) into v_a, v_p from log;
+  -- (o insert do 'log' roda uma vez de qualquer jeito: CTE que escreve sempre executa; a conta sai das canceladas)
+  select count(*) filter (where c.automatica), count(*) filter (where not c.automatica) into v_a, v_p from canceladas c;
   return jsonb_build_object('automaticas', v_a, 'de_pessoa', v_p);
 end;
 $$;
