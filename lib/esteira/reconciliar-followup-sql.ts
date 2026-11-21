@@ -84,7 +84,9 @@ export const SQL_VARRER_TAREFAS_DA_PASSAGEM = `with alvo as (
               and l.esteira_passou_em is not null and l.esteira_passou_em > now() - interval '30 days'
               -- (Lupa 203526) só a passagem PELO MOVE: a marca do próprio move, com a mesma data
               and l.source_metadata->'passagem'->>'venceu_72h' = 'true'
-              and (l.source_metadata->'passagem'->>'em')::timestamptz = l.esteira_passou_em),
+              -- (Lupa 203752) o cast só para texto em forma de data: um passagem.em torto não derruba a varredura inteira
+              and case when l.source_metadata->'passagem'->>'em' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'
+                       then (l.source_metadata->'passagem'->>'em')::timestamptz end = l.esteira_passou_em),
          canceladas as (
            update public.crm_tasks t
               set status = 'cancelled',
