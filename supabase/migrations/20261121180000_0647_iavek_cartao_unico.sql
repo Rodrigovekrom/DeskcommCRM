@@ -109,7 +109,10 @@ begin
       );
     -- (0647) a troca de FUNIL é a passagem da esteira (ida ao Follow-up ou volta à entrada), não um avanço de etapa.
     elsif new.stage_id is distinct from old.stage_id and new.status = 'open'
-          and new.pipeline_id is not distinct from old.pipeline_id then
+          and new.pipeline_id is not distinct from old.pipeline_id
+          -- (0648, Lupa 202834) a ida à coluna de entrada do vendedor (o gatilho da 0648 marca a chave LOCAL iavek.pa_<lead>
+          -- antes deste AFTER) é parte da passagem: o 'lead_passado' já avisa; nada de 'guardiao_etapa' a mais
+          and nullif(current_setting('iavek.pa_' || replace(new.id::text, '-', ''), true), '') is null then
       select name into v_etapa_de from public.crm_stages where id = old.stage_id;
       select name into v_etapa_para from public.crm_stages where id = new.stage_id;
       insert into public.notificacoes (organization_id, user_id, tipo, lead_id, ator_user_id, dados)

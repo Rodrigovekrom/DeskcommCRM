@@ -63,3 +63,37 @@ export const SQL_RECONCILIAR_FOLLOWUP = `with sdrs as (
            returning tk.id)
          select (select count(*) from g)::int as guardioes, (select count(*) from o)::int as originais,
                 (select count(*) from t)::int as tarefas`;
+
+/**
+ * ia.vek v1.9.62 (CRM-497, Lupa 202834): a VARREDURA idempotente das tarefas da passagem. A passagem das 72h move o lead
+ * numa escrita e fecha as tarefas numa 2ª chamada (fn_iavek_tarefas_da_passagem); se a 2ª falhar, o lead já passou e as
+ * tarefas de ANTES da passagem ficariam abertas (só a linha de log contava). A cada rodada, no Follow-up: os leads ABERTOS
+ * que passaram pelo move (esteira_passou_em, nos últimos 30 dias) e ainda têm tarefa aberta CRIADA ANTES da passagem: as
+ * automáticas fecham com 'passou_ao_followup' e as de pessoa com 'passagem_sem_revisao' (as preservadas, $3, ficam: P3),
+ * cada uma com a linha task_cancelled. A tarefa criada DEPOIS da passagem nunca é tocada. Devolve quantas fechou.
+ * $1 = organization_id, $2 = pipeline_id do Follow-up, $3 = text[] dos source_kind preservados.
+ */
+export const SQL_VARRER_TAREFAS_DA_PASSAGEM = `with alvo as (
+           select l.id, l.esteira_passou_em from public.crm_leads l
+            where l.organization_id = $1 and l.pipeline_id = $2 and l.status = 'open'
+              and l.esteira_passou_em is not null and l.esteira_passou_em > now() - interval '30 days'),
+         canceladas as (
+           update public.crm_tasks t
+              set status = 'cancelled',
+                  cancelada_motivo = case when coalesce(t.source_kind = any(array['ligacao:L1','ligacao:L2','ligacao:L3','ligacao:L4','ligacao:L5','ligacao:L6','ligacao:L7','ligacao:quente']), false)
+                                          then 'passou_ao_followup' else 'passagem_sem_revisao' end
+             from alvo a
+            where t.organization_id = $1 and t.lead_id = a.id
+              and t.status in ('pending', 'in_progress')
+              and t.created_at < a.esteira_passou_em
+              and not coalesce(t.source_kind = any($3::text[]), false)
+           returning t.id, t.organization_id, t.lead_id, t.contact_id, t.title, t.source_kind, t.cancelada_motivo),
+         log as (
+           insert into public.crm_lead_activities
+             (organization_id, lead_id, contact_id, source_module, source_id, type, actor_kind, reason, payload, metadata, performed_at)
+           select c.organization_id, c.lead_id, c.contact_id, 'tarefas', c.id, 'task_cancelled', 'rule',
+                  'Tarefa cancelada na passagem (varredura): ' || c.cancelada_motivo,
+                  jsonb_build_object('motivo', c.cancelada_motivo, 'ligacao', c.source_kind, 'titulo', left(c.title, 200)),
+                  jsonb_build_object('origem', 'varredura_da_passagem'), now()
+             from canceladas c)
+         select count(*)::int as varridas from canceladas`;

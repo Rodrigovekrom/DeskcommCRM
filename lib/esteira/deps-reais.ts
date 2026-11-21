@@ -24,7 +24,7 @@ import { logger } from "@/lib/logger";
 import { buscaEmLotes } from "@/lib/supabase/em-lotes";
 import { lerTudo, todasAsPaginas } from "@/lib/supabase/paginas";
 import { manterAteDoLead, nascimentoDoLead } from "@/lib/iavek/cronometro-72h";
-import { SQL_RECONCILIAR_FOLLOWUP } from "@/lib/esteira/reconciliar-followup-sql";
+import { SQL_RECONCILIAR_FOLLOWUP, SQL_VARRER_TAREFAS_DA_PASSAGEM } from "@/lib/esteira/reconciliar-followup-sql";
 import { preservadasNaPassagem } from "@/lib/iavek/regras-da-passagem";
 import { enviarPushAoUsuario } from "@/lib/notifications/web_push";
 import { criarTarefaInterna } from "@/lib/tarefas/criar-tarefa";
@@ -597,6 +597,10 @@ export function depsReaisDaEsteira(admin: SupabaseClient, orgId: string, agora: 
       );
       const r = (rows[0] ?? { guardioes: 0, originais: 0, tarefas: 0 }) as { guardioes: number; originais: number; tarefas: number };
       const conversas = await reconciliarConversasDoFollowup(admin, orgId, followupPipelineId, ctx);
+      // v1.9.62 (Lupa 202834): a varredura idempotente das tarefas de ANTES da passagem que ficaram abertas
+      const { rows: v } = await getRequestPool().query(SQL_VARRER_TAREFAS_DA_PASSAGEM, [orgId, followupPipelineId, preservadasNaPassagem()]);
+      const varridas = (v[0] as { varridas?: number } | undefined)?.varridas ?? 0;
+      if (varridas > 0) logger.warn("esteira_passagem_tarefas_varridas", { organization_id: orgId, varridas });
       if (r.guardioes + r.originais + r.tarefas + conversas > 0) {
         // A saúde lê esta linha: > 0 = AMARELO (a entrega da passagem falhou em algum ponto e foi corrigida aqui).
         logger.warn("esteira_followup_reconciliados", { organization_id: orgId, guardioes: r.guardioes, originais: r.originais, tarefas: r.tarefas, conversas });

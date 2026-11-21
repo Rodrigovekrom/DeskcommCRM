@@ -9,6 +9,8 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { SQL_VARRER_TAREFAS_DA_PASSAGEM } from "@/lib/esteira/reconciliar-followup-sql";
+
 import { GOV_AGENT_A, GOV_AGENT_B, GOV_MANAGER, GOV_ORG, GOV_PIPELINE, GOV_STAGE, lastLine, seedGov, sql } from "./gov-helpers";
 import { motivoDoErro } from "./psql-transporte";
 
@@ -172,10 +174,52 @@ describe("0647: a troca de FUNIL não avisa 'guardiao_etapa'", () => {
   });
 });
 
+describe("0647: o sinal administrativo não é alcançável pelo cliente", () => {
+  it("o set_config é do pg_catalog, fora do schema exposto pelo PostgREST (public): nenhum 'public.set_config'", () => {
+    expect(
+      valor(`select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.proname = 'set_config' and n.nspname = 'public';`),
+    ).toBe("0");
+  });
+});
+
 describe("a invariante do cartão único: a etapa de todo lead pertence ao funil dele", () => {
   it("0 leads com a etapa de outro funil", () => {
     expect(
       valor(`select count(*) from public.crm_leads l join public.crm_stages s on s.id = l.stage_id where s.pipeline_id is distinct from l.pipeline_id;`),
     ).toBe("0");
+  });
+});
+
+describe("v1.9.62 (Lupa 202834): a varredura idempotente das tarefas de ANTES da passagem", () => {
+  const LP = `${N}041`;
+  const T_ANTES = `${N}042`;
+  const T_DEPOIS = `${N}043`;
+  const T_PROMESSA = `${N}044`;
+  const varrer = (preservar: string) =>
+    valor(
+      SQL_VARRER_TAREFAS_DA_PASSAGEM.replaceAll("$1", `'${GOV_ORG}'`).replaceAll("$2", `'${FUNIL_2}'`).replaceAll("$3::text[]", preservar) + ";",
+    );
+  beforeAll(() => {
+    sql(`insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, esteira_passou_em)
+           values ('${LP}', '${GOV_ORG}', '${FUNIL_2}', '${ETAPA_2}', 'Passou 0647', now() - interval '1 hour') on conflict (id) do nothing;
+         insert into public.crm_tasks (id, organization_id, title, lead_id, assigned_to, due_date, status, source_kind, created_at) values
+           ('${T_ANTES}', '${GOV_ORG}', 'De antes', '${LP}', '${GOV_AGENT_B}', now(), 'pending', null, now() - interval '2 hours'),
+           ('${T_DEPOIS}', '${GOV_ORG}', 'De depois', '${LP}', '${GOV_AGENT_B}', now(), 'pending', null, now()),
+           ('${T_PROMESSA}', '${GOV_ORG}', 'Promessa', '${LP}', '${GOV_AGENT_B}', now(), 'pending', 'promised_followup', now() - interval '2 hours')
+           on conflict (id) do nothing;`);
+  });
+
+  it("com a promessa PRESERVADA (P3 = seguem): fecha só a de antes; a de depois e a promessa ficam", () => {
+    expect(varrer(`array['promised_proposal','promised_followup']::text[]`)).toBe("1");
+    expect(valor(`select status || '/' || cancelada_motivo from public.crm_tasks where id='${T_ANTES}';`)).toBe("cancelled/passagem_sem_revisao");
+    expect(valor(`select status from public.crm_tasks where id='${T_DEPOIS}';`)).toBe("pending");
+    expect(valor(`select status from public.crm_tasks where id='${T_PROMESSA}';`)).toBe("pending");
+  });
+
+  it("idempotente, e sem preservar (P3 de hoje): a promessa de antes também fecha; a de depois nunca", () => {
+    expect(varrer(`'{}'::text[]`)).toBe("1");
+    expect(varrer(`'{}'::text[]`)).toBe("0");
+    expect(valor(`select status from public.crm_tasks where id='${T_PROMESSA}';`)).toBe("cancelled");
+    expect(valor(`select status from public.crm_tasks where id='${T_DEPOIS}';`)).toBe("pending");
   });
 });

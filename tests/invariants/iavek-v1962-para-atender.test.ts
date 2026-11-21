@@ -70,6 +70,16 @@ describe("0648: o lead do vendedor vai para a coluna de entrada dele", () => {
     ).toBe(IA);
   });
 
+  it("(Lupa 202834) a ida à coluna NÃO avisa 'guardiao_etapa' ao guardião (o 'lead_passado' já avisa)", () => {
+    const id = L("09");
+    sql(`insert into public.crm_leads (id, organization_id, pipeline_id, stage_id, title, sdr_user_id)
+         values ('${id}', '${GOV_ORG}', '${FUNIL}', '${IA}', 'Guardião 0648', '${GOV_AGENT_B}') on conflict (id) do nothing;`);
+    sql(`update public.crm_leads set owner_user_id='${GOV_AGENT_A}', owner_kind='user' where id='${id}';`);
+    expect(etapa(id)).toBe(PARA_ATENDER);
+    expect(valor(`select count(*) from public.notificacoes where lead_id='${id}' and tipo='guardiao_etapa';`)).toBe("0");
+    expect(valor(`select count(*) from public.notificacoes where lead_id='${id}' and tipo='lead_passado';`)).toBe("1");
+  });
+
   it("para quem NÃO é vendedor (a SDR): fica onde está", () => {
     sql(`update public.crm_leads set owner_user_id='${GOV_AGENT_B}', owner_kind='user' where id='${L("02")}';`);
     expect(etapa(L("02"))).toBe(IA);
