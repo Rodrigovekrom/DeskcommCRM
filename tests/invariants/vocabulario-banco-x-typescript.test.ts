@@ -456,6 +456,26 @@ const PARES: Array<{
     arquivo: "lib/campanhas/tipos.ts",
     simbolo: "STATUS_DO_DESTINATARIO",
   },
+  // ia.vek CRM-439 (0651): as orientações da loja e as novidades da versão. O alvo por função é o FUNCOES sem o 'apoio'
+  // (conta como gerente) e sem a 'analista_ficha' (não usa o CRM); uma função nova pede migration nova.
+  {
+    tabela: "iavek_comunicados",
+    coluna: "tipo",
+    arquivo: "lib/iavek/comunicados.ts",
+    simbolo: "TIPOS_DE_COMUNICADO",
+  },
+  {
+    tabela: "iavek_comunicados",
+    coluna: "alvo",
+    arquivo: "lib/iavek/comunicados.ts",
+    simbolo: "ALVOS_DE_COMUNICADO",
+  },
+  {
+    tabela: "iavek_comunicados",
+    coluna: "para_funcao",
+    arquivo: "lib/iavek/comunicados.ts",
+    simbolo: "FUNCOES_ALVO",
+  },
 ];
 
 /** Tira um nível de parênteses externos, se ele envolver a expressão inteira. */

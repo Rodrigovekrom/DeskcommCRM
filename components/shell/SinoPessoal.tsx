@@ -141,6 +141,13 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
         return t("{n} carros saíram do estoque").replace("{n}", String(n.dados.quantidade ?? "—"));
       }
       return t("{carro} saiu do estoque").replace("{carro}", String(n.dados.carro_nome ?? t("Um carro")));
+    // ia.vek CRM-439 (0651): a orientação da gerência e a novidade da versão (o texto mora no comunicado).
+    case "orientacao_da_loja":
+      return t("Orientação da loja: {titulo}").replace("{titulo}", String(n.dados.titulo ?? "—"));
+    case "novidade_da_versao":
+      return t("Novidade da versão {versao}: {titulo}")
+        .replace("{versao}", String(n.dados.versao ?? "—"))
+        .replace("{titulo}", String(n.dados.titulo ?? "—"));
     default:
       return quem;
   }
@@ -233,9 +240,11 @@ export function SinoPessoal() {
                   ? `/app/proposals/${n.dados.proposta_id}`
                   : typeof n.dados.pedido_id === "string"
                     ? "/app/meu-dia"
-                    : n.conversation_id
-                      ? `/app/inbox?id=${n.conversation_id}`
-                      : null;
+                    : typeof n.dados.comunicado_id === "string"
+                      ? `/app/manual-da-loja#comunicado-${n.dados.comunicado_id}`
+                      : n.conversation_id
+                        ? `/app/inbox?id=${n.conversation_id}`
+                        : null;
               const conteudo = (
                 <>
                   <span className={cn("block text-sm", !n.lida && "font-medium")}>

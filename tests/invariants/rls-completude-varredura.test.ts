@@ -76,6 +76,21 @@ interface Excecao {
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
   {
+    tabela: "iavek_comunicados",
+    razao:
+      "tests/invariants/iavek-comunicados-0651.test.ts — as orientações da loja e as novidades da versão (0651, CRM-439): JWT authenticated de outra organização (o agente e o gestor dela) conta 0 linhas; o vendedor não vê o comunicado da SDR nem as linhas dos outros; o gestor e o admin da plataforma veem a org inteira.",
+  },
+  {
+    tabela: "iavek_comunicados_destinatarios",
+    razao:
+      "tests/invariants/iavek-comunicados-0651.test.ts — o retrato de quem cada comunicado alcançou (0651, CRM-439): JWT authenticated de outra organização (o agente e o gestor dela) conta 0 linhas; o vendedor não vê o comunicado da SDR nem as linhas dos outros; o gestor e o admin da plataforma veem a org inteira.",
+  },
+  {
+    tabela: "iavek_comunicados_lidos",
+    razao:
+      "tests/invariants/iavek-comunicados-0651.test.ts — o 'li e entendi' de cada destinatário (0651, CRM-439): JWT authenticated de outra organização (o agente e o gestor dela) conta 0 linhas; o vendedor não vê o comunicado da SDR nem as linhas dos outros; o gestor e o admin da plataforma veem a org inteira.",
+  },
+  {
     tabela: "iavek_turnos_da_ia",
     razao:
       "tests/invariants/iavek-turnos-da-ia-so-do-servidor.test.ts — um registro por turno respondido pela IA (0646, v1.9.60, CRM-491), exclusivo do servidor: SELECT/INSERT/UPDATE/DELETE com JWT authenticated recusados para o admin da organização e para o anon; o service_role grava e lê.",

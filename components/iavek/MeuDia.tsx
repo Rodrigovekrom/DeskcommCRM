@@ -19,6 +19,7 @@ import { SecaoRecolhivel } from "@/components/inbox/SecaoRecolhivel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PedidosDeAgendamento } from "@/components/iavek/PedidosDeAgendamento";
+import { OrientacoesParaVoce } from "@/components/iavek/OrientacoesDaLoja";
 import { CarrosAnunciados } from "@/components/iavek/CarrosAnunciados";
 
 /**
@@ -170,6 +171,8 @@ export function MeuDia() {
         </div>
         <span className="text-sm text-muted-foreground">{t(ROTULO_DA_FUNCAO[funcao])}</span>
       </header>
+      {/* ia.vek CRM-439 (0651): as orientações da loja que faltam ler, no topo; não trava a tela. */}
+      <OrientacoesParaVoce />
       {/* ia.vek v1.7.6: pedidos de agendamento (o admin decide; os demais acompanham os seus). */}
       <PedidosDeAgendamento />
       {isLoading ? (

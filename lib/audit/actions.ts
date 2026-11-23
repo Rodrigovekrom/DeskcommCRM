@@ -323,6 +323,10 @@ export const AUDIT_ACTIONS = [
   "iavek.lados_do_funil_changed",
   "iavek.lead_passagem",
   "iavek.padrao_marcado",
+  // ia.vek CRM-439 (0651): a orientação da gerência, o "li e entendi" e a novidade da versão (só ids e contagens).
+  "iavek.comunicado_enviado",
+  "iavek.comunicado_lido",
+  "iavek.novidade_publicada",
   "proposals.config_changed",
   // Mudar a régua do abandono (spec 16 §5.2) muda como TODO período passa a ser
   // lido — é mutação relevante, não preferência de exibição.
