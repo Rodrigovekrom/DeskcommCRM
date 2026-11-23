@@ -50493,11 +50493,11 @@ create table if not exists public.iavek_comunicados (
     references public.iavek_comunicados (organization_id, id),
   constraint iavek_comunicados_substitui_outra check (substitui_id is null or substitui_id <> id),
   -- o para_usuario só fica nulo depois do envio (a pessoa apagada); a função de envio exige que ele venha preenchido.
-  constraint iavek_comunicados_alvo_check check (
+  constraint iavek_comunicados_alvo_destino_check check (
     (alvo = 'funcao' and para_funcao is not null and para_usuario is null)
     or (alvo = 'pessoa' and para_funcao is null)
   ),
-  constraint iavek_comunicados_versao_check check (
+  constraint iavek_comunicados_versao_so_novidade_check check (
     (tipo = 'novidade' and versao is not null) or (tipo = 'orientacao' and versao is null)
   ),
   -- (Lupa H) a orientação sempre pede o "li e entendi"; o enviado_por preenchido NÃO é check (bateria no SET NULL):
@@ -50663,6 +50663,13 @@ create policy iavek_comunicados_lidos_insert on public.iavek_comunicados_lidos
   with check (
     user_id = auth.uid()
     and organization_id in (select public.fn_user_org_ids())
+    -- (Lupa 121236) a org da leitura é a do retrato do envio.
+    and exists (
+      select 1 from public.iavek_comunicados_destinatarios d
+       where d.comunicado_id = iavek_comunicados_lidos.comunicado_id
+         and d.user_id = auth.uid()
+         and d.organization_id = iavek_comunicados_lidos.organization_id
+    )
   );
 
 revoke all on table public.iavek_comunicados from public, anon, authenticated;

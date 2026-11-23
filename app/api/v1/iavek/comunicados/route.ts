@@ -8,6 +8,8 @@
  * A leitura usa o cliente da SESSÃO (a RLS da 0651) com `organization_id` à mão. O envio confere o papel
  * (`requireRole("manager")`: gerente, admin e o admin da plataforma) e grava TUDO numa chamada só
  * (`fn_iavek_enviar_comunicado`, só do service_role): o comunicado, o retrato de quem recebe e o sino. Sem push.
+ * O admin da plataforma que NÃO é membro da loja recebe 403 ao enviar (a função exige quem envia ativo na org): falha
+ * fechada, de propósito (Lupa 121236).
  */
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";

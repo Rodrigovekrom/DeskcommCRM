@@ -348,7 +348,7 @@ describe("0651: o 'li e entendi'", () => {
           `insert into public.iavek_comunicados_lidos (comunicado_id, user_id, organization_id) values ('${PARA_VENDEDOR}', '${SDR}', '${ORG_A}');`,
         ),
       ),
-    ).toMatch(/violates foreign key|destinatario_fkey/);
+    ).toMatch(/row-level security|violates foreign key/); // a policy (Lupa 121236) barra antes da FK
     expect(
       falha(
         como(
