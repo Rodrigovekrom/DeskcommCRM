@@ -50818,6 +50818,118 @@ $$;
 revoke execute on function public.fn_iavek_li_e_entendi(uuid) from public, anon;
 grant execute on function public.fn_iavek_li_e_entendi(uuid) to authenticated, service_role;
 
+-- ---- ia.vek: o dono é avisado quando a gerência responde o cliente dele (migration 0652, CRM-434) ----
+-- ⚠️ ANTES DA VARREDURA anon: função nova. Ver o cabeçalho de supabase/migrations/20261123140000_0652_iavek_resposta_de_outro.sql.
+-- O tipo 'resposta_de_outro' está em notificacoes_tipo_check, mais abaixo, no lugar.
+-- ---- 2. o gatilho ----
+create or replace function public.fn_iavek_avisa_resposta_de_outro()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_janela constant interval := interval '10 minutes';
+  v_conversa record;
+  v_padrao uuid;
+  v_lead record;
+  v_empate integer;
+begin
+  begin
+    if new.conversation_id is null then return null; end if;
+
+    select c.id, c.organization_id, c.contact_id, c.is_group into v_conversa
+      from public.conversations c
+     where c.id = new.conversation_id and c.organization_id = new.organization_id;
+    if not found or v_conversa.is_group or v_conversa.contact_id is null then return null; end if;
+
+    -- quem escreveu: gerente ou admin ATIVO desta org.
+    if not exists (
+      select 1 from public.user_organizations uo
+       where uo.organization_id = new.organization_id
+         and uo.user_id = new.sent_by_user_id
+         and uo.revoked_at is null
+         and uo.role in ('manager', 'admin')
+    ) then
+      return null;
+    end if;
+
+    -- o funil padrão (o mesmo limit 1 dos chamadores de resolveActiveLeadForContact).
+    select p.id into v_padrao
+      from public.crm_pipelines p
+     where p.organization_id = new.organization_id and p.is_default = true and p.is_archived = false
+     limit 1;
+
+    -- o lead ativo: abertos; os do funil padrão se houver algum, senão todos; o de maior atividade.
+    with abertos as (
+      select l.id, l.owner_user_id, l.sdr_user_id, l.pipeline_id,
+             coalesce(l.last_activity_at, l.created_at) as atividade
+        from public.crm_leads l
+       where l.organization_id = new.organization_id
+         and l.contact_id = v_conversa.contact_id
+         and l.status = 'open'
+    ), pool as (
+      select a.* from abertos a
+       where v_padrao is null
+          or a.pipeline_id = v_padrao
+          or not exists (select 1 from abertos b where b.pipeline_id = v_padrao)
+    )
+    select p.id, p.owner_user_id, p.sdr_user_id, p.atividade,
+           (select count(*) from pool q where q.atividade is not distinct from p.atividade) as empatados
+      into v_lead
+      from pool p
+     order by p.atividade desc nulls last
+     limit 1;
+    if not found then return null; end if;
+    -- empate no topo (com 2+ no pool): ambíguo, não avisa. Um lead só nunca é empate.
+    if v_lead.empatados > 1 then return null; end if;
+
+    -- o dono: existe, é membro ativo, não é quem escreveu; quem escreveu não é o guardião do lead.
+    if v_lead.owner_user_id is null
+       or v_lead.owner_user_id = new.sent_by_user_id
+       or v_lead.sdr_user_id is not distinct from new.sent_by_user_id then
+      return null;
+    end if;
+    if not exists (
+      select 1 from public.user_organizations uo
+       where uo.organization_id = new.organization_id
+         and uo.user_id = v_lead.owner_user_id
+         and uo.revoked_at is null
+    ) then
+      return null;
+    end if;
+
+    -- a janela: 1 por conversa e dono a cada 10 min (o índice da 0579 por user_id, organization_id, created_at).
+    if exists (
+      select 1 from public.notificacoes n
+       where n.user_id = v_lead.owner_user_id
+         and n.organization_id = new.organization_id
+         and n.created_at > now() - v_janela
+         and n.tipo = 'resposta_de_outro'
+         and n.dados->>'conversation_id' = new.conversation_id::text
+    ) then
+      return null;
+    end if;
+
+    insert into public.notificacoes (organization_id, user_id, tipo, lead_id, ator_user_id, dados)
+    values (new.organization_id, v_lead.owner_user_id, 'resposta_de_outro', v_lead.id, new.sent_by_user_id,
+            jsonb_build_object('conversation_id', new.conversation_id));
+  exception when others then
+    -- sem dado de cliente: só o código do erro e o id da mensagem.
+    raise warning 'fn_iavek_avisa_resposta_de_outro (0652): SQLSTATE % (mensagem %)', sqlstate, new.id;
+  end;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_avisa_resposta_de_outro() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_avisa_resposta_de_outro on public.messages;
+create trigger trg_iavek_avisa_resposta_de_outro
+  after insert on public.messages
+  for each row
+  when (new.direction = 'outbound' and new.sent_via::text = 'user' and new.sent_by_user_id is not null)
+  execute function public.fn_iavek_avisa_resposta_de_outro();
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -53002,7 +53114,9 @@ alter table public.notificacoes add constraint notificacoes_tipo_check check (ti
   'agendamento_no_seu_lead',
   -- ia.vek CRM-439 (migration 0651): a orientação da gerência e a novidade da versão.
   'orientacao_da_loja',
-  'novidade_da_versao'
+  'novidade_da_versao',
+  -- ia.vek CRM-434 (migration 0652): um gerente ou admin respondeu o cliente deste dono.
+  'resposta_de_outro'
 ));
 
 

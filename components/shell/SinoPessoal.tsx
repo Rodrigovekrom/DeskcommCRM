@@ -141,6 +141,9 @@ export function fraseDaNotificacao(n: NotificacaoDoSino, t: (s: string) => strin
         return t("{n} carros saíram do estoque").replace("{n}", String(n.dados.quantidade ?? "—"));
       }
       return t("{carro} saiu do estoque").replace("{carro}", String(n.dados.carro_nome ?? t("Um carro")));
+    // ia.vek CRM-434 (0652): um gerente ou admin respondeu o cliente deste dono (sem o texto da mensagem).
+    case "resposta_de_outro":
+      return troca("{who} respondeu o seu cliente {lead}");
     // ia.vek CRM-439 (0651): a orientação da gerência e a novidade da versão (o texto mora no comunicado).
     case "orientacao_da_loja":
       return t("Orientação da loja: {titulo}").replace("{titulo}", String(n.dados.titulo ?? "—"));
@@ -236,7 +239,10 @@ export function SinoPessoal() {
               const href =
                 typeof n.dados.conversa_id === "string"
                   ? `/app/inbox?id=${n.dados.conversa_id}`
-                  : typeof n.dados.proposta_id === "string"
+                  : // ia.vek CRM-434 (0652): a conversa EXATA em que a gerência respondeu.
+                    typeof n.dados.conversation_id === "string"
+                    ? `/app/inbox?id=${n.dados.conversation_id}`
+                    : typeof n.dados.proposta_id === "string"
                   ? `/app/proposals/${n.dados.proposta_id}`
                   : typeof n.dados.pedido_id === "string"
                     ? "/app/meu-dia"

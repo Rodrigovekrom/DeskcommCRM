@@ -12062,6 +12062,8 @@ export const DICIONARIO: Traducoes = {
   "Pediram ajuda no seu lead {nome}: ele segue com o dono.": { es: "Pidieron ayuda en tu lead {nome}: sigue con su dueño." },
   "Aviso do grupo sem lead reconhecido: {nome}. O lead segue em IA Atendendo.": { es: "Aviso del grupo sin lead reconocido: {nome}. El lead sigue en IA Atendiendo." },
   "um cliente": { es: "un cliente" },
+  // ia.vek CRM-434 (0652): a gerência respondeu o cliente deste dono.
+  "{who} respondeu o seu cliente {lead}": { es: "{who} respondió a tu cliente {lead}" },
   // ia.vek CRM-439 (0651): orientações da loja e novidades da versão.
   "Li e entendi": { es: "Leí y entendí" },
   "Novidade da versão {versao}": { es: "Novedad de la versión {versao}" },

@@ -80,8 +80,9 @@ beforeAll(() => {
 describe("0651: a volta", () => {
   it("controle: antes da volta, as 3 tabelas e as 5 funções existem, e o check tem as 21 da 0629 mais as 2 novas", () => {
     expect(numero(OBJETOS)).toBe(8);
+    // as 21 da 0629 e as 2 da 0651 estão lá; uma migration DEPOIS (a 0652, CRM-434) pode ter acrescentado outras.
     expect(tiposDoCheck()).toEqual(
-      [...TIPOS_DA_0629, "novidade_da_versao", "orientacao_da_loja"].sort(),
+      expect.arrayContaining([...TIPOS_DA_0629, "novidade_da_versao", "orientacao_da_loja"]),
     );
     expect(
       numero(`select count(*) from public.notificacoes where tipo = 'orientacao_da_loja';`),
