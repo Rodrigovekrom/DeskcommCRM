@@ -32,6 +32,7 @@ const GUARDIAO_GERENTE = id(1, 5);
 const DONO_GERENTE = id(1, 6);
 const GERENTE_REVOGADO = id(1, 7);
 const DONO_REVOGADO = id(1, 8);
+const DONO_APAGADO = id(1, 11);
 const GERENTE_B = id(1, 9);
 const DONO_B = id(1, 10);
 
@@ -60,6 +61,7 @@ const C = {
   semAberto: cenario(8),
   semDono: cenario(9),
   donoRevogado: cenario(10),
+  donoApagado: cenario(16),
   padrao: cenario(11),
   empate: cenario(12),
   semAtividade: cenario(13),
@@ -137,6 +139,7 @@ beforeAll(() => {
     DONO_GERENTE,
     GERENTE_REVOGADO,
     DONO_REVOGADO,
+    DONO_APAGADO,
     GERENTE_B,
     DONO_B,
   ];
@@ -152,6 +155,7 @@ beforeAll(() => {
     ${membro(DONO_GERENTE, ORG, "manager", "gerente")}
     ${membro(GERENTE_REVOGADO, ORG, "manager", "gerente", true)}
     ${membro(DONO_REVOGADO, ORG, "agent", "vendedor")}
+    ${membro(DONO_APAGADO, ORG, "agent", "vendedor")}
     ${membro(GERENTE_B, ORG_B, "manager", "gerente")}
     ${membro(DONO_B, ORG_B, "agent", "vendedor")}
     do $s$ begin
@@ -190,6 +194,7 @@ beforeAll(() => {
     ${lead({ id: L(8), pipeline: P_PADRAO, c: C.semAberto, dono: DONO, status: "won" })}
     ${lead({ id: L(9), pipeline: P_PADRAO, c: C.semDono, dono: null })}
     ${lead({ id: L(10), pipeline: P_PADRAO, c: C.donoRevogado, dono: DONO_REVOGADO })}
+    ${lead({ id: L(19), pipeline: P_PADRAO, c: C.donoApagado, dono: DONO_APAGADO })}
     ${lead({ id: L(11), pipeline: P_OUTRO, c: C.padrao, dono: AGENTE, atividade: "2026-11-22T10:00:00Z" })}
     ${lead({ id: L(12), pipeline: P_PADRAO, c: C.padrao, dono: DONO, atividade: "2026-11-01T10:00:00Z" })}
     ${lead({ id: L(13), pipeline: P_OUTRO, c: C.empate, dono: DONO, atividade: "2026-11-20T10:00:00Z" })}
@@ -203,6 +208,9 @@ beforeAll(() => {
     ${lead({ id: L(52), org: ORG_B, pipeline: P_B_OUTRO, c: B.intruso, dono: DONO_B })}
     -- o dono só pode ser posto num lead enquanto ativo (0403); a saída da loja vem DEPOIS, como na vida real.
     update public.user_organizations set revoked_at = now() where user_id = '${DONO_REVOGADO}' and organization_id = '${ORG}';
+    -- (Lupa 133248, C2) o dono que NÃO é mais membro: apagado de auth.users (a linha de user_organizations sai junto, em
+    -- cascade); crm_leads.owner_user_id não tem FK, então o lead segue apontando para ele.
+    delete from auth.users where id = '${DONO_APAGADO}';
   `);
 });
 
@@ -247,8 +255,16 @@ describe("0652: quem dispara", () => {
 });
 
 describe("0652: sem destinatário é SILÊNCIO, e a mensagem fica", () => {
-  it("sem lead aberto, lead sem dono e dono revogado", () => {
-    for (const c of [C.semAberto, C.semDono, C.donoRevogado]) {
+  it("sem lead aberto, lead sem dono, dono revogado e dono que não é mais membro (apagado)", () => {
+    expect(
+      numero(`select count(*) from public.user_organizations where user_id = '${DONO_APAGADO}';`),
+    ).toBe(0);
+    expect(
+      numero(
+        `select count(*) from public.crm_leads where id = '${L(19)}' and owner_user_id = '${DONO_APAGADO}';`,
+      ),
+    ).toBe(1);
+    for (const c of [C.semAberto, C.semDono, C.donoRevogado, C.donoApagado]) {
       sql(mensagem(c, GERENTE));
       expect(avisos(c)).toBe(0);
       expect(mensagens(c)).toBe(1);
