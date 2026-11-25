@@ -19,9 +19,7 @@ name: iavek-imagem
 
 on:
   push:
-    # TEMPORÁRIO (Maestro 120349-11153, CRM-439): a branch de trabalho crm-439 não monta imagem; só o iavek-banco roda
-    # no push dela. Este commit é REVERTIDO antes de a crm-439 entrar numa versão v1.9.x (pré-requisito do pacote).
-    branches: ["iavek/**", "!iavek/crm-439-*"]
+    branches: ["iavek/**"]
   workflow_dispatch: {}
 
 concurrency:
