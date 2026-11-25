@@ -24,6 +24,7 @@ const DECIDIDAS = [
   "fn_iavek_avisar_trava",
   "fn_iavek_contatos_do_followup", // 0635: o contato/conversa do SDR de Follow-up vem dos leads open E future (Compra futura segue no Follow-up)
   "fn_iavek_escondidos_da_sdr", // 0641 (CRM-407): o contato escondido da SDR = lead open/future no Follow-up, e 'é dela' só com lead open/future (Compra futura segue no Follow-up, como a 0635)
+  "fn_iavek_avisa_resposta_de_outro", // 0652 (CRM-434): o lead ativo é o do app (só status open); o lead em Compra futura NÃO avisa o dono
   "fn_iavek_aviso_de_ajuda",
   "fn_iavek_faixa_de_ajuda",
   "fn_iavek_lead_segue_a_conversa",

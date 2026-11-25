@@ -173,3 +173,4 @@ anterior ao mês atual) e uma seção no painel do gerente. Entra junto.
   igual a perdido e ganho. Entrou na lista da trava do status, que agora também pega `is distinct from 'open'`.
 
 - `fn_iavek_contatos_do_followup` (0635, v1.9.52): o SDR de Follow-up vê o contato e a conversa dos leads do funil Follow-up com status `open` OU `future` (o lead em Compra futura segue sendo trabalhado no Follow-up); o fechado (ganho/perdido) não.
+- `fn_iavek_avisa_resposta_de_outro` (0652, CRM-434): o aviso "respondeu o seu cliente" vai ao dono do lead ATIVO do contato, com o critério do app (`resolveActiveLeadForContact`: só `status = 'open'`). O lead em **Compra futura** (`future`) não é ativo, então a resposta da gerência ao cliente dele NÃO avisa o dono: é silêncio, como no lead ganho, perdido ou sem lead aberto. Mudar isso pede decisão do Rodrigo.

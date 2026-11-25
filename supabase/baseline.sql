@@ -50469,6 +50469,467 @@ create trigger trg_iavek_quente_fecha_com_resposta_de_gente
 -- As 4 funções e a conversations_select ficam no CORPO (antes da policy de conversations, como a 0635); as 2 de contacts,
 -- no bloco da 0607. Ver o cabeçalho de supabase/migrations/20261114230000_0641_iavek_sdr_nao_ve_contato_do_followup.sql.
 
+-- ---- ia.vek: orientações da loja e novidades da versão (migration 0651, CRM-439 fase 1) ----
+-- ⚠️ ANTES DA VARREDURA anon: funções novas. Ver o cabeçalho de supabase/migrations/20261123120000_0651_iavek_comunicados_da_loja.sql.
+-- Os tipos 'orientacao_da_loja' e 'novidade_da_versao' estão em notificacoes_tipo_check, mais abaixo, no lugar.
+-- ---- 1. as tabelas ----
+create table if not exists public.iavek_comunicados (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  tipo text not null check (tipo in ('orientacao', 'novidade')),
+  titulo text not null check (char_length(btrim(titulo)) between 1 and 120),
+  texto text not null check (char_length(btrim(texto)) between 1 and 4000),
+  alvo text not null check (alvo in ('funcao', 'pessoa')),
+  para_funcao text check (para_funcao is null or para_funcao in ('sdr', 'suporte', 'vendedor', 'gerente', 'sdr_followup')),
+  para_usuario uuid references auth.users(id) on delete set null,
+  pede_leitura boolean not null default true,
+  enviado_por uuid references auth.users(id) on delete set null,
+  enviado_em timestamptz not null default now(),
+  substitui_id uuid,
+  versao text check (versao is null or char_length(btrim(versao)) between 1 and 40),
+  constraint iavek_comunicados_org_id_key unique (organization_id, id),
+  -- só corrige uma da MESMA org; NO ACTION (nunca SET NULL), para nenhum cascade virar UPDATE no gatilho.
+  constraint iavek_comunicados_substitui_fkey foreign key (organization_id, substitui_id)
+    references public.iavek_comunicados (organization_id, id),
+  constraint iavek_comunicados_substitui_outra check (substitui_id is null or substitui_id <> id),
+  -- o para_usuario só fica nulo depois do envio (a pessoa apagada); a função de envio exige que ele venha preenchido.
+  constraint iavek_comunicados_alvo_destino_check check (
+    (alvo = 'funcao' and para_funcao is not null and para_usuario is null)
+    or (alvo = 'pessoa' and para_funcao is null)
+  ),
+  constraint iavek_comunicados_versao_so_novidade_check check (
+    (tipo = 'novidade' and versao is not null) or (tipo = 'orientacao' and versao is null)
+  ),
+  -- (Lupa H) a orientação sempre pede o "li e entendi"; o enviado_por preenchido NÃO é check (bateria no SET NULL):
+  -- quem exige é a função de envio.
+  constraint iavek_comunicados_orientacao_pede_leitura check (tipo <> 'orientacao' or pede_leitura)
+);
+comment on table public.iavek_comunicados is
+  'ia.vek CRM-439 (0651): orientações da loja (da gerência) e novidades da versão (do time). Não se editam nem se apagam; quem recebe está em iavek_comunicados_destinatarios.';
+create index if not exists iavek_comunicados_por_org on public.iavek_comunicados (organization_id, enviado_em desc);
+create index if not exists iavek_comunicados_substitui on public.iavek_comunicados (organization_id, substitui_id)
+  where substitui_id is not null;
+
+create table if not exists public.iavek_comunicados_destinatarios (
+  comunicado_id uuid not null references public.iavek_comunicados(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  funcao_no_envio text,
+  primary key (comunicado_id, user_id)
+);
+comment on table public.iavek_comunicados_destinatarios is
+  'ia.vek CRM-439 (0651): o retrato de quem o comunicado alcançou no envio (o Y do "X de Y leram"). Não se edita.';
+create index if not exists iavek_comunicados_destinatarios_por_pessoa
+  on public.iavek_comunicados_destinatarios (user_id, organization_id);
+
+create table if not exists public.iavek_comunicados_lidos (
+  comunicado_id uuid not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  lida_em timestamptz not null default now(),
+  primary key (comunicado_id, user_id),
+  -- só lê quem é destinatário.
+  constraint iavek_comunicados_lidos_destinatario_fkey foreign key (comunicado_id, user_id)
+    references public.iavek_comunicados_destinatarios (comunicado_id, user_id) on delete cascade
+);
+comment on table public.iavek_comunicados_lidos is
+  'ia.vek CRM-439 (0651): o "li e entendi" de cada destinatário. Não se edita.';
+create index if not exists iavek_comunicados_lidos_por_pessoa
+  on public.iavek_comunicados_lidos (user_id, organization_id);
+
+-- ---- 2. as travas (valem para todo papel, até o service_role) ----
+create or replace function public.fn_iavek_comunicado_nao_edita()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (to_jsonb(new) - 'enviado_por' - 'para_usuario') is distinct from (to_jsonb(old) - 'enviado_por' - 'para_usuario') then
+    raise exception 'Um comunicado enviado não se edita: envie outro que corrige.' using errcode = 'PT409';
+  end if;
+  if new.enviado_por is distinct from old.enviado_por and new.enviado_por is not null then
+    raise exception 'Um comunicado enviado não se edita: envie outro que corrige.' using errcode = 'PT409';
+  end if;
+  if new.para_usuario is distinct from old.para_usuario and new.para_usuario is not null then
+    raise exception 'Um comunicado enviado não se edita: envie outro que corrige.' using errcode = 'PT409';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.fn_iavek_comunicado_nao_edita() from public, anon, authenticated;
+
+create or replace function public.fn_iavek_comunicado_nao_apaga()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- só o cascade da org passa (a linha da org já não existe quando o cascade chega aqui).
+  if exists (select 1 from public.organizations o where o.id = old.organization_id) then
+    raise exception 'Um comunicado enviado não se apaga: envie outro que corrige.' using errcode = 'PT409';
+  end if;
+  return old;
+end;
+$$;
+revoke execute on function public.fn_iavek_comunicado_nao_apaga() from public, anon, authenticated;
+
+create or replace function public.fn_iavek_comunicado_registro_fixo()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    raise exception 'O registro de um comunicado não se edita.' using errcode = 'PT409';
+  end if;
+  -- DELETE: só no cascade (a org, o comunicado ou a pessoa já não existe).
+  if exists (select 1 from public.organizations o where o.id = old.organization_id)
+     and exists (select 1 from public.iavek_comunicados c where c.id = old.comunicado_id)
+     and exists (select 1 from auth.users u where u.id = old.user_id) then
+    raise exception 'O registro de um comunicado não se apaga.' using errcode = 'PT409';
+  end if;
+  return old;
+end;
+$$;
+revoke execute on function public.fn_iavek_comunicado_registro_fixo() from public, anon, authenticated;
+
+drop trigger if exists iavek_comunicados_nao_edita on public.iavek_comunicados;
+create trigger iavek_comunicados_nao_edita
+  before update on public.iavek_comunicados
+  for each row execute function public.fn_iavek_comunicado_nao_edita();
+drop trigger if exists iavek_comunicados_nao_apaga on public.iavek_comunicados;
+create trigger iavek_comunicados_nao_apaga
+  before delete on public.iavek_comunicados
+  for each row execute function public.fn_iavek_comunicado_nao_apaga();
+drop trigger if exists iavek_comunicados_destinatarios_fixo on public.iavek_comunicados_destinatarios;
+create trigger iavek_comunicados_destinatarios_fixo
+  before update or delete on public.iavek_comunicados_destinatarios
+  for each row execute function public.fn_iavek_comunicado_registro_fixo();
+drop trigger if exists iavek_comunicados_lidos_fixo on public.iavek_comunicados_lidos;
+create trigger iavek_comunicados_lidos_fixo
+  before update or delete on public.iavek_comunicados_lidos
+  for each row execute function public.fn_iavek_comunicado_registro_fixo();
+
+-- ---- 3. a RLS e os grants ----
+alter table public.iavek_comunicados enable row level security;
+alter table public.iavek_comunicados_destinatarios enable row level security;
+alter table public.iavek_comunicados_lidos enable row level security;
+
+drop policy if exists iavek_comunicados_select on public.iavek_comunicados;
+create policy iavek_comunicados_select on public.iavek_comunicados
+  for select to authenticated
+  using (
+    public.fn_is_platform_admin_full()
+    or (
+      organization_id in (select public.fn_user_org_ids())
+      and (
+        public.fn_role_at_least(organization_id, 'manager')
+        or exists (
+          select 1 from public.iavek_comunicados_destinatarios d
+           where d.comunicado_id = iavek_comunicados.id and d.user_id = auth.uid()
+        )
+      )
+    )
+  );
+
+drop policy if exists iavek_comunicados_destinatarios_select on public.iavek_comunicados_destinatarios;
+create policy iavek_comunicados_destinatarios_select on public.iavek_comunicados_destinatarios
+  for select to authenticated
+  using (
+    public.fn_is_platform_admin_full()
+    or (
+      organization_id in (select public.fn_user_org_ids())
+      and (user_id = auth.uid() or public.fn_role_at_least(organization_id, 'manager'))
+    )
+  );
+
+drop policy if exists iavek_comunicados_lidos_select on public.iavek_comunicados_lidos;
+create policy iavek_comunicados_lidos_select on public.iavek_comunicados_lidos
+  for select to authenticated
+  using (
+    public.fn_is_platform_admin_full()
+    or (
+      organization_id in (select public.fn_user_org_ids())
+      and (user_id = auth.uid() or public.fn_role_at_least(organization_id, 'manager'))
+    )
+  );
+
+drop policy if exists iavek_comunicados_lidos_insert on public.iavek_comunicados_lidos;
+create policy iavek_comunicados_lidos_insert on public.iavek_comunicados_lidos
+  for insert to authenticated
+  with check (
+    user_id = auth.uid()
+    and organization_id in (select public.fn_user_org_ids())
+    -- (Lupa 121236) a org da leitura é a do retrato do envio.
+    and exists (
+      select 1 from public.iavek_comunicados_destinatarios d
+       where d.comunicado_id = iavek_comunicados_lidos.comunicado_id
+         and d.user_id = auth.uid()
+         and d.organization_id = iavek_comunicados_lidos.organization_id
+    )
+  );
+
+revoke all on table public.iavek_comunicados from public, anon, authenticated;
+revoke all on table public.iavek_comunicados_destinatarios from public, anon, authenticated;
+revoke all on table public.iavek_comunicados_lidos from public, anon, authenticated;
+grant select on table public.iavek_comunicados to authenticated;
+grant select on table public.iavek_comunicados_destinatarios to authenticated;
+grant select, insert on table public.iavek_comunicados_lidos to authenticated;
+grant select, insert, update, delete on table public.iavek_comunicados to service_role;
+grant select, insert, update, delete on table public.iavek_comunicados_destinatarios to service_role;
+grant select, insert, update, delete on table public.iavek_comunicados_lidos to service_role;
+
+-- ---- 5. enviar: tudo numa só chamada (Lupa C), só do servidor ----
+create or replace function public.fn_iavek_enviar_comunicado(
+  p_org uuid,
+  p_tipo text,
+  p_titulo text,
+  p_texto text,
+  p_alvo text,
+  p_para_funcao text,
+  p_para_usuario uuid,
+  p_pede_leitura boolean,
+  p_enviado_por uuid,
+  p_substitui_id uuid,
+  p_versao text
+)
+returns table (comunicado_id uuid, destinatarios integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+  v_n integer;
+begin
+  -- (Lupa H) a definer não passa pela RLS: quem envia e para quem são conferidos AQUI, na mesma org.
+  if p_tipo = 'orientacao' and p_enviado_por is null then
+    raise exception 'A orientação precisa de quem a enviou.' using errcode = 'PT422';
+  end if;
+  if p_enviado_por is not null and not exists (
+    select 1 from public.user_organizations uo
+     where uo.organization_id = p_org and uo.user_id = p_enviado_por and uo.revoked_at is null
+  ) then
+    raise exception 'Quem envia não é um membro ativo desta organização.' using errcode = 'PT403';
+  end if;
+  if p_alvo = 'pessoa' and (p_para_usuario is null or not exists (
+    select 1 from public.user_organizations uo
+     where uo.organization_id = p_org and uo.user_id = p_para_usuario and uo.revoked_at is null
+       and coalesce(uo.interface_settings->>'funcao', '') <> 'analista_ficha'
+  )) then
+    raise exception 'A pessoa escolhida não é um membro ativo desta organização.' using errcode = 'PT422';
+  end if;
+  if p_substitui_id is not null and not exists (
+    select 1 from public.iavek_comunicados c
+     where c.id = p_substitui_id and c.organization_id = p_org and c.tipo = p_tipo
+  ) then
+    raise exception 'O comunicado corrigido não é desta organização nem do mesmo tipo.' using errcode = 'PT422';
+  end if;
+
+  insert into public.iavek_comunicados
+    (organization_id, tipo, titulo, texto, alvo, para_funcao, para_usuario, pede_leitura, enviado_por, substitui_id, versao)
+  values
+    (p_org, p_tipo, btrim(p_titulo), btrim(p_texto), p_alvo,
+     case when p_alvo = 'funcao' then p_para_funcao end,
+     case when p_alvo = 'pessoa' then p_para_usuario end,
+     coalesce(p_pede_leitura, true), p_enviado_por, p_substitui_id, p_versao)
+  returning id into v_id;
+
+  -- o retrato: os membros ATIVOS alcançados agora, sem quem enviou. 'apoio' conta como 'gerente' (0598).
+  insert into public.iavek_comunicados_destinatarios (comunicado_id, user_id, organization_id, funcao_no_envio)
+  select distinct on (uo.user_id)
+         v_id, uo.user_id, p_org,
+         case uo.interface_settings->>'funcao' when 'apoio' then 'gerente' else uo.interface_settings->>'funcao' end
+    from public.user_organizations uo
+   where uo.organization_id = p_org
+     and uo.revoked_at is null
+     -- a analista de ficha não usa o CRM (a fn_user_org_ids a deixa de fora, 0586): nunca é destinatária.
+     and coalesce(uo.interface_settings->>'funcao', '') <> 'analista_ficha'
+     and uo.user_id is distinct from p_enviado_por
+     and (
+       (p_alvo = 'funcao'
+         and (case uo.interface_settings->>'funcao' when 'apoio' then 'gerente' else uo.interface_settings->>'funcao' end) = p_para_funcao)
+       or (p_alvo = 'pessoa' and uo.user_id = p_para_usuario)
+     )
+   order by uo.user_id;
+  get diagnostics v_n = row_count;
+
+  if v_n = 0 then
+    -- desfaz o comunicado inteiro (a exceção leva a transação da chamada junto).
+    raise exception 'Ninguém recebe este comunicado: confira a função ou a pessoa.' using errcode = 'PT422';
+  end if;
+
+  -- o sino: sem o texto (o título e a versão só para a linha do sino).
+  insert into public.notificacoes (organization_id, user_id, tipo, ator_user_id, dados)
+  select p_org, d.user_id,
+         case p_tipo when 'orientacao' then 'orientacao_da_loja' else 'novidade_da_versao' end,
+         p_enviado_por,
+         jsonb_strip_nulls(jsonb_build_object('comunicado_id', v_id, 'titulo', btrim(p_titulo), 'versao', p_versao))
+    from public.iavek_comunicados_destinatarios d
+   where d.comunicado_id = v_id;
+
+  return query select v_id, v_n;
+end;
+$$;
+revoke execute on function public.fn_iavek_enviar_comunicado(uuid, text, text, text, text, text, uuid, boolean, uuid, uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.fn_iavek_enviar_comunicado(uuid, text, text, text, text, text, uuid, boolean, uuid, uuid, text)
+  to service_role;
+
+-- ---- 6. o "li e entendi": INVOKER (a RLS vale), numa só chamada ----
+create or replace function public.fn_iavek_li_e_entendi(p_comunicado uuid)
+returns timestamptz
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_org uuid;
+  v_lida timestamptz;
+begin
+  select d.organization_id into v_org
+    from public.iavek_comunicados_destinatarios d
+   where d.comunicado_id = p_comunicado and d.user_id = auth.uid();
+  if v_org is null then
+    raise exception 'Este comunicado não é para você.' using errcode = 'PT404';
+  end if;
+
+  insert into public.iavek_comunicados_lidos (comunicado_id, user_id, organization_id)
+  values (p_comunicado, auth.uid(), v_org)
+  on conflict (comunicado_id, user_id) do nothing;
+
+  update public.notificacoes n
+     set lida_em = now()
+   where n.user_id = auth.uid()
+     and n.organization_id = v_org
+     and n.tipo in ('orientacao_da_loja', 'novidade_da_versao')
+     and n.dados->>'comunicado_id' = p_comunicado::text
+     and n.lida_em is null;
+
+  select l.lida_em into v_lida
+    from public.iavek_comunicados_lidos l
+   where l.comunicado_id = p_comunicado and l.user_id = auth.uid();
+  return v_lida;
+end;
+$$;
+revoke execute on function public.fn_iavek_li_e_entendi(uuid) from public, anon;
+grant execute on function public.fn_iavek_li_e_entendi(uuid) to authenticated, service_role;
+
+-- ---- ia.vek: o dono é avisado quando a gerência responde o cliente dele (migration 0652, CRM-434) ----
+-- ⚠️ ANTES DA VARREDURA anon: função nova. Ver o cabeçalho de supabase/migrations/20261123140000_0652_iavek_resposta_de_outro.sql.
+-- O tipo 'resposta_de_outro' está em notificacoes_tipo_check, mais abaixo, no lugar.
+-- ---- 2. o gatilho ----
+create or replace function public.fn_iavek_avisa_resposta_de_outro()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_janela constant interval := interval '10 minutes';
+  v_conversa record;
+  v_padrao uuid;
+  v_lead record;
+  v_empate integer;
+begin
+  begin
+    if new.conversation_id is null then return null; end if;
+
+    select c.id, c.organization_id, c.contact_id, c.is_group into v_conversa
+      from public.conversations c
+     where c.id = new.conversation_id and c.organization_id = new.organization_id;
+    if not found or v_conversa.is_group or v_conversa.contact_id is null then return null; end if;
+
+    -- quem escreveu: gerente ou admin ATIVO desta org.
+    if not exists (
+      select 1 from public.user_organizations uo
+       where uo.organization_id = new.organization_id
+         and uo.user_id = new.sent_by_user_id
+         and uo.revoked_at is null
+         and uo.role in ('manager', 'admin')
+    ) then
+      return null;
+    end if;
+
+    -- o funil padrão (o mesmo limit 1 dos chamadores de resolveActiveLeadForContact).
+    select p.id into v_padrao
+      from public.crm_pipelines p
+     where p.organization_id = new.organization_id and p.is_default = true and p.is_archived = false
+     limit 1;
+
+    -- o lead ativo: abertos; os do funil padrão se houver algum, senão todos; o de maior atividade.
+    with abertos as (
+      select l.id, l.owner_user_id, l.sdr_user_id, l.pipeline_id,
+             coalesce(l.last_activity_at, l.created_at) as atividade
+        from public.crm_leads l
+       where l.organization_id = new.organization_id
+         and l.contact_id = v_conversa.contact_id
+         and l.status = 'open'
+    ), pool as (
+      select a.* from abertos a
+       where v_padrao is null
+          or a.pipeline_id = v_padrao
+          or not exists (select 1 from abertos b where b.pipeline_id = v_padrao)
+    )
+    select p.id, p.owner_user_id, p.sdr_user_id, p.atividade,
+           (select count(*) from pool q where q.atividade is not distinct from p.atividade) as empatados
+      into v_lead
+      from pool p
+     order by p.atividade desc nulls last
+     limit 1;
+    if not found then return null; end if;
+    -- empate no topo (com 2+ no pool): ambíguo, não avisa. Um lead só nunca é empate.
+    if v_lead.empatados > 1 then return null; end if;
+
+    -- o dono: existe, é membro ativo, não é quem escreveu; quem escreveu não é o guardião do lead.
+    if v_lead.owner_user_id is null
+       or v_lead.owner_user_id = new.sent_by_user_id
+       or v_lead.sdr_user_id is not distinct from new.sent_by_user_id then
+      return null;
+    end if;
+    if not exists (
+      select 1 from public.user_organizations uo
+       where uo.organization_id = new.organization_id
+         and uo.user_id = v_lead.owner_user_id
+         and uo.revoked_at is null
+    ) then
+      return null;
+    end if;
+
+    -- a janela: 1 por conversa e dono a cada 10 min (o índice da 0579 por user_id, organization_id, created_at).
+    if exists (
+      select 1 from public.notificacoes n
+       where n.user_id = v_lead.owner_user_id
+         and n.organization_id = new.organization_id
+         and n.created_at > now() - v_janela
+         and n.tipo = 'resposta_de_outro'
+         and n.dados->>'conversation_id' = new.conversation_id::text
+    ) then
+      return null;
+    end if;
+
+    insert into public.notificacoes (organization_id, user_id, tipo, lead_id, ator_user_id, dados)
+    values (new.organization_id, v_lead.owner_user_id, 'resposta_de_outro', v_lead.id, new.sent_by_user_id,
+            jsonb_build_object('conversation_id', new.conversation_id));
+  exception when others then
+    -- sem dado de cliente: só o código do erro e o id da mensagem.
+    raise warning 'fn_iavek_avisa_resposta_de_outro (0652): SQLSTATE % (mensagem %)', sqlstate, new.id;
+  end;
+  return null;
+end;
+$$;
+revoke execute on function public.fn_iavek_avisa_resposta_de_outro() from public, anon, authenticated;
+
+drop trigger if exists trg_iavek_avisa_resposta_de_outro on public.messages;
+create trigger trg_iavek_avisa_resposta_de_outro
+  after insert on public.messages
+  for each row
+  when (new.direction = 'outbound' and new.sent_via::text = 'user' and new.sent_by_user_id is not null)
+  execute function public.fn_iavek_avisa_resposta_de_outro();
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -52650,7 +53111,12 @@ alter table public.notificacoes add constraint notificacoes_tipo_check check (ti
   -- ia.vek v1.9.13 (migration 0601): a IA travou nesta conversa, com o motivo.
   'ia_travou',
   -- ia.vek v1.9.48 (migration 0629): alguém da loja agendou no lead de OUTRA pessoa; o dono é avisado.
-  'agendamento_no_seu_lead'
+  'agendamento_no_seu_lead',
+  -- ia.vek CRM-439 (migration 0651): a orientação da gerência e a novidade da versão.
+  'orientacao_da_loja',
+  'novidade_da_versao',
+  -- ia.vek CRM-434 (migration 0652): um gerente ou admin respondeu o cliente deste dono.
+  'resposta_de_outro'
 ));
 
 

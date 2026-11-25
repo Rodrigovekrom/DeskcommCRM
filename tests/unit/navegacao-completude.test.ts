@@ -48,6 +48,8 @@ const NAV_ALLOWLIST: Record<string, string> = {
     "ia.vek: tela residual, só do dono do servidor (is_platform_admin), que diz que as atualizações são feitas pela equipe. Sem porta de propósito: o ia.vek não segue mais o upstream e o rodapé de versão deixou de ser link",
   "/app/proposals/novo":
     "sub-fluxo de criação de proposta, alcançado pelo botão 'Nova proposta' em /app/proposals",
+  "/app/manual-da-loja":
+    "ia.vek CRM-439 (0651): o Manual da loja, alcançado pelo bloco 'Orientações para você' do Meu dia e pelo aviso do sino. Fora do menu de propósito: o menu de cada função é decisão do Rodrigo ('literalmente apenas esses', v1.9.6)",
 };
 
 /** Deriva as rotas estáticas a partir dos arquivos de página que existem. */
