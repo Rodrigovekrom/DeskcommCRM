@@ -14,6 +14,7 @@ import { usePreCarregarRespostas } from "@/hooks/inbox/useMessageTemplates";
 import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
 import { BuscaDoQuadro, useNomeDoCarroDaBusca } from "@/components/iavek/BuscaDoQuadro";
 import { PadraoNoCardContext, type AvaliacaoDoLead } from "@/components/iavek/PadraoDoLead";
+import { BotaoDoTopo, TopoRecolhivel, useTopoDoPipeline } from "@/components/iavek/TopoDoPipeline";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
 import { Button } from "@/components/ui/button";
@@ -117,10 +118,13 @@ export function CarteiraClient({
   const [achados, setAchados] = useState<Record<string, number>>({});
   const aoAchar = useCallback((funilId: string, n: number) => setAchados((a) => (a[funilId] === n ? a : { ...a, [funilId]: n })), []);
   const encontrados = funis.reduce((soma, f) => soma + (achados[f.id] ?? 0), 0);
+  // CRM-549 (Rodrigo 27/11): no celular o topo nasce recolhido e o quadro ganha a altura; no PC, nada muda.
+  const topo = useTopoDoPipeline();
+  const comFiltro = Boolean(filtros.search?.trim()) || (filtros.owner !== undefined && filtros.owner !== "any");
 
   return (
     <div
-      className="flex h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] min-h-[28rem] flex-col gap-3"
+      className="flex h-[calc(100dvh-3.5rem-var(--space-6)-max(var(--space-6),var(--rodape-ocupado,0px)))] flex-col gap-3 md:min-h-[28rem]"
       data-testid="pipeline-do-vendedor"
       data-visao={visaoEfetiva}
       data-recorte={recorte}
@@ -128,13 +132,18 @@ export function CarteiraClient({
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">{ehVendedor ? t("Meus leads") : t("Pipeline")}</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className={cn("text-sm text-muted-foreground", !topo.aberto && "max-md:hidden")}>
             {recorte === "loja" ? t("Todos os leads da loja") : t("Sua carteira")}
           </p>
         </div>
-        {comBotao && followup && <BotaoDaVisao visao={visaoEfetiva} escolher={escolher} />}
+        {/* md:contents: no PC o envoltório some e o botão da visão fica no header, como antes. */}
+        <div className="flex flex-wrap items-center gap-2 md:contents">
+          {comBotao && followup && <BotaoDaVisao visao={visaoEfetiva} escolher={escolher} />}
+          <BotaoDoTopo aberto={topo.aberto} alternar={topo.alternar} comFiltro={comFiltro} />
+        </div>
       </header>
 
+      <TopoRecolhivel aberto={topo.aberto}>
       <ContadoresDoPipeline contadores={painel.data?.contadores ?? null} />
 
       {recorte === "loja" && <SeletorDeVendedor filters={filtros} onChange={setFiltros} />}
@@ -152,6 +161,7 @@ export function CarteiraClient({
 
       {/* ia.vek v1.9.45 (CRM-294): o mês previsto passou e ninguém agiu; o gerente decide. */}
       {(activeOrg?.role === "manager" || activeOrg?.role === "admin") && <FaixaCompraFuturaVencida />}
+      </TopoRecolhivel>
 
       <AvisosDoCartaoContext.Provider value={painel.data ? { comTarefa } : null}>
         {funis.length === 1 ? (

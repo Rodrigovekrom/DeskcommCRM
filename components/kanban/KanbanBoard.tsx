@@ -163,6 +163,8 @@ export function KanbanBoard({
   // esta opção só troca o destino do erro.
   const [recusaDeCampos, setRecusaDeCampos] = useState<RecusaDeCampos | null>(null);
   const [retomada, setRetomada] = useState<RetomadaPendente | null>(null);
+  // ia.vek CRM-549: o snap-x do celular sai enquanto um cartão é arrastado.
+  const [arrastando, setArrastando] = useState(false);
   // ia.vek v1.7.7: soltar o cartão numa etapa de PERDA pede o motivo (a mesma
   // janela do "Perder" do menu do cartão) em vez de tentar mover e levar recusa.
   const [perdaPendente, setPerdaPendente] = useState<string | null>(null);
@@ -537,10 +539,14 @@ export function KanbanBoard({
     <DragDropContext
       enableDefaultSensors={false}
       sensors={SENSORES_DO_QUADRO}
-      onDragStart={() => congelar(true)}
+      onDragStart={() => {
+        congelar(true);
+        setArrastando(true);
+      }}
       onDragEnd={(r) => {
         handleDragEnd(r);
         congelar(false);
+        setArrastando(false);
       }}
     >
       {/* UM contêiner de rolagem só, nos dois eixos. Rolar cada coluna por
@@ -571,7 +577,14 @@ export function KanbanBoard({
         </p>
       )}
       <div
-        className={cn("min-h-0 flex-1 overflow-auto px-4", atualizando && "pointer-events-none opacity-40 transition-opacity")}
+        // ia.vek CRM-549: no celular (< md) cada deslize para numa coluna (o snap-center da StageColumn só vale com o
+        // snap-x aqui). Desligado durante o arrasto: a rolagem automática do arrasto anda aos poucos, e o snap a
+        // puxaria de volta para a coluna de antes. No PC (md+) nada muda.
+        className={cn(
+          "min-h-0 flex-1 overflow-auto px-4",
+          !arrastando && "max-md:snap-x max-md:snap-mandatory",
+          atualizando && "pointer-events-none opacity-40 transition-opacity",
+        )}
         data-quadro-do-funil
         aria-busy={atualizando || undefined}
         data-atualizando={atualizando ? "" : undefined}
