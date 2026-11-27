@@ -14,7 +14,7 @@ import { usePreCarregarRespostas } from "@/hooks/inbox/useMessageTemplates";
 import { SemRespostaPorVendedor } from "@/components/iavek/SemRespostaPorVendedor";
 import { BuscaDoQuadro, useNomeDoCarroDaBusca } from "@/components/iavek/BuscaDoQuadro";
 import { PadraoNoCardContext, type AvaliacaoDoLead } from "@/components/iavek/PadraoDoLead";
-import { BotaoDoTopo, TopoRecolhivel, useTopoDoPipeline } from "@/components/iavek/TopoDoPipeline";
+import { BotaoDoTopo, TopoRecolhivel, useNomeDoVendedorEscolhido, useTopoDoPipeline } from "@/components/iavek/TopoDoPipeline";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { SeletorDeVendedor } from "@/components/kanban/SeletorDeVendedor";
 import { Button } from "@/components/ui/button";
@@ -120,7 +120,7 @@ export function CarteiraClient({
   const encontrados = funis.reduce((soma, f) => soma + (achados[f.id] ?? 0), 0);
   // CRM-549 (Rodrigo 27/11): no celular o topo nasce recolhido e o quadro ganha a altura; no PC, nada muda.
   const topo = useTopoDoPipeline();
-  const comFiltro = Boolean(filtros.search?.trim()) || (filtros.owner !== undefined && filtros.owner !== "any");
+  const vendedorEscolhido = useNomeDoVendedorEscolhido(recorte === "loja" ? filtros.owner : undefined);
 
   return (
     <div
@@ -139,7 +139,7 @@ export function CarteiraClient({
         {/* md:contents: no PC o envoltório some e o botão da visão fica no header, como antes. */}
         <div className="flex flex-wrap items-center gap-2 md:contents">
           {comBotao && followup && <BotaoDaVisao visao={visaoEfetiva} escolher={escolher} />}
-          <BotaoDoTopo aberto={topo.aberto} alternar={topo.alternar} comFiltro={comFiltro} />
+          <BotaoDoTopo aberto={topo.aberto} alternar={topo.alternar} vendedor={vendedorEscolhido} comBusca={Boolean(filtros.search?.trim())} />
         </div>
       </header>
 
@@ -149,7 +149,12 @@ export function CarteiraClient({
       {recorte === "loja" && <SeletorDeVendedor filters={filtros} onChange={setFiltros} />}
       <BuscaDoQuadro valor={filtros.search ?? ""} onChange={(v) => setFiltros((f) => ({ ...f, search: v }))} encontrados={encontrados} />
 
-      {/* v1.9.18: o vendedor nunca vê a faixa de sem dono nem o Assumir. */}
+      {/* ia.vek v1.9.45 (CRM-294): o mês previsto passou e ninguém agiu; o gerente decide. */}
+      {(activeOrg?.role === "manager" || activeOrg?.role === "admin") && <FaixaCompraFuturaVencida />}
+      </TopoRecolhivel>
+
+      {/* CRM-549 (Lupa 111347, a): as 2 faixas de trabalho do guardião ficam SEMPRE visíveis, também no celular.
+          v1.9.18: o vendedor nunca vê a faixa de sem dono nem o Assumir. */}
       {recorte === "carteira" && !ehVendedor && visaoEfetiva !== "followup" && (
         // O painel recarrega a cada evento do quadro; a faixa vai junto.
         <FaixaSemDono pipelineId={entrada.id} quadroAtualizadoEm={painel.dataUpdatedAt} />
@@ -158,10 +163,6 @@ export function CarteiraClient({
       {activeOrg?.interface_settings?.funcao === "sdr" && visaoEfetiva !== "followup" && (
         <FaixaDePedidosDeAjuda pipelineId={entrada.id} />
       )}
-
-      {/* ia.vek v1.9.45 (CRM-294): o mês previsto passou e ninguém agiu; o gerente decide. */}
-      {(activeOrg?.role === "manager" || activeOrg?.role === "admin") && <FaixaCompraFuturaVencida />}
-      </TopoRecolhivel>
 
       <AvisosDoCartaoContext.Provider value={painel.data ? { comTarefa } : null}>
         {funis.length === 1 ? (

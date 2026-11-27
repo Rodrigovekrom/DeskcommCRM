@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { useT } from "@/hooks/i18n/useT";
+import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { cn } from "@/lib/utils";
 
 /** A escolha de cada aparelho: o topo do Pipeline aberto ou recolhido no celular. */
@@ -45,10 +46,36 @@ export function useTopoDoPipeline() {
 }
 
 /**
- * ia.vek CRM-549 (Rodrigo 27/11: "celular recolhido, PC aberto como está") — o botão que abre e fecha o topo do
- * Pipeline. Só existe abaixo do `md` (768px): no PC ele não aparece.
+ * O nome do vendedor escolhido no seletor (o mesmo `filters.owner`), para a linha recolhida (Lupa 111347, b). Lê a
+ * MESMA consulta do SeletorDeVendedor (["team", "assignable"]): não há pedido a mais. Sem escolha: null.
  */
-export function BotaoDoTopo({ aberto, alternar, comFiltro }: { aberto: boolean; alternar: () => void; comFiltro: boolean }) {
+export function useNomeDoVendedorEscolhido(owner: string | undefined): string | null {
+  const t = useT();
+  const escolhido = owner && owner !== "any" ? owner : null;
+  const { data: membros } = useAssignableMembers(Boolean(escolhido));
+  if (!escolhido) return null;
+  if (escolhido === "unassigned") return t("Sem responsável");
+  const membro = (membros ?? []).find((m) => m.user_id === escolhido);
+  if (!membro) return membros ? t("Outro responsável") : "…";
+  return membro.full_name ?? t("Sem nome");
+}
+
+/**
+ * ia.vek CRM-549 (Rodrigo 27/11: "celular recolhido, PC aberto como está") — o botão que abre e fecha o topo do
+ * Pipeline. Só existe abaixo do `md` (768px): no PC ele não aparece. Com o topo recolhido, os selos dizem o que está
+ * filtrando: o NOME do vendedor escolhido e "busca" (Lupa 111347, b).
+ */
+export function BotaoDoTopo({
+  aberto,
+  alternar,
+  vendedor,
+  comBusca,
+}: {
+  aberto: boolean;
+  alternar: () => void;
+  vendedor: string | null;
+  comBusca: boolean;
+}) {
   const t = useT();
   return (
     <button
@@ -60,9 +87,14 @@ export function BotaoDoTopo({ aberto, alternar, comFiltro }: { aberto: boolean; 
       data-testid="botao-do-topo"
     >
       {t("Filtros e números")}
-      {comFiltro && (
-        <span className="rounded-full bg-accent px-1.5 text-xs text-accent-foreground" data-testid="topo-com-filtro">
-          {t("filtro ativo")}
+      {vendedor && (
+        <span className="max-w-32 truncate rounded-full bg-accent px-1.5 text-xs text-accent-foreground" data-testid="topo-vendedor">
+          {vendedor}
+        </span>
+      )}
+      {comBusca && (
+        <span className="rounded-full bg-accent px-1.5 text-xs text-accent-foreground" data-testid="topo-com-busca">
+          {t("busca")}
         </span>
       )}
       <ChevronDown aria-hidden className={cn("size-4 transition-transform", aberto && "rotate-180")} />
@@ -71,7 +103,8 @@ export function BotaoDoTopo({ aberto, alternar, comFiltro }: { aberto: boolean; 
 }
 
 /**
- * O bloco que recolhe (contadores, seletor, busca e faixas). No PC (`md:contents`) o envoltório some do layout e os
+ * O bloco que recolhe (contadores, seletor, busca e a faixa da compra futura; as faixas de sem dono e de pedidos de
+ * ajuda ficam SEMPRE visíveis, fora dele: Lupa 111347, a). No PC (`md:contents`) o envoltório some do layout e os
  * filhos ficam no `gap-3` da página, como sempre estiveram; no celular, recolhido, o bloco fica escondido.
  */
 export function TopoRecolhivel({ aberto, children }: { aberto: boolean; children: ReactNode }) {

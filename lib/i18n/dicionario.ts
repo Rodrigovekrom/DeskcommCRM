@@ -1434,7 +1434,7 @@ export const DICIONARIO: Traducoes = {
   "Todos os leads da loja": { es: "Todos los leads de la tienda" },
   "Sua carteira": { es: "Tu cartera" },
   "Filtros e números": { es: "Filtros y números" },
-  "filtro ativo": { es: "filtro activo" },
+  "busca": { es: "búsqueda" },
   "Parado há 1 dia": { es: "Parado hace 1 día" },
   "Parado há {dias} dias": { es: "Parado hace {dias} días" },
   "Meus dados": { es: "Mis datos" },

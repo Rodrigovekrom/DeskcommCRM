@@ -1,8 +1,9 @@
 /**
  * ia.vek CRM-549 (Rodrigo 27/11, via Maestro 105656): o Kanban das 72h no celular. "Celular RECOLHIDO, PC ABERTO
  * como está."
- *  - abaixo do `md` (768px) o topo do Pipeline (contadores, seletor, busca, faixas) nasce recolhido, abre num toque e
- *    lembra a escolha no aparelho;
+ *  - abaixo do `md` (768px) o topo do Pipeline (contadores, seletor, busca, compra futura) nasce recolhido, abre num
+ *    toque e lembra a escolha no aparelho; as faixas de sem dono e de pedidos de ajuda ficam SEMPRE visíveis, e o
+ *    selo da linha recolhida diz o NOME do vendedor escolhido e "busca" (Lupa 111347, a e b);
  *  - no PC (md+) o envoltório é `md:contents` (some do layout) e o botão é `md:hidden`: a tela fica como era;
  *  - no celular sai o min-h-[28rem] (rolagem dentro de rolagem) e o quadro ganha o snap-x, desligado no arrasto.
  */
@@ -12,6 +13,13 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
+const membros = vi.hoisted(() => ({ data: undefined as undefined | Array<{ user_id: string; full_name: string | null }>, enabled: [] as boolean[] }));
+vi.mock("@/hooks/inbox/useAssignableMembers", () => ({
+  useAssignableMembers: (enabled: boolean) => {
+    membros.enabled.push(enabled);
+    return { data: enabled ? membros.data : undefined };
+  },
+}));
 
 import {
   BotaoDoTopo,
@@ -19,6 +27,7 @@ import {
   TopoRecolhivel,
   guardarTopo,
   topoGuardadoAberto,
+  useNomeDoVendedorEscolhido,
   useTopoDoPipeline,
 } from "@/components/iavek/TopoDoPipeline";
 
@@ -26,6 +35,8 @@ const fonte = (arq: string) => readFileSync(path.join(process.cwd(), arq), "utf8
 
 afterEach(() => {
   window.localStorage.clear();
+  membros.data = undefined;
+  membros.enabled = [];
   vi.restoreAllMocks();
 });
 
@@ -78,19 +89,37 @@ describe("CRM-549: o topo do Pipeline no celular", () => {
     expect(bloco.className).toContain("md:contents");
   });
 
-  it("o botão só existe no celular (md:hidden), diz se está aberto e avisa o filtro ativo", () => {
+  it("o botão só existe no celular (md:hidden), diz se está aberto e mostra o vendedor e a busca", () => {
     const alternar = vi.fn();
-    const { rerender } = render(<BotaoDoTopo aberto={false} alternar={alternar} comFiltro={false} />);
+    const { rerender } = render(<BotaoDoTopo aberto={false} alternar={alternar} vendedor={null} comBusca={false} />);
     const botao = screen.getByTestId("botao-do-topo");
     expect(botao.className).toContain("md:hidden");
     expect(botao.getAttribute("aria-expanded")).toBe("false");
     expect(botao.getAttribute("aria-controls")).toBe("topo-do-pipeline");
-    expect(screen.queryByTestId("topo-com-filtro")).toBeNull();
+    expect(screen.queryByTestId("topo-vendedor")).toBeNull();
+    expect(screen.queryByTestId("topo-com-busca")).toBeNull();
     fireEvent.click(botao);
     expect(alternar).toHaveBeenCalledTimes(1);
-    rerender(<BotaoDoTopo aberto alternar={alternar} comFiltro />);
+    rerender(<BotaoDoTopo aberto alternar={alternar} vendedor="Vendedor Um" comBusca />);
     expect(botao.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByTestId("topo-com-filtro")).toBeTruthy();
+    expect(screen.getByTestId("topo-vendedor").textContent).toBe("Vendedor Um");
+    expect(screen.getByTestId("topo-com-busca").textContent).toBe("busca");
+  });
+
+  it("o nome do vendedor vem do MESMO owner do seletor; sem escolha não pede a lista", () => {
+    membros.data = [
+      { user_id: "u1", full_name: "Vendedor Um" },
+      { user_id: "u2", full_name: null },
+    ];
+    expect(renderHook(() => useNomeDoVendedorEscolhido("any")).result.current).toBeNull();
+    expect(renderHook(() => useNomeDoVendedorEscolhido(undefined)).result.current).toBeNull();
+    expect(membros.enabled.every((e) => e === false)).toBe(true);
+    expect(renderHook(() => useNomeDoVendedorEscolhido("u1")).result.current).toBe("Vendedor Um");
+    expect(renderHook(() => useNomeDoVendedorEscolhido("u2")).result.current).toBe("Sem nome");
+    expect(renderHook(() => useNomeDoVendedorEscolhido("unassigned")).result.current).toBe("Sem responsável");
+    expect(renderHook(() => useNomeDoVendedorEscolhido("agent:x")).result.current).toBe("Outro responsável");
+    membros.data = undefined;
+    expect(renderHook(() => useNomeDoVendedorEscolhido("u1")).result.current).toBe("…");
   });
 });
 
@@ -103,13 +132,19 @@ describe("CRM-549: a página e o quadro (o PC fica como estava)", () => {
     expect(pagina).not.toMatch(/[\s"]min-h-\[28rem\]/);
   });
 
-  it("os contadores, o seletor, a busca e as faixas moram dentro do topo que recolhe", () => {
+  it("contadores, seletor, busca e compra futura moram no topo que recolhe; sem dono e ajuda ficam SEMPRE visíveis", () => {
     const ini = pagina.indexOf("<TopoRecolhivel");
     const fim = pagina.indexOf("</TopoRecolhivel>");
     expect(ini).toBeGreaterThan(0);
     const dentro = pagina.slice(ini, fim);
-    for (const parte of ["<ContadoresDoPipeline", "<SeletorDeVendedor", "<BuscaDoQuadro", "<FaixaSemDono", "<FaixaDePedidosDeAjuda", "<FaixaCompraFuturaVencida"]) {
+    for (const parte of ["<ContadoresDoPipeline", "<SeletorDeVendedor", "<BuscaDoQuadro", "<FaixaCompraFuturaVencida"]) {
       expect(dentro, parte).toContain(parte);
+    }
+    // Lupa 111347 (a): as 2 faixas de trabalho do guardião, fora do recolhido (cada uma 1 vez, depois dele).
+    for (const parte of ["<FaixaSemDono", "<FaixaDePedidosDeAjuda"]) {
+      expect(dentro, parte).not.toContain(parte);
+      expect(pagina.split(parte).length - 1, parte).toBe(1);
+      expect(pagina.indexOf(parte), parte).toBeGreaterThan(fim);
     }
     // O quadro em si fica fora: recolher o topo nunca esconde os leads.
     expect(dentro).not.toContain("<QuadroDoFunil");
