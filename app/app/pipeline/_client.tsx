@@ -148,12 +148,10 @@ export function CarteiraClient({
 
       {recorte === "loja" && <SeletorDeVendedor filters={filtros} onChange={setFiltros} />}
       <BuscaDoQuadro valor={filtros.search ?? ""} onChange={(v) => setFiltros((f) => ({ ...f, search: v }))} encontrados={encontrados} />
-
-      {/* ia.vek v1.9.45 (CRM-294): o mês previsto passou e ninguém agiu; o gerente decide. */}
-      {(activeOrg?.role === "manager" || activeOrg?.role === "admin") && <FaixaCompraFuturaVencida />}
       </TopoRecolhivel>
 
-      {/* CRM-549 (Lupa 111347, a): as 2 faixas de trabalho do guardião ficam SEMPRE visíveis, também no celular.
+      {/* CRM-549 (Lupa 111347 a, 112440 c): as faixas ficam SEMPRE visíveis, também no celular, e na MESMA ordem de
+          antes (sem dono, ajuda, compra futura): no PC a tela é idêntica.
           v1.9.18: o vendedor nunca vê a faixa de sem dono nem o Assumir. */}
       {recorte === "carteira" && !ehVendedor && visaoEfetiva !== "followup" && (
         // O painel recarrega a cada evento do quadro; a faixa vai junto.
@@ -163,6 +161,9 @@ export function CarteiraClient({
       {activeOrg?.interface_settings?.funcao === "sdr" && visaoEfetiva !== "followup" && (
         <FaixaDePedidosDeAjuda pipelineId={entrada.id} />
       )}
+
+      {/* ia.vek v1.9.45 (CRM-294): o mês previsto passou e ninguém agiu; o gerente decide. */}
+      {(activeOrg?.role === "manager" || activeOrg?.role === "admin") && <FaixaCompraFuturaVencida />}
 
       <AvisosDoCartaoContext.Provider value={painel.data ? { comTarefa } : null}>
         {funis.length === 1 ? (

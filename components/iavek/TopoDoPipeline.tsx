@@ -52,11 +52,12 @@ export function useTopoDoPipeline() {
 export function useNomeDoVendedorEscolhido(owner: string | undefined): string | null {
   const t = useT();
   const escolhido = owner && owner !== "any" ? owner : null;
-  const { data: membros } = useAssignableMembers(Boolean(escolhido));
+  const { data: membros, isError } = useAssignableMembers(Boolean(escolhido));
   if (!escolhido) return null;
   if (escolhido === "unassigned") return t("Sem responsável");
   const membro = (membros ?? []).find((m) => m.user_id === escolhido);
-  if (!membro) return membros ? t("Outro responsável") : "…";
+  // Lupa 112440: se a lista falhar, o selo não fica em "…" para sempre.
+  if (!membro) return membros || isError ? t("Outro responsável") : "…";
   return membro.full_name ?? t("Sem nome");
 }
 
@@ -103,8 +104,8 @@ export function BotaoDoTopo({
 }
 
 /**
- * O bloco que recolhe (contadores, seletor, busca e a faixa da compra futura; as faixas de sem dono e de pedidos de
- * ajuda ficam SEMPRE visíveis, fora dele: Lupa 111347, a). No PC (`md:contents`) o envoltório some do layout e os
+ * O bloco que recolhe (contadores, seletor e busca; as faixas de sem dono, de pedidos de ajuda e da compra futura
+ * ficam SEMPRE visíveis, fora dele e na ordem de antes: Lupa 111347 a, 112440 c). No PC (`md:contents`) o envoltório some do layout e os
  * filhos ficam no `gap-3` da página, como sempre estiveram; no celular, recolhido, o bloco fica escondido.
  */
 export function TopoRecolhivel({ aberto, children }: { aberto: boolean; children: ReactNode }) {

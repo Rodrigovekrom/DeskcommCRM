@@ -1,9 +1,9 @@
 /**
  * ia.vek CRM-549 (Rodrigo 27/11, via Maestro 105656): o Kanban das 72h no celular. "Celular RECOLHIDO, PC ABERTO
  * como está."
- *  - abaixo do `md` (768px) o topo do Pipeline (contadores, seletor, busca, compra futura) nasce recolhido, abre num
- *    toque e lembra a escolha no aparelho; as faixas de sem dono e de pedidos de ajuda ficam SEMPRE visíveis, e o
- *    selo da linha recolhida diz o NOME do vendedor escolhido e "busca" (Lupa 111347, a e b);
+ *  - abaixo do `md` (768px) o topo do Pipeline (contadores, seletor, busca) nasce recolhido, abre num toque e lembra
+ *    a escolha no aparelho; as 3 faixas (sem dono, ajuda, compra futura) ficam SEMPRE visíveis, na ordem de antes, e
+ *    o selo da linha recolhida diz o NOME do vendedor escolhido e "busca" (Lupa 111347 a e b, 112440 c);
  *  - no PC (md+) o envoltório é `md:contents` (some do layout) e o botão é `md:hidden`: a tela fica como era;
  *  - no celular sai o min-h-[28rem] (rolagem dentro de rolagem) e o quadro ganha o snap-x, desligado no arrasto.
  */
@@ -13,11 +13,15 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
-const membros = vi.hoisted(() => ({ data: undefined as undefined | Array<{ user_id: string; full_name: string | null }>, enabled: [] as boolean[] }));
+const membros = vi.hoisted(() => ({
+  data: undefined as undefined | Array<{ user_id: string; full_name: string | null }>,
+  isError: false,
+  enabled: [] as boolean[],
+}));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({
   useAssignableMembers: (enabled: boolean) => {
     membros.enabled.push(enabled);
-    return { data: enabled ? membros.data : undefined };
+    return { data: enabled ? membros.data : undefined, isError: enabled && membros.isError };
   },
 }));
 
@@ -36,6 +40,7 @@ const fonte = (arq: string) => readFileSync(path.join(process.cwd(), arq), "utf8
 afterEach(() => {
   window.localStorage.clear();
   membros.data = undefined;
+  membros.isError = false;
   membros.enabled = [];
   vi.restoreAllMocks();
 });
@@ -120,6 +125,9 @@ describe("CRM-549: o topo do Pipeline no celular", () => {
     expect(renderHook(() => useNomeDoVendedorEscolhido("agent:x")).result.current).toBe("Outro responsável");
     membros.data = undefined;
     expect(renderHook(() => useNomeDoVendedorEscolhido("u1")).result.current).toBe("…");
+    // Lupa 112440: a lista falhou: o selo não fica em "…" para sempre.
+    membros.isError = true;
+    expect(renderHook(() => useNomeDoVendedorEscolhido("u1")).result.current).toBe("Outro responsável");
   });
 });
 
@@ -132,20 +140,26 @@ describe("CRM-549: a página e o quadro (o PC fica como estava)", () => {
     expect(pagina).not.toMatch(/[\s"]min-h-\[28rem\]/);
   });
 
-  it("contadores, seletor, busca e compra futura moram no topo que recolhe; sem dono e ajuda ficam SEMPRE visíveis", () => {
+  it("contadores, seletor e busca moram no topo que recolhe; as 3 faixas ficam SEMPRE visíveis, na ordem de antes", () => {
     const ini = pagina.indexOf("<TopoRecolhivel");
     const fim = pagina.indexOf("</TopoRecolhivel>");
     expect(ini).toBeGreaterThan(0);
     const dentro = pagina.slice(ini, fim);
-    for (const parte of ["<ContadoresDoPipeline", "<SeletorDeVendedor", "<BuscaDoQuadro", "<FaixaCompraFuturaVencida"]) {
+    for (const parte of ["<ContadoresDoPipeline", "<SeletorDeVendedor", "<BuscaDoQuadro"]) {
       expect(dentro, parte).toContain(parte);
     }
-    // Lupa 111347 (a): as 2 faixas de trabalho do guardião, fora do recolhido (cada uma 1 vez, depois dele).
-    for (const parte of ["<FaixaSemDono", "<FaixaDePedidosDeAjuda"]) {
+    // Lupa 111347 (a) e 112440 (c): as 3 faixas fora do recolhido (cada uma 1 vez, depois dele) e na ORDEM da 65
+    // (sem dono, ajuda, compra futura): o gerente na carteira vê duas delas, e no PC a ordem tem de ser a de antes.
+    const faixas = ["<FaixaSemDono", "<FaixaDePedidosDeAjuda", "<FaixaCompraFuturaVencida"];
+    for (const parte of faixas) {
       expect(dentro, parte).not.toContain(parte);
       expect(pagina.split(parte).length - 1, parte).toBe(1);
       expect(pagina.indexOf(parte), parte).toBeGreaterThan(fim);
     }
+    const posicoes = faixas.map((f) => pagina.indexOf(f));
+    expect(posicoes).toEqual([...posicoes].sort((a, b) => a - b));
+    // A mesma ordem da 65 (c0bd296c9), lida do mesmo arquivo antes da mudança: busca, sem dono, ajuda, compra futura.
+    expect(pagina.indexOf("<BuscaDoQuadro")).toBeLessThan(posicoes[0]!);
     // O quadro em si fica fora: recolher o topo nunca esconde os leads.
     expect(dentro).not.toContain("<QuadroDoFunil");
   });
